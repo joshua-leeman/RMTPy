@@ -549,4 +549,90 @@ class Ensemble(RMT, SpectralMixin):
 # 5. Tenfold Class
 # =============================
 class Tenfold(Ensemble):
-    pass
+    """
+    Base class for tenfold-way RMT ensembles.
+
+    Attributes
+    ----------
+    beta : int
+        Dyson index (symmetry class)
+    sigma : float
+        Standard deviation of the matrix elements
+
+    Methods
+    -------
+    spectral_density(eigenvalue)
+        Calculate the mean spectral density at a given eigenvalue.
+    """
+
+    def __init__(
+        self,
+        beta: int,
+        N: int = None,
+        dim: int = None,
+        scale: float = 1.0,
+        dtype: type = np.complex128,
+    ) -> None:
+        """
+        Initialize the tenfold ensemble.
+
+        Parameters
+        ----------
+        beta : int
+            Dyson index (symmetry class)
+        N : int, optional
+            Number of Majorana fermions (default is None)
+        dim : int, optional
+            Dimension of the matrix (default is None)
+        scale : float, optional
+            Energy scale (default is 1.0)
+        dtype : type, optional
+            Data type of the matrix (default is np.complex128)
+        """
+        # Initialize RMT ensemble
+        super().__init__(N=N, dim=dim, scale=scale, dtype=np.float64)
+
+        # Set Dyson index
+        self._beta = beta
+
+        # Calculate standard deviation of matrix elements
+        self._sigma = self.scale / np.sqrt(2 * self.beta * self.dim)
+
+    def spectral_density(self, eigenvalue: float) -> float:
+        """
+        Calculate the mean spectral density at eigenvalue.
+
+        Parameters
+        ----------
+        eigenvalue : float
+            Eigenvalue at which to evaluate the spectral density
+
+        Returns
+        -------
+        float
+            Spectral density at the given eigenvalue
+        """
+        # Calculate semi-circle spectral density
+        if abs(eigenvalue) < self.scale:
+            return np.sqrt(1 - (eigenvalue / self.scale) ** 2) / (
+                np.pi * self.scale / 2
+            )
+        else:
+            return 0.0
+
+    @property
+    def beta(self) -> int:
+        """
+        Dyson index (symmetry class).
+            1: Orthogonal
+            2: Unitary
+            4: Symplectic
+        """
+        return self._beta
+
+    @property
+    def sigma(self) -> float:
+        """
+        Standard deviation of the matrix elements.
+        """
+        return self._sigma
