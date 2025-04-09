@@ -76,8 +76,10 @@ class RMT(ABC):
             raise ValueError("Energy scale must be a positive number.")
 
         # Check if data type is valid
-        if not isinstance(self.dtype, type):
-            raise TypeError("Data type must be a type object.")
+        try:
+            np.dtype(self.dtype)
+        except TypeError:
+            raise TypeError("Data type must be a valid NumPy data type.")
 
     @abstractmethod
     def generate(self, out=None) -> np.ndarray:
