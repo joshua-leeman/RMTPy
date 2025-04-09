@@ -112,6 +112,10 @@ class RMT(ABC):
         # Store cumulative density function
         self.cumulative_density = interp1d(eigen_grid, cumulative_density_values)
 
+    def unfold(self, eigenvalue: float) -> float:
+        # Compute unfolded eigenvalue about the mean and return it
+        return self.dim * (self.cumulative_density(eigenvalue) - 0.5)
+
     @property
     def N(self) -> int:
         return self._N
