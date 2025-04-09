@@ -14,12 +14,14 @@ It is grouped into the following sections:
 # =============================
 # Standard imports
 from abc import ABC, abstractmethod
+from typing import Tuple
 
 # Third-party imports
 import numpy as np
 from scipy.integrate import cumulative_trapezoid
 from scipy.interpolate import interp1d
 from scipy.linalg import eigvalsh
+from scipy.special import gamma
 
 
 # =============================
@@ -349,6 +351,34 @@ class SpectralMixin:
 
         # Return nearest-neighbor level spacings
         return spacings
+
+    def form_factors(
+        self, times: np.ndarray, unfolded_eigvals: np.ndarray = None
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        # If unfolded eigenvalues are not provided, generate them
+        if unfolded_eigvals is None:
+            unfolded_eigvals = np.vectorize(self.unfold)(self.eigval_sample())
+
+        # Calculate unfolded complex exponentials
+        exponentials = np.multiply(times[:, None, None], unfolded_eigvals)
+        exponentials = (-1j * 2 * np.pi) * exponentials
+        np.exp(exponentials, out=exponentials)
+
+        # Calculate partition function and its mean
+        partition_func = np.sum(exponentials, axis=2)
+        mean_partition_func = np.mean(partition_func, axis=1)
+
+        # Calculate spectral form factor parts
+        sff = np.abs(partition_func) ** 2  # disconnected part
+        csff = np.var(partition_func, axis=1)  # connected part
+        sff += csff  # total
+
+        # Normalize spectral form factors
+        sff /= self.dim**2
+        csff /= self.dim**2
+
+        # Return spectral form factors
+        return sff, csff
 
 
 # =============================
