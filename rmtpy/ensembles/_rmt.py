@@ -251,7 +251,7 @@ class RMT(ABC):
         float
             Unfolded eigenvalue
         """
-        # Compute unfolded eigenvalue about the mean and return it
+        # Return unfolded eigenvalue about spectrum center mean
         return self.cumulative_density(eigenvalue) - self.dim // 2
 
     @property
@@ -427,4 +427,15 @@ class SpectralMixin:
 # 4. Ensemble Class
 # =============================
 class Ensemble(RMT, SpectralMixin):
-    pass
+    def __init__(
+        self,
+        N: int = None,
+        dim: int = None,
+        scale: float = 1.0,
+        dtype: type = np.complex128,
+    ) -> None:
+        # Initialize RMT ensemble
+        super().__init__(N=N, dim=dim, scale=scale, dtype=dtype)
+
+        # Create cumulative density function
+        self._create_cumulative_density()
