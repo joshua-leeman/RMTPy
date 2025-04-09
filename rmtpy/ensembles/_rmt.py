@@ -380,6 +380,48 @@ class SpectralMixin:
         # Return spectral form factors
         return sff, csff
 
+    def wigner_surmise(self, s: float) -> float:
+        # If Dyson index is zero, return Poisson surmise
+        if self.beta == 0:
+            return np.exp(-s)
+
+        # Calculate Wigner surmise
+        a = (
+            2
+            * gamma((self.beta + 2) / 2) ** (self.beta + 1)
+            / gamma((self.beta + 1) / 2) ** (self.beta + 2)
+        )
+        b = (gamma((self.beta + 2) / 2) / gamma((self.beta + 1) / 2)) ** 2
+
+        # Return Wigner surmise at given spacing
+        return a * s**self.beta * np.exp(-b * s**2)
+
+    def universal_csff(self, t: float) -> float:
+        # Return GOE connected spectral form factor if beta = 1
+        if self.beta == 1:
+            if t <= 1:
+                return (2 * t - t * np.log(2 * t + 1)) / self.dim
+            else:
+                return (2 - t * np.log((2 * t + 1) / (2 * t - 1))) / self.dim
+
+        # Return GUE connected spectral form factor if beta = 2
+        elif self.beta == 2:
+            if t <= 1:
+                return t / self.dim
+            else:
+                return 1.0 / self.dim
+
+        # Return GSE connected spectral form factor if beta = 4
+        elif self.beta == 4:
+            if t <= 2:
+                return (t - t / 2 * np.log(abs(t - 1))) / self.dim
+            else:
+                return 2.0 / self.dim
+
+        # Return unity for other Dyson indices
+        else:
+            return 1.0 / self.dim
+
 
 # =============================
 # 4. Ensemble Class
