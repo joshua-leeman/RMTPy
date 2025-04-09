@@ -9,6 +9,8 @@ from abc import ABC, abstractmethod
 
 # Third-party imports
 import numpy as np
+from scipy.integrate import cumulative_trapezoid
+from scipy.interpolate import interp1d
 
 
 # =============================
@@ -80,6 +82,27 @@ class RMT(ABC):
             np.dtype(self.dtype)
         except TypeError:
             raise TypeError("Data type must be a valid NumPy data type.")
+
+    def _prepare_cumulative_density(self, num_pts: int = 2**16, multiplier: int = 3):
+        # Create grid for cumulative trapezoidal integration
+        eigen_grid = np.linspace(
+            -multiplier * self.scale,
+            multiplier * self.scale,
+            num_pts,
+        )
+
+        # Calculate spectral density values
+        density_values = self.dim * np.vectorize(self.spectral_density)(eigen_grid)
+
+        # Compute numerical cumulative density function values
+        cumulative_density_values = cumulative_trapezoid(
+            density_values,
+            eigen_grid,
+            initial=0,
+        )
+
+        # Store cumulative density function
+        self.cumulative_density = interp1d(eigen_grid, cumulative_density_values)
 
     @abstractmethod
     def generate(self, out=None) -> np.ndarray:
