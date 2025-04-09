@@ -369,7 +369,7 @@ class SpectralMixin:
         mean_partition_func = np.mean(partition_func, axis=1)
 
         # Calculate spectral form factor parts
-        sff = np.abs(partition_func) ** 2  # disconnected part
+        sff = np.abs(mean_partition_func) ** 2  # disconnected part
         csff = np.var(partition_func, axis=1)  # connected part
         sff += csff  # total
 
