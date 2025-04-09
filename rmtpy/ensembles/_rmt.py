@@ -6,6 +6,7 @@ It is grouped into the following sections:
     2. RMT Class
     3. Spectral Mixin
     4. Ensemble Class
+    5. Tenfold Class
 """
 
 
@@ -313,7 +314,37 @@ class RMT(ABC):
 # 3. Spectral Mixin
 # =============================
 class SpectralMixin:
+    """
+    Mixin class for spectral properties of RMT ensembles.
+
+    Methods
+    -------
+    eigval_sample(realizs=1)
+        Generate a sample of eigenvalues from the ensemble.
+    nn_spacings(unfolded_eigvals=None)
+        Calculate the nearest-neighbor level spacings of an eigenvalue sample.
+    form_factors(times, unfolded_eigvals=None)
+        Calculate the spectral form factors from an eigenvalue sample.
+    wigner_surmise(s)
+        Calculate the Wigner surmise for the given spacing.
+    universal_csff(t)
+        Calculate the universal connected spectral form factor at time t.
+    """
+
     def eigval_sample(self, realizs: int = 1) -> np.ndarray:
+        """
+        Generate a sample of eigenvalues from the ensemble.
+
+        Parameters
+        ----------
+        realizs : int, optional
+            Number of realizations to sample (default is 1)
+
+        Returns
+        -------
+        np.ndarray
+            Sample of eigenvalues from the ensemble
+        """
         # Allocate memory for realizations of eigenvalues
         eigenvalues = np.empty((realizs, self.dim), dtype=self.real_dtype)
 
@@ -328,6 +359,19 @@ class SpectralMixin:
         return eigenvalues
 
     def nn_spacings(self, unfolded_eigvals: np.ndarray = None) -> np.ndarray:
+        """
+        Calculate the nearest-neighbor level spacings of an eigenvalue sample.
+
+        Parameters
+        ----------
+        unfolded_eigvals : np.ndarray, optional
+            Unfolded eigenvalues (default is None)
+
+        Returns
+        -------
+        np.ndarray
+            Nearest-neighbor level spacings
+        """
         # If ensemble dimension is one, raise error
         if self.dim == 1:
             raise ValueError(
@@ -355,6 +399,21 @@ class SpectralMixin:
     def form_factors(
         self, times: np.ndarray, unfolded_eigvals: np.ndarray = None
     ) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Calculate the spectral form factors from an eigenvalue sample.
+
+        Parameters
+        ----------
+        times : np.ndarray
+            Array of time values for the form factors
+        unfolded_eigvals : np.ndarray, optional
+            Unfolded eigenvalues (default is None)
+
+        Returns
+        -------
+        Tuple[np.ndarray, np.ndarray]
+            Spectral form factors and connected spectral form factors
+        """
         # If unfolded eigenvalues are not provided, generate them
         if unfolded_eigvals is None:
             unfolded_eigvals = np.vectorize(self.unfold)(self.eigval_sample())
@@ -381,6 +440,19 @@ class SpectralMixin:
         return sff, csff
 
     def wigner_surmise(self, s: float) -> float:
+        """
+        Calculate the Wigner surmise for the given spacing.
+
+        Parameters
+        ----------
+        s : float
+            Spacing between unfolded eigenvalues
+
+        Returns
+        -------
+        float
+            Wigner surmise value for the given spacing
+        """
         # If Dyson index is zero, return Poisson surmise
         if self.beta == 0:
             return np.exp(-s)
@@ -397,6 +469,19 @@ class SpectralMixin:
         return a * s**self.beta * np.exp(-b * s**2)
 
     def universal_csff(self, t: float) -> float:
+        """
+        Calculate the universal connected spectral form factor at time t.
+
+        Parameters
+        ----------
+        t : float
+            Time parameter for the spectral form factor
+
+        Returns
+        -------
+        float
+            Universal connected spectral form factor at time t
+        """
         # Return GOE connected spectral form factor if beta = 1
         if self.beta == 1:
             if t <= 1:
@@ -427,6 +512,11 @@ class SpectralMixin:
 # 4. Ensemble Class
 # =============================
 class Ensemble(RMT, SpectralMixin):
+    """
+    Random matrix theory (RMT) ensemble class.
+    Inherits from the RMT base class and the Spectral Mixin class.
+    """
+
     def __init__(
         self,
         N: int = None,
@@ -434,8 +524,29 @@ class Ensemble(RMT, SpectralMixin):
         scale: float = 1.0,
         dtype: type = np.complex128,
     ) -> None:
+        """
+        Initialize the RMT ensemble.
+
+        Parameters
+        ----------
+        N : int, optional
+            Number of Majorana fermions (default is None)
+        dim : int, optional
+            Dimension of the matrix (default is None)
+        scale : float, optional
+            Energy scale (default is 1.0)
+        dtype : type, optional
+            Data type of the matrix (default is np.complex128)
+        """
         # Initialize RMT ensemble
         super().__init__(N=N, dim=dim, scale=scale, dtype=dtype)
 
         # Create cumulative density function
         self._create_cumulative_density()
+
+
+# =============================
+# 5. Tenfold Class
+# =============================
+class Tenfold(Ensemble):
+    pass
