@@ -1,4 +1,4 @@
-# rmt.ensembles._rmt.py
+# rmtpy.ensembles._rmt.py
 """
 This module contains the classes for random matrix theory (RMT) ensembles.
 It is grouped into the following sections:
