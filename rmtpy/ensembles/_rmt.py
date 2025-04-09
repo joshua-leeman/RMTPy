@@ -4,6 +4,8 @@ This module contains the classes for random matrix theory (RMT) ensembles.
 It is grouped into the following sections:
     1. Imports
     2. RMT Class
+    3. Spectral Mixin
+    4. Ensemble Class
 """
 
 
@@ -17,6 +19,7 @@ from abc import ABC, abstractmethod
 import numpy as np
 from scipy.integrate import cumulative_trapezoid
 from scipy.interpolate import interp1d
+from scipy.linalg import eigvalsh
 
 
 # =============================
@@ -302,3 +305,54 @@ class RMT(ABC):
         Degeneracy of the ensemble's eigenvalues.
         """
         pass
+
+
+# =============================
+# 3. Spectral Mixin
+# =============================
+class SpectralMixin:
+    def eigval_sample(self, realizs: int = 1) -> np.ndarray:
+        # Allocate memory for realizations of eigenvalues
+        eigenvalues = np.empty((realizs, self.dim), dtype=self.real_dtype)
+
+        # Loop over realizations
+        for r in range(realizs):
+            # Compute eigenvalues of random matrix
+            eigenvalues[r, :] = eigvalsh(
+                self.generate(), overwrite_a=True, check_finite=False, driver="evr"
+            )
+
+        # Return eigenvalues
+        return eigenvalues
+
+    def nn_spacings(self, unfolded_eigvals: np.ndarray = None) -> np.ndarray:
+        # If ensemble dimension is one, raise error
+        if self.dim == 1:
+            raise ValueError(
+                "Cannot compute nearest-neighbor spacings for 1D ensemble."
+            )
+
+        # If unfolded eigenvalues are not provided, generate them
+        if unfolded_eigvals is None:
+            unfolded_eigvals = np.vectorize(self.unfold)(self.eigval_sample())
+
+        # Compute nearest-neighbor level spacings
+        spacings = np.diff(unfolded_eigvals, axis=1)
+
+        # If degeneracy greater than one, clean spacings
+        if self.degeneracy > 1:
+            # Remove near-duplicate spacings
+            spacings = spacings[:, 1 :: self.degeneracy]
+
+            # Duplicate spacings with degeneracy
+            spacings = np.repeat(spacings, self.degeneracy, axis=1)
+
+        # Return nearest-neighbor level spacings
+        return spacings
+
+
+# =============================
+# 4. Ensemble Class
+# =============================
+class Ensemble(RMT, SpectralMixin):
+    pass
