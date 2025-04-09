@@ -83,6 +83,14 @@ class RMT(ABC):
         except TypeError:
             raise TypeError("Data type must be a valid NumPy data type.")
 
+    @abstractmethod
+    def generate(self, out=None) -> np.ndarray:
+        pass
+
+    @abstractmethod
+    def spectral_density(self, eigenvalue: float) -> float:
+        pass
+
     def _prepare_cumulative_density(self, num_pts: int = 2**16, multiplier: int = 3):
         # Create grid for cumulative trapezoidal integration
         eigen_grid = np.linspace(
@@ -103,14 +111,6 @@ class RMT(ABC):
 
         # Store cumulative density function
         self.cumulative_density = interp1d(eigen_grid, cumulative_density_values)
-
-    @abstractmethod
-    def generate(self, out=None) -> np.ndarray:
-        pass
-
-    @abstractmethod
-    def spectral_density(self, eigenvalue: float) -> float:
-        pass
 
     @property
     def N(self) -> int:
