@@ -210,7 +210,7 @@ class MonteCarlo(ABC):
 
     def _create_output_dir(self, res_type: str = "") -> str:
         # Construct results directory path
-        output_dir = f"{self.project_path}/res/{str(self)}/{self._ens_args['name']}/"
+        output_dir = f"{self._project_path}/res/{str(self)}/{self._ens_args['name']}/"
         output_dir += "/".join(
             f"{key}_{val}" for key, val in self._ens_args.items() if key != "name"
         )
