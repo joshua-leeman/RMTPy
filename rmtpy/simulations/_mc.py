@@ -19,11 +19,8 @@ from ast import literal_eval
 from importlib import import_module
 from textwrap import dedent
 from time import strftime
-from typing import Tuple
 
 # Third-party imports
-import numpy as np
-import matplotlib.pyplot as plt
 from dotenv import load_dotenv
 from psutil import cpu_count, virtual_memory
 
