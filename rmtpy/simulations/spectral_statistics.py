@@ -31,6 +31,28 @@ from rmtpy.simulations._mc import MonteCarlo
 # =============================
 # 2. Functions
 # =============================
+def calc_spectral_hist(eigenvalues: np.ndarray, show: bool = False) -> None:
+    pass
+
+
+def calc_nn_spacing_dist(eigenvalues: np.ndarray, show: bool = False) -> None:
+    pass
+
+
+def calc_form_factors(eigenvalues: np.ndarray, show: bool = False) -> None:
+    pass
+
+
+def plot_spectral_hist():
+    pass
+
+
+def plot_nn_spacing_dist():
+    pass
+
+
+def plot_form_factors():
+    pass
 
 
 # =============================
