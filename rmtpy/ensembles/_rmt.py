@@ -291,6 +291,13 @@ class RMT(ABC):
         return self._real_dtype
 
     @property
+    def matrix_memory(self) -> int:
+        """
+        Memory size per matrix.
+        """
+        return self._matrix_memory
+
+    @property
     @abstractmethod
     def beta(self) -> int:
         """
