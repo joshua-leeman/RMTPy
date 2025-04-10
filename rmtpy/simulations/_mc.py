@@ -91,7 +91,53 @@ class MonteCarlo(ABC):
 
     @staticmethod
     def _parse_args(parser: ArgumentParser) -> dict:
-        pass
+        # Add ensemble argument
+        parser.add_argument(
+            "-ens",
+            "--ensemble",
+            type=str,
+            required=True,
+            help="random matrix ensemble in JSON (required)",
+        )
+
+        # Add simulation argument(s)
+        parser.add_argument(
+            "-args",
+            "--arguments",
+            type=str,
+            default="{'realizs': 1}",
+            help="simulation arguments in JSON (default is {'realizs': 1})",
+        )
+
+        # Store total memory in GiB
+        total_memory = virtual_memory().total // 2**30
+
+        # Add job specification argument(s)
+        parser.add_argument(
+            "-spec",
+            "--specification",
+            type=str,
+            default=f"{{'workers': 1, 'memory': {total_memory}}}",
+            help=f"job specification in JSON (default is {{'workers': 1, 'memory': {total_memory} [in GiB]}})",
+        )
+
+        # Parse arguments into dictionary
+        parsed_args = vars(parser.parse_args())
+
+        # Initialize output dictionary
+        mc_args = {}
+
+        # Convert ensemble argument to dictionary
+        mc_args["ens_args"] = literal_eval(parsed_args["ensemble"])
+
+        # Convert simulation argument to dictionary
+        mc_args["sim_args"] = literal_eval(parsed_args["arguments"])
+
+        # Convert job specification argument to dictionary
+        mc_args["spec_args"] = literal_eval(parsed_args["specification"])
+
+        # Return dictionary of Monte Carlo arguments
+        return mc_args
 
     def _check_mc(self) -> None:
         pass
