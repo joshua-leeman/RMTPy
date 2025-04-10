@@ -36,10 +36,10 @@ from rmtpy.configs.spectral_statistics_config import (
 # =============================
 # 2. Functions
 # =============================
-def _create_histogram(data: np.ndarray, dataclass: object, path: str = "") -> None:
-    # Create default path if not provided
-    if path == "":
-        path = f"res/data/{dataclass.data_filename}"
+def _create_histogram(data: np.ndarray, dataclass: object, data_path: str = "") -> None:
+    # Create default data_path if not provided
+    if data_path == "":
+        data_path = f"res/data/{dataclass.data_filename}"
 
     # Calculate bin edges
     min_edge, max_edge = np.min(data), np.max(data)
@@ -51,32 +51,34 @@ def _create_histogram(data: np.ndarray, dataclass: object, path: str = "") -> No
     hist_counts, hist_edges = np.histogram(data, bins=bins, density=True)
 
     # Save histogram data
-    if path.endswith(".npz"):
+    if data_path.endswith(".npz"):
         np.savez_compressed(
-            path,
+            data_path,
             hist_counts=hist_counts,
             hist_edges=hist_edges,
         )
-    elif path.endswith(".csv"):
+    elif data_path.endswith(".csv"):
         np.savetxt(
-            path,
+            data_path,
             np.column_stack((hist_edges[:-1], hist_counts)),
             delimiter=",",
             header="Bin Edges, Counts",
             comments="",
         )
     else:
-        raise ValueError(f"Unsupported file type. Expected .npz or .csv, got {path}")
+        raise ValueError(
+            f"Unsupported file type. Expected .npz or .csv, got {data_path}"
+        )
 
 
-def calc_spectral_hist(eigenvalues: np.ndarray, path: str = "") -> None:
+def calc_spectral_hist(eigenvalues: np.ndarray, data_path: str = "") -> None:
     # Create and save histogram of eigenvalues
-    _create_histogram(data=eigenvalues, dataclass=spectral_config, path=path)
+    _create_histogram(data=eigenvalues, dataclass=spectral_config, data_path=data_path)
 
 
-def calc_nn_spacing_dist(spacings: np.ndarray, path: str = "") -> None:
+def calc_nn_spacing_dist(spacings: np.ndarray, data_path: str = "") -> None:
     # Create and save histogram of nearest neighbor spacings
-    _create_histogram(data=spacings, dataclass=spacings_config, path=path)
+    _create_histogram(data=spacings, dataclass=spacings_config, data_path=data_path)
 
 
 def form_factors_logtimes(dim: int):
@@ -90,60 +92,78 @@ def form_factors_logtimes(dim: int):
 
 
 def save_form_factors(
-    times: np.ndarray, sff: np.ndarray, csff: np.ndarray, path: str = ""
+    times: np.ndarray, sff: np.ndarray, csff: np.ndarray, data_path: str = ""
 ) -> None:
-    # Create default path if not provided
-    if path == "":
-        path = f"res/data/{sff_config.data_filename}"
+    # Create default data_path if not provided
+    if data_path == "":
+        data_path = f"res/data/{sff_config.data_filename}"
 
     # Save form factors data
-    if path.endswith(".npz"):
+    if data_path.endswith(".npz"):
         np.savez_compressed(
-            path,
+            data_path,
             times=times,
             sff=sff,
             csff=csff,
         )
-    elif path.endswith(".csv"):
+    elif data_path.endswith(".csv"):
         np.savetxt(
-            path,
+            data_path,
             np.column_stack((times, sff, csff)),
             delimiter=",",
             header="Logtime, SFF, cSFF",
             comments="",
         )
     else:
-        raise ValueError(f"Unsupported file type. Expected .npz or .csv, got {path}")
+        raise ValueError(
+            f"Unsupported file type. Expected .npz or .csv, got {data_path}"
+        )
 
 
-def save_form_factors(
-    times: np.ndarray, sff: np.ndarray, csff: np.ndarray, file_type: str = ".npz"
+def plot_spectral_hist(
+    data_path: str,
+    plot_path: str = "",
+    titled: bool = False,
+    energies: np.ndarray = None,
+    density: np.ndarray = None,
 ) -> None:
-    # Create results directory
-    data_dir = MonteCarlo._create_output_dir(res_type="data")
+    # Load histogram data
+    hist_data = np.load(data_path)
 
-    # Save form factors data
-    if file_type == ".npz":
-        np.savez_compressed(
-            os.path.join(data_dir, sff_config.data_filename),
-            times=times,
-            sff=sff,
-            csff=csff,
+    # Unpack histogram data
+    hist_counts = hist_data["hist_counts"]
+    hist_edges = hist_data["hist_edges"]
+
+    # Create default plot_path if not provided
+    if plot_path == "":
+        plot_path = f"res/plots/{spectral_config.plot_filename}"
+
+    # Initialize figure and axis
+    fig, ax = plt.subplots()
+
+    # Set line widths
+    for spine in ax.spines.values():
+        spine.set_linewidth(spectral_config.axes_width)
+
+    # Plot histogram
+    ax.hist(
+        hist_edges[:-1],
+        bins=hist_edges,
+        weights=hist_counts,
+        color=spectral_config.hist_color,
+        alpha=spectral_config.hist_alpha,
+        zorder=spectral_config.hist_zorder,
+    )
+
+    # If energies and density are provided, plot them
+    if energies is not None and density is not None:
+        density_line = ax.plot(
+            energies,
+            density,
+            color=spectral_config.curve_color,
+            linewidth=spectral_config.curve_width,
+            zorder=spectral_config.curve_zorder,
         )
-    elif file_type == ".csv":
-        np.savetxt(
-            os.path.join(data_dir, sff_config.data_filename),
-            np.column_stack((times, sff, csff)),
-            delimiter=",",
-            header="Logtime, SFF, cSFF",
-            comments="",
-        )
-    else:
-        raise ValueError(f"Unsupported file type: {file_type}")
-
-
-def plot_spectral_hist():
-    pass
 
 
 def plot_nn_spacing_dist():
