@@ -140,7 +140,73 @@ class MonteCarlo(ABC):
         return mc_args
 
     def _check_mc(self) -> None:
-        pass
+        # Retrieve list of valid ensembles
+        ensemble_list = [
+            file.rstrip(".py")
+            for file in os.listdir(f"{self._project_path}/rmtpy/ensembles")
+            if file.endswith(".py") and not file.startswith("_")
+        ]
+
+        # Check if ensemble is valid
+        if self._ens_input["name"] not in ensemble_list:
+            raise ValueError(
+                dedent(
+                    f"""
+                    Ensemble '{self._ens_input["name"]}' is not valid.
+                    Valid ensembles are: {ensemble_list}
+                    """
+                )
+            )
+
+        # Check if number of realizations is valid
+        if (
+            not isinstance(self._realizs, (int, float))
+            or self._realizs < 1
+            or self._realizs != int(self._realizs)
+        ):
+            raise ValueError(f"Number of realizations must be a positive integer.")
+
+        # Check if number of workers is valid
+        # If so, set to int
+        if (
+            not isinstance(self._workers, (int, float))
+            or self._workers < 1
+            or self._workers != int(self._workers)
+            or self._workers > self._max_workers
+        ):
+            raise ValueError(
+                f"Number of workers must be a positive integer less than or equal to {self._max_workers}."
+            )
+        else:
+            self._workers = int(self._workers)
+
+        # Check if memory is valid
+        # If so, set to bytes
+        if (
+            not isinstance(self._memory, (int, float))
+            or self._memory < 1
+            or self._memory > self._max_memory // 2**30
+        ):
+            raise ValueError(
+                f"Memory must be a positive integer less than or equal to {self.max_memory / 2**30:.1f} [in GiB]."
+            )
+        else:
+            self._memory = self.memory * 2**30
+
+        # Check if provided memory is sufficient
+        # If so, determine number of usable workers
+        if self.memory < self.calc_memory:
+            raise ValueError(
+                dedent(
+                    f"""
+                    Provided memory is insufficient for calculations:
+                    Memory Required > {self.calc_memory // 2**30} GB
+                    Memory Provided: {self.memory // 2**30} GB
+                    """
+                )
+            )
+        else:
+            self._workers = min(self.workers, self.memory // self.calc_memory)
 
     def _create_output_dir(self) -> None:
         pass
@@ -172,3 +238,7 @@ class MonteCarlo(ABC):
     @property
     def memory(self):
         return self._memory
+
+    @property
+    def calc_memory(self):
+        return 4 * self._ensemble.matrix_memory
