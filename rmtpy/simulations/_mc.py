@@ -193,6 +193,34 @@ class MonteCarlo(ABC):
         # Return dictionary of Monte Carlo arguments
         return mc_args
 
+    @staticmethod
+    def _create_output_dir(self, res_type: str = "") -> str:
+        """
+        Returns the project's results directory for the Monte Carlo simulation.
+
+        Parameters
+        ----------
+        res_type : str, optional
+            Type of results directory. (default is "")
+
+        Returns
+        -------
+        str
+            Results directory path.
+        """
+        # Construct results directory path
+        output_dir = f"{self._project_path}/res/{str(self)}/{self._ens_args['name']}/"
+        output_dir += "/".join(
+            f"{key}_{val}" for key, val in self._ens_args.items() if key != "name"
+        )
+        output_dir += f"/realizs={self.realizs}/{self._time_path}/{res_type}"
+
+        # Create directory if it does not exist
+        os.makedirs(output_dir, exist_ok=True)
+
+        # Return results directory path
+        return output_dir
+
     def _check_mc(self) -> None:
         """
         Check if Monte Carlo simulation is valid.
@@ -264,33 +292,6 @@ class MonteCarlo(ABC):
             )
         else:
             self._workers = min(self.workers, self.memory // self.calc_memory)
-
-    def _create_output_dir(self, res_type: str = "") -> str:
-        """
-        Returns the project's results directory for the Monte Carlo simulation.
-
-        Parameters
-        ----------
-        res_type : str, optional
-            Type of results directory. (default is "")
-
-        Returns
-        -------
-        str
-            Results directory path.
-        """
-        # Construct results directory path
-        output_dir = f"{self._project_path}/res/{str(self)}/{self._ens_args['name']}/"
-        output_dir += "/".join(
-            f"{key}_{val}" for key, val in self._ens_args.items() if key != "name"
-        )
-        output_dir += f"/realizs={self.realizs}/{self._time_path}/{res_type}"
-
-        # Create directory if it does not exist
-        os.makedirs(output_dir, exist_ok=True)
-
-        # Return results directory path
-        return output_dir
 
     @abstractmethod
     def run(self) -> None:

@@ -26,21 +26,68 @@ import matplotlib.pyplot as plt
 
 # Local application imports
 from rmtpy.simulations._mc import MonteCarlo
+from rmtpy.configs.spectral_statistics_config import (
+    spectral_config,
+    spacings_config,
+    sff_config,
+)
 
 
 # =============================
 # 2. Functions
 # =============================
-def calc_spectral_hist(eigenvalues: np.ndarray, show: bool = False) -> None:
-    pass
+def _create_histogram(
+    data: np.ndarray, dataclass: object, file_type: str = ".npz"
+) -> None:
+    # Calculate bin edges
+    min_edge, max_edge = np.min(data), np.max(data)
+
+    # Arrange bin edges
+    bins = np.arange(min_edge, max_edge + dataclass.bin_width, dataclass.bin_width)
+
+    # Calculate normalized histogram of data
+    hist_counts, hist_edges = np.histogram(data, bins=bins, density=True)
+
+    # Create results directory
+    data_dir = MonteCarlo._create_output_dir(res_type="data")
+
+    # Save histogram data
+    if file_type == ".npz":
+        np.savez_compressed(
+            os.path.join(data_dir, dataclass.data_filename),
+            hist_counts=hist_counts,
+            hist_edges=hist_edges,
+        )
+    elif file_type == ".csv":
+        np.savetxt(
+            os.path.join(data_dir, dataclass.data_filename),
+            np.column_stack((hist_edges[:-1], hist_counts)),
+            delimiter=",",
+            header="Bin Edges, Counts",
+            comments="",
+        )
+    else:
+        raise ValueError(f"Unsupported file type: {file_type}")
 
 
-def calc_nn_spacing_dist(eigenvalues: np.ndarray, show: bool = False) -> None:
-    pass
+def calc_spectral_hist(eigenvalues: np.ndarray, file_type: str = ".npz") -> None:
+    # Create and save histogram of eigenvalues
+    _create_histogram(eigenvalues, spectral_config, file_type)
 
 
-def calc_form_factors(eigenvalues: np.ndarray, show: bool = False) -> None:
-    pass
+def calc_nn_spacing_dist(spacings: np.ndarray, file_type: str = ".npz") -> None:
+    # Create and save histogram of nearest neighbor spacings
+    _create_histogram(spacings, spacings_config, file_type)
+
+
+def form_factor_logtimes(dim: int):
+    # Create and return logtime array
+    return np.logspace(
+        sff_config.logtime_min,
+        sff_config.logtime_max,
+        sff_config.logtime_num,
+        base=dim,
+    )
 
 
 def plot_spectral_hist():
