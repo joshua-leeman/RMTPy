@@ -27,6 +27,9 @@ from psutil import cpu_count, virtual_memory
 # Load environment variables
 load_dotenv()
 
+# Store project path
+project_path = os.getenv("PROJECT_PATH")
+
 
 # =============================
 # 2. Monte Carlo Class
@@ -105,9 +108,6 @@ class MonteCarlo(ABC):
 
         # Check if Monte Carlo simulation is valid
         self._check_mc()
-
-        # Store project path
-        self._project_path = os.getenv("PROJECT_PATH")
 
         # Store date and time of simulation
         self._time_date = strftime("%Y-%m-%d %H:%M:%S")
@@ -193,7 +193,6 @@ class MonteCarlo(ABC):
         # Return dictionary of Monte Carlo arguments
         return mc_args
 
-    @staticmethod
     def _create_output_dir(self, res_type: str = "") -> str:
         """
         Returns the project's results directory for the Monte Carlo simulation.
@@ -209,7 +208,7 @@ class MonteCarlo(ABC):
             Results directory path.
         """
         # Construct results directory path
-        output_dir = f"{self._project_path}/res/{str(self)}/{self._ens_args['name']}/"
+        output_dir = f"{project_path}/res/{str(self)}/{self._ens_args['name']}/"
         output_dir += "/".join(
             f"{key}_{val}" for key, val in self._ens_args.items() if key != "name"
         )

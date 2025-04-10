@@ -36,9 +36,11 @@ from rmtpy.configs.spectral_statistics_config import (
 # =============================
 # 2. Functions
 # =============================
-def _create_histogram(
-    data: np.ndarray, dataclass: object, file_type: str = ".npz"
-) -> None:
+def _create_histogram(data: np.ndarray, dataclass: object, path: str = "") -> None:
+    # Create default path if not provided
+    if path == "":
+        path = f"res/data/{dataclass.data_filename}"
+
     # Calculate bin edges
     min_edge, max_edge = np.min(data), np.max(data)
 
@@ -48,39 +50,36 @@ def _create_histogram(
     # Calculate normalized histogram of data
     hist_counts, hist_edges = np.histogram(data, bins=bins, density=True)
 
-    # Create results directory
-    data_dir = MonteCarlo._create_output_dir(res_type="data")
-
     # Save histogram data
-    if file_type == ".npz":
+    if path.endswith(".npz"):
         np.savez_compressed(
-            os.path.join(data_dir, dataclass.data_filename),
+            path,
             hist_counts=hist_counts,
             hist_edges=hist_edges,
         )
-    elif file_type == ".csv":
+    elif path.endswith(".csv"):
         np.savetxt(
-            os.path.join(data_dir, dataclass.data_filename),
+            path,
             np.column_stack((hist_edges[:-1], hist_counts)),
             delimiter=",",
             header="Bin Edges, Counts",
             comments="",
         )
     else:
-        raise ValueError(f"Unsupported file type: {file_type}")
+        raise ValueError(f"Unsupported file type. Expected .npz or .csv, got {path}")
 
 
-def calc_spectral_hist(eigenvalues: np.ndarray, file_type: str = ".npz") -> None:
+def calc_spectral_hist(eigenvalues: np.ndarray, path: str = "") -> None:
     # Create and save histogram of eigenvalues
-    _create_histogram(eigenvalues, spectral_config, file_type)
+    _create_histogram(data=eigenvalues, dataclass=spectral_config, path=path)
 
 
-def calc_nn_spacing_dist(spacings: np.ndarray, file_type: str = ".npz") -> None:
+def calc_nn_spacing_dist(spacings: np.ndarray, path: str = "") -> None:
     # Create and save histogram of nearest neighbor spacings
-    _create_histogram(spacings, spacings_config, file_type)
+    _create_histogram(data=spacings, dataclass=spacings_config, path=path)
 
 
-def form_factor_logtimes(dim: int):
+def form_factors_logtimes(dim: int):
     # Create and return logtime array
     return np.logspace(
         sff_config.logtime_min,
@@ -88,6 +87,59 @@ def form_factor_logtimes(dim: int):
         sff_config.logtime_num,
         base=dim,
     )
+
+
+def save_form_factors(
+    times: np.ndarray, sff: np.ndarray, csff: np.ndarray, path: str = ""
+) -> None:
+    # Create default path if not provided
+    if path == "":
+        path = f"res/data/{sff_config.data_filename}"
+
+    # Save form factors data
+    if path.endswith(".npz"):
+        np.savez_compressed(
+            path,
+            times=times,
+            sff=sff,
+            csff=csff,
+        )
+    elif path.endswith(".csv"):
+        np.savetxt(
+            path,
+            np.column_stack((times, sff, csff)),
+            delimiter=",",
+            header="Logtime, SFF, cSFF",
+            comments="",
+        )
+    else:
+        raise ValueError(f"Unsupported file type. Expected .npz or .csv, got {path}")
+
+
+def save_form_factors(
+    times: np.ndarray, sff: np.ndarray, csff: np.ndarray, file_type: str = ".npz"
+) -> None:
+    # Create results directory
+    data_dir = MonteCarlo._create_output_dir(res_type="data")
+
+    # Save form factors data
+    if file_type == ".npz":
+        np.savez_compressed(
+            os.path.join(data_dir, sff_config.data_filename),
+            times=times,
+            sff=sff,
+            csff=csff,
+        )
+    elif file_type == ".csv":
+        np.savetxt(
+            os.path.join(data_dir, sff_config.data_filename),
+            np.column_stack((times, sff, csff)),
+            delimiter=",",
+            header="Logtime, SFF, cSFF",
+            comments="",
+        )
+    else:
+        raise ValueError(f"Unsupported file type: {file_type}")
 
 
 def plot_spectral_hist():
