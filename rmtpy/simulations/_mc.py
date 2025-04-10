@@ -75,13 +75,13 @@ class MonteCarlo(ABC):
         ens_args["name"] = re.sub(r"\W+", "", ens_args["name"]).strip().lower()
 
         # Copy ensemble input and pop name
-        ens_args = ens_args.copy()
-        ens_args.pop("name")
+        ens_inputs = ens_args.copy()
+        ens_inputs.pop("name")
 
         # Initialize ensemble
         module = import_module(f"rmtpy.ensembles.{ens_args['name']}")
         ENSEMBLE = getattr(module, module.class_name)
-        self._ensemble = ENSEMBLE(**ens_args)
+        self._ensemble = ENSEMBLE(**ens_inputs)
 
         # Reorder ensemble input and and store
         self._ens_args = {
