@@ -35,7 +35,45 @@ load_dotenv()
 # 2. Monte Carlo Class
 # =============================
 class MonteCarlo(ABC):
+    """
+    Monte Carlo simulation base class.
+
+    Attributes
+    ----------
+    ensemble : object
+        Random matrix ensemble object.
+    realizs : int
+        Number of realizations.
+    max_workers : int
+        Maximum number of workers available.
+    max_memory : int
+        Maximum memory available in bytes.
+    workers : int
+        Number of workers for simulation.
+    memory : int
+        Memory allocated for simulation in bytes.
+    calc_memory : int
+        Memory required for calculations in bytes.
+
+    Methods
+    -------
+    run()
+        Run the Monte Carlo simulation.
+    """
+
     def __init__(self, ens_args: dict, sim_args: dict, spec_args: dict = {}) -> None:
+        """
+        Initialize the Monte Carlo simulation.
+
+        Parameters
+        ----------
+        ens_args : dict
+            Input parameters for the ensemble.
+        sim_args : dict, optional
+            Input parameters for the simulation. (default is {})
+        spec_args : dict, optional
+            Specifications for the job. (default is {})
+        """
         # Clean ensemble name in ens_args
         ens_args["name"] = re.sub(r"\W+", "", ens_args["name"]).strip().lower()
 
@@ -79,9 +117,15 @@ class MonteCarlo(ABC):
         self._time_path = self._time_date.replace(" ", "_").replace(":", "-")
 
     def __repr__(self) -> str:
+        """
+        Default representation of the Monte Carlo simulation.
+        """
         return f"{self.__class__.__name__} ({self.ensemble}, realizs={self.realizs})"
 
     def __str__(self) -> str:
+        """
+        Path representation of the Monte Carlo simulation.
+        """
         # Replace underscores with spaces
         string = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", self.__class__.__name__)
         string = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", string)
@@ -91,6 +135,19 @@ class MonteCarlo(ABC):
 
     @staticmethod
     def _parse_args(parser: ArgumentParser) -> dict:
+        """
+        Get Monte Carlo arguments from the parser.
+
+        Parameters
+        ----------
+        parser : ArgumentParser
+            Parser for command-line options.
+
+        Returns
+        -------
+        dict
+            Monte Carlo arguments.
+        """
         # Add ensemble argument
         parser.add_argument(
             "-ens",
@@ -140,6 +197,9 @@ class MonteCarlo(ABC):
         return mc_args
 
     def _check_mc(self) -> None:
+        """
+        Check if Monte Carlo simulation is valid.
+        """
         # Retrieve list of valid ensembles
         ensemble_list = [
             file.rstrip(".py")
@@ -209,6 +269,19 @@ class MonteCarlo(ABC):
             self._workers = min(self.workers, self.memory // self.calc_memory)
 
     def _create_output_dir(self, res_type: str = "") -> str:
+        """
+        Returns the project's results directory for the Monte Carlo simulation.
+
+        Parameters
+        ----------
+        res_type : str, optional
+            Type of results directory. (default is "")
+
+        Returns
+        -------
+        str
+            Results directory path.
+        """
         # Construct results directory path
         output_dir = f"{self._project_path}/res/{str(self)}/{self._ens_args['name']}/"
         output_dir += "/".join(
@@ -224,32 +297,56 @@ class MonteCarlo(ABC):
 
     @abstractmethod
     def run(self) -> None:
+        """
+        Run the Monte Carlo simulation.
+        """
         pass
 
     @property
     def ensemble(self):
+        """
+        Ensemble object.
+        """
         return self._ensemble
 
     @property
     def realizs(self):
+        """
+        Number of realizations.
+        """
         return self._realizs
 
     @property
     def max_workers(self):
+        """
+        Maximum number of workers.
+        """
         return self._max_workers
 
     @property
     def max_memory(self):
+        """
+        Maximum memory available. [bytes]
+        """
         return self._max_memory
 
     @property
     def workers(self):
+        """
+        Number of workers for simulation.
+        """
         return self._workers
 
     @property
     def memory(self):
+        """
+        Memory allocated for simulation. [bytes]
+        """
         return self._memory
 
     @property
     def calc_memory(self):
+        """
+        Memory required for calculations. [bytes]
+        """
         return 4 * self._ensemble.matrix_memory
