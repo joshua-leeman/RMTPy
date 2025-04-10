@@ -6,6 +6,7 @@ It is grouped into the following sections:
     2. Spectral Histogram Data Class
     3. NN Level Spacings Data Class
     4. Form Factors Data Class
+    5. Instantiations
 """
 
 
@@ -124,3 +125,18 @@ class SpectralFormFactors:
     sff_zorder: int = 3
     csff_zorder: int = 4
     universal_zorder: int = 5
+
+
+# =============================
+# 5. Instantiations
+# =============================
+# Instantiate data classes
+spectral_config = SpectralHistogram()
+spacings_config = NNLevelSpacings()
+sff_config = SpectralFormFactors()
+
+# Set matplotlib rcParams for plots
+rcParams["text.usetex"] = True
+rcParams["font.family"] = "serif"
+rcParams["font.serif"] = "Latin Modern Roman"
+rcParams["font.size"] = 12
