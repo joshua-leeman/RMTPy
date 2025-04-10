@@ -208,8 +208,19 @@ class MonteCarlo(ABC):
         else:
             self._workers = min(self.workers, self.memory // self.calc_memory)
 
-    def _create_output_dir(self) -> None:
-        pass
+    def _create_output_dir(self, res_type: str = "") -> str:
+        # Construct results directory path
+        output_dir = f"{self.project_path}/res/{str(self)}/{self._ens_args['name']}/"
+        output_dir += "/".join(
+            f"{key}_{val}" for key, val in self._ens_args.items() if key != "name"
+        )
+        output_dir += f"/realizs={self.realizs}/{self._time_path}/{res_type}"
+
+        # Create directory if it does not exist
+        os.makedirs(output_dir, exist_ok=True)
+
+        # Return results directory path
+        return output_dir
 
     @abstractmethod
     def run(self) -> None:
