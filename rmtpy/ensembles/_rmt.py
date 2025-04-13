@@ -367,12 +367,12 @@ class SpectralMixin:
 
     def nn_spacings(self, levels: np.ndarray = None) -> np.ndarray:
         """
-        Calculate the nearest-neighbor level spacings of an eigenvalue sample.
+        Calculate the nearest-neighbor level spacings of a spectrum sample.
 
         Parameters
         ----------
-        unfolded_eigvals : np.ndarray, optional
-            Unfolded eigenvalues (default is None)
+        levels : np.ndarray, optional
+            Spectrum levels (default is None)
 
         Returns
         -------
@@ -385,7 +385,7 @@ class SpectralMixin:
                 "Cannot compute nearest-neighbor spacings for 1D ensembles."
             )
 
-        # If unfolded eigenvalues are not provided, generate them
+        # If levels are not provided, generate them
         if levels is None:
             levels = np.vectorize(self.unfold)(self.eigval_sample())
 
@@ -404,29 +404,29 @@ class SpectralMixin:
         return spacings
 
     def form_factors(
-        self, times: np.ndarray, unfolded_eigvals: np.ndarray = None
+        self, times: np.ndarray, levels: np.ndarray = None
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Calculate the spectral form factors from an eigenvalue sample.
+        Calculate the spectral form factors from spectrum sample.
 
         Parameters
         ----------
         times : np.ndarray
             Array of time values for the form factors
-        unfolded_eigvals : np.ndarray, optional
-            Unfolded eigenvalues (default is None)
+        levels : np.ndarray, optional
+            Spectrum levels (default is None)
 
         Returns
         -------
         Tuple[np.ndarray, np.ndarray]
             Spectral form factors and connected spectral form factors
         """
-        # If unfolded eigenvalues are not provided, generate them
-        if unfolded_eigvals is None:
-            unfolded_eigvals = np.vectorize(self.unfold)(self.eigval_sample())
+        # If levels are not provided, generate them
+        if levels is None:
+            levels = np.vectorize(self.unfold)(self.eigval_sample())
 
-        # Calculate unfolded complex exponentials
-        exponentials = np.multiply(times[:, None, None], unfolded_eigvals)
+        # Calculate complex exponentials
+        exponentials = np.multiply(times[:, None, None], levels)
         exponentials = (-1j * 2 * np.pi) * exponentials
         np.exp(exponentials, out=exponentials)
 
