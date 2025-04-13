@@ -227,7 +227,16 @@ class SpectralStatistics(MonteCarlo):
         self._create_histogram(data=spacings, dataclass=spacings_config)
 
     def _form_factors(self, levels: np.ndarray) -> None:
-        pass
+        # Create logtime array
+        np.logspace(
+            sff_config.logtime_min,
+            sff_config.logtime_max,
+            sff_config.logtime_num,
+            base=self.ensemble.dim,
+        )
+
+        # Calculate spectral form factors
+        sff, csff = self.ensemble.form_factors(levels=levels)
 
     def run_spectral_histogram(self, unfold: bool = False) -> None:
         pass
