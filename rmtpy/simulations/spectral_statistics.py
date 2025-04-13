@@ -93,7 +93,7 @@ def _ensemble_from_path(path: str, file_name: str) -> dict:
 
 def plot_spectral_hist(data_path: str) -> None:
     # Reads results path and extracts ensemble
-    ensemble = _ensemble_from_path(data_path, sff_config.data_filename)
+    ensemble = _ensemble_from_path(data_path, spectral_config.data_filename)
 
     # Load histogram data from file
     hist_data = np.load(data_path)
@@ -165,12 +165,14 @@ def plot_spectral_hist(data_path: str) -> None:
     plt.close(fig)
 
 
-def plot_nn_spacing_dist():
-    pass
+def plot_nn_spacing_dist(data_path: str) -> None:
+    # Reads results path and extracts ensemble
+    ensemble = _ensemble_from_path(data_path, spacings_config.data_filename)
 
 
-def plot_form_factors():
-    pass
+def plot_form_factors(data_path: str) -> None:
+    # Reads results path and extracts ensemble
+    ensemble = _ensemble_from_path(data_path, sff_config.data_filename)
 
 
 # =============================
