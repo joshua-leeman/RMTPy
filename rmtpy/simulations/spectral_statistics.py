@@ -3,7 +3,7 @@
 This module contains programs for performing Monte Carlo simulations to obtain the spectral statistics of random matrix ensembles.
 It is grouped into the following sections:
     1. Imports
-    2. Functions
+    2. Plotting Functions
     3. Spectral Statistics Class
     4. Main Function
 """
@@ -34,7 +34,7 @@ from rmtpy.configs.spectral_statistics_config import (
 
 
 # =============================
-# 2. Functions
+# 2. Plotting Functions
 # =============================
 def form_factors_logtimes(dim: int):
     # Create and return logtime array
@@ -154,7 +154,7 @@ class SpectralStatistics(MonteCarlo):
         # Return eigenvalues
         return ensemble.eigval_samples(realizs=realizs)
 
-    def _create_worker_args(self) -> List[Dict]:
+    def _realize_eigvals(self) -> List[Dict]:
         # Calculate realizations per worker and remainder
         realizs_per_worker, remainder = divmod(self.realizs, self.workers)
 
@@ -175,8 +175,12 @@ class SpectralStatistics(MonteCarlo):
                 "sim_args": {"realizs": realizs_array[i]},
             }
 
-        # Return list of worker arguments
-        return worker_args
+        # Run workers in parallel
+        with Pool(processes=self.workers) as pool:
+            eigenvals = np.vstack(pool.map(self._worker_func, worker_args))
+
+        # Return eigenvalues
+        return eigenvals
 
     def _create_histogram(self, data: np.ndarray, dataclass: object) -> None:
         # Create output directory and store it
@@ -211,14 +215,32 @@ class SpectralStatistics(MonteCarlo):
                 f"Unsupported file type. Expected .npz or .csv, got {output_dir}"
             )
 
-    def run(self):
+    def _spectral_histogram(self, eigenvals: np.ndarray, unfold: bool = False) -> None:
+        pass
+
+    def _nn_spacing_dist(self, eigenvals: np.ndarray, unfold: bool = True) -> None:
+        pass
+
+    def _form_factors(self, eigenvals: np.ndarray, unfold: bool = True) -> None:
+        pass
+
+    def run_spectral_histogram(self) -> None:
+        pass
+
+    def run_nn_spacing_dist(self) -> None:
+        pass
+
+    def run_form_factors(self) -> None:
+        pass
+
+    def run(self) -> None:
         pass
 
 
 # =============================
 # 4. Main Function
 # =============================
-def main():
+def main() -> None:
     # Create argument parser
     parser = ArgumentParser(description="Spectral Statistics Monte Carlo")
 
