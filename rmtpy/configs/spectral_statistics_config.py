@@ -96,11 +96,9 @@ class SpectralFormFactors:
     """
 
     # Simulation parameters
-    logtime_num: int = 5000
+    logtime_num: int = 1000
     logtime_min: int = -2
     logtime_max: int = 1
-    num_batches: int = 500
-    batch_jump: int = 10
 
     # Results parameters
     data_filename: str = "form_factors.npz"
