@@ -125,7 +125,7 @@ def plot_spectral_hist(data_path: str) -> None:
     )
 
     # Evaluate theoretical average spectral density
-    density = np.vectorize(ensemble.mean_density)(energies)
+    density = np.vectorize(ensemble.spectral_density)(energies)
 
     # Plot theoretical average spectral density
     ax.plot(
@@ -155,6 +155,9 @@ def plot_spectral_hist(data_path: str) -> None:
 
     # Create plot path from data path
     split_data_path = data_path.split("/")
+    split_data_path[-2] = "plots"
+    if not os.path.exists(os.path.join(*split_data_path[:-1])):
+        os.makedirs(os.path.join(*split_data_path[:-1]), exist_ok=True)
     split_data_path[-1] = spectral_config.plot_filename
     plot_path = os.path.join(*split_data_path)
 
@@ -197,7 +200,7 @@ def plot_nn_spacing_dist(data_path: str) -> None:
     spacings = np.linspace(0, spacings_config.x_max, num=spacings_config.density_num)
 
     # Calculate Wigner surmise distribution
-    surmise = ensemble.wigner_surprise(spacings=spacings)
+    surmise = ensemble.wigner_surmise(spacings)
 
     # Plot Wigner surmise distribution
     ax.plot(
@@ -224,6 +227,10 @@ def plot_nn_spacing_dist(data_path: str) -> None:
 
     # Create plot path from data path
     split_data_path = data_path.split("/")
+    split_data_path[-2] = "plots"
+
+    if not os.path.exists(os.path.join(*split_data_path[:-1])):
+        os.makedirs(os.path.join(*split_data_path[:-1]), exist_ok=True)
     split_data_path[-1] = spacings_config.plot_filename
     plot_path = os.path.join(*split_data_path)
 
@@ -294,7 +301,6 @@ def plot_form_factors(data_path: str) -> None:
         universal_csff,
         color=sff_config.universal_color,
         linewidth=sff_config.universal_width,
-        alpha=sff_config.universal_alpha,
         zorder=sff_config.universal_zorder,
     )
 
@@ -309,7 +315,10 @@ def plot_form_factors(data_path: str) -> None:
 
     # Create tick labels for x-axis
     ax.set_xticks(
-        ensemble.dim ** np.arange(sff_config.logtime_min, sff_config.logtime_max + 1)
+        [
+            ensemble.dim**i
+            for i in range(sff_config.logtime_min, sff_config.logtime_max + 1)
+        ]
     )
     ax.set_xticklabels(
         [
@@ -333,6 +342,9 @@ def plot_form_factors(data_path: str) -> None:
 
     # Create plot path from data path
     split_data_path = data_path.split("/")
+    split_data_path[-2] = "plots"
+    if not os.path.exists(os.path.join(*split_data_path[:-1])):
+        os.makedirs(os.path.join(*split_data_path[:-1]), exist_ok=True)
     split_data_path[-1] = sff_config.plot_filename
     plot_path = os.path.join(*split_data_path)
 
@@ -645,15 +657,45 @@ class SpectralStatistics(MonteCarlo):
 
         # If spectral histogram is to be run without unfolding, run it
         if self.do_spectral_hist and not self.unfold_spectral_hist:
-            self.run_spectral_hist(plot=False)
+            # Calculate spectral histogram
+            self._spectral_hist(levels=levels)
+
+            # Determine output directory
+            output_dir = self._create_output_dir(res_type="data")
+
+            # Create results path
+            results_path = os.path.join(output_dir, spectral_config.data_filename)
+
+            # Run plot function
+            plot_spectral_hist(data_path=results_path)
 
         # If nearest neighbor spacing distribution is to be run without unfolding, run it
         if self.do_nn_spacing_dist and not self.unfold_nn_spacing_dist:
-            self.run_nn_spacing_dist(plot=False)
+            # Calculate nearest neighbor spacing distribution
+            self._nn_spacing_dist(levels=levels)
+
+            # Determine output directory
+            output_dir = self._create_output_dir(res_type="data")
+
+            # Create results path
+            results_path = os.path.join(output_dir, spacings_config.data_filename)
+
+            # Run plot function
+            plot_nn_spacing_dist(data_path=results_path)
 
         # If spectral form factors is to be run without unfolding, run it
         if self.do_form_factors and not self.unfold_form_factors:
-            self.run_form_factors(plot=False)
+            # Calculate spectral form factors
+            self._form_factors(levels=levels)
+
+            # Determine output directory
+            output_dir = self._create_output_dir(res_type="data")
+
+            # Create results path
+            results_path = os.path.join(output_dir, sff_config.data_filename)
+
+            # Run plot function
+            plot_form_factors(data_path=results_path)
 
         # If any simulation is to be run with unfolding, unfold levels
         if (
@@ -666,15 +708,45 @@ class SpectralStatistics(MonteCarlo):
 
         # If spectral histogram is to be run with unfolding, run it
         if self.do_spectral_hist and self.unfold_spectral_hist:
-            self.run_spectral_hist(plot=False)
+            # Calculate spectral histogram
+            self._spectral_hist(levels=levels)
+
+            # Determine output directory
+            output_dir = self._create_output_dir(res_type="data")
+
+            # Create results path
+            results_path = os.path.join(output_dir, spectral_config.data_filename)
+
+            # Run plot function
+            plot_spectral_hist(data_path=results_path)
 
         # If nearest neighbor spacing distribution is to be run with unfolding, run it
         if self.do_nn_spacing_dist and self.unfold_nn_spacing_dist:
-            self.run_nn_spacing_dist(plot=False)
+            # Calculate nearest neighbor spacing distribution
+            self._nn_spacing_dist(levels=levels)
+
+            # Determine output directory
+            output_dir = self._create_output_dir(res_type="data")
+
+            # Create results path
+            results_path = os.path.join(output_dir, spacings_config.data_filename)
+
+            # Run plot function
+            plot_nn_spacing_dist(data_path=results_path)
 
         # If spectral form factors is to be run with unfolding, run it
         if self.do_form_factors and self.unfold_form_factors:
-            self.run_form_factors(plot=False)
+            # Calculate spectral form factors
+            self._form_factors(levels=levels)
+
+            # Determine output directory
+            output_dir = self._create_output_dir(res_type="data")
+
+            # Create results path
+            results_path = os.path.join(output_dir, sff_config.data_filename)
+
+            # Run plot function
+            plot_form_factors(data_path=results_path)
 
         # Stop timer and store elapsed time
         elapsed_time = time() - start_time
