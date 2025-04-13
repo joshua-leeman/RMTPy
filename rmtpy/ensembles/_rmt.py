@@ -365,7 +365,7 @@ class SpectralMixin:
         # Return eigenvalues
         return eigenvalues
 
-    def nn_spacings(self, unfolded_eigvals: np.ndarray = None) -> np.ndarray:
+    def nn_spacings(self, levels: np.ndarray = None) -> np.ndarray:
         """
         Calculate the nearest-neighbor level spacings of an eigenvalue sample.
 
@@ -382,15 +382,15 @@ class SpectralMixin:
         # If ensemble dimension is one, raise error
         if self.dim == 1:
             raise ValueError(
-                "Cannot compute nearest-neighbor spacings for 1D ensemble."
+                "Cannot compute nearest-neighbor spacings for 1D ensembles."
             )
 
         # If unfolded eigenvalues are not provided, generate them
-        if unfolded_eigvals is None:
-            unfolded_eigvals = np.vectorize(self.unfold)(self.eigval_sample())
+        if levels is None:
+            levels = np.vectorize(self.unfold)(self.eigval_sample())
 
         # Compute nearest-neighbor level spacings
-        spacings = np.diff(unfolded_eigvals, axis=1)
+        spacings = np.diff(levels, axis=1)
 
         # If degeneracy greater than one, clean spacings
         if self.degeneracy > 1:
