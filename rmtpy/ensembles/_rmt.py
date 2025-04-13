@@ -597,7 +597,7 @@ class Tenfold(Ensemble):
             Data type of the matrix (default is np.complex128)
         """
         # Initialize RMT ensemble
-        super().__init__(N=N, dim=dim, scale=scale, dtype=np.float64)
+        super().__init__(N=N, dim=dim, scale=scale, dtype=dtype)
 
         # Set Dyson index
         self._beta = beta
