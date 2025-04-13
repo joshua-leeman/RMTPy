@@ -87,7 +87,7 @@ class MonteCarlo(ABC):
         ens_inputs = ensemble.copy()
         ens_inputs.pop("name")
 
-        # Initialize ensemble
+        # Import and initialize ensemble
         module = import_module(f"rmtpy.ensembles.{ensemble['name']}")
         ENSEMBLE = getattr(module, module.class_name)
         self._ensemble = ENSEMBLE(**ens_inputs)
