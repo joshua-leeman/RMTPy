@@ -216,42 +216,15 @@ class SpectralStatistics(MonteCarlo):
             )
 
     def _spectral_histogram(self, levels: np.ndarray) -> None:
-        # Calculate bin edges and bin range
-        min_edge, max_edge = np.min(levels), np.max(levels)
-
-        # Arrange bin edges
-        bins = np.arange(
-            min_edge, max_edge + spectral_config.bin_width, spectral_config.bin_width
-        )
-
-        # Calculate normalized histogram of levels
-        hist_counts, hist_edges = np.histogram(levels, bins=bins, density=True)
-
-        # Create results directory and store it
-        output_dir = self._create_output_dir(res_type="data")
-
-        # Save histogram data
-        if output_dir.endswith(".npz"):
-            np.savez_compressed(
-                output_dir,
-                hist_counts=hist_counts,
-                hist_edges=hist_edges,
-            )
-        elif output_dir.endswith(".csv"):
-            np.savetxt(
-                output_dir,
-                np.column_stack((hist_edges[:-1], hist_counts)),
-                delimiter=",",
-                header="Bin Edges, Counts",
-                comments="",
-            )
-        else:
-            raise ValueError(
-                f"Unsupported file type. Expected .npz or .csv, got {output_dir}"
-            )
+        # Create histogram using levels as data
+        self._create_histogram(data=levels, dataclass=spectral_config)
 
     def _nn_spacing_dist(self, levels: np.ndarray) -> None:
-        pass
+        # Calculate nearst neighbor spacings
+        spacings = self.ensemble.nn_spacing(levels=levels)
+
+        # Create histogram using spacings as data
+        self._create_histogram(data=spacings, dataclass=spacings_config)
 
     def _form_factors(self, levels: np.ndarray) -> None:
         pass
