@@ -472,7 +472,7 @@ class SpectralStatistics(MonteCarlo):
 
         # Create output directory and store results path
         output_dir = self._create_output_dir(res_type="data")
-        results_path = os.path.join(output_dir, sff_config.data_filename)
+        results_path = os.path.join(output_dir, dataclass.data_filename)
 
         # Save histogram data
         np.savez_compressed(
@@ -487,7 +487,7 @@ class SpectralStatistics(MonteCarlo):
 
     def _nn_spacing_dist(self, levels: np.ndarray) -> None:
         # Calculate nearst neighbor spacings
-        spacings = self.ensemble.nn_spacing(levels=levels)
+        spacings = self.ensemble.nn_spacings(levels=levels)
 
         # Create histogram using spacings as data
         self._create_hist(data=spacings, dataclass=spacings_config)
