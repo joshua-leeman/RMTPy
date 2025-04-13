@@ -36,51 +36,6 @@ from rmtpy.configs.spectral_statistics_config import (
 # =============================
 # 2. Functions
 # =============================
-def _create_histogram(data: np.ndarray, dataclass: object, data_path: str = "") -> None:
-    # Create default data_path if not provided
-    if data_path == "":
-        data_path = f"res/data/{dataclass.data_filename}"
-
-    # Calculate bin edges
-    min_edge, max_edge = np.min(data), np.max(data)
-
-    # Arrange bin edges
-    bins = np.arange(min_edge, max_edge + dataclass.bin_width, dataclass.bin_width)
-
-    # Calculate normalized histogram of data
-    hist_counts, hist_edges = np.histogram(data, bins=bins, density=True)
-
-    # Save histogram data
-    if data_path.endswith(".npz"):
-        np.savez_compressed(
-            data_path,
-            hist_counts=hist_counts,
-            hist_edges=hist_edges,
-        )
-    elif data_path.endswith(".csv"):
-        np.savetxt(
-            data_path,
-            np.column_stack((hist_edges[:-1], hist_counts)),
-            delimiter=",",
-            header="Bin Edges, Counts",
-            comments="",
-        )
-    else:
-        raise ValueError(
-            f"Unsupported file type. Expected .npz or .csv, got {data_path}"
-        )
-
-
-def calc_spectral_hist(eigenvalues: np.ndarray, data_path: str = "") -> None:
-    # Create and save histogram of eigenvalues
-    _create_histogram(data=eigenvalues, dataclass=spectral_config, data_path=data_path)
-
-
-def calc_nn_spacing_dist(spacings: np.ndarray, data_path: str = "") -> None:
-    # Create and save histogram of nearest neighbor spacings
-    _create_histogram(data=spacings, dataclass=spacings_config, data_path=data_path)
-
-
 def form_factors_logtimes(dim: int):
     # Create and return logtime array
     return np.logspace(
@@ -178,6 +133,27 @@ def plot_form_factors():
 # 3. Spectral Statistics Class
 # =============================
 class SpectralStatistics(MonteCarlo):
+    @staticmethod
+    def _worker_func(args: dict) -> np.ndarray:
+        # Unpack the arguments
+        ens_args = args["ens_args"]
+        sim_args = args["sim_args"]
+
+        # Copy ensemble arguments and pop name
+        ens_inputs = ens_args.copy()
+        ens_inputs.pop("name")
+
+        # Initialize ensemble
+        module = import_module(f"rmtpy.ensembles.{ens_args['name']}")
+        ENSEMBLE = getattr(module, module.class_name)
+        ensemble = ENSEMBLE(**ens_inputs)
+
+        # Unpack simulation arguments
+        realizs = sim_args["realizs"]
+
+        # Return eigenvalues
+        return ensemble.eigval_samples(realizs=realizs)
+
     def _create_worker_args(self) -> List[Dict]:
         # Calculate realizations per worker and remainder
         realizs_per_worker, remainder = divmod(self.realizs, self.workers)
@@ -202,26 +178,38 @@ class SpectralStatistics(MonteCarlo):
         # Return list of worker arguments
         return worker_args
 
-    @staticmethod
-    def _worker_func(args: dict) -> np.ndarray:
-        # Unpack the arguments
-        ens_args = args["ens_args"]
-        sim_args = args["sim_args"]
+    def _create_histogram(self, data: np.ndarray, dataclass: object) -> None:
+        # Create output directory and store it
+        output_dir = self._create_output_dir(res_type="data")
 
-        # Copy ensemble arguments and pop name
-        ens_inputs = ens_args.copy()
-        ens_inputs.pop("name")
+        # Calculate bin edges
+        min_edge, max_edge = np.min(data), np.max(data)
 
-        # Initialize ensemble
-        module = import_module(f"rmtpy.ensembles.{ens_args['name']}")
-        ENSEMBLE = getattr(module, module.class_name)
-        ensemble = ENSEMBLE(**ens_inputs)
+        # Arrange bin edges
+        bins = np.arange(min_edge, max_edge + dataclass.bin_width, dataclass.bin_width)
 
-        # Unpack simulation arguments
-        realizs = sim_args["realizs"]
+        # Calculate normalized histogram of data
+        hist_counts, hist_edges = np.histogram(data, bins=bins, density=True)
 
-        # Return eigenvalues
-        return ensemble.eigval_samples(realizs=realizs)
+        # Save histogram data
+        if output_dir.endswith(".npz"):
+            np.savez_compressed(
+                output_dir,
+                hist_counts=hist_counts,
+                hist_edges=hist_edges,
+            )
+        elif output_dir.endswith(".csv"):
+            np.savetxt(
+                output_dir,
+                np.column_stack((hist_edges[:-1], hist_counts)),
+                delimiter=",",
+                header="Bin Edges, Counts",
+                comments="",
+            )
+        else:
+            raise ValueError(
+                f"Unsupported file type. Expected .npz or .csv, got {output_dir}"
+            )
 
     def run(self):
         pass
