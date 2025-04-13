@@ -18,6 +18,7 @@ from argparse import ArgumentParser
 from ast import literal_eval
 from importlib import import_module
 from multiprocessing import Pool
+from pathlib import Path
 from textwrap import dedent
 from time import time
 from typing import Dict, List
@@ -148,12 +149,10 @@ def plot_spectral_hist(data_path: str) -> None:
     )
 
     # Create plot path from data path
-    split_data_path = data_path.split("/")
-    split_data_path[-2] = "plots"
-    if not os.path.exists(os.path.join(*split_data_path[:-1])):
-        os.makedirs(os.path.join(*split_data_path[:-1]), exist_ok=True)
-    split_data_path[-1] = spectral_config.plot_filename
-    plot_path = os.path.join(*split_data_path)
+    data_path = Path(data_path)
+    plot_dir = data_path.parent.parent / "plots"
+    plot_dir.mkdir(parents=True, exist_ok=True)
+    plot_path = plot_dir / spectral_config.plot_filename
 
     # Save plot to file
     plt.savefig(plot_path, dpi=300, bbox_inches="tight")
@@ -220,13 +219,10 @@ def plot_nn_spacing_dist(data_path: str) -> None:
     )
 
     # Create plot path from data path
-    split_data_path = data_path.split("/")
-    split_data_path[-2] = "plots"
-
-    if not os.path.exists(os.path.join(*split_data_path[:-1])):
-        os.makedirs(os.path.join(*split_data_path[:-1]), exist_ok=True)
-    split_data_path[-1] = spacings_config.plot_filename
-    plot_path = os.path.join(*split_data_path)
+    data_path = Path(data_path)
+    plot_dir = data_path.parent.parent / "plots"
+    plot_dir.mkdir(parents=True, exist_ok=True)
+    plot_path = plot_dir / spacings_config.plot_filename
 
     # Save plot to file
     plt.savefig(plot_path, dpi=300, bbox_inches="tight")
@@ -335,12 +331,10 @@ def plot_form_factors(data_path: str) -> None:
     )
 
     # Create plot path from data path
-    split_data_path = data_path.split("/")
-    split_data_path[-2] = "plots"
-    if not os.path.exists(os.path.join(*split_data_path[:-1])):
-        os.makedirs(os.path.join(*split_data_path[:-1]), exist_ok=True)
-    split_data_path[-1] = sff_config.plot_filename
-    plot_path = os.path.join(*split_data_path)
+    data_path = Path(data_path)
+    plot_dir = data_path.parent.parent / "plots"
+    plot_dir.mkdir(parents=True, exist_ok=True)
+    plot_path = plot_dir / sff_config.plot_filename
 
     # Save plot to file
     plt.savefig(plot_path, dpi=300, bbox_inches="tight")
