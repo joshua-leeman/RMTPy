@@ -133,6 +133,7 @@ def plot_form_factors():
 # 3. Spectral Statistics Class
 # =============================
 class SpectralStatistics(MonteCarlo):
+
     @staticmethod
     def _worker_func(args: dict) -> np.ndarray:
         # Unpack the arguments
@@ -183,9 +184,6 @@ class SpectralStatistics(MonteCarlo):
         return eigenvals
 
     def _create_histogram(self, data: np.ndarray, dataclass: object) -> None:
-        # Create output directory and store it
-        output_dir = self._create_output_dir(res_type="data")
-
         # Calculate bin edges
         min_edge, max_edge = np.min(data), np.max(data)
 
@@ -195,16 +193,20 @@ class SpectralStatistics(MonteCarlo):
         # Calculate normalized histogram of data
         hist_counts, hist_edges = np.histogram(data, bins=bins, density=True)
 
+        # Create output directory and store results path
+        output_dir = self._create_output_dir(res_type="data")
+        res_path = os.path.join(output_dir, sff_config.data_filename)
+
         # Save histogram data
-        if output_dir.endswith(".npz"):
+        if res_path.endswith(".npz"):
             np.savez_compressed(
-                output_dir,
+                res_path,
                 hist_counts=hist_counts,
                 hist_edges=hist_edges,
             )
-        elif output_dir.endswith(".csv"):
+        elif res_path.endswith(".csv"):
             np.savetxt(
-                output_dir,
+                res_path,
                 np.column_stack((hist_edges[:-1], hist_counts)),
                 delimiter=",",
                 header="Bin Edges, Counts",
@@ -212,7 +214,7 @@ class SpectralStatistics(MonteCarlo):
             )
         else:
             raise ValueError(
-                f"Unsupported file type. Expected .npz or .csv, got {output_dir}"
+                f"Unsupported file type. Expected .npz or .csv, got {res_path}"
             )
 
     def _spectral_histogram(self, levels: np.ndarray) -> None:
@@ -228,18 +230,85 @@ class SpectralStatistics(MonteCarlo):
 
     def _form_factors(self, levels: np.ndarray) -> None:
         # Create logtime array
-        np.logspace(
+        times = np.logspace(
             sff_config.logtime_min,
             sff_config.logtime_max,
             sff_config.logtime_num,
             base=self.ensemble.dim,
+            dtype=np.float64,
         )
 
-        # Calculate spectral form factors
-        sff, csff = self.ensemble.form_factors(levels=levels)
+        # Allocate memory for form factors
+        sff = np.empty_like(times, dtype=np.float64)
+        csff = np.empty_like(times, dtype=np.float64)
+
+        # Determine the number of batches based on memory
+        num_batches = np.ceil(
+            times.size
+            * self.realizs
+            * self.ensemble.dim
+            * np.dtype(np.float64).itemsize
+            / self.memory
+        ).astype(int)
+
+        # Split logtimes into batches
+        batched_times = np.array_split(times, num_batches)
+
+        # Loop over batches and calculate form factors
+        index = 0
+        for batch in batched_times:
+            # Calculate and store form factors
+            sff[index : index + batch.size], csff[index : index + batch.size] = (
+                self.ensemble.form_factors(times=batch, levels=levels)
+            )
+
+            # Increment index
+            index += batch.size
+
+        # Create output directory and store results path
+        output_dir = self._create_output_dir(res_type="data")
+        res_path = os.path.join(output_dir, sff_config.data_filename)
+
+        # Save form factors data
+        if res_path.endswith(".npz"):
+            np.savez_compressed(
+                res_path,
+                times=times,
+                sff=sff,
+                csff=csff,
+            )
+        elif res_path.endswith(".csv"):
+            np.savetxt(
+                res_path,
+                np.column_stack((times, sff, csff)),
+                delimiter=",",
+                header="Time, SFF, cSFF",
+                comments="",
+            )
+        else:
+            raise ValueError(
+                f"Unsupported file type. Expected .npz or .csv, got {res_path}"
+            )
 
     def run_spectral_histogram(self, unfold: bool = False) -> None:
-        pass
+        # Start timer
+        start_time = time()
+
+        # Realize eigenvalues
+        levels = self._realize_eigvals()
+
+        # Unfold eigenvalues if specified
+        if unfold:
+            levels = self.ensemble.unfold(levels=levels)
+
+        # Calculate spectral histogram
+        self._spectral_histogram(levels=levels)
+
+        # Stop timer and store elapsed time
+        elapsed_time = time() - start_time
+
+        # Print elapsed time
+        print(f"Spectral histogram calculated in {elapsed_time:.2f} seconds.")
 
     def run_nn_spacing_dist(self, unfold: bool = True) -> None:
         pass
