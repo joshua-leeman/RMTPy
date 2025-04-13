@@ -26,6 +26,7 @@ from typing import Dict, List
 from dotenv import load_dotenv
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.ticker import LogLocator, NullLocator
 from psutil import virtual_memory
 
 # Local application imports
@@ -169,10 +170,178 @@ def plot_nn_spacing_dist(data_path: str) -> None:
     # Reads results path and extracts ensemble
     ensemble = _ensemble_from_path(data_path, spacings_config.data_filename)
 
+    # Load histrogram data from file
+    hist_data = np.load(data_path)
+
+    # Unpack histogram data
+    hist_counts = hist_data["hist_counts"]
+    hist_edges = hist_data["hist_edges"]
+
+    # Create figure and axis
+    fig, ax = plt.subplots()
+
+    # Set line widths
+    for spine in ax.spines.values():
+        spine.set_linewidth(spacings_config.axes_width)
+
+    # Plot histogram
+    ax.hist(
+        hist_edges[:-1],
+        bins=hist_edges,
+        weights=hist_counts,
+        color=spacings_config.hist_color,
+        alpha=spacings_config.hist_alpha,
+        zorder=spacings_config.hist_zorder,
+    )
+
+    # Create array of spacings values
+    spacings = np.linspace(0, spacings_config.x_max, num=spacings_config.density_num)
+
+    # Calculate Wigner surmise distribution
+    surmise = ensemble.wigner_surprise(spacings=spacings)
+
+    # Plot Wigner surmise distribution
+    ax.plot(
+        spacings,
+        surmise,
+        color=spacings_config.curve_color,
+        linewidth=spacings_config.curve_width,
+        zorder=spacings_config.curve_zorder,
+    )
+
+    # Set axis labels and limits
+    ax.set_xlabel(spacings_config.xlabel)
+    ax.set_ylabel(spacings_config.ylabel)
+    ax.set_xlim(0, spacings_config.x_max)
+
+    # Set tick marks all around and inward
+    ax.tick_params(
+        direction="in",
+        top=True,
+        bottom=True,
+        left=True,
+        right=True,
+    )
+
+    # Create plot path from data path
+    split_data_path = data_path.split("/")
+    split_data_path[-1] = spacings_config.plot_filename
+    plot_path = os.path.join(*split_data_path)
+
+    # Save plot to file
+    plt.savefig(plot_path, dpi=300, bbox_inches="tight")
+
+    # Close plot
+    plt.close(fig)
+
 
 def plot_form_factors(data_path: str) -> None:
     # Reads results path and extracts ensemble
     ensemble = _ensemble_from_path(data_path, sff_config.data_filename)
+
+    # Load form factors data from file
+    form_factors_data = np.load(data_path)
+
+    # Unpack form factors data
+    times = form_factors_data["times"]
+    sff = form_factors_data["sff"]
+    csff = form_factors_data["csff"]
+
+    # Create figure and axis
+    fig, ax = plt.subplots()
+
+    # Set line widths
+    for spine in ax.spines.values():
+        spine.set_linewidth(sff_config.axes_width)
+
+    # Set x- and y-scales to logarithmic
+    ax.set_xscale("log", base=ensemble.dim)
+    ax.set_yscale("log", base=ensemble.dim)
+
+    # Turn off x- and y-axis minor ticks
+    ax.xaxis.set_minor_locator(NullLocator())
+    ax.yaxis.set_minor_locator(NullLocator())
+
+    # Limit number of major ticks on x- and y-axis
+    ax.xaxis.set_major_locator(LogLocator(base=ensemble.dim, numticks=6))
+    ax.yaxis.set_major_locator(LogLocator(base=ensemble.dim, numticks=6))
+
+    # Plot spectral form factor
+    ax.plot(
+        times,
+        sff,
+        color=sff_config.sff_color,
+        linewidth=sff_config.sff_width,
+        alpha=sff_config.sff_alpha,
+        zorder=sff_config.sff_zorder,
+    )
+
+    # Plot connected spectral form factor
+    ax.plot(
+        times,
+        csff,
+        color=sff_config.csff_color,
+        linewidth=sff_config.csff_width,
+        alpha=sff_config.csff_alpha,
+        zorder=sff_config.csff_zorder,
+    )
+
+    # Calculate universal connected spectral form factor
+    universal_csff = np.vectorize(ensemble.universal_csff)(times)
+
+    # Plot universal connected spectral form factor
+    ax.plot(
+        times,
+        universal_csff,
+        color=sff_config.universal_color,
+        linewidth=sff_config.universal_width,
+        alpha=sff_config.universal_alpha,
+        zorder=sff_config.universal_zorder,
+    )
+
+    # Set axis labels and limits
+    ax.set_xlabel(sff_config.xlabel)
+    ax.set_ylabel(sff_config.ylabel)
+    ax.set_xlim(
+        ensemble.dim**sff_config.logtime_min,
+        ensemble.dim**sff_config.logtime_max,
+    )
+    ax.set_ylim(0.1 * ensemble.dim ** (-2), 10)
+
+    # Create tick labels for x-axis
+    ax.set_xticks(
+        ensemble.dim ** np.arange(sff_config.logtime_min, sff_config.logtime_max + 1)
+    )
+    ax.set_xticklabels(
+        [
+            rf"$D^{{{i+1}}}$" if i not in [-1, 0] else r"$1$" if i == -1 else r"$D$"
+            for i in range(sff_config.logtime_min, sff_config.logtime_max + 1)
+        ]
+    )
+
+    # Create ticks for y-axis
+    ax.set_yticks([ensemble.dim**i for i in range(-2, 1)])
+    ax.set_yticklabels([(rf"$D^{{{i}}}$" if i != 0 else r"$1$") for i in range(-2, 1)])
+
+    # Set tick marks all around and inward
+    ax.tick_params(
+        direction="in",
+        top=True,
+        bottom=True,
+        left=True,
+        right=True,
+    )
+
+    # Create plot path from data path
+    split_data_path = data_path.split("/")
+    split_data_path[-1] = sff_config.plot_filename
+    plot_path = os.path.join(*split_data_path)
+
+    # Save plot to file
+    plt.savefig(plot_path, dpi=300, bbox_inches="tight")
+
+    # Close plot
+    plt.close(fig)
 
 
 # =============================
