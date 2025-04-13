@@ -38,7 +38,7 @@ class SpectralHistogram:
     data_filename: str = "spectrum.npz"
     plot_filename: str = "spectrum.png"
 
-    # Plotting settings
+    # Plot settings
     title: str = "Average Spectral Density"
     hist_legend: str = "simulation"
     curve_legend: str = "theory"
@@ -71,7 +71,7 @@ class NNLevelSpacings:
     data_filename: str = "spacings.npz"
     plot_filename: str = "spacings.png"
 
-    # Plotting settings
+    # Plot settings
     title: str = "NNS Distribution"
     hist_legend: str = "simulation"
     curve_legend: str = "surmise"
@@ -104,7 +104,7 @@ class SpectralFormFactors:
     data_filename: str = "form_factors.npz"
     plot_filename: str = "form_factors.png"
 
-    # Plotting settings
+    # Plot settings
     title: str = "Spectral Form Factors"
     sff_legend: str = r"$\textrm{SFF}$"
     csff_legend: str = r"$\textrm{cSFF}$"
