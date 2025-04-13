@@ -21,14 +21,7 @@ from textwrap import dedent
 from time import strftime
 
 # Third-party imports
-from dotenv import load_dotenv
 from psutil import cpu_count, virtual_memory
-
-# Load environment variables
-load_dotenv()
-
-# Store project path
-project_path = os.getenv("PROJECT_PATH")
 
 
 # =============================
@@ -202,7 +195,7 @@ class MonteCarlo(ABC):
         # Retrieve list of valid ensembles
         ensemble_list = [
             file.rstrip(".py")
-            for file in os.listdir(f"{project_path}/rmtpy/ensembles")
+            for file in os.listdir(f"rmtpy/ensembles")
             if file.endswith(".py") and not file.startswith("_")
         ]
 
