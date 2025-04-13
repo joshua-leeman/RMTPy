@@ -353,17 +353,17 @@ class SpectralMixin:
             Sample of eigenvalues from the ensemble
         """
         # Allocate memory for realizations of eigenvalues
-        eigenvalues = np.empty((realizs, self.dim), dtype=self.real_dtype)
+        eigenvals = np.empty((realizs, self.dim), dtype=self.real_dtype)
 
         # Loop over realizations
         for r in range(realizs):
             # Compute eigenvalues of random matrix
-            eigenvalues[r, :] = eigvalsh(
+            eigenvals[r, :] = eigvalsh(
                 self.generate(), overwrite_a=True, check_finite=False, driver="evr"
             )
 
         # Return eigenvalues
-        return eigenvalues
+        return eigenvals
 
     def nn_spacings(self, levels: np.ndarray = None) -> np.ndarray:
         """
