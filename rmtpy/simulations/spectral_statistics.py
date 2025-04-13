@@ -23,6 +23,7 @@ from time import time
 from typing import Dict, List
 
 # Third-party imports
+from dotenv import load_dotenv
 import numpy as np
 import matplotlib.pyplot as plt
 from psutil import virtual_memory
@@ -35,11 +36,25 @@ from rmtpy.configs.spectral_statistics_config import (
     sff_config,
 )
 
+# Load environment variables
+load_dotenv()
+
+# Store project path
+project_path = os.getenv("PROJECT_PATH")
+
 
 # =============================
 # 2. Plotting Functions
 # =============================
-def _read_results_path(path: str) -> dict:
+def _read_results_path(path: str, file_name: str) -> dict:
+    # Check if path exists
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"File not found: {path}")
+
+    # Check if path is named correctly
+    if os.path.basename(path) != file_name:
+        raise ValueError(f"File name must be '{file_name}'")
+
     # Initialize metadata dictionary
     metadata = {}
 
@@ -49,15 +64,25 @@ def _read_results_path(path: str) -> dict:
             split_datum = datum.split("=")
             metadata[split_datum[0]] = literal_eval(split_datum[1])
 
-    # Include ensemble name in metadata
-    metadata["ensemble"] = path.split("/")[3]
+    # Retrieve list of valid ensembles
+    ensemble_list = [
+        file.rstrip(".py")
+        for file in os.listdir(f"{project_path}/rmtpy/ensembles")
+        if file.endswith(".py") and not file.startswith("_")
+    ]
+
+    # Grabs ensemble name from path
+    metadata["ensemble"] = next(
+        datum for datum in path.split("/") if datum in ensemble_list
+    )
 
     # Return metadata dictionary
     return metadata
 
 
-def plot_spectral_hist() -> None:
-    pass
+def plot_spectral_hist(data_path: str) -> None:
+    # Checks and reads metadata from data path
+    metadata = _read_results_path(data_path)
 
 
 def plot_nn_spacing_dist():
@@ -282,7 +307,10 @@ class SpectralStatistics(MonteCarlo):
 
         # Plot spectral histogram if specified
         if plot:
-            pass
+            # Determine output directory
+            output_dir = self._create_output_dir(res_type="data")
+
+            # Run plot function
 
         # Stop timer and store elapsed time
         elapsed_time = time() - start_time
