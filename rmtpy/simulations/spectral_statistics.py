@@ -15,6 +15,7 @@ It is grouped into the following sections:
 # Standard library imports
 import os
 from argparse import ArgumentParser
+from ast import literal_eval
 from importlib import import_module
 from multiprocessing import Pool
 from textwrap import dedent
@@ -38,6 +39,23 @@ from rmtpy.configs.spectral_statistics_config import (
 # =============================
 # 2. Plotting Functions
 # =============================
+def _read_results_path(path: str) -> dict:
+    # Initialize metadata dictionary
+    metadata = {}
+
+    # Read file path and extract metadata
+    for datum in path.split("/"):
+        if "=" in datum:
+            split_datum = datum.split("=")
+            metadata[split_datum[0]] = literal_eval(split_datum[1])
+
+    # Include ensemble name in metadata
+    metadata["ensemble"] = path.split("/")[3]
+
+    # Return metadata dictionary
+    return metadata
+
+
 def plot_spectral_hist() -> None:
     pass
 
@@ -179,11 +197,11 @@ class SpectralStatistics(MonteCarlo):
 
         # Create output directory and store results path
         output_dir = self._create_output_dir(res_type="data")
-        res_path = os.path.join(output_dir, sff_config.data_filename)
+        results_path = os.path.join(output_dir, sff_config.data_filename)
 
         # Save histogram data
         np.savez_compressed(
-            res_path,
+            results_path,
             hist_counts=hist_counts,
             hist_edges=hist_edges,
         )
@@ -238,11 +256,11 @@ class SpectralStatistics(MonteCarlo):
 
         # Create output directory and store results path
         output_dir = self._create_output_dir(res_type="data")
-        res_path = os.path.join(output_dir, sff_config.data_filename)
+        results_path = os.path.join(output_dir, sff_config.data_filename)
 
         # Save form factors data
         np.savez_compressed(
-            res_path,
+            results_path,
             times=times,
             sff=sff,
             csff=csff,
