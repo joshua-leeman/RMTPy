@@ -215,25 +215,25 @@ class SpectralStatistics(MonteCarlo):
                 f"Unsupported file type. Expected .npz or .csv, got {output_dir}"
             )
 
-    def _spectral_histogram(self, eigenvals: np.ndarray, unfold: bool = False) -> None:
+    def _spectral_histogram(self, eigenvals: np.ndarray) -> None:
         pass
 
-    def _nn_spacing_dist(self, eigenvals: np.ndarray, unfold: bool = True) -> None:
+    def _nn_spacing_dist(self, eigenvals: np.ndarray) -> None:
         pass
 
-    def _form_factors(self, eigenvals: np.ndarray, unfold: bool = True) -> None:
+    def _form_factors(self, eigenvals: np.ndarray) -> None:
         pass
 
-    def run_spectral_histogram(self) -> None:
+    def run_spectral_histogram(self, unfold: bool = False) -> None:
         pass
 
-    def run_nn_spacing_dist(self) -> None:
+    def run_nn_spacing_dist(self, unfold: bool = True) -> None:
         pass
 
-    def run_form_factors(self) -> None:
+    def run_form_factors(self, unfold: bool = True) -> None:
         pass
 
-    def run(self) -> None:
+    def run_all(self) -> None:
         pass
 
 
