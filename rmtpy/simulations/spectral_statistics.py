@@ -117,7 +117,6 @@ def plot_spectral_hist(data_path: str) -> None:
         weights=hist_counts,
         color=spectral_config.hist_color,
         alpha=spectral_config.hist_alpha,
-        alpha=spectral_config.hist_alpha,
     )
 
     # Create array of energy values
@@ -351,7 +350,7 @@ class SpectralStatistics(MonteCarlo):
     def __init__(
         self,
         ensemble: dict,
-        realizs: int = 1,
+        realizations: int = 1,
         workers: int = 1,
         memory: int = virtual_memory().total // 2**30,
         run: List[int] = [1, 2, 3],
@@ -363,7 +362,7 @@ class SpectralStatistics(MonteCarlo):
             raise ValueError("Unfold must be a subset of run.")
 
         # Initialize Monte Carlo simulation
-        super().__init__(ensemble, realizs, workers, memory)
+        super().__init__(ensemble, realizations, workers, memory)
 
         # Store which simulations to run
         self.do_spectral_hist = 1 in run
@@ -561,7 +560,11 @@ class SpectralStatistics(MonteCarlo):
             # Determine output directory
             output_dir = self._create_output_dir(res_type="data")
 
+            # Create results path
+            results_path = os.path.join(output_dir, spectral_config.data_filename)
+
             # Run plot function
+            plot_spectral_hist(data_path=results_path)
 
         # Stop timer and store elapsed time
         elapsed_time = time() - start_time
@@ -570,13 +573,114 @@ class SpectralStatistics(MonteCarlo):
         print(f"Spectral histogram calculated in {elapsed_time:.2f} seconds.")
 
     def run_nn_spacing_dist(self, plot: bool = True) -> None:
-        pass
+        # Start timer
+        start_time = time()
+
+        # Realize eigenvalues
+        levels = self._realize_eigvals()
+
+        # Unfold eigenvalues if specified
+        if self.unfold_nn_spacing_dist:
+            levels = self.ensemble.unfold(levels=levels)
+
+        # Calculate nearest neighbor spacing distribution
+        self._nn_spacing_dist(levels=levels)
+
+        # Plot nearest neighbor spacing distribution if specified
+        if plot:
+            # Determine output directory
+            output_dir = self._create_output_dir(res_type="data")
+
+            # Create results path
+            results_path = os.path.join(output_dir, spacings_config.data_filename)
+
+            # Run plot function
+            plot_nn_spacing_dist(data_path=results_path)
+
+        # Stop timer and store elapsed time
+        elapsed_time = time() - start_time
+
+        # Print elapsed time
+        print(
+            f"Nearest neighbor spacing distribution calculated in {elapsed_time:.2f} seconds."
+        )
 
     def run_form_factors(self, plot: bool = True) -> None:
-        pass
+        # Start timer
+        start_time = time()
+
+        # Realize eigenvalues
+        levels = self._realize_eigvals()
+
+        # Unfold eigenvalues if specified
+        if self.unfold_form_factors:
+            levels = self.ensemble.unfold(levels=levels)
+
+        # Calculate spectral form factors
+        self._form_factors(levels=levels)
+
+        # Plot spectral form factors if specified
+        if plot:
+            # Determine output directory
+            output_dir = self._create_output_dir(res_type="data")
+
+            # Create results path
+            results_path = os.path.join(output_dir, sff_config.data_filename)
+
+            # Run plot function
+            plot_form_factors(data_path=results_path)
+
+        # Stop timer and store elapsed time
+        elapsed_time = time() - start_time
+
+        # Print elapsed time
+        print(f"Spectral form factors calculated in {elapsed_time:.2f} seconds.")
 
     def run(self) -> None:
-        pass
+        # Start timer
+        start_time = time()
+
+        # Realize eigenvalues
+        levels = self._realize_eigvals()
+
+        # If spectral histogram is to be run without unfolding, run it
+        if self.do_spectral_hist and not self.unfold_spectral_hist:
+            self.run_spectral_hist(plot=False)
+
+        # If nearest neighbor spacing distribution is to be run without unfolding, run it
+        if self.do_nn_spacing_dist and not self.unfold_nn_spacing_dist:
+            self.run_nn_spacing_dist(plot=False)
+
+        # If spectral form factors is to be run without unfolding, run it
+        if self.do_form_factors and not self.unfold_form_factors:
+            self.run_form_factors(plot=False)
+
+        # If any simulation is to be run with unfolding, unfold levels
+        if (
+            self.unfold_spectral_hist
+            or self.unfold_nn_spacing_dist
+            or self.unfold_form_factors
+        ):
+            # Unfold levels
+            levels = self.ensemble.unfold(levels=levels)
+
+        # If spectral histogram is to be run with unfolding, run it
+        if self.do_spectral_hist and self.unfold_spectral_hist:
+            self.run_spectral_hist(plot=False)
+
+        # If nearest neighbor spacing distribution is to be run with unfolding, run it
+        if self.do_nn_spacing_dist and self.unfold_nn_spacing_dist:
+            self.run_nn_spacing_dist(plot=False)
+
+        # If spectral form factors is to be run with unfolding, run it
+        if self.do_form_factors and self.unfold_form_factors:
+            self.run_form_factors(plot=False)
+
+        # Stop timer and store elapsed time
+        elapsed_time = time() - start_time
+
+        # Print elapsed time
+        print(f"Spectral statistics calculated in {elapsed_time:.2f} seconds.")
 
 
 # =============================
