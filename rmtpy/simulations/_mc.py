@@ -202,16 +202,16 @@ class MonteCarlo(ABC):
         # Retrieve list of valid ensembles
         ensemble_list = [
             file.rstrip(".py")
-            for file in os.listdir(f"{self._project_path}/rmtpy/ensembles")
+            for file in os.listdir(f"{project_path}/rmtpy/ensembles")
             if file.endswith(".py") and not file.startswith("_")
         ]
 
         # Check if ensemble is valid
-        if self._ens_input["name"] not in ensemble_list:
+        if self._ens_args["name"] not in ensemble_list:
             raise ValueError(
                 dedent(
                     f"""
-                    Ensemble '{self._ens_input["name"]}' is not valid.
+                    Ensemble '{self._ens_args["name"]}' is not valid.
                     Valid ensembles are: {ensemble_list}
                     """
                 )
