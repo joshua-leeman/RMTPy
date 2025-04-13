@@ -550,7 +550,7 @@ class SpectralStatistics(MonteCarlo):
 
         # Unfold eigenvalues if specified
         if self.unfold_spectral_hist:
-            levels = self.ensemble.unfold(levels=levels)
+            levels = self.ensemble.unfold(levels)
 
         # Calculate spectral histogram
         self._spectral_hist(levels=levels)
@@ -581,7 +581,7 @@ class SpectralStatistics(MonteCarlo):
 
         # Unfold eigenvalues if specified
         if self.unfold_nn_spacing_dist:
-            levels = self.ensemble.unfold(levels=levels)
+            levels = self.ensemble.unfold(levels)
 
         # Calculate nearest neighbor spacing distribution
         self._nn_spacing_dist(levels=levels)
@@ -614,7 +614,7 @@ class SpectralStatistics(MonteCarlo):
 
         # Unfold eigenvalues if specified
         if self.unfold_form_factors:
-            levels = self.ensemble.unfold(levels=levels)
+            levels = self.ensemble.unfold(levels)
 
         # Calculate spectral form factors
         self._form_factors(levels=levels)
@@ -662,7 +662,7 @@ class SpectralStatistics(MonteCarlo):
             or self.unfold_form_factors
         ):
             # Unfold levels
-            levels = self.ensemble.unfold(levels=levels)
+            levels = self.ensemble.unfold(levels)
 
         # If spectral histogram is to be run with unfolding, run it
         if self.do_spectral_hist and self.unfold_spectral_hist:
