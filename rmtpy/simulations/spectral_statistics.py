@@ -37,12 +37,6 @@ from rmtpy.configs.spectral_statistics_config import (
     sff_config,
 )
 
-# Load environment variables
-load_dotenv()
-
-# Store project path
-project_path = os.getenv("PROJECT_PATH")
-
 
 # =============================
 # 2. Plotting Functions
@@ -68,7 +62,7 @@ def _ensemble_from_path(path: str, file_name: str) -> dict:
     # Retrieve list of valid ensembles
     ensemble_list = [
         file.rstrip(".py")
-        for file in os.listdir(f"{project_path}/rmtpy/ensembles")
+        for file in os.listdir(f"rmtpy/ensembles")
         if file.endswith(".py") and not file.startswith("_")
     ]
 
