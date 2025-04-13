@@ -174,7 +174,7 @@ class RMT(ABC):
         )
 
         # Calculate spectral density values
-        density_values = self.dim * np.vectorize(self.spectral_density)(eigen_grid)
+        density_values = np.vectorize(self.spectral_density)(eigen_grid)
 
         # Compute numerical cumulative density function values
         cumulative_density_values = cumulative_trapezoid(
@@ -240,7 +240,7 @@ class RMT(ABC):
 
     def unfold(self, eigenvalue: float) -> float:
         """
-        Unfold eigenvalue about spectrum center.
+        Unfold eigenvalue about spectrum's center.
 
         Parameters
         ----------
@@ -252,8 +252,8 @@ class RMT(ABC):
         float
             Unfolded eigenvalue
         """
-        # Return unfolded eigenvalue about spectrum center mean
-        return self.cumulative_density(eigenvalue) - self.dim // 2
+        # Return unfolded eigenvalue about spectrum's center
+        return self.dim * (self.cumulative_density(eigenvalue) - 1 / 2)
 
     @property
     def N(self) -> int:
