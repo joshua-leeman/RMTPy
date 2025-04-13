@@ -430,7 +430,7 @@ class SpectralStatistics(MonteCarlo):
         realizs = sim_args["realizs"]
 
         # Return eigenvalues
-        return ensemble.eigval_samples(realizs=realizs)
+        return ensemble.eigval_sample(realizs=realizs)
 
     def _realize_eigvals(self) -> List[Dict]:
         # Calculate realizations per worker and remainder
