@@ -282,7 +282,7 @@ class MonteCarlo(ABC):
             Results directory path.
         """
         # Construct results directory path
-        output_dir = f"{project_path}/res/{str(self)}/{self._ens_args['name']}/"
+        output_dir = f"res/{str(self)}/{self._ens_args['name']}/"
         output_dir += "/".join(
             f"{key}={val}" for key, val in self._ens_args.items() if key != "name"
         )
