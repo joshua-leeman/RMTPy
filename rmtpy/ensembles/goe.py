@@ -56,7 +56,7 @@ class GOE(Tenfold):
             Data type of the matrix elements (default is np.complex128)
         """
         # Initialize tenfold ensemble
-        super().__init__(N=N, dim=dim, scale=scale, dtype=dtype)
+        super().__init__(beta=beta, N=N, dim=dim, scale=scale, dtype=dtype)
 
         # Set degeneracy of eigenvalues
         self._degeneracy = degeneracy
