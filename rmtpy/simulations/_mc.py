@@ -61,7 +61,13 @@ class MonteCarlo(ABC):
         Run the Monte Carlo simulation.
     """
 
-    def __init__(self, ens_args: dict, sim_args: dict, spec_args: dict = {}) -> None:
+    def __init__(
+        self,
+        ensemble: dict,
+        realizs: int = 1,
+        workers: int = 1,
+        memory: float = virtual_memory().total // 2**30,
+    ) -> None:
         """
         Initialize the Monte Carlo simulation.
 
@@ -75,36 +81,32 @@ class MonteCarlo(ABC):
             Specifications for the job. (default is {})
         """
         # Clean ensemble name in ens_args
-        ens_args["name"] = re.sub(r"\W+", "", ens_args["name"]).strip().lower()
+        ensemble["name"] = re.sub(r"\W+", "", ensemble["name"]).strip().lower()
 
         # Copy ensemble input and pop name
-        ens_inputs = ens_args.copy()
+        ens_inputs = ensemble.copy()
         ens_inputs.pop("name")
 
         # Initialize ensemble
-        module = import_module(f"rmtpy.ensembles.{ens_args['name']}")
+        module = import_module(f"rmtpy.ensembles.{ensemble['name']}")
         ENSEMBLE = getattr(module, module.class_name)
         self._ensemble = ENSEMBLE(**ens_inputs)
 
         # Reorder ensemble input and and store
         self._ens_args = {
-            key: ens_args[key] for key in self.ensemble._arg_order if key in ens_args
+            key: ensemble[key] for key in self.ensemble._arg_order if key in ensemble
         }
 
-        # Store simulation input and update with name
-        self._sim_input = sim_args.copy()
-        self._sim_input["name"] = str(self)
-
         # Store number of realizations
-        self._realizs = int(sim_args.get("realizations", 1))
+        self._realizs = realizs
 
         # Store system specifications
         self._max_workers = cpu_count(logical=False)
         self._max_memory = virtual_memory().total  # in bytes
 
         # Store job specifications
-        self._workers = spec_args.get("workers", 1)
-        self._memory = spec_args.get("memory", self.max_memory // 2**30)  # in GiB
+        self._workers = workers
+        self._memory = memory  # in GiB
 
         # Check if Monte Carlo simulation is valid
         self._check_mc()
@@ -154,71 +156,44 @@ class MonteCarlo(ABC):
             help="random matrix ensemble in JSON (required)",
         )
 
-        # Add simulation argument(s)
+        # Add number of realizations argument
         parser.add_argument(
-            "-args",
-            "--arguments",
-            type=str,
-            default="{'realizs': 1}",
-            help="simulation arguments in JSON (default is {'realizs': 1})",
+            "-realizs",
+            "--realizations",
+            type=int,
+            default=1,
+            help="number of realizations (default is 1)",
+        )
+
+        # Add number of workers argument
+        parser.add_argument(
+            "-w",
+            "--workers",
+            type=int,
+            default=1,
+            help=f"number of workers (default is 1, maximum is {cpu_count(logical=False)})",
         )
 
         # Store total memory in GiB
         total_memory = virtual_memory().total // 2**30
 
-        # Add job specification argument(s)
+        # Add memory argument
         parser.add_argument(
-            "-spec",
-            "--specification",
-            type=str,
-            default=f"{{'workers': 1, 'memory': {total_memory}}}",
-            help=f"job specification in JSON (default is {{'workers': 1, 'memory': {total_memory} [in GiB]}})",
+            "-m",
+            "--memory",
+            type=int,
+            default=total_memory,
+            help=f"memory allocated for simulation in GiB (default is {total_memory})",
         )
 
         # Parse arguments into dictionary
-        parsed_args = vars(parser.parse_args())
-
-        # Initialize output dictionary
-        mc_args = {}
+        mc_args = vars(parser.parse_args())
 
         # Convert ensemble argument to dictionary
-        mc_args["ens_args"] = literal_eval(parsed_args["ensemble"])
-
-        # Convert simulation argument to dictionary
-        mc_args["sim_args"] = literal_eval(parsed_args["arguments"])
-
-        # Convert job specification argument to dictionary
-        mc_args["spec_args"] = literal_eval(parsed_args["specification"])
+        mc_args["ensemble"] = literal_eval(mc_args["ensemble"])
 
         # Return dictionary of Monte Carlo arguments
         return mc_args
-
-    def _create_output_dir(self, res_type: str = "") -> str:
-        """
-        Returns the project's results directory for the Monte Carlo simulation.
-
-        Parameters
-        ----------
-        res_type : str, optional
-            Type of results directory. (default is "")
-
-        Returns
-        -------
-        str
-            Results directory path.
-        """
-        # Construct results directory path
-        output_dir = f"{project_path}/res/{str(self)}/{self._ens_args['name']}/"
-        output_dir += "/".join(
-            f"{key}_{val}" for key, val in self._ens_args.items() if key != "name"
-        )
-        output_dir += f"/realizs={self.realizs}/{self._time_path}/{res_type}"
-
-        # Create directory if it does not exist
-        os.makedirs(output_dir, exist_ok=True)
-
-        # Return results directory path
-        return output_dir
 
     def _check_mc(self) -> None:
         """
@@ -292,10 +267,37 @@ class MonteCarlo(ABC):
         else:
             self._workers = min(self.workers, self.memory // self.calc_memory)
 
+    def _create_output_dir(self, res_type: str = "") -> str:
+        """
+        Returns the project's results directory for the Monte Carlo simulation.
+
+        Parameters
+        ----------
+        res_type : str, optional
+            Type of results directory. (default is "")
+
+        Returns
+        -------
+        str
+            Results directory path.
+        """
+        # Construct results directory path
+        output_dir = f"{project_path}/res/{str(self)}/{self._ens_args['name']}/"
+        output_dir += "/".join(
+            f"{key}_{val}" for key, val in self._ens_args.items() if key != "name"
+        )
+        output_dir += f"/realizs={self.realizs}/{self._time_path}/{res_type}"
+
+        # Create directory if it does not exist
+        os.makedirs(output_dir, exist_ok=True)
+
+        # Return results directory path
+        return output_dir
+
     @abstractmethod
     def run(self) -> None:
         """
-        Run the Monte Carlo simulation.
+        Run the specified Monte Carlo simulation(s).
         """
         pass
 
