@@ -46,7 +46,7 @@ project_path = os.getenv("PROJECT_PATH")
 # =============================
 # 2. Plotting Functions
 # =============================
-def _read_results_path(path: str, file_name: str) -> dict:
+def _ensemble_from_path(path: str, file_name: str) -> dict:
     # Check if path exists
     if not os.path.exists(path):
         raise FileNotFoundError(f"File not found: {path}")
@@ -72,17 +72,97 @@ def _read_results_path(path: str, file_name: str) -> dict:
     ]
 
     # Grabs ensemble name from path
-    metadata["ensemble"] = next(
-        datum for datum in path.split("/") if datum in ensemble_list
-    )
+    try:
+        ensemble_name = next(
+            datum for datum in path.split("/") if datum in ensemble_list
+        )
+    except StopIteration:
+        raise ValueError(f"Ensemble name not found in path: {path}")
 
-    # Return metadata dictionary
-    return metadata
+    # Copy metadata as ensemble inputs and pop realizations
+    ens_inputs = metadata.copy()
+    ens_inputs.pop("realizs")
+
+    # Import ensemble module and class
+    module = import_module(f"rmtpy.ensembles.{ensemble_name}")
+    ENSEMBLE = getattr(module, module.class_name)
+
+    # Return initialized ensemble
+    return ENSEMBLE(**ens_inputs)
 
 
 def plot_spectral_hist(data_path: str) -> None:
-    # Checks and reads metadata from data path
-    metadata = _read_results_path(data_path)
+    # Reads results path and extracts ensemble
+    ensemble = _ensemble_from_path(data_path, sff_config.data_filename)
+
+    # Load histogram data from file
+    hist_data = np.load(data_path)
+
+    # Unpack histogram data
+    hist_counts = hist_data["hist_counts"]
+    hist_edges = hist_data["hist_edges"]
+
+    # Create figure and axis
+    fig, ax = plt.subplots()
+
+    # Set line widths
+    for spine in ax.spines.values():
+        spine.set_linewidth(spectral_config.axes_width)
+
+    # Plot histogram
+    ax.hist(
+        hist_edges[:-1],
+        bins=hist_edges,
+        weights=hist_counts,
+        color=spectral_config.hist_color,
+        alpha=spectral_config.hist_alpha,
+        alpha=spectral_config.hist_alpha,
+    )
+
+    # Create array of energy values
+    energies = np.linspace(
+        -ensemble.scale, ensemble.scale, num=spectral_config.density_num
+    )
+
+    # Evaluate theoretical average spectral density
+    density = np.vectorize(ensemble.mean_density)(energies)
+
+    # Plot theoretical average spectral density
+    ax.plot(
+        energies,
+        density,
+        color=spectral_config.curve_color,
+        linewidth=spectral_config.curve_width,
+        zorder=spectral_config.curve_zorder,
+    )
+
+    # Set axis labels and limits
+    ax.set_xlabel(spectral_config.xlabel)
+    ax.set_ylabel(spectral_config.ylabel)
+    ax.set_xlim(
+        -spectral_config.x_range * ensemble.scale,
+        spectral_config.x_range * ensemble.scale,
+    )
+
+    # Set tick markrs all around and inward
+    ax.tick_params(
+        direction="in",
+        top=True,
+        bottom=True,
+        left=True,
+        right=True,
+    )
+
+    # Create plot path from data path
+    split_data_path = data_path.split("/")
+    split_data_path[-1] = spectral_config.plot_filename
+    plot_path = os.path.join(*split_data_path)
+
+    # Save plot to file
+    plt.savefig(plot_path, dpi=300, bbox_inches="tight")
+
+    # Close plot
+    plt.close(fig)
 
 
 def plot_nn_spacing_dist():
