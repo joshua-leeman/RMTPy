@@ -16,6 +16,7 @@ from math import comb
 
 # Third-party imports
 import numpy as np
+from scipy.sparse import csr_matrix, eye_array, kron
 
 # Local application imports
 from ._rmt import Ensemble
@@ -113,6 +114,9 @@ class SYK(Ensemble):
             )
         elif self.N <= self.q:
             raise ValueError(f"Invalid N: N={self.N}. Must be greater than q={self.q}.")
+
+    def _create_majoranas(self):
+        pass
 
     @property
     def q(self):
