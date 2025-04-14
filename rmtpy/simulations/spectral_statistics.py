@@ -778,6 +778,14 @@ class SpectralStatistics(MonteCarlo):
         self._run_simulation(2, unfold=unfold)
 
     def run_form_factors(self, unfold: bool = False) -> None:
+        """
+        Run the spectral form factors simulation.
+
+        Parameters
+        ----------
+        unfold : bool, optional
+            Whether to unfold eigenvalues (default is False).
+        """
         # Run spectral form factors simulation
         self._run_simulation(3, unfold=unfold)
 
