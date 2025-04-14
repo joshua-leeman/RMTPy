@@ -199,7 +199,7 @@ def plot_spectral_hist(data_path: str) -> None:
 
 def plot_nn_spacing_dist(data_path: str) -> None:
     """
-    Plots the nearest-neighbor spacing distribution from the given data path.
+    Plots the nearest-neighbor level spacing distribution from the given data path.
 
     Parameters
     ----------
