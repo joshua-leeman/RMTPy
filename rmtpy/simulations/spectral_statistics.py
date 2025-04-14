@@ -422,6 +422,29 @@ class SpectralStatistics(MonteCarlo):
         run: List[int] = [1, 2, 3],
         unfold: List[int] = [],
     ) -> None:
+        """
+        Initialize the SpectralStatistics class.
+
+        Parameters
+        ----------
+        ensemble : dict
+            Ensemble parameters.
+        realizations : int, optional
+            Number of realizations (default is 1).
+        workers : int, optional
+            Number of workers (default is 1).
+        memory : int, optional
+            Memory allocated for simulation in bytes (default is total system memory).
+        run : list of int, optional
+            List of simulations to run (default is [1, 2, 3]).
+        unfold : list of int, optional
+            List of simulations to unfold eigenvalues (default is empty list).
+
+        Raises
+        ------
+        ValueError
+            If unfold is not a subset of run or if 1 is included in unfold.
+        """
 
         # Validate unfold is a subset of run
         if not set(unfold).issubset(set(run)):
