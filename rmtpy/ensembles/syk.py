@@ -48,8 +48,8 @@ class SYK(Ensemble):
 
     def __init__(
         self,
-        q: int,
-        N: int,
+        q: int = None,
+        N: int = None,
         scale: float = 1.0,
         dtype: type = np.complex128,
     ) -> None:
@@ -119,6 +119,10 @@ class SYK(Ensemble):
         """
         # Check if base ensemble parameters are valid
         super()._check_ensemble()
+
+        # Checks if SYK q-parameter is provided
+        if self.q is None:
+            raise ValueError("SYK q-parameter must be provided.")
 
         # Check if SYK parameters are valid
         if self.q < 2 or self.q % 2 != 0:
@@ -288,20 +292,30 @@ class SYK(Ensemble):
     @property
     def beta(self):
         """
-        Get the Dyson index.
+        Dyson index (symmetry class).
+            1: Orthogonal
+            2: Unitary
+            4: Symplectic
         """
         return self._beta
 
     @property
     def sigma(self):
         """
-        Get the standard deviation of the matrix elements.
+        Standard deviation of the matrix elements.
         """
         return self._sigma
 
     @property
     def majorana(self):
         """
-        Get the Majorana operators.
+        Majorana operators.
         """
         return self._majorana
+
+    @property
+    def degeneracy(self):
+        """
+        Degeneracy of the ensemble's eigenvalues.
+        """
+        return 2 if self.beta == 4 else 1
