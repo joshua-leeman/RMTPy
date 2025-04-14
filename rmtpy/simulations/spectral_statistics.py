@@ -42,6 +42,28 @@ from rmtpy.configs.spectral_statistics_config import (
 # 2. Plotting Functions
 # =============================
 def _ensemble_from_path(path: str, file_name: str) -> dict:
+    """
+    Determines the ensemble from the given path of data file.
+
+    Parameters
+    ----------
+    path : str
+        Path to the data file.
+    file_name : str
+        Name of the data file.
+
+    Returns
+    -------
+    object
+        Initialized ensemble object.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the specified path does not exist.
+    ValueError
+        If the file name does not match the expected name or if the ensemble name is not found in the path.
+    """
     # Check if path exists
     if not os.path.exists(path):
         raise FileNotFoundError(f"File not found: {path}")
