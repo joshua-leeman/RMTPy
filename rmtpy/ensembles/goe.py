@@ -40,7 +40,7 @@ class GOE(Tenfold):
 
     Methods
     -------
-    generate(out: np.ndarray = None) -> np.ndarray
+    generate() -> np.ndarray
         Generate a random matrix from the GOE.
     """
 
