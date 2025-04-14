@@ -126,6 +126,11 @@ class RMT(ABC):
     def _check_ensemble(self) -> None:
         """
         Check if the ensemble parameters are valid.
+
+        Raises
+        ------
+        ValueError
+            If the given ensemble is not valid and why.
         """
         # Check if dimension parameters are valid
         if self.N is not None:
