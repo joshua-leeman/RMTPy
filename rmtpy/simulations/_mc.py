@@ -83,6 +83,8 @@ class MonteCarlo(ABC):
         # Import and initialize ensemble
         module = import_module(f"rmtpy.ensembles.{ensemble['name']}")
         ENSEMBLE = getattr(module, module.class_name)
+        print("ens_inputs", ens_inputs)
+        print("ENSEMBLE", ENSEMBLE)
         self._ensemble = ENSEMBLE(**ens_inputs)
 
         # Reorder ensemble input and and store
