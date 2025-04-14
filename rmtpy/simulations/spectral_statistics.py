@@ -372,7 +372,6 @@ class SpectralStatistics(MonteCarlo):
                 "func": self._spectral_hist,
                 "plot": plot_spectral_hist,
                 "file": spectral_config.data_filename,
-                "message": "Spectral histogram",
             },
             2: {
                 "do": 2 in run,
@@ -380,7 +379,6 @@ class SpectralStatistics(MonteCarlo):
                 "func": self._nn_spacing_dist,
                 "plot": plot_nn_spacing_dist,
                 "file": spacings_config.data_filename,
-                "message": "NN-spacing distribution",
             },
             3: {
                 "do": 3 in run,
@@ -388,7 +386,6 @@ class SpectralStatistics(MonteCarlo):
                 "func": self._form_factors,
                 "plot": plot_form_factors,
                 "file": sff_config.data_filename,
-                "message": "Spectral form factors",
             },
         }
 
@@ -566,9 +563,6 @@ class SpectralStatistics(MonteCarlo):
         # Store simulation information
         sim_info = self._job[sim_num]
 
-        # Start timer
-        start_time = time()
-
         # Realize eigenvalues if not provided
         if levels is None:
             levels = self._realize_eigvals()
@@ -584,12 +578,6 @@ class SpectralStatistics(MonteCarlo):
 
         # Run plot function
         sim_info["plot"](os.path.join(output_dir, sim_info["file"]))
-
-        # Stop timer and store elapsed time
-        elapsed_time = time() - start_time
-
-        # Print elapsed time
-        print(f"{sim_info['message']} calculated in {elapsed_time:.2f} seconds.")
 
     def run_spectral_hist(self, unfold: bool = False) -> None:
         # Run spectral histogram simulation
