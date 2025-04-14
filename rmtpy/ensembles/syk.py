@@ -34,6 +34,18 @@ class_name = "SYK"
 # 2. Ensemble Class
 # =============================
 class SYK(Ensemble):
+    """
+    The Sachdev-Ye-Kitaev (SYK) ensemble class.
+    Inherits from the Ensemble class.
+
+    Methods
+    -------
+    generate() -> np.ndarray
+        Generate a random SYK Hamiltonian.
+    spectral_density(eigval: float, num_terms: int = 1000) -> float
+        Calculate the mean spectral density at a given eigenvalue.
+    """
+
     def __init__(
         self,
         q: int,
