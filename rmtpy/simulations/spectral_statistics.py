@@ -754,6 +754,14 @@ class SpectralStatistics(MonteCarlo):
         sim_info["plot"](os.path.join(output_dir, sim_info["file"]))
 
     def run_spectral_hist(self, unfold: bool = False) -> None:
+        """
+        Run the spectral histogram simulation.
+
+        Parameters
+        ----------
+        unfold : bool, optional
+            Whether to unfold eigenvalues (default is False).
+        """
         # Run spectral histogram simulation
         self._run_simulation(1, unfold=unfold)
 
