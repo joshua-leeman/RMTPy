@@ -790,6 +790,9 @@ class SpectralStatistics(MonteCarlo):
         self._run_simulation(3, unfold=unfold)
 
     def run(self) -> None:
+        """
+        Run all specified simulations.
+        """
         # Start timer
         start_time = time()
 
