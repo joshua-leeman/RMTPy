@@ -34,6 +34,16 @@ degeneracy = 1
 # 2. Ensemble Class
 # =============================
 class GOE(Tenfold):
+    """
+    The Gaussian Orthogonal Ensemble (GOE) class.
+    Inherits from the Tenfold class.
+
+    Methods
+    -------
+    generate(out: np.ndarray = None) -> np.ndarray
+        Generate a random matrix from the GOE.
+    """
+
     def __init__(
         self,
         N: int = None,
