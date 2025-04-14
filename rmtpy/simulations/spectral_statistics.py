@@ -354,7 +354,7 @@ class SpectralStatistics(MonteCarlo):
         workers: int = 1,
         memory: int = virtual_memory().total // 2**30,
         run: List[int] = [1, 2, 3],
-        unfold: List[int] = [2, 3],
+        unfold: List[int] = [],
     ) -> None:
 
         # Validate unfold is a subset of run
@@ -364,15 +364,33 @@ class SpectralStatistics(MonteCarlo):
         # Initialize Monte Carlo simulation
         super().__init__(ensemble, realizations, workers, memory)
 
-        # Store which simulations to run
-        self.do_spectral_hist = 1 in run
-        self.do_nn_spacing_dist = 2 in run
-        self.do_form_factors = 3 in run
-
-        # Store which simulations to unfold
-        self.unfold_spectral_hist = 1 in unfold
-        self.unfold_nn_spacing_dist = 2 in unfold
-        self.unfold_form_factors = 3 in unfold
+        # Store job arguments in dictionary
+        self._job = {
+            1: {
+                "do": 1 in run,
+                "unfold": 1 in unfold,
+                "func": self._spectral_hist,
+                "plot": plot_spectral_hist,
+                "file": spectral_config.data_filename,
+                "message": "Spectral histogram",
+            },
+            2: {
+                "do": 2 in run,
+                "unfold": 2 in unfold,
+                "func": self._nn_spacing_dist,
+                "plot": plot_nn_spacing_dist,
+                "file": spacings_config.data_filename,
+                "message": "NN-spacing distribution",
+            },
+            3: {
+                "do": 3 in run,
+                "unfold": 3 in unfold,
+                "func": self._form_factors,
+                "plot": plot_form_factors,
+                "file": sff_config.data_filename,
+                "message": "Spectral form factors",
+            },
+        }
 
     @staticmethod
     def _parse_args(parser: ArgumentParser) -> dict:
@@ -380,14 +398,15 @@ class SpectralStatistics(MonteCarlo):
         parser.add_argument(
             "--run",
             nargs="+",
+            type=int,
             choices=[1, 2, 3],
             default=[1, 2, 3],
             help=dedent(
                 """
                 Specify which simulation(s) to run:
-                    1: Spectral Histogram
-                    2: NN-Level Spacings
-                    3: Spectral Form Factors
+                    (1) Spectral Histogram
+                    (2) NN-Level Spacings
+                    (3) Spectral Form Factors
                 """
             ),
         )
@@ -396,14 +415,14 @@ class SpectralStatistics(MonteCarlo):
         parser.add_argument(
             "--unfold",
             nargs="+",
-            choices=[1, 2, 3],
-            default=[2, 3],
+            type=int,
+            choices=[2, 3],
+            default=[],
             help=dedent(
                 """
-                Specify which simulation(s) to unfold eigenvalues (must be subset of --run):
-                    1: Spectral Histogram
-                    2: NN-Level Spacings
-                    3: Spectral Form Factors
+                Specify which simulation(s) to unfold eigenvalues (must be subset of --run and cannot be 1):
+                    (2) NN-Level Spacings
+                    (3) Spectral Form Factors
                 """
             ),
         )
@@ -541,100 +560,48 @@ class SpectralStatistics(MonteCarlo):
             csff=csff,
         )
 
-    def run_spectral_hist(self, plot: bool = True) -> None:
+    def _run_simulation(
+        self, sim_num: int, levels: np.ndarray = None, unfold: bool = False
+    ) -> None:
+        # Store simulation information
+        sim_info = self._job[sim_num]
+
         # Start timer
         start_time = time()
 
-        # Realize eigenvalues
-        levels = self._realize_eigvals()
+        # Realize eigenvalues if not provided
+        if levels is None:
+            levels = self._realize_eigvals()
+            # Unfold eigenvalues if specified
+            if unfold:
+                levels = self.ensemble.unfold(levels)
 
-        # Unfold eigenvalues if specified
-        if self.unfold_spectral_hist:
-            levels = self.ensemble.unfold(levels)
+        # Run simulation functionm
+        sim_info["func"](levels)
 
-        # Calculate spectral histogram
-        self._spectral_hist(levels=levels)
+        # Determine output directory
+        output_dir = self._create_output_dir(res_type="data")
 
-        # Plot spectral histogram if specified
-        if plot:
-            # Determine output directory
-            output_dir = self._create_output_dir(res_type="data")
-
-            # Create results path
-            results_path = os.path.join(output_dir, spectral_config.data_filename)
-
-            # Run plot function
-            plot_spectral_hist(data_path=results_path)
+        # Run plot function
+        sim_info["plot"](os.path.join(output_dir, sim_info["file"]))
 
         # Stop timer and store elapsed time
         elapsed_time = time() - start_time
 
         # Print elapsed time
-        print(f"Spectral histogram calculated in {elapsed_time:.2f} seconds.")
+        print(f"{sim_info['message']} calculated in {elapsed_time:.2f} seconds.")
 
-    def run_nn_spacing_dist(self, plot: bool = True) -> None:
-        # Start timer
-        start_time = time()
+    def run_spectral_hist(self, unfold: bool = False) -> None:
+        # Run spectral histogram simulation
+        self._run_simulation(1, unfold=unfold)
 
-        # Realize eigenvalues
-        levels = self._realize_eigvals()
+    def run_nn_spacing_dist(self, unfold: bool = False) -> None:
+        # Run nearest neighbor spacing distribution simulation
+        self._run_simulation(2, unfold=unfold)
 
-        # Unfold eigenvalues if specified
-        if self.unfold_nn_spacing_dist:
-            levels = self.ensemble.unfold(levels)
-
-        # Calculate nearest neighbor spacing distribution
-        self._nn_spacing_dist(levels=levels)
-
-        # Plot nearest neighbor spacing distribution if specified
-        if plot:
-            # Determine output directory
-            output_dir = self._create_output_dir(res_type="data")
-
-            # Create results path
-            results_path = os.path.join(output_dir, spacings_config.data_filename)
-
-            # Run plot function
-            plot_nn_spacing_dist(data_path=results_path)
-
-        # Stop timer and store elapsed time
-        elapsed_time = time() - start_time
-
-        # Print elapsed time
-        print(
-            f"Nearest neighbor spacing distribution calculated in {elapsed_time:.2f} seconds."
-        )
-
-    def run_form_factors(self, plot: bool = True) -> None:
-        # Start timer
-        start_time = time()
-
-        # Realize eigenvalues
-        levels = self._realize_eigvals()
-
-        # Unfold eigenvalues if specified
-        if self.unfold_form_factors:
-            levels = self.ensemble.unfold(levels)
-
-        # Calculate spectral form factors
-        self._form_factors(levels=levels)
-
-        # Plot spectral form factors if specified
-        if plot:
-            # Determine output directory
-            output_dir = self._create_output_dir(res_type="data")
-
-            # Create results path
-            results_path = os.path.join(output_dir, sff_config.data_filename)
-
-            # Run plot function
-            plot_form_factors(data_path=results_path)
-
-        # Stop timer and store elapsed time
-        elapsed_time = time() - start_time
-
-        # Print elapsed time
-        print(f"Spectral form factors calculated in {elapsed_time:.2f} seconds.")
+    def run_form_factors(self, unfold: bool = False) -> None:
+        # Run spectral form factors simulation
+        self._run_simulation(3, unfold=unfold)
 
     def run(self) -> None:
         # Start timer
@@ -643,104 +610,25 @@ class SpectralStatistics(MonteCarlo):
         # Realize eigenvalues
         levels = self._realize_eigvals()
 
-        # If spectral histogram is to be run without unfolding, run it
-        if self.do_spectral_hist and not self.unfold_spectral_hist:
-            # Calculate spectral histogram
-            self._spectral_hist(levels=levels)
+        # Run each specified simulation that does not require unfolding
+        for sim_num in self._job:
+            if self._job[sim_num]["do"] and not self._job[sim_num]["unfold"]:
+                self._run_simulation(sim_num, levels)
 
-            # Determine output directory
-            output_dir = self._create_output_dir(res_type="data")
-
-            # Create results path
-            results_path = os.path.join(output_dir, spectral_config.data_filename)
-
-            # Run plot function
-            plot_spectral_hist(data_path=results_path)
-
-        # If nearest neighbor spacing distribution is to be run without unfolding, run it
-        if self.do_nn_spacing_dist and not self.unfold_nn_spacing_dist:
-            # Calculate nearest neighbor spacing distribution
-            self._nn_spacing_dist(levels=levels)
-
-            # Determine output directory
-            output_dir = self._create_output_dir(res_type="data")
-
-            # Create results path
-            results_path = os.path.join(output_dir, spacings_config.data_filename)
-
-            # Run plot function
-            plot_nn_spacing_dist(data_path=results_path)
-
-        # If spectral form factors is to be run without unfolding, run it
-        if self.do_form_factors and not self.unfold_form_factors:
-            # Calculate spectral form factors
-            self._form_factors(levels=levels)
-
-            # Determine output directory
-            output_dir = self._create_output_dir(res_type="data")
-
-            # Create results path
-            results_path = os.path.join(output_dir, sff_config.data_filename)
-
-            # Run plot function
-            plot_form_factors(data_path=results_path)
-
-        # If any simulation is to be run with unfolding, unfold levels
-        if (
-            self.unfold_spectral_hist
-            or self.unfold_nn_spacing_dist
-            or self.unfold_form_factors
-        ):
-            # Unfold levels
+        # Unfold eigenvalues if specified
+        if any(self._job[sim_num]["unfold"] for sim_num in self._job):
             levels = self.ensemble.unfold(levels)
 
-        # If spectral histogram is to be run with unfolding, run it
-        if self.do_spectral_hist and self.unfold_spectral_hist:
-            # Calculate spectral histogram
-            self._spectral_hist(levels=levels)
-
-            # Determine output directory
-            output_dir = self._create_output_dir(res_type="data")
-
-            # Create results path
-            results_path = os.path.join(output_dir, spectral_config.data_filename)
-
-            # Run plot function
-            plot_spectral_hist(data_path=results_path)
-
-        # If nearest neighbor spacing distribution is to be run with unfolding, run it
-        if self.do_nn_spacing_dist and self.unfold_nn_spacing_dist:
-            # Calculate nearest neighbor spacing distribution
-            self._nn_spacing_dist(levels=levels)
-
-            # Determine output directory
-            output_dir = self._create_output_dir(res_type="data")
-
-            # Create results path
-            results_path = os.path.join(output_dir, spacings_config.data_filename)
-
-            # Run plot function
-            plot_nn_spacing_dist(data_path=results_path)
-
-        # If spectral form factors is to be run with unfolding, run it
-        if self.do_form_factors and self.unfold_form_factors:
-            # Calculate spectral form factors
-            self._form_factors(levels=levels)
-
-            # Determine output directory
-            output_dir = self._create_output_dir(res_type="data")
-
-            # Create results path
-            results_path = os.path.join(output_dir, sff_config.data_filename)
-
-            # Run plot function
-            plot_form_factors(data_path=results_path)
+        # Run each specified simulation that requires unfolding
+        for sim_num in self._job:
+            if self._job[sim_num]["do"] and self._job[sim_num]["unfold"]:
+                self._run_simulation(sim_num, levels)
 
         # Stop timer and store elapsed time
         elapsed_time = time() - start_time
 
         # Print elapsed time
-        print(f"Spectral statistics calculated in {elapsed_time:.2f} seconds.")
+        print(f"Spectral statistics completed in {elapsed_time:.2f} seconds.")
 
 
 # =============================
