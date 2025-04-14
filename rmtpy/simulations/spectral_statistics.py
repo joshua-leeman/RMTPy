@@ -643,6 +643,14 @@ class SpectralStatistics(MonteCarlo):
         self._create_hist(data=levels, dataclass=spectral_config)
 
     def _nn_spacing_dist(self, levels: np.ndarray) -> None:
+        """
+        Create a histogram of the nearest-neighbor level spacing sample.
+
+        Parameters
+        ----------
+        levels : np.ndarray
+            Eigenvalue sample.
+        """
         # Calculate nearst neighbor spacings
         spacings = self.ensemble.nn_spacings(levels=levels)
 
