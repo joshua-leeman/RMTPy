@@ -766,6 +766,14 @@ class SpectralStatistics(MonteCarlo):
         self._run_simulation(1, unfold=unfold)
 
     def run_nn_spacing_dist(self, unfold: bool = False) -> None:
+        """
+        Run the nearest-neighbor level spacing distribution simulation.
+
+        Parameters
+        ----------
+        unfold : bool, optional
+            Whether to unfold eigenvalues (default is False).
+        """
         # Run nearest neighbor spacing distribution simulation
         self._run_simulation(2, unfold=unfold)
 
