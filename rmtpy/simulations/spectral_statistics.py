@@ -423,7 +423,7 @@ class SpectralStatistics(MonteCarlo):
         unfold: List[int] = [],
     ) -> None:
         """
-        Initialize the SpectralStatistics class.
+        Initialize the SpectralStatistics simulation class.
 
         Parameters
         ----------
@@ -480,6 +480,11 @@ class SpectralStatistics(MonteCarlo):
 
     @staticmethod
     def _parse_args(parser: ArgumentParser) -> dict:
+        """
+        Parse command line arguments for the SpectralStatistics simulation class.
+
+
+        """
         # Add arguments for which simulation(s) to run
         parser.add_argument(
             "--run",
