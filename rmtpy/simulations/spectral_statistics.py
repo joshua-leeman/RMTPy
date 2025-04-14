@@ -717,6 +717,23 @@ class SpectralStatistics(MonteCarlo):
     def _run_simulation(
         self, sim_num: int, levels: np.ndarray = None, unfold: bool = False
     ) -> None:
+        """
+        Run a simulation and save the results.
+
+        Parameters
+        ----------
+        sim_num : int
+            Simulation number.
+        levels : np.ndarray, optional
+            Eigenvalue sample (default is None).
+        unfold : bool, optional
+            Whether to unfold eigenvalues (default is False).
+
+        Raises
+        ------
+        ValueError
+            If the simulation number is not valid.
+        """
         # Store simulation information
         sim_info = self._job[sim_num]
 
