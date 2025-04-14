@@ -24,7 +24,6 @@ from time import time
 from typing import Dict, List
 
 # Third-party imports
-from dotenv import load_dotenv
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.ticker import LogLocator, NullLocator
