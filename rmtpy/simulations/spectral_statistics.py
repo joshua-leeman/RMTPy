@@ -191,6 +191,14 @@ def plot_spectral_hist(data_path: str) -> None:
 
 
 def plot_nn_spacing_dist(data_path: str) -> None:
+    """
+    Plots the nearest-neighbor spacing distribution from the given data path.
+
+    Parameters
+    ----------
+    data_path : str
+        Path to the data file containing histogram data.
+    """
     # Reads results path and extracts ensemble
     ensemble = _ensemble_from_path(data_path, spacings_config.data_filename)
 
