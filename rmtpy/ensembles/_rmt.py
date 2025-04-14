@@ -80,7 +80,7 @@ class RMT(ABC):
         scale : float, optional
             Energy scale (default is 1.0)
         dtype : type, optional
-            Data type of the matrix (default is np.complex128)
+            Data type of the matrix elements (default is np.complex128)
         """
         # Store ensemble parameters
         self._N = N

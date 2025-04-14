@@ -39,6 +39,20 @@ class SYK(Ensemble):
         scale: float = 1.0,
         dtype: type = np.complex128,
     ):
+        """
+        Intialize the SYK ensemble.
+
+        Parameters
+        ----------
+        q : int
+            Number of Majorana fermions.
+        N : int
+            Number of Majorana fermions.
+        scale : float, optional
+            Energy scale (default is 1.0).
+        dtype : type, optional
+            Data type of the matrix elements (default is np.complex128).
+        """
         # Set SYK-specific parameters
         self._q = q
 
