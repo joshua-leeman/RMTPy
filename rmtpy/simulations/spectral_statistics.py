@@ -631,6 +631,14 @@ class SpectralStatistics(MonteCarlo):
         )
 
     def _spectral_hist(self, levels: np.ndarray) -> None:
+        """
+        Create a histogram of the eigenvalue sample.
+
+        Parameters
+        ----------
+        levels : np.ndarray
+            Eigenvalue sample.
+        """
         # Create histogram using levels as data
         self._create_hist(data=levels, dataclass=spectral_config)
 
