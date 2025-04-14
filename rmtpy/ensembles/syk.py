@@ -120,3 +120,24 @@ class SYK(Ensemble):
         Get the SYK parameter q.
         """
         return self._q
+
+    @property
+    def eta(self):
+        """
+        Get the suppression factor.
+        """
+        return self._eta
+
+    @property
+    def beta(self):
+        """
+        Get the Dyson index.
+        """
+        return self._beta
+
+    @property
+    def sigma(self):
+        """
+        Get the standard deviation of the matrix elements.
+        """
+        return self._sigma
