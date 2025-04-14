@@ -611,25 +611,23 @@ class Tenfold(Ensemble):
         # Calculate standard deviation of matrix elements
         self._sigma = self.scale / np.sqrt(2 * self.beta * self.dim)
 
-    def spectral_density(self, eigenvalue: float) -> float:
+    def spectral_density(self, eigval: float) -> float:
         """
         Calculate the mean spectral density at eigenvalue.
 
         Parameters
         ----------
-        eigenvalue : float
-            Eigenvalue at which to evaluate the spectral density
+        eigval : float
+            Eigenvalue at which to evaluate the mean spectral density
 
         Returns
         -------
         float
-            Spectral density at the given eigenvalue
+            Mean spectral density at the given eigenvalue
         """
         # Calculate semi-circle spectral density
-        if abs(eigenvalue) < self.scale:
-            return np.sqrt(1 - (eigenvalue / self.scale) ** 2) / (
-                np.pi * self.scale / 2
-            )
+        if abs(eigval) < self.scale:
+            return np.sqrt(1 - (eigval / self.scale) ** 2) / (np.pi * self.scale / 2)
         else:
             return 0.0
 
