@@ -824,6 +824,9 @@ class SpectralStatistics(MonteCarlo):
 # 4. Main Function
 # =============================
 def main() -> None:
+    """
+    Main function to run the Spectral Statistics Monte Carlo simulation from the command line.
+    """
     # Create argument parser
     parser = ArgumentParser(description="Spectral Statistics Monte Carlo")
 
