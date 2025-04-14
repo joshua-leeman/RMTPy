@@ -109,6 +109,14 @@ def _ensemble_from_path(path: str, file_name: str) -> dict:
 
 
 def plot_spectral_hist(data_path: str) -> None:
+    """
+    Plots the spectral histogram from the given data path.
+
+    Parameters
+    ----------
+    data_path : str
+        Path to the data file containing histogram data.
+    """
     # Reads results path and extracts ensemble
     ensemble = _ensemble_from_path(data_path, spectral_config.data_filename)
 
