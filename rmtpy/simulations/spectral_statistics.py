@@ -483,7 +483,15 @@ class SpectralStatistics(MonteCarlo):
         """
         Parse command line arguments for the SpectralStatistics simulation class.
 
+        Parameters
+        ----------
+        parser : ArgumentParser
+            Argument parser object.
 
+        Returns
+        -------
+        dict
+            Parsed arguments as a dictionary.
         """
         # Add arguments for which simulation(s) to run
         parser.add_argument(
