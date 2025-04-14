@@ -413,6 +413,22 @@ def plot_form_factors(data_path: str) -> None:
 # 3. Spectral Statistics Class
 # =============================
 class SpectralStatistics(MonteCarlo):
+    """
+    SpectralStatistics class for performing Monte Carlo simulations to obtain spectral statistics of random matrix ensembles.
+    Inherits from the MonteCarlo class.
+
+    Methods
+    -------
+    run_spectral_hist(unfold: bool = False)
+        Run the spectral histogram simulation.
+    run_nn_spacing_dist(unfold: bool = False)
+        Run the nearest-neighbor level spacing distribution simulation.
+    run_form_factors(unfold: bool = False)
+        Run the spectral form factors simulation.
+    run()
+        Run all specified simulations.
+    """
+
     def __init__(
         self,
         ensemble: dict,
