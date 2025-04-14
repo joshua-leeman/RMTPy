@@ -531,6 +531,19 @@ class SpectralStatistics(MonteCarlo):
 
     @staticmethod
     def _worker_func(args: dict) -> np.ndarray:
+        """
+        Worker function to run the simulation on a separate processes.
+
+        Parameters
+        ----------
+        args : dict
+            Dictionary containing ensemble and simulation arguments.
+
+        Returns
+        -------
+        np.ndarray
+            Eigenvalue sample from the simulation.
+        """
         # Unpack the arguments
         ens_args = args["ens_args"]
         sim_args = args["sim_args"]
