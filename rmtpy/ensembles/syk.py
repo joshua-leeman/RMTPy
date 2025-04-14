@@ -158,6 +158,69 @@ class SYK(Ensemble):
             else:
                 return majorana
 
+    def generate(self):
+        """
+        Return a random SYK Hamiltonian.
+
+        Returns
+        -------
+        np.ndarray
+            Random SYK Hamiltonian as a dense matrix.
+        """
+        # Create Majorana operators if not already created
+        if not hasattr(self, "_majorana"):
+            self._majorana = self._create_majoranas()
+
+        # Initialize indices and products for Majorana operators
+        indices = list(range(self.q))
+        products = [None for _ in range(self.q)]
+
+        # Fill products with initial products of Majorana operators
+        products[0] = self.majorana[indices[0]]
+        for i in range(1, self.q):
+            products[i] = products[i - 1].dot(self.majorana[indices[i]], format="csr")
+
+        # Initialize Hamiltonian
+        H = csr_matrix((self.dim, self.dim), dtype=self.dtype)
+
+        # Generate random matrix elements through loop
+        while True:
+            # Add currect product to SYK Hamiltonian
+            H += (
+                self._rng.standard_normal(dtype=self.real_dtype)
+                * products[-1][: self.dim : self.dim]
+            )
+
+            # Generate next combination of indices
+            for i in reversed(range(self.q)):
+                # If index is less than maximum index, increment it, and break
+                if indices[i] < self.N - self.q + i:
+                    indices += 1
+                    for j in range(i + 1, self.q):
+                        indices[j] = indices[j - 1] + 1
+                    break
+            else:
+                # If all indices have been processed, break loop
+                break
+
+            # Update products with new indices
+            if i == 0:
+                products[0] = self.majorana[indices[0]]
+            else:
+                products[i] = products[i - 1].dot(
+                    self.majorana[indices[i]], format="csr"
+                )
+
+            # Update products at indices greater than changed index
+            for j in range(i + 1, self.q):
+                products[j] = products[j - 1].dot(
+                    self.majorana[indices[j]], format="csr"
+                )
+
+        # Scalle and return SYK Hamiltonian
+        H *= 1j ** (self.q * (self.q - 1) // 2) * self.sigma
+        return H.toarray()
+
     @property
     def q(self):
         """
@@ -185,3 +248,10 @@ class SYK(Ensemble):
         Get the standard deviation of the matrix elements.
         """
         return self._sigma
+
+    @property
+    def majorana(self):
+        """
+        Get the Majorana operators.
+        """
+        return self._majorana
