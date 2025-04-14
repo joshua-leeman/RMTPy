@@ -600,6 +600,16 @@ class SpectralStatistics(MonteCarlo):
         return eigenvals
 
     def _create_hist(self, data: np.ndarray, dataclass: object) -> None:
+        """
+        Creates a histogram from the given data and saves it to a file.
+
+        Parameters
+        ----------
+        data : np.ndarray
+            Data to create the histogram from.
+        dataclass : object
+            Configuration class containing histogram parameters.
+        """
         # Calculate bin edges
         min_edge, max_edge = np.min(data), np.max(data)
 
