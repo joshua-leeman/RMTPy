@@ -81,7 +81,24 @@ class SYK(Ensemble):
         return f"{self.__class__.__name__} (q={self.q}, N={self.N}, scale={self.scale})"
 
     def _check_ensemble(self):
-        pass
+        """
+        Check if the SYK parameters are valid.
+
+        Raises
+        ------
+        ValueError
+            If the SYK parameters are invalid.
+        """
+        # Check if base ensemble parameters are valid
+        super()._check_ensemble()
+
+        # Check if SYK parameters are valid
+        if self.q < 2 or self.q % 2 != 0:
+            raise ValueError(
+                f"Invalid SYK q-parameter: q={self.q}. Must be even and greater than or equal to 2."
+            )
+        elif self.N <= self.q:
+            raise ValueError(f"Invalid N: N={self.N}. Must be greater than q={self.q}.")
 
     @property
     def q(self):
