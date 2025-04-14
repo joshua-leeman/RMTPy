@@ -563,7 +563,15 @@ class SpectralStatistics(MonteCarlo):
         # Return eigenvalues
         return ensemble.eigval_sample(realizs=realizs)
 
-    def _realize_eigvals(self) -> List[Dict]:
+    def _realize_eigvals(self) -> np.ndarray:
+        """
+        Divides the number of realizations among workers and runs the simulation in parallel.
+
+        Returns
+        -------
+        np.ndarray
+            Eigenvalue sample from the simulation.
+        """
         # Calculate realizations per worker and remainder
         realizs_per_worker, remainder = divmod(self.realizs, self.workers)
 
