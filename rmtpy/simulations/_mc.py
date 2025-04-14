@@ -191,6 +191,11 @@ class MonteCarlo(ABC):
     def _check_mc(self) -> None:
         """
         Check if Monte Carlo simulation is valid.
+
+        Raises
+        ------
+        ValueError
+            If the Monte Carlo simulation is not valid and explains why.
         """
         # Retrieve list of valid ensembles
         ensemble_list = [
