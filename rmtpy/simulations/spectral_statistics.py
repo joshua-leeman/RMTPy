@@ -658,6 +658,14 @@ class SpectralStatistics(MonteCarlo):
         self._create_hist(data=spacings, dataclass=spacings_config)
 
     def _form_factors(self, levels: np.ndarray) -> None:
+        """
+        Create a plot of the spectral form factors versus time.
+
+        Parameters
+        ----------
+        levels : np.ndarray
+            Eigenvalue sample.
+        """
         # Create logtime array
         times = np.logspace(
             sff_config.logtime_min,
