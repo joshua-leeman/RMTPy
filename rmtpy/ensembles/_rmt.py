@@ -563,6 +563,7 @@ class Ensemble(RMT, SpectralMixin):
 class Tenfold(Ensemble):
     """
     Base class for tenfold-way RMT ensembles.
+    Inherits from the Ensemble class.
 
     Attributes
     ----------
