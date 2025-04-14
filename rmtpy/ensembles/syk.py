@@ -12,7 +12,7 @@ It is grouped into the following sections:
 # 1. Imports
 # =============================
 # Standard library imports
-from math import comb
+from math import comb, prod
 from typing import List
 
 # Third-party imports
@@ -67,14 +67,9 @@ class SYK(Ensemble):
         dtype : type, optional
             Data type of the matrix elements (default is np.complex128).
         """
-        # Set SYK-specific parameters
+        # Set SYK parameters
         self._q = q
-
-        # Initialize ensemble class
-        super().__init__(N=N, scale=scale, dtype=dtype)
-
-        # Check if SYK parameters are valid
-        self._check_ensemble()
+        self._N = N
 
         # Calculate suppression factor
         self._eta = np.sum(
@@ -84,6 +79,12 @@ class SYK(Ensemble):
             / comb(self.N, self.q)
             for k in range(self.q + 1)
         )
+
+        # Initialize ensemble class
+        super().__init__(N=N, scale=scale, dtype=dtype)
+
+        # Check if SYK parameters are valid
+        self._check_ensemble()
 
         # Determine Dyson index
         self._beta = (
@@ -194,7 +195,7 @@ class SYK(Ensemble):
         # Fill products with initial products of Majorana operators
         products[0] = self.majorana[indices[0]]
         for i in range(1, self.q):
-            products[i] = products[i - 1].dot(self.majorana[indices[i]], format="csr")
+            products[i] = products[i - 1].dot(self.majorana[indices[i]])
 
         # Initialize Hamiltonian
         H = csr_matrix((self.dim, self.dim), dtype=self.dtype)
@@ -223,15 +224,11 @@ class SYK(Ensemble):
             if i == 0:
                 products[0] = self.majorana[indices[0]]
             else:
-                products[i] = products[i - 1].dot(
-                    self.majorana[indices[i]], format="csr"
-                )
+                products[i] = products[i - 1].dot(self.majorana[indices[i]])
 
             # Update products at indices greater than changed index
             for j in range(i + 1, self.q):
-                products[j] = products[j - 1].dot(
-                    self.majorana[indices[j]], format="csr"
-                )
+                products[j] = products[j - 1].dot(self.majorana[indices[j]])
 
         # Scalle and return SYK Hamiltonian
         H *= 1j ** (self.q * (self.q - 1) // 2) * self.sigma
@@ -254,7 +251,7 @@ class SYK(Ensemble):
         # Check if eigenvalue is within support
         if abs(eigval) < self.scale:
             # Approximate mean spectral density's infinite product
-            product = np.prod(
+            product = prod(
                 (
                     1
                     - (2 * eigval / self.scale) ** 2
