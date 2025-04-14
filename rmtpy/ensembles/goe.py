@@ -71,15 +71,9 @@ class GOE(Tenfold):
         # Set degeneracy of eigenvalues
         self._degeneracy = degeneracy
 
-    def generate(self, out: np.ndarray = None) -> np.ndarray:
+    def generate(self) -> np.ndarray:
         """
         Return a random matrix from the GOE.
-
-        Parameters
-        ----------
-        out : np.ndarray, optional
-            If provided, the generated matrix will be stored in this array.
-            Otherwise, a new array will be allocated.
 
         Returns
         -------
