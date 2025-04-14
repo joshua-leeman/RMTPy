@@ -68,6 +68,18 @@ class SYK(Ensemble):
         # Set order of SYK arguments
         self._arg_order = ["name", "q", "N", "scale"]
 
+    def __repr__(self):
+        """
+        LaTeX representation of the SYK ensemble.
+        """
+        return rf"$\textrm{{{self.__class__.__name__}}}_{self.q}\ N={self.N}$"
+
+    def __str__(self):
+        """
+        String representation of the SYK ensemble.
+        """
+        return f"{self.__class__.__name__} (q={self.q}, N={self.N}, scale={self.scale})"
+
     def _check_ensemble(self):
         pass
 
