@@ -269,6 +269,21 @@ def plot_nn_spacing_dist(data_path: str) -> None:
 
 
 def plot_form_factors(data_path: str) -> None:
+    """
+    Plots the spectral form factors from the given data path.
+
+    Parameters
+    ----------
+    data_path : str
+        Path to the data file containing form factors data.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the specified path does not exist.
+    ValueError
+        If the file name does not match the expected name or if the ensemble name is not found in the path.
+    """
     # Reads results path and extracts ensemble
     ensemble = _ensemble_from_path(data_path, sff_config.data_filename)
 
