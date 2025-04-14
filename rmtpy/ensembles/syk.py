@@ -221,6 +221,44 @@ class SYK(Ensemble):
         H *= 1j ** (self.q * (self.q - 1) // 2) * self.sigma
         return H.toarray()
 
+    def spectral_density(self, eigval: float, num_terms: int = 1000) -> float:
+        """
+        Calculate the mean spectral density at eigenvalue.
+
+        Parameters
+        ----------
+        eigval : float
+            Eigenvalue at which to calculate the mean spectral density.
+
+        Returns
+        -------
+        float
+            Mean spectral density at the given eigenvalue.
+        """
+        # Check if eigenvalue is within support
+        if abs(eigval) < self.scale:
+            # Approximate mean spectral density's infinite product
+            product = np.prod(
+                (
+                    1
+                    - (2 * eigval / self.scale) ** 2
+                    * self.eta ** (k + 1)
+                    / (1 + self.eta ** (k + 1)) ** 2
+                )
+                * ((1 - self.eta ** (2 * k + 2)) / (1 - self.eta ** (2 * k + 1)))
+                for k in range(num_terms)
+            )
+
+            # Return SYK mean spectral density at eigenvalue
+            return (
+                product
+                * np.sqrt(1 - (eigval / self.scale) ** 2)
+                / (np.pi * self.scale / 2)
+            )
+        else:
+            # If eigenvalue is outside support, return 0
+            return 0.0
+
     @property
     def q(self):
         """
