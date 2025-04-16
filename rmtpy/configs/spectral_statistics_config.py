@@ -101,8 +101,8 @@ class SpectralFormFactors:
 
     # Simulation parameters
     logtime_num: int = 5000
-    logtime_min: float = -1.75
-    logtime_max: float = 1.00
+    logtime_min: float = -0.75
+    logtime_max: float = 2.00
 
     # Results parameters
     data_filename: str = "form_factors.npz"
@@ -113,10 +113,12 @@ class SpectralFormFactors:
     sff_legend: str = r"$\textrm{SFF}$"
     csff_legend: str = r"$\textrm{cSFF}$"
     universal_legend: str = "theory"
-    xlabel: str = r"$\tau = J t$"
-    ylabel: str = r"$K(\tau)$"
-    sff_color: str = "Red"
-    csff_color: str = "Blue"
+    xlabel: str = r"$J t$"
+    ylabel: str = r"$K(J t)$"
+    unfolded_xlabel: str = r"$\tau$"
+    unfolded_ylabel: str = r"$K(\tau)$"
+    sff_color: str = "Blue"
+    csff_color: str = "Red"
     universal_color: str = "Black"
     sff_alpha: float = 1.0
     csff_alpha: float = 1.0
