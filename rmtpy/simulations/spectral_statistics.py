@@ -410,64 +410,93 @@ def plot_form_factors(data_path: str, unfold: bool = False) -> None:
     ax.xaxis.set_major_locator(LogLocator(base=ensemble.dim, numticks=6))
     ax.yaxis.set_major_locator(LogLocator(base=ensemble.dim, numticks=6))
 
-    # Plot spectral form factor
-    ax.plot(
-        times,
-        sff,
-        color=sff_config.sff_color,
-        linewidth=sff_config.sff_width,
-        alpha=sff_config.sff_alpha,
-        zorder=sff_config.sff_zorder,
-    )
+    # Create plot based on whether unfolding has occurred
+    if not unfold:
+        # Plot spectral form factor
+        ax.plot(
+            times,
+            sff,
+            color=sff_config.sff_color,
+            linewidth=sff_config.sff_width,
+            alpha=sff_config.sff_alpha,
+            zorder=sff_config.sff_zorder,
+        )
 
-    # Plot connected spectral form factor
-    ax.plot(
-        times,
-        csff,
-        color=sff_config.csff_color,
-        linewidth=sff_config.csff_width,
-        alpha=sff_config.csff_alpha,
-        zorder=sff_config.csff_zorder,
-    )
+        # Plot connected spectral form factor
+        ax.plot(
+            times,
+            csff,
+            color=sff_config.csff_color,
+            linewidth=sff_config.csff_width,
+            alpha=sff_config.csff_alpha,
+            zorder=sff_config.csff_zorder,
+        )
 
-    # Calculate universal connected spectral form factor
-    universal_csff = np.vectorize(ensemble.universal_csff)(times)
+        # Set axis labels and limits
+        ax.set_xlabel(sff_config.xlabel)
+        ax.set_ylabel(sff_config.ylabel)
+        ax.set_xlim(
+            ensemble.dim**sff_config.logtime_min / ensemble.N / ensemble.J,
+            ensemble.dim**sff_config.logtime_max / ensemble.N / ensemble.J,
+        )
+        ax.set_ylim(ensemble.dim ** (-2.10), ensemble.dim**0.10)
 
-    # Plot universal connected spectral form factor
-    ax.plot(
-        times,
-        universal_csff,
-        color=sff_config.universal_color,
-        linewidth=sff_config.universal_width,
-        zorder=sff_config.universal_zorder,
-    )
+        # Create tick labels for x-axis
+        ax.set_xticks(
+            np.array([1, ensemble.dim, ensemble.dim**2]) / ensemble.N / ensemble.J
+        )
+        ax.set_xticklabels([r"$1 / N$", r"$D / N$", r"$D^2 / N$"])
 
-    # Set axis labels and limits
-    ax.set_xlabel(sff_config.xlabel)
-    ax.set_ylabel(sff_config.ylabel)
-    ax.set_xlim(
-        ensemble.dim ** (sff_config.logtime_min + 1) / ensemble.N / ensemble.J,
-        ensemble.dim ** (sff_config.logtime_max + 1) / ensemble.N / ensemble.J,
-    )
-    ax.set_ylim(0.1 * ensemble.dim ** (-2), 10)
+    else:
+        # Plot spectral form factor
+        ax.plot(
+            times,
+            sff,
+            color=sff_config.sff_color,
+            linewidth=sff_config.sff_width,
+            alpha=sff_config.sff_alpha,
+            zorder=sff_config.sff_zorder,
+        )
 
-    # Create tick labels for x-axis
-    ax.set_xticks(
-        [
-            ensemble.dim ** (i + 1) / ensemble.N / ensemble.J
-            for i in range(int(sff_config.logtime_min), int(sff_config.logtime_max) + 1)
-        ]
-    )
-    ax.set_xticklabels(
-        [
-            (r"$D^2 / N$" if i == 1 else r"$D / N$" if i == 0 else r"$1 / N$")
-            for i in range(int(sff_config.logtime_min), int(sff_config.logtime_max + 1))
-        ]
-    )
+        # Plot connected spectral form factor
+        ax.plot(
+            times,
+            csff,
+            color=sff_config.csff_color,
+            linewidth=sff_config.csff_width,
+            alpha=sff_config.csff_alpha,
+            zorder=sff_config.csff_zorder,
+        )
+
+        # Calculate universal connected spectral form factor
+        universal_csff = np.vectorize(ensemble.universal_csff)(times)
+
+        # Plot universal connected spectral form factor
+        ax.plot(
+            times,
+            universal_csff,
+            color=sff_config.universal_color,
+            linewidth=sff_config.universal_width,
+            zorder=sff_config.universal_zorder,
+            linestyle="dashed",
+        )
+
+        # Set axis labels and limits
+        ax.set_xlabel(sff_config.unfolded_xlabel)
+        ax.set_ylabel(sff_config.unfolded_ylabel)
+        ax.set_xlim(
+            ensemble.dim ** (sff_config.logtime_min - 1),
+            ensemble.dim ** (sff_config.logtime_max - 1),
+        )
+        ax.set_ylim(ensemble.dim ** (-2.10), ensemble.dim**0.10)
+
+        # Create tick labels for x-axis
+        ax.set_xticks(np.array([ensemble.dim**-1, 1, ensemble.dim]))
+        ax.set_xticklabels([r"$D^{-1}$", r"$1$", r"$D$"])
 
     # Create ticks for y-axis
     ax.set_yticks([ensemble.dim**i for i in range(-2, 1)])
-    ax.set_yticklabels([(rf"$D^{{{i}}}$" if i != 0 else r"$1$") for i in range(-2, 1)])
+    ax.set_yticklabels([r"$D^{-2}$", r"$D^{-1}$", r"$1$"])
 
     # Set tick marks all around and inward
     ax.tick_params(
@@ -775,18 +804,27 @@ class SpectralStatistics(MonteCarlo):
         levels : np.ndarray
             Eigenvalue sample.
         """
-        # Create logtime array
-        times = (
-            np.logspace(
-                sff_config.logtime_min + 1,
-                sff_config.logtime_max + 1,
+        # Create logtime array depending on unfolding
+        if not unfold:
+            times = (
+                np.logspace(
+                    sff_config.logtime_min,
+                    sff_config.logtime_max,
+                    sff_config.logtime_num,
+                    base=self.ensemble.dim,
+                    dtype=np.float64,
+                )
+                / self.ensemble.N
+                / self.ensemble.J
+            )
+        else:
+            times = np.logspace(
+                sff_config.logtime_min - 1,
+                sff_config.logtime_max - 1,
                 sff_config.logtime_num,
                 base=self.ensemble.dim,
                 dtype=np.float64,
             )
-            / self.ensemble.N
-            / self.ensemble.J
-        )
 
         # Allocate memory for form factors
         sff = np.empty_like(times, dtype=np.float64)
