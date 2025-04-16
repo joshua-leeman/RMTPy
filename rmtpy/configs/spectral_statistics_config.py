@@ -44,6 +44,8 @@ class SpectralHistogram:
     curve_legend: str = "theory"
     xlabel: str = r"$E$"
     ylabel: str = r"$\langle \rho(E) \rangle$"
+    unfolded_xlabel: str = r"$\xi$"
+    unfolded_ylabel: str = r"$\langle \rho(\xi) \rangle$"
     hist_color: str = "RoyalBlue"
     curve_color: str = "Black"
     hist_alpha: float = 0.5
@@ -65,7 +67,7 @@ class NNLevelSpacings:
     # Simulation parameters
     num_bins: int = 100
     density_num: int = 1000
-    x_max: float = 4.0
+    x_max: int = 4
 
     # Results parameters
     data_filename: str = "spacings.npz"
@@ -75,8 +77,10 @@ class NNLevelSpacings:
     title: str = "NNS Distribution"
     hist_legend: str = "simulation"
     curve_legend: str = "surmise"
-    xlabel: str = r"$s$"
-    ylabel: str = r"$\langle \rho(s) \rangle$"
+    xlabel: str = r"$\varepsilon$"
+    ylabel: str = r"$\langle \rho(\varepsilon / d) \rangle$"
+    unfolded_xlabel: str = r"$s$"
+    unfolded_ylabel: str = r"$\langle \rho(s) \rangle$"
     hist_color: str = "Orange"
     curve_color: str = "Black"
     hist_alpha: float = 0.5
