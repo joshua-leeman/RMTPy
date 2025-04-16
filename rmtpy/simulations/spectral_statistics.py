@@ -151,9 +151,7 @@ def plot_spectral_hist(data_path: str) -> None:
     )
 
     # Create array of energy values
-    energies = np.linspace(
-        -ensemble.scale, ensemble.scale, num=spectral_config.density_num
-    )
+    energies = np.linspace(-ensemble.E0, ensemble.E0, num=spectral_config.density_num)
 
     # Evaluate theoretical average spectral density
     density = np.vectorize(ensemble.spectral_density)(energies)
@@ -171,9 +169,25 @@ def plot_spectral_hist(data_path: str) -> None:
     ax.set_xlabel(spectral_config.xlabel)
     ax.set_ylabel(spectral_config.ylabel)
     ax.set_xlim(
-        -spectral_config.x_range * ensemble.scale,
-        spectral_config.x_range * ensemble.scale,
+        -spectral_config.x_range * ensemble.E0,
+        spectral_config.x_range * ensemble.E0,
     )
+
+    # Create tick labels for x-axis
+    ax.set_xticks([ensemble.E0 * i for i in range(-1, 2)])
+    ax.set_xticklabels(
+        [
+            (
+                r"$-\frac{1}{2}NJ$"
+                if i == -1
+                else r"$\frac{1}{2}NJ$" if i == 1 else r"$0$"
+            )
+            for i in range(-1, 2)
+        ]
+    )
+
+    # Create minor ticks for x-axis
+    ax.set_xticks([ensemble.E0 * i / 2 for i in range(-1, 2)], minor=True)
 
     # Set tick markrs all around and inward
     ax.tick_params(
@@ -182,6 +196,8 @@ def plot_spectral_hist(data_path: str) -> None:
         bottom=True,
         left=True,
         right=True,
+        which="both",
+        length=5,
     )
 
     # Create plot path from data path
@@ -364,22 +380,22 @@ def plot_form_factors(data_path: str) -> None:
     ax.set_xlabel(sff_config.xlabel)
     ax.set_ylabel(sff_config.ylabel)
     ax.set_xlim(
-        ensemble.dim**sff_config.logtime_min,
-        ensemble.dim**sff_config.logtime_max,
+        ensemble.dim ** (sff_config.logtime_min + 1) / ensemble.N / ensemble.J,
+        ensemble.dim ** (sff_config.logtime_max + 1) / ensemble.N / ensemble.J,
     )
     ax.set_ylim(0.1 * ensemble.dim ** (-2), 10)
 
     # Create tick labels for x-axis
     ax.set_xticks(
         [
-            ensemble.dim**i
-            for i in range(sff_config.logtime_min, sff_config.logtime_max + 1)
+            ensemble.dim ** (i + 1) / ensemble.N / ensemble.J
+            for i in range(int(sff_config.logtime_min), int(sff_config.logtime_max) + 1)
         ]
     )
     ax.set_xticklabels(
         [
-            rf"$D^{{{i+1}}}$" if i not in [-1, 0] else r"$1$" if i == -1 else r"$D$"
-            for i in range(sff_config.logtime_min, sff_config.logtime_max + 1)
+            (r"$D^2 / N$" if i == 1 else r"$D / N$" if i == 0 else r"$1 / N$")
+            for i in range(int(sff_config.logtime_min), int(sff_config.logtime_max + 1))
         ]
     )
 
@@ -626,14 +642,10 @@ class SpectralStatistics(MonteCarlo):
         dataclass : object
             Configuration class containing histogram parameters.
         """
-        # Calculate bin edges
-        min_edge, max_edge = np.min(data), np.max(data)
-
-        # Arrange bin edges
-        bins = np.arange(min_edge, max_edge + dataclass.bin_width, dataclass.bin_width)
-
         # Calculate normalized histogram of data
-        hist_counts, hist_edges = np.histogram(data, bins=bins, density=True)
+        hist_counts, hist_edges = np.histogram(
+            data, bins=dataclass.num_bins, density=True
+        )
 
         # Create output directory and store results path
         output_dir = self._create_output_dir(res_type="data")
@@ -683,12 +695,16 @@ class SpectralStatistics(MonteCarlo):
             Eigenvalue sample.
         """
         # Create logtime array
-        times = np.logspace(
-            sff_config.logtime_min,
-            sff_config.logtime_max,
-            sff_config.logtime_num,
-            base=self.ensemble.dim,
-            dtype=np.float64,
+        times = (
+            np.logspace(
+                sff_config.logtime_min + 1,
+                sff_config.logtime_max + 1,
+                sff_config.logtime_num,
+                base=self.ensemble.dim,
+                dtype=np.float64,
+            )
+            / self.ensemble.N
+            / self.ensemble.J
         )
 
         # Allocate memory for form factors
