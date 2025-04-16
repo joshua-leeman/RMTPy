@@ -48,7 +48,7 @@ class GOE(Tenfold):
         self,
         N: int = None,
         dim: int = None,
-        scale: float = 1.0,
+        J: float = 1.0,
         dtype: type = np.complex128,
     ) -> None:
         """
@@ -60,13 +60,13 @@ class GOE(Tenfold):
             Number of Majorana fermions
         dim : int, optional
             Dimension of the matrix
-        scale : float, optional
-            Energy scale (default is 1.0)
+        J : float, optional
+            Energy scale of interactions (default is 1.0)
         dtype : type, optional
             Data type of the matrix elements (default is np.complex128)
         """
         # Initialize tenfold ensemble
-        super().__init__(beta=beta, N=N, dim=dim, scale=scale, dtype=dtype)
+        super().__init__(beta=beta, N=N, dim=dim, J=J, dtype=dtype)
 
         # Set degeneracy of eigenvalues
         self._degeneracy = degeneracy
