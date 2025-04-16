@@ -423,6 +423,9 @@ class SpectralMixin:
             # Duplicate spacings with degeneracy
             spacings = np.repeat(spacings, self.degeneracy, axis=1)
 
+        # Calculate and store mean level spacing
+        self._mean_spacing = np.mean(spacings, axis=1)
+
         # Return nearest-neighbor level spacings
         return spacings
 
@@ -536,6 +539,18 @@ class SpectralMixin:
         # Return unity for other Dyson indices
         else:
             return 1.0 / self.dim
+
+    @property
+    def mean_spacing(self) -> np.ndarray:
+        """
+        Mean level spacing.
+        """
+        try:
+            return self._mean_spacing
+        except AttributeError:
+            raise AttributeError(
+                "Mean level spacing not calculated. Call nn_spacings() first."
+            )
 
 
 # =============================
