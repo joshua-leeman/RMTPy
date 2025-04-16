@@ -538,7 +538,7 @@ class SpectralStatistics(MonteCarlo):
             nargs="+",
             type=int,
             choices=[1, 2, 3],
-            default=[1, 2, 3],
+            default=[],
             help=dedent(
                 """
                 Specify which simulation(s) to run:
@@ -753,9 +753,7 @@ class SpectralStatistics(MonteCarlo):
             csff=csff,
         )
 
-    def _run_simulation(
-        self, sim_num: int, levels: np.ndarray = None, unfold: bool = False
-    ) -> None:
+    def _run_simulation(self, sim_num: int, levels: np.ndarray = None) -> None:
         """
         Run a simulation and save the results.
 
@@ -790,9 +788,11 @@ class SpectralStatistics(MonteCarlo):
         output_dir = self._create_output_dir(res_type="data")
 
         # Run plot function
-        sim_info["plot"](os.path.join(output_dir, sim_info["file"]), unfold=unfold)
+        sim_info["plot"](
+            os.path.join(output_dir, sim_info["file"]), unfold=sim_info["unfold"]
+        )
 
-    def run_spectral_hist(self, unfold: bool = False) -> None:
+    def run_spectral_hist(self) -> None:
         """
         Run the spectral histogram simulation.
 
@@ -802,9 +802,9 @@ class SpectralStatistics(MonteCarlo):
             Whether to unfold eigenvalues (default is False).
         """
         # Run spectral histogram simulation
-        self._run_simulation(1, unfold=unfold)
+        self._run_simulation(1)
 
-    def run_nn_spacing_dist(self, unfold: bool = False) -> None:
+    def run_nn_spacing_dist(self) -> None:
         """
         Run the nearest-neighbor level spacing distribution simulation.
 
@@ -814,9 +814,9 @@ class SpectralStatistics(MonteCarlo):
             Whether to unfold eigenvalues (default is False).
         """
         # Run nearest neighbor spacing distribution simulation
-        self._run_simulation(2, unfold=unfold)
+        self._run_simulation(2)
 
-    def run_form_factors(self, unfold: bool = False) -> None:
+    def run_form_factors(self) -> None:
         """
         Run the spectral form factors simulation.
 
@@ -826,7 +826,7 @@ class SpectralStatistics(MonteCarlo):
             Whether to unfold eigenvalues (default is False).
         """
         # Run spectral form factors simulation
-        self._run_simulation(3, unfold=unfold)
+        self._run_simulation(3)
 
     def run(self) -> None:
         """
@@ -840,15 +840,21 @@ class SpectralStatistics(MonteCarlo):
 
         # Run each specified simulation that does not require unfolding
         for sim_num in self._job:
+            print(f"Running simulation {sim_num}...")
             if self._job[sim_num]["do"] and not self._job[sim_num]["unfold"]:
                 self._run_simulation(sim_num, levels)
 
         # Unfold eigenvalues if specified
-        if any(self._job[sim_num]["unfold"] for sim_num in self._job) or self._all:
+        if any(self._job[sim_num]["unfold"] for sim_num in self._job):
             levels = self.ensemble.unfold(levels)
+        elif self._all:
+            levels = self.ensemble.unfold(levels)
+            for sim_num in self._job:
+                self._job[sim_num]["unfold"] = True
 
         # Run each specified simulation that requires unfolding
         for sim_num in self._job:
+            print(f"Running simulation unfolded {sim_num}...")
             if self._job[sim_num]["do"] and self._job[sim_num]["unfold"]:
                 self._run_simulation(sim_num, levels)
 
