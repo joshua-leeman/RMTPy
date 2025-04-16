@@ -35,11 +35,11 @@ class RMT(ABC):
     Attributes
     ----------
     N : int
-        Number of Majorana fermions
+        Number of particles
     dim : int
         Dimension of the matrix
-    scale : float
-        Energy scale
+    J : float
+        Energy scale of interactions
     dtype : type
         Data type of the matrix
     real_dtype : type
@@ -48,6 +48,8 @@ class RMT(ABC):
         Dyson index (symmetry class)
     degeneracy : int
         Degeneracy of the ensemble's eigenvalues
+    E0 : float
+        Ground state energy
 
     Methods
     -------
@@ -65,7 +67,7 @@ class RMT(ABC):
         self,
         N: int = None,
         dim: int = None,
-        scale: float = 1.0,
+        J: float = 1.0,
         dtype: type = np.complex128,
     ) -> None:
         """
@@ -77,15 +79,18 @@ class RMT(ABC):
             Number of Majorana fermions (default is None)
         dim : int, optional
             Dimension of the matrix (default is None)
-        scale : float, optional
-            Energy scale (default is 1.0)
+        J : float, optional
+            Energy scale of the interactions (default is 1.0)
         dtype : type, optional
             Data type of the matrix elements (default is np.complex128)
         """
         # Store ensemble parameters
         self._N = N
         self._dim = dim
-        self._scale = scale
+        self._J = J
+
+        # Calculate ground state energy
+        self._E0 = self.N * self.J / 2
 
         # Store data type
         self._dtype = dtype
@@ -103,7 +108,10 @@ class RMT(ABC):
         self._matrix_memory = self.dim**2 * np.dtype(self.dtype).itemsize
 
         # Set default order of arguments
-        self._arg_order = ["name", "N", "dim", "scale"]
+        self._arg_order = ["name", "N", "dim", "J"]
+
+        # Create cumulative density function
+        self._create_cumulative_density()
 
     def __repr__(self) -> str:
         """
@@ -119,9 +127,9 @@ class RMT(ABC):
         String representation of the ensemble.
         """
         if self.N is None:
-            return f"{self.__class__.__name__} (dim={self.dim}, scale={self.scale})"
+            return f"{self.__class__.__name__} (dim={self.dim}, J={self.J})"
         else:
-            return f"{self.__class__.__name__} (N={self.N}, scale={self.scale})"
+            return f"{self.__class__.__name__} (N={self.N}, J={self.J})"
 
     def _check_ensemble(self) -> None:
         """
@@ -145,12 +153,13 @@ class RMT(ABC):
             raise ValueError("Either N or dim must be specified.")
 
         # If valid, clean N and dim inputs
-        self._N = int(self.N) if self.N is not None else None
+        # Determine effective N if N is not provided
+        self._N = int(self.N) if self.N is not None else 2 * (np.log2(self.dim) + 1)
         self._dim = int(self.dim) if self.dim is not None else 2 ** (self.N // 2 - 1)
 
-        # Check if energy scale is valid
-        if not isinstance(self.scale, (int, float)) or self.scale <= 0:
-            raise ValueError("Energy scale must be a positive number.")
+        # Check if interaction energy scale is valid
+        if not isinstance(self.J, (int, float)) or self.J <= 0:
+            raise ValueError("Interaction energy scale must be a positive number.")
 
         # Check if data type is valid
         try:
@@ -169,12 +178,12 @@ class RMT(ABC):
         num_pts : int, optional
             Number of points for the grid (default is 2**16)
         multiplier : int, optional
-            Multiplier used to extend energy scale (default is 3)
+            Multiplier used to extend limits of interp1d (default is 3)
         """
         # Create grid for cumulative trapezoidal integration
         eigen_grid = np.linspace(
-            -multiplier * self.scale,
-            multiplier * self.scale,
+            -multiplier * self.N * self.J,
+            multiplier * self.N * self.J,
             num_pts,
         )
 
@@ -258,7 +267,9 @@ class RMT(ABC):
             Unfolded eigenvalue
         """
         # Return unfolded eigenvalue about spectrum's center
-        return self.dim * (self.cumulative_density(eigenvalue) - 1 / 2)
+        return (
+            self.dim * (self.cumulative_density(eigenvalue) - 1 / 2) / self.degeneracy
+        )
 
     @property
     def N(self) -> int:
@@ -275,11 +286,18 @@ class RMT(ABC):
         return self._dim
 
     @property
-    def scale(self) -> float:
+    def J(self) -> float:
         """
-        Energy scale.
+        Energy scale of the ensemble interactions.
         """
-        return self._scale
+        return self._J
+
+    @property
+    def E0(self) -> float:
+        """
+        Ground state energy.
+        """
+        return self._E0
 
     @property
     def dtype(self) -> type:
@@ -533,7 +551,7 @@ class Ensemble(RMT, SpectralMixin):
         self,
         N: int = None,
         dim: int = None,
-        scale: float = 1.0,
+        J: float = 1.0,
         dtype: type = np.complex128,
     ) -> None:
         """
@@ -545,16 +563,13 @@ class Ensemble(RMT, SpectralMixin):
             Number of Majorana fermions (default is None)
         dim : int, optional
             Dimension of the matrix (default is None)
-        scale : float, optional
-            Energy scale (default is 1.0)
+        J : float, optional
+            Energy scale of interactions (default is 1.0)
         dtype : type, optional
             Data type of the matrix (default is np.complex128)
         """
         # Initialize RMT ensemble
-        super().__init__(N=N, dim=dim, scale=scale, dtype=dtype)
-
-        # Create cumulative density function
-        self._create_cumulative_density()
+        super().__init__(N=N, dim=dim, J=J, dtype=dtype)
 
 
 # =============================
@@ -571,6 +586,8 @@ class Tenfold(Ensemble):
         Dyson index (symmetry class)
     sigma : float
         Standard deviation of the matrix elements
+    E0 : float
+        Ground state energy
 
     Methods
     -------
@@ -583,11 +600,11 @@ class Tenfold(Ensemble):
         beta: int,
         N: int = None,
         dim: int = None,
-        scale: float = 1.0,
+        J: float = 1.0,
         dtype: type = np.complex128,
     ) -> None:
         """
-        Initialize the tenfold ensemble.
+        Initialize the tenfold (Gaussian) ensemble.
 
         Parameters
         ----------
@@ -597,19 +614,19 @@ class Tenfold(Ensemble):
             Number of Majorana fermions (default is None)
         dim : int, optional
             Dimension of the matrix (default is None)
-        scale : float, optional
-            Energy scale (default is 1.0)
+        J : float, optional
+            Energy scale of interactions (default is 1.0)
         dtype : type, optional
             Data type of the matrix (default is np.complex128)
         """
         # Initialize RMT ensemble
-        super().__init__(N=N, dim=dim, scale=scale, dtype=dtype)
+        super().__init__(N=N, dim=dim, J=J, dtype=dtype)
 
         # Set Dyson index
         self._beta = beta
 
         # Calculate standard deviation of matrix elements
-        self._sigma = self.scale / np.sqrt(2 * self.beta * self.dim)
+        self._sigma = self.N * self.J / 2 / np.sqrt(2 * self.beta * self.dim)
 
     def spectral_density(self, eigval: float) -> float:
         """
@@ -626,8 +643,8 @@ class Tenfold(Ensemble):
             Mean spectral density at the given eigenvalue
         """
         # Calculate semi-circle spectral density
-        if abs(eigval) < self.scale:
-            return np.sqrt(1 - (eigval / self.scale) ** 2) / (np.pi * self.scale / 2)
+        if abs(eigval) < self.E0:
+            return np.sqrt(1 - (eigval / self.E0) ** 2) / (np.pi * self.E0 / 2)
         else:
             return 0.0
 
