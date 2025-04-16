@@ -284,32 +284,30 @@ def plot_nn_spacing_dist(data_path: str, unfold: bool = False) -> None:
     for spine in ax.spines.values():
         spine.set_linewidth(spacings_config.axes_width)
 
-        # Plot histogram
-        ax.hist(
-            hist_edges[:-1],
-            bins=hist_edges,
-            weights=hist_counts,
-            color=spacings_config.hist_color,
-            alpha=spacings_config.hist_alpha,
-            zorder=spacings_config.hist_zorder,
-        )
+    # Plot histogram
+    ax.hist(
+        hist_edges[:-1],
+        bins=hist_edges,
+        weights=hist_counts,
+        color=spacings_config.hist_color,
+        alpha=spacings_config.hist_alpha,
+        zorder=spacings_config.hist_zorder,
+    )
 
-        # Create array of spacings values
-        spacings = np.linspace(
-            0, spacings_config.x_max, num=spacings_config.density_num
-        )
+    # Create array of spacings values
+    spacings = np.linspace(0, spacings_config.x_max, num=spacings_config.density_num)
 
-        # Calculate Wigner surmise distribution
-        surmise = ensemble.wigner_surmise(spacings)
+    # Calculate Wigner surmise distribution
+    surmise = ensemble.wigner_surmise(spacings)
 
-        # Plot Wigner surmise distribution
-        ax.plot(
-            spacings,
-            surmise,
-            color=spacings_config.curve_color,
-            linewidth=spacings_config.curve_width,
-            zorder=spacings_config.curve_zorder,
-        )
+    # Plot Wigner surmise distribution
+    ax.plot(
+        spacings,
+        surmise,
+        color=spacings_config.curve_color,
+        linewidth=spacings_config.curve_width,
+        zorder=spacings_config.curve_zorder,
+    )
 
     # Set x-limits
     ax.set_xlim(0, spacings_config.x_max)
@@ -347,6 +345,8 @@ def plot_nn_spacing_dist(data_path: str, unfold: bool = False) -> None:
         bottom=True,
         left=True,
         right=True,
+        which="both",
+        length=5,
     )
 
     # Create plot path from data path
@@ -758,6 +758,10 @@ class SpectralStatistics(MonteCarlo):
         """
         # Calculate nearst neighbor spacings
         spacings = self.ensemble.nn_spacings(levels=levels)
+
+        # If unfolding is not requested, divide spacings by mean level spacing
+        if not unfold:
+            spacings /= np.mean(spacings)
 
         # Create histogram using spacings as data
         self._create_hist(data=spacings, dataclass=spacings_config, unfold=unfold)
