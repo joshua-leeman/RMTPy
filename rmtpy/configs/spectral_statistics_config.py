@@ -30,7 +30,7 @@ class SpectralHistogram:
     """
 
     # Simulation parameters
-    bin_width: float = 0.02
+    num_bins: int = 100
     density_num: int = 1000
     x_range: float = 1.2  # factor of scale
 
@@ -42,8 +42,8 @@ class SpectralHistogram:
     title: str = "Average Spectral Density"
     hist_legend: str = "simulation"
     curve_legend: str = "theory"
-    xlabel: str = r"$x = E / \lambda$"
-    ylabel: str = r"$\langle \rho(x) \rangle$"
+    xlabel: str = r"$E$"
+    ylabel: str = r"$\langle \rho(E) \rangle$"
     hist_color: str = "RoyalBlue"
     curve_color: str = "Black"
     hist_alpha: float = 0.5
@@ -63,7 +63,7 @@ class NNLevelSpacings:
     """
 
     # Simulation parameters
-    bin_width: float = 0.02
+    num_bins: int = 100
     density_num: int = 1000
     x_max: float = 4.0
 
@@ -97,8 +97,8 @@ class SpectralFormFactors:
 
     # Simulation parameters
     logtime_num: int = 5000
-    logtime_min: int = -2
-    logtime_max: int = 1
+    logtime_min: float = -1.75
+    logtime_max: float = 1.00
 
     # Results parameters
     data_filename: str = "form_factors.npz"
@@ -109,7 +109,7 @@ class SpectralFormFactors:
     sff_legend: str = r"$\textrm{SFF}$"
     csff_legend: str = r"$\textrm{cSFF}$"
     universal_legend: str = "theory"
-    xlabel: str = r"$\tau = t / 2 \lambda$"
+    xlabel: str = r"$\tau = J t$"
     ylabel: str = r"$K(\tau)$"
     sff_color: str = "Red"
     csff_color: str = "Blue"
