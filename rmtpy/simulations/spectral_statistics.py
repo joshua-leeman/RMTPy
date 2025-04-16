@@ -478,7 +478,6 @@ def plot_form_factors(data_path: str, unfold: bool = False) -> None:
             color=sff_config.universal_color,
             linewidth=sff_config.universal_width,
             zorder=sff_config.universal_zorder,
-            linestyle="dashed",
         )
 
         # Set axis labels and limits
@@ -493,6 +492,15 @@ def plot_form_factors(data_path: str, unfold: bool = False) -> None:
         # Create tick labels for x-axis
         ax.set_xticks(np.array([ensemble.dim**-1, 1, ensemble.dim]))
         ax.set_xticklabels([r"$D^{-1}$", r"$1$", r"$D$"])
+
+    # Plot horizontal line at y=D^{-1}
+    ax.axhline(
+        ensemble.dim**-1,
+        color=sff_config.universal_color,
+        linewidth=sff_config.universal_width,
+        zorder=sff_config.universal_zorder,
+        linestyle="dashed",
+    )
 
     # Create ticks for y-axis
     ax.set_yticks([ensemble.dim**i for i in range(-2, 1)])
