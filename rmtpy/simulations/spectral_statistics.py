@@ -108,7 +108,7 @@ def _ensemble_from_path(path: str, file_name: str) -> dict:
     return ENSEMBLE(**ens_inputs)
 
 
-def plot_spectral_hist(data_path: str) -> None:
+def plot_spectral_hist(data_path: str, unfolded: bool = False) -> None:
     """
     Plots the spectral histogram from the given data path.
 
@@ -204,7 +204,7 @@ def plot_spectral_hist(data_path: str) -> None:
     data_path = Path(data_path)
     plot_dir = data_path.parent.parent / "plots"
     plot_dir.mkdir(parents=True, exist_ok=True)
-    plot_path = plot_dir / spectral_config.plot_filename
+    plot_path = plot_dir / f"{unfolded * "unfolded_"}{spectral_config.plot_filename}"
 
     # Save plot to file
     plt.savefig(plot_path, dpi=300, bbox_inches="tight")
@@ -213,7 +213,7 @@ def plot_spectral_hist(data_path: str) -> None:
     plt.close(fig)
 
 
-def plot_nn_spacing_dist(data_path: str) -> None:
+def plot_nn_spacing_dist(data_path: str, unfolded: bool = False) -> None:
     """
     Plots the nearest-neighbor level spacing distribution from the given data path.
 
@@ -289,7 +289,7 @@ def plot_nn_spacing_dist(data_path: str) -> None:
     data_path = Path(data_path)
     plot_dir = data_path.parent.parent / "plots"
     plot_dir.mkdir(parents=True, exist_ok=True)
-    plot_path = plot_dir / spacings_config.plot_filename
+    plot_path = plot_dir / f"{unfolded * "unfolded_"}{spacings_config.plot_filename}"
 
     # Save plot to file
     plt.savefig(plot_path, dpi=300, bbox_inches="tight")
@@ -298,7 +298,7 @@ def plot_nn_spacing_dist(data_path: str) -> None:
     plt.close(fig)
 
 
-def plot_form_factors(data_path: str) -> None:
+def plot_form_factors(data_path: str, unfolded: bool = False) -> None:
     """
     Plots the spectral form factors from the given data path.
 
@@ -416,7 +416,7 @@ def plot_form_factors(data_path: str) -> None:
     data_path = Path(data_path)
     plot_dir = data_path.parent.parent / "plots"
     plot_dir.mkdir(parents=True, exist_ok=True)
-    plot_path = plot_dir / sff_config.plot_filename
+    plot_path = plot_dir / f"{unfolded * "unfolded_"}{sff_config.plot_filename}"
 
     # Save plot to file
     plt.savefig(plot_path, dpi=300, bbox_inches="tight")
