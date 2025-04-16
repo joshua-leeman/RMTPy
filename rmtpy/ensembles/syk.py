@@ -12,7 +12,7 @@ It is grouped into the following sections:
 # 1. Imports
 # =============================
 # Standard library imports
-from math import comb, prod
+from math import pi, comb, factorial, prod, sqrt
 from typing import List
 
 # Third-party imports
@@ -50,7 +50,7 @@ class SYK(Ensemble):
         self,
         q: int = None,
         N: int = None,
-        scale: float = 1.0,
+        J: float = 1.0,
         dtype: type = np.complex128,
     ) -> None:
         """
@@ -62,26 +62,26 @@ class SYK(Ensemble):
             Number of Majorana fermions.
         N : int
             Number of Majorana fermions.
-        scale : float, optional
-            Energy scale (default is 1.0).
+        J : float, optional
+            Energy scale of interactions (default is 1.0).
         dtype : type, optional
             Data type of the matrix elements (default is np.complex128).
         """
         # Set SYK parameters
         self._q = q
         self._N = N
+        self._J = J
 
         # Calculate suppression factor
         self._eta = np.sum(
-            (-1) ** (self.q - k)
-            * comb(self.q, k)
-            * comb(self.N - k, self.q - k)
-            / comb(self.N, self.q)
-            for k in range(self.q + 1)
-        )
+            (-1) ** (q - k) * comb(q, k) * comb(N - q, q - k) for k in range(q + 1)
+        ) / comb(N, q)
+
+        # Calculate standard deviation of matrix elements
+        self._sigma = N * J * sqrt((1 - self.eta) / comb(N, q)) / 4
 
         # Initialize ensemble class
-        super().__init__(N=N, scale=scale, dtype=dtype)
+        super().__init__(N=N, J=J, dtype=dtype)
 
         # Check if SYK parameters are valid
         self._check_ensemble()
@@ -91,11 +91,8 @@ class SYK(Ensemble):
             {(0, 0): 1, (0, 4): 4}.get((self.q % 4, self.N % 8), 2) if q > 2 else 0
         )
 
-        # Calculate standard deviation of matrix elements
-        self._sigma = self.scale * np.sqrt((1 - self._eta) / comb(self.N, self.q)) / 2
-
         # Set order of SYK arguments
-        self._arg_order = ["name", "q", "N", "scale"]
+        self._arg_order = ["name", "q", "N", "J"]
 
     def __repr__(self) -> str:
         """
@@ -107,7 +104,7 @@ class SYK(Ensemble):
         """
         String representation of the SYK ensemble.
         """
-        return f"{self.__class__.__name__} (q={self.q}, N={self.N}, scale={self.scale})"
+        return f"{self.__class__.__name__} (q={self.q}, N={self.N}, J={self.J})"
 
     def _check_ensemble(self) -> None:
         """
@@ -159,7 +156,7 @@ class SYK(Ensemble):
             eye_mat = eye_array(2 ** (i + 1), format="csr", dtype=self.dtype)
 
             # Initialize new Majorana operators
-            majorana = [None for _ in range(len(majorana_0) + 1)]
+            majorana = [None for _ in range(len(majorana_0) + 2)]
 
             # Create new Majorana operators
             for j in range(len(majorana_0)):
@@ -198,21 +195,21 @@ class SYK(Ensemble):
             products[i] = products[i - 1].dot(self.majorana[indices[i]])
 
         # Initialize Hamiltonian
-        H = csr_matrix((self.dim, self.dim), dtype=self.dtype)
+        H = np.zeros((self.dim, self.dim), dtype=self.dtype)
 
         # Generate random matrix elements through loop
         while True:
             # Add currect product to SYK Hamiltonian
             H += (
                 self._rng.standard_normal(dtype=self.real_dtype)
-                * products[-1][: self.dim : self.dim]
-            )
+                * products[-1][: self.dim, : self.dim]
+            ).toarray()
 
             # Generate next combination of indices
             for i in reversed(range(self.q)):
                 # If index is less than maximum index, increment it, and break
                 if indices[i] < self.N - self.q + i:
-                    indices += 1
+                    indices[i] += 1
                     for j in range(i + 1, self.q):
                         indices[j] = indices[j - 1] + 1
                     break
@@ -231,10 +228,10 @@ class SYK(Ensemble):
                 products[j] = products[j - 1].dot(self.majorana[indices[j]])
 
         # Scalle and return SYK Hamiltonian
-        H *= 1j ** (self.q * (self.q - 1) // 2) * self.sigma
-        return H.toarray()
+        H *= 1j ** (self.q * (self.q - 1) / 2) * self.sigma
+        return H
 
-    def spectral_density(self, eigval: float, num_terms: int = 1000) -> float:
+    def spectral_density(self, eigval: float, num_terms: int = 100) -> float:
         """
         Calculate the mean spectral density at eigenvalue.
 
@@ -249,24 +246,24 @@ class SYK(Ensemble):
             Mean spectral density at the given eigenvalue.
         """
         # Check if eigenvalue is within support
-        if abs(eigval) < self.scale:
+        if abs(eigval) < self._E0:
             # Approximate mean spectral density's infinite product
             product = prod(
                 (
                     1
-                    - (2 * eigval / self.scale) ** 2
+                    - (eigval / self._E0 * 2) ** 2
                     * self.eta ** (k + 1)
                     / (1 + self.eta ** (k + 1)) ** 2
                 )
                 * ((1 - self.eta ** (2 * k + 2)) / (1 - self.eta ** (2 * k + 1)))
                 for k in range(num_terms)
-            )
+            ) * sqrt(1 - self.eta)
 
             # Return SYK mean spectral density at eigenvalue
             return (
                 product
-                * np.sqrt(1 - (eigval / self.scale) ** 2)
-                / (np.pi * self.scale / 2)
+                * sqrt(1 - (eigval / self._E0) ** 2)
+                / (pi * sqrt(comb(self.N, self.q)) * self.sigma)
             )
         else:
             # If eigenvalue is outside support, return 0
