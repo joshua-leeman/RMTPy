@@ -125,7 +125,9 @@ def plot_spectral_hist(data_path: str, unfold: bool = False) -> None:
         If the file name does not match the expected name or if the ensemble name is not found in the path.
     """
     # Reads results path and extracts ensemble
-    ensemble = _ensemble_from_path(data_path, spectral_config.data_filename)
+    ensemble = _ensemble_from_path(
+        data_path, f"{unfold * 'unfolded_'}{spectral_config.data_filename}"
+    )
 
     # Load histogram data from file
     hist_data = np.load(data_path)
@@ -150,44 +152,78 @@ def plot_spectral_hist(data_path: str, unfold: bool = False) -> None:
         alpha=spectral_config.hist_alpha,
     )
 
-    # Create array of energy values
-    energies = np.linspace(-ensemble.E0, ensemble.E0, num=spectral_config.density_num)
+    # Create plot based on whether unfolding has occurred
+    if not unfold:
+        # Create array of energy values
+        energies = np.linspace(
+            -ensemble.E0, ensemble.E0, num=spectral_config.density_num
+        )
 
-    # Evaluate theoretical average spectral density
-    density = np.vectorize(ensemble.spectral_density)(energies)
+        # Evaluate theoretical average spectral density
+        density = np.vectorize(ensemble.spectral_density)(energies)
 
-    # Plot theoretical average spectral density
-    ax.plot(
-        energies,
-        density,
-        color=spectral_config.curve_color,
-        linewidth=spectral_config.curve_width,
-        zorder=spectral_config.curve_zorder,
-    )
+        # Plot theoretical average spectral density
+        ax.plot(
+            energies,
+            density,
+            color=spectral_config.curve_color,
+            linewidth=spectral_config.curve_width,
+            zorder=spectral_config.curve_zorder,
+        )
 
-    # Set axis labels and limits
-    ax.set_xlabel(spectral_config.xlabel)
-    ax.set_ylabel(spectral_config.ylabel)
-    ax.set_xlim(
-        -spectral_config.x_range * ensemble.E0,
-        spectral_config.x_range * ensemble.E0,
-    )
+        # Set axis labels and limits
+        ax.set_xlabel(spectral_config.xlabel)
+        ax.set_ylabel(spectral_config.ylabel)
+        ax.set_xlim(
+            -spectral_config.x_range * ensemble.E0,
+            spectral_config.x_range * ensemble.E0,
+        )
 
-    # Create tick labels for x-axis
-    ax.set_xticks([ensemble.E0 * i for i in range(-1, 2)])
-    ax.set_xticklabels(
-        [
-            (
-                r"$-\frac{1}{2}NJ$"
-                if i == -1
-                else r"$\frac{1}{2}NJ$" if i == 1 else r"$0$"
-            )
-            for i in range(-1, 2)
-        ]
-    )
+        # Create tick labels for x-axis
+        ax.set_xticks([-ensemble.E0, 0, ensemble.E0])
+        ax.set_xticklabels([r"$-\frac{1}{2}NJ$", r"$0$", r"$\frac{1}{2}NJ$"])
 
-    # Create minor ticks for x-axis
-    ax.set_xticks([ensemble.E0 * i / 2 for i in range(-1, 2)], minor=True)
+        # Create minor ticks for x-axis
+        ax.set_xticks([-ensemble.E0 / 2, ensemble.E0 / 2], minor=True)
+    else:
+        # Create array of levels
+        energies = np.linspace(
+            -ensemble.dim / 2, ensemble.dim / 2, num=spectral_config.density_num
+        )
+
+        # Evaluate theoretical average spectral density
+        density = np.full_like(energies, 1 / ensemble.dim)
+
+        # Plot theoretical average spectral density
+        ax.plot(
+            energies,
+            density,
+            color=spectral_config.curve_color,
+            linewidth=spectral_config.curve_width,
+            zorder=spectral_config.curve_zorder,
+        )
+
+        # Set axis labels and limits
+        ax.set_xlabel(spectral_config.unfolded_xlabel)
+        ax.set_ylabel(spectral_config.unfolded_ylabel)
+        ax.set_xlim(
+            -spectral_config.x_range * ensemble.dim / 2,
+            spectral_config.x_range * ensemble.dim / 2,
+        )
+
+        # Create tick labels for x-axis
+        ax.set_xticks([-ensemble.dim / 2, 0, ensemble.dim / 2])
+        ax.set_xticklabels([r"$-\frac{1}{2}D$", r"$0$", r"$\frac{1}{2}D$"])
+
+        # Create minor ticks for x-axis
+        ax.set_xticks([-ensemble.dim / 4, ensemble.dim / 4], minor=True)
+
+        # Create tick labels for y-axis
+        ax.set_yticks([0, 1 / ensemble.dim])
+        ax.set_yticklabels([r"$0$", r"$D^{-1}$"])
+
+        # Set minor ticks for y-axis
+        ax.set_yticks([1 / (2 * ensemble.dim), 3 / (2 * ensemble.dim)], minor=True)
 
     # Set tick markrs all around and inward
     ax.tick_params(
@@ -230,7 +266,9 @@ def plot_nn_spacing_dist(data_path: str, unfold: bool = False) -> None:
         If the file name does not match the expected name or if the ensemble name is not found in the path.
     """
     # Reads results path and extracts ensemble
-    ensemble = _ensemble_from_path(data_path, spacings_config.data_filename)
+    ensemble = _ensemble_from_path(
+        data_path, f"{unfold * 'unfolded_'}{spacings_config.data_filename}"
+    )
 
     # Load histrogram data from file
     hist_data = np.load(data_path)
@@ -246,35 +284,61 @@ def plot_nn_spacing_dist(data_path: str, unfold: bool = False) -> None:
     for spine in ax.spines.values():
         spine.set_linewidth(spacings_config.axes_width)
 
-    # Plot histogram
-    ax.hist(
-        hist_edges[:-1],
-        bins=hist_edges,
-        weights=hist_counts,
-        color=spacings_config.hist_color,
-        alpha=spacings_config.hist_alpha,
-        zorder=spacings_config.hist_zorder,
-    )
+        # Plot histogram
+        ax.hist(
+            hist_edges[:-1],
+            bins=hist_edges,
+            weights=hist_counts,
+            color=spacings_config.hist_color,
+            alpha=spacings_config.hist_alpha,
+            zorder=spacings_config.hist_zorder,
+        )
 
-    # Create array of spacings values
-    spacings = np.linspace(0, spacings_config.x_max, num=spacings_config.density_num)
+        # Create array of spacings values
+        spacings = np.linspace(
+            0, spacings_config.x_max, num=spacings_config.density_num
+        )
 
-    # Calculate Wigner surmise distribution
-    surmise = ensemble.wigner_surmise(spacings)
+        # Calculate Wigner surmise distribution
+        surmise = ensemble.wigner_surmise(spacings)
 
-    # Plot Wigner surmise distribution
-    ax.plot(
-        spacings,
-        surmise,
-        color=spacings_config.curve_color,
-        linewidth=spacings_config.curve_width,
-        zorder=spacings_config.curve_zorder,
-    )
+        # Plot Wigner surmise distribution
+        ax.plot(
+            spacings,
+            surmise,
+            color=spacings_config.curve_color,
+            linewidth=spacings_config.curve_width,
+            zorder=spacings_config.curve_zorder,
+        )
 
-    # Set axis labels and limits
-    ax.set_xlabel(spacings_config.xlabel)
-    ax.set_ylabel(spacings_config.ylabel)
+    # Set x-limits
     ax.set_xlim(0, spacings_config.x_max)
+
+    # Create labels based on whether unfolding has occurred
+    if not unfold:
+        # Set axis labels and limits
+        ax.set_xlabel(spacings_config.xlabel)
+        ax.set_ylabel(spacings_config.ylabel)
+
+        # Create tick labels for x-axis
+        ax.set_xticks(range(spacings_config.x_max))
+        ax.set_xticklabels(
+            [
+                r"$0$" if i == 0 else r"$d$" if i == 1 else rf"${i}d$"
+                for i in range(spacings_config.x_max)
+            ]
+        )
+    else:
+        # Set axis labels
+        ax.set_xlabel(spacings_config.unfolded_xlabel)
+        ax.set_ylabel(spacings_config.unfolded_ylabel)
+
+        # Create tick labels for x-axis
+        ax.set_xticks(range(spacings_config.x_max))
+        ax.set_xticklabels([rf"${i}$" for i in range(spacings_config.x_max)])
+
+        # Create minor ticks for x-axis
+        ax.set_xticks([0.5, 1.5, 2.5], minor=True)
 
     # Set tick marks all around and inward
     ax.tick_params(
@@ -315,7 +379,9 @@ def plot_form_factors(data_path: str, unfold: bool = False) -> None:
         If the file name does not match the expected name or if the ensemble name is not found in the path.
     """
     # Reads results path and extracts ensemble
-    ensemble = _ensemble_from_path(data_path, sff_config.data_filename)
+    ensemble = _ensemble_from_path(
+        data_path, f"{unfold * 'unfolded_'}{sff_config.data_filename}"
+    )
 
     # Load form factors data from file
     form_factors_data = np.load(data_path)
@@ -638,7 +704,9 @@ class SpectralStatistics(MonteCarlo):
         # Return eigenvalues
         return eigenvals
 
-    def _create_hist(self, data: np.ndarray, dataclass: object) -> None:
+    def _create_hist(
+        self, data: np.ndarray, dataclass: object, unfold: bool = False
+    ) -> None:
         """
         Creates a histogram from the given data and saves it to a file.
 
@@ -656,7 +724,9 @@ class SpectralStatistics(MonteCarlo):
 
         # Create output directory and store results path
         output_dir = self._create_output_dir(res_type="data")
-        results_path = os.path.join(output_dir, dataclass.data_filename)
+        results_path = os.path.join(
+            output_dir, f"{unfold * 'unfolded_'}{dataclass.data_filename}"
+        )
 
         # Save histogram data
         np.savez_compressed(
@@ -665,7 +735,7 @@ class SpectralStatistics(MonteCarlo):
             hist_edges=hist_edges,
         )
 
-    def _spectral_hist(self, levels: np.ndarray) -> None:
+    def _spectral_hist(self, levels: np.ndarray, unfold: bool = False) -> None:
         """
         Create a histogram of the eigenvalue sample.
 
@@ -675,9 +745,9 @@ class SpectralStatistics(MonteCarlo):
             Eigenvalue sample.
         """
         # Create histogram using levels as data
-        self._create_hist(data=levels, dataclass=spectral_config)
+        self._create_hist(data=levels, dataclass=spectral_config, unfold=unfold)
 
-    def _nn_spacing_dist(self, levels: np.ndarray) -> None:
+    def _nn_spacing_dist(self, levels: np.ndarray, unfold: bool = False) -> None:
         """
         Create a histogram of the nearest-neighbor level spacing sample.
 
@@ -690,9 +760,9 @@ class SpectralStatistics(MonteCarlo):
         spacings = self.ensemble.nn_spacings(levels=levels)
 
         # Create histogram using spacings as data
-        self._create_hist(data=spacings, dataclass=spacings_config)
+        self._create_hist(data=spacings, dataclass=spacings_config, unfold=unfold)
 
-    def _form_factors(self, levels: np.ndarray) -> None:
+    def _form_factors(self, levels: np.ndarray, unfold: bool = False) -> None:
         """
         Create a plot of the spectral form factors versus time.
 
@@ -743,7 +813,9 @@ class SpectralStatistics(MonteCarlo):
 
         # Create output directory and store results path
         output_dir = self._create_output_dir(res_type="data")
-        results_path = os.path.join(output_dir, sff_config.data_filename)
+        results_path = os.path.join(
+            output_dir, f"{unfold * 'unfolded_'}{sff_config.data_filename}"
+        )
 
         # Save form factors data
         np.savez_compressed(
@@ -778,18 +850,21 @@ class SpectralStatistics(MonteCarlo):
         if levels is None:
             levels = self._realize_eigvals()
             # Unfold eigenvalues if specified
-            if unfold:
+            if sim_info["unfold"]:
                 levels = self.ensemble.unfold(levels)
 
         # Run simulation functionm
-        sim_info["func"](levels)
+        sim_info["func"](levels, unfold=sim_info["unfold"])
 
         # Determine output directory
         output_dir = self._create_output_dir(res_type="data")
 
         # Run plot function
         sim_info["plot"](
-            os.path.join(output_dir, sim_info["file"]), unfold=sim_info["unfold"]
+            os.path.join(
+                output_dir, f"{sim_info['unfold'] * 'unfolded_'}{sim_info['file']}"
+            ),
+            unfold=sim_info["unfold"],
         )
 
     def run_spectral_hist(self) -> None:
@@ -840,7 +915,6 @@ class SpectralStatistics(MonteCarlo):
 
         # Run each specified simulation that does not require unfolding
         for sim_num in self._job:
-            print(f"Running simulation {sim_num}...")
             if self._job[sim_num]["do"] and not self._job[sim_num]["unfold"]:
                 self._run_simulation(sim_num, levels)
 
@@ -854,7 +928,6 @@ class SpectralStatistics(MonteCarlo):
 
         # Run each specified simulation that requires unfolding
         for sim_num in self._job:
-            print(f"Running simulation unfolded {sim_num}...")
             if self._job[sim_num]["do"] and self._job[sim_num]["unfold"]:
                 self._run_simulation(sim_num, levels)
 
