@@ -108,7 +108,7 @@ def _ensemble_from_path(path: str, file_name: str) -> dict:
     return ENSEMBLE(**ens_inputs)
 
 
-def plot_spectral_hist(data_path: str, unfolded: bool = False) -> None:
+def plot_spectral_hist(data_path: str, unfold: bool = False) -> None:
     """
     Plots the spectral histogram from the given data path.
 
@@ -204,7 +204,7 @@ def plot_spectral_hist(data_path: str, unfolded: bool = False) -> None:
     data_path = Path(data_path)
     plot_dir = data_path.parent.parent / "plots"
     plot_dir.mkdir(parents=True, exist_ok=True)
-    plot_path = plot_dir / f"{unfolded * "unfolded_"}{spectral_config.plot_filename}"
+    plot_path = plot_dir / f"{unfold * 'unfolded_'}{spectral_config.plot_filename}"
 
     # Save plot to file
     plt.savefig(plot_path, dpi=300, bbox_inches="tight")
@@ -213,7 +213,7 @@ def plot_spectral_hist(data_path: str, unfolded: bool = False) -> None:
     plt.close(fig)
 
 
-def plot_nn_spacing_dist(data_path: str, unfolded: bool = False) -> None:
+def plot_nn_spacing_dist(data_path: str, unfold: bool = False) -> None:
     """
     Plots the nearest-neighbor level spacing distribution from the given data path.
 
@@ -289,7 +289,7 @@ def plot_nn_spacing_dist(data_path: str, unfolded: bool = False) -> None:
     data_path = Path(data_path)
     plot_dir = data_path.parent.parent / "plots"
     plot_dir.mkdir(parents=True, exist_ok=True)
-    plot_path = plot_dir / f"{unfolded * "unfolded_"}{spacings_config.plot_filename}"
+    plot_path = plot_dir / f"{unfold * 'unfolded_'}{spacings_config.plot_filename}"
 
     # Save plot to file
     plt.savefig(plot_path, dpi=300, bbox_inches="tight")
@@ -298,7 +298,7 @@ def plot_nn_spacing_dist(data_path: str, unfolded: bool = False) -> None:
     plt.close(fig)
 
 
-def plot_form_factors(data_path: str, unfolded: bool = False) -> None:
+def plot_form_factors(data_path: str, unfold: bool = False) -> None:
     """
     Plots the spectral form factors from the given data path.
 
@@ -416,7 +416,7 @@ def plot_form_factors(data_path: str, unfolded: bool = False) -> None:
     data_path = Path(data_path)
     plot_dir = data_path.parent.parent / "plots"
     plot_dir.mkdir(parents=True, exist_ok=True)
-    plot_path = plot_dir / f"{unfolded * "unfolded_"}{sff_config.plot_filename}"
+    plot_path = plot_dir / f"{unfold * 'unfolded_'}{sff_config.plot_filename}"
 
     # Save plot to file
     plt.savefig(plot_path, dpi=300, bbox_inches="tight")
@@ -451,7 +451,7 @@ class SpectralStatistics(MonteCarlo):
         realizations: int = 1,
         workers: int = 1,
         memory: int = virtual_memory().total // 2**30,
-        run: List[int] = [1, 2, 3],
+        run: List[int] = [],
         unfold: List[int] = [],
     ) -> None:
         """
@@ -484,6 +484,13 @@ class SpectralStatistics(MonteCarlo):
 
         # Initialize Monte Carlo simulation
         super().__init__(ensemble, realizations, workers, memory)
+
+        # If run is empty, denote all flag and set run to all simulations
+        if not run:
+            self._all = True
+            run = [1, 2, 3]
+        else:
+            self._all = False
 
         # Store job arguments in dictionary
         self._job = {
@@ -783,7 +790,7 @@ class SpectralStatistics(MonteCarlo):
         output_dir = self._create_output_dir(res_type="data")
 
         # Run plot function
-        sim_info["plot"](os.path.join(output_dir, sim_info["file"]))
+        sim_info["plot"](os.path.join(output_dir, sim_info["file"]), unfold=unfold)
 
     def run_spectral_hist(self, unfold: bool = False) -> None:
         """
@@ -837,7 +844,7 @@ class SpectralStatistics(MonteCarlo):
                 self._run_simulation(sim_num, levels)
 
         # Unfold eigenvalues if specified
-        if any(self._job[sim_num]["unfold"] for sim_num in self._job):
+        if any(self._job[sim_num]["unfold"] for sim_num in self._job) or self._all:
             levels = self.ensemble.unfold(levels)
 
         # Run each specified simulation that requires unfolding
