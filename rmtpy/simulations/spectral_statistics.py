@@ -810,7 +810,17 @@ class SpectralStatistics(MonteCarlo):
             )
 
             # Append tick time values
-            times = np.append(times, [1, self.ensemble.N * self.ensemble.J])
+            times = np.append(
+                times,
+                np.array(
+                    [
+                        1 / self.ensemble.N / self.ensemble.J,
+                        1,
+                        self.ensemble.dim / self.ensemble.N / self.ensemble.J,
+                        self.ensemble.dim**2 / self.ensemble.N / self.ensemble.J,
+                    ]
+                ),
+            )
         else:
             times = np.logspace(
                 sff_config.logtime_min - 1,
