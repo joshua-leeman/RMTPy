@@ -410,28 +410,28 @@ def plot_form_factors(data_path: str, unfold: bool = False) -> None:
     ax.xaxis.set_major_locator(LogLocator(base=ensemble.dim, numticks=6))
     ax.yaxis.set_major_locator(LogLocator(base=ensemble.dim, numticks=6))
 
+    # Plot spectral form factor
+    ax.plot(
+        times,
+        sff,
+        color=sff_config.sff_color,
+        linewidth=sff_config.sff_width,
+        alpha=sff_config.sff_alpha,
+        zorder=sff_config.sff_zorder,
+    )
+
+    # Plot connected spectral form factor
+    ax.plot(
+        times,
+        csff,
+        color=sff_config.csff_color,
+        linewidth=sff_config.csff_width,
+        alpha=sff_config.csff_alpha,
+        zorder=sff_config.csff_zorder,
+    )
+
     # Create plot based on whether unfolding has occurred
     if not unfold:
-        # Plot spectral form factor
-        ax.plot(
-            times,
-            sff,
-            color=sff_config.sff_color,
-            linewidth=sff_config.sff_width,
-            alpha=sff_config.sff_alpha,
-            zorder=sff_config.sff_zorder,
-        )
-
-        # Plot connected spectral form factor
-        ax.plot(
-            times,
-            csff,
-            color=sff_config.csff_color,
-            linewidth=sff_config.csff_width,
-            alpha=sff_config.csff_alpha,
-            zorder=sff_config.csff_zorder,
-        )
-
         # Set axis labels and limits
         ax.set_xlabel(sff_config.xlabel)
         ax.set_ylabel(sff_config.ylabel)
