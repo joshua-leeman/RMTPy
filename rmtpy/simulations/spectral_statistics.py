@@ -441,13 +441,40 @@ def plot_form_factors(data_path: str, unfold: bool = False) -> None:
         )
         ax.set_ylim(ensemble.dim ** (-2.10), ensemble.dim**0.10)
 
-        # Create tick labels for x-axis
-        ax.set_xticks(
-            np.array([1, ensemble.N * ensemble.J, ensemble.dim, ensemble.dim**2])
-            / ensemble.N
-            / ensemble.J
+        # Store tick times and form factor values
+        tick_times = np.array(
+            [
+                1 / ensemble.N / ensemble.J,
+                1,
+                ensemble.dim / ensemble.N / ensemble.J,
+                ensemble.dim**2 / ensemble.N / ensemble.J,
+            ]
         )
+        indices = np.searchsorted(times, tick_times)
+        tick_sff = sff[indices]
+
+        # Create tick labels for x-axis
+        ax.set_xticks(tick_times)
         ax.set_xticklabels([r"$1 / N$", r"$1$", r"$D / N$", r"$D^2 / N$"])
+
+        # Plot tick points
+        ax.scatter(
+            tick_times,
+            tick_sff,
+            color=sff_config.points_color,
+            alpha=sff_config.points_alpha,
+            zorder=sff_config.points_zorder,
+        )
+
+        # Vertical dotted lines from each tick point to x-axis
+        for x, y in zip(tick_times, tick_sff):
+            ax.axvline(
+                x=x,
+                color=sff_config.points_color,
+                alpha=sff_config.points_alpha,
+                zorder=sff_config.points_zorder,
+                linestyle="dotted",
+            )
 
     else:
         # Calculate universal connected spectral form factor
@@ -821,7 +848,11 @@ class SpectralStatistics(MonteCarlo):
                     ]
                 ),
             )
+
+            # Sort times in ascending order
+            times = np.sort(times)
         else:
+            # Create logtime array based on ensemble parameters
             times = np.logspace(
                 sff_config.logtime_min - 1,
                 sff_config.logtime_max - 1,
@@ -829,6 +860,21 @@ class SpectralStatistics(MonteCarlo):
                 base=self.ensemble.dim,
                 dtype=np.float64,
             )
+
+            # Append tick time values
+            times = np.append(
+                times,
+                np.array(
+                    [
+                        1 / self.ensemble.dim,
+                        1,
+                        self.ensemble.dim,
+                    ]
+                ),
+            )
+
+            # Sort times in ascending order
+            times = np.sort(times)
 
         # Allocate memory for form factors
         sff = np.empty_like(times, dtype=np.float64)
