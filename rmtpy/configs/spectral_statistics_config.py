@@ -129,6 +129,9 @@ class SpectralFormFactors:
     sff_zorder: int = 3
     csff_zorder: int = 4
     universal_zorder: int = 5
+    points_alpha: float = 1.0
+    points_color: str = "Black"
+    points_zorder: int = 6
 
 
 # =============================
