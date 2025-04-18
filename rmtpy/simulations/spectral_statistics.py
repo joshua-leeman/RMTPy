@@ -448,26 +448,6 @@ def plot_form_factors(data_path: str, unfold: bool = False) -> None:
         ax.set_xticklabels([r"$1 / N$", r"$D / N$", r"$D^2 / N$"])
 
     else:
-        # Plot spectral form factor
-        ax.plot(
-            times,
-            sff,
-            color=sff_config.sff_color,
-            linewidth=sff_config.sff_width,
-            alpha=sff_config.sff_alpha,
-            zorder=sff_config.sff_zorder,
-        )
-
-        # Plot connected spectral form factor
-        ax.plot(
-            times,
-            csff,
-            color=sff_config.csff_color,
-            linewidth=sff_config.csff_width,
-            alpha=sff_config.csff_alpha,
-            zorder=sff_config.csff_zorder,
-        )
-
         # Calculate universal connected spectral form factor
         universal_csff = np.vectorize(ensemble.universal_csff)(times)
 
