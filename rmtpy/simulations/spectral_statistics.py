@@ -443,9 +443,11 @@ def plot_form_factors(data_path: str, unfold: bool = False) -> None:
 
         # Create tick labels for x-axis
         ax.set_xticks(
-            np.array([1, ensemble.dim, ensemble.dim**2]) / ensemble.N / ensemble.J
+            np.array([1, ensemble.N * ensemble.J, ensemble.dim, ensemble.dim**2])
+            / ensemble.N
+            / ensemble.J
         )
-        ax.set_xticklabels([r"$1 / N$", r"$D / N$", r"$D^2 / N$"])
+        ax.set_xticklabels([r"$1 / N$", r"$1$", r"$D / N$", r"$D^2 / N$"])
 
     else:
         # Calculate universal connected spectral form factor
