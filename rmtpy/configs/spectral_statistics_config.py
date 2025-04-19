@@ -33,7 +33,7 @@ class SpectralHistogram:
     # Simulation parameters
     num_bins: int = 100
     density_num: int = 1000
-    x_range: float = 1.2  # factor of scale
+    x_range: float = 1.2  # factor of J
 
     # File names
     data_filename: str = "spectrum.npz"
@@ -61,6 +61,14 @@ class SpectralHistogram:
     ylabel: str = r"$\langle \rho(E) \rangle$"
     unfolded_xlabel: str = r"$\xi$"
     unfolded_ylabel: str = r"$\langle \rho(\xi) \rangle$"
+
+    # Tick labeling
+    xticklabels: Tuple[str, 3] = (
+        r"$-\frac{1}{2}NJ$",
+        r"$0$",
+        r"$\frac{1}{2}NJ$",
+    )
+    ticklabel_fontsize: int = 10
 
 
 # =============================
@@ -111,18 +119,18 @@ class NNLevelSpacings:
 @dataclass
 class SpectralFormFactors:
     """
-    Data class for spectral form factors simulation parameters.
+    Data class for spectral form factors simulation parameters
     """
 
     # Simulation parameters
-    logtime_num: int = 5000
+    num_logtimes: int = 5000
     logtime_min: float = -0.5
     logtime_max: float = 1.5
     unfolded_logtime_min: float = -1.5
     unfolded_logtime_max: float = 0.5
 
-    # Major tick times
-    tick_times: Tuple[float, ...] = ()
+    # Number of tick times
+    num_tick_times: int = 5
 
     # File names
     data_filename: str = "form_factors.npz"
