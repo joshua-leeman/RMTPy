@@ -167,8 +167,8 @@ class SpectralFormFactors:
     logy_max: float = 0.2
 
     # Plot settings
-    sff_legend: str = r"$SFF$"
-    csff_legend: str = r"$cSFF$"
+    sff_legend: str = r"SFF"
+    csff_legend: str = r"cSFF"
     universal_legend: str = "theory"
     xlabel: str = r"$\log_D(NJt)$"
     ylabel: str = r"$\log_DK(Jt)$"
