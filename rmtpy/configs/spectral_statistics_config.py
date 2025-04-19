@@ -78,6 +78,7 @@ class SpectralHistogram:
         r"$D^{-1}$",
     )
     ticklabel_fontsize: int = 10
+    tick_length: int = 6
 
 
 # =============================
