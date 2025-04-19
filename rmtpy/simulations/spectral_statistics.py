@@ -353,12 +353,12 @@ def plot_nn_spacing_dist(data_path: str, unfold: bool = False) -> None:
     # Create tick labels for x-axis
     ax.set_xticks(range(spacings_config.x_max))
     ax.set_xticklabels(
-        [rf"${i}$" for i in range(spacings_config.x_max)],
+        [rf"${i}.0$" for i in range(spacings_config.x_max + 1)],
         fontsize=spacings_config.ticklabel_fontsize,
     )
 
     # Create minor ticks for x-axis
-    ax.set_xticks([0.5, 1.5, 2.5], minor=True)
+    ax.set_xticks([0.5, 1.5, 2.5, 3.5], minor=True)
 
     # Set tick marks all around and inward
     ax.tick_params(
