@@ -15,6 +15,7 @@ It is grouped into the following sections:
 # =============================
 # Standard library imports
 from dataclasses import dataclass
+from typing import Tuple
 
 # Third-party imports
 from matplotlib.pyplot import rcParams
@@ -119,6 +120,9 @@ class SpectralFormFactors:
     logtime_max: float = 1.5
     unfolded_logtime_min: float = -1.5
     unfolded_logtime_max: float = 0.5
+
+    # Major tick times
+    tick_times: Tuple[float, ...] = ()
 
     # File names
     data_filename: str = "form_factors.npz"
