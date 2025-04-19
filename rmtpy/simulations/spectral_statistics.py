@@ -168,7 +168,7 @@ def plot_spectral_hist(data_path: str, unfold: bool = False) -> None:
         density = np.vectorize(ensemble.spectral_density)(energies)
 
         # Plot theoretical average spectral density
-        ax.plot(
+        (density_plot,) = ax.plot(
             energies,
             density,
             color=spectral_config.curve_color,
@@ -195,6 +195,9 @@ def plot_spectral_hist(data_path: str, unfold: bool = False) -> None:
 
         # Change font size of y-axis tick labels
         ax.tick_params(axis="y", labelsize=spectral_config.ticklabel_fontsize)
+
+        # Set legend title
+        legend_title = rf"{repr(ensemble)}"
     else:
         # Create array of levels
         energies = np.linspace(
@@ -205,7 +208,7 @@ def plot_spectral_hist(data_path: str, unfold: bool = False) -> None:
         density = np.full_like(energies, 1 / ensemble.dim)
 
         # Plot theoretical average spectral density
-        ax.plot(
+        (density_plot,) = ax.plot(
             energies,
             density,
             color=spectral_config.curve_color,
@@ -241,6 +244,9 @@ def plot_spectral_hist(data_path: str, unfold: bool = False) -> None:
         # Set minor ticks for y-axis
         ax.set_yticks((1 / (2 * ensemble.dim), 3 / (2 * ensemble.dim)), minor=True)
 
+        # Set legend title
+        legend_title = rf"{repr(ensemble)}" + "\nunfolded"
+
     # Set tick markrs all around and inward
     ax.tick_params(
         direction="in",
@@ -251,6 +257,19 @@ def plot_spectral_hist(data_path: str, unfold: bool = False) -> None:
         which="both",
         length=spectral_config.tick_length,
     )
+
+    # Create legend
+    legend = ax.legend(
+        handles=[density_plot],
+        labels=[spectral_config.curve_legend],
+        title=legend_title,
+        loc=spectral_config.legend_location,
+        bbox_to_anchor=spectral_config.legend_bbox,
+        fontsize=spectral_config.legend_fontsize,
+        title_fontsize=spectral_config.legend_title_fontsize,
+        frameon=spectral_config.legend_frameon,
+    )
+    legend._legend_box.align = spectral_config.legend_textalignment
 
     # Store plot file name
     if not unfold:
@@ -328,7 +347,7 @@ def plot_nn_spacing_dist(data_path: str, unfold: bool = False) -> None:
     surmise = ensemble.wigner_surmise(spacings)
 
     # Plot Wigner surmise distribution
-    ax.plot(
+    (surmise,) = ax.plot(
         spacings,
         surmise,
         color=spacings_config.curve_color,
@@ -345,10 +364,16 @@ def plot_nn_spacing_dist(data_path: str, unfold: bool = False) -> None:
         ax.set_xlabel(spacings_config.xlabel)
         ax.set_ylabel(spacings_config.ylabel)
 
+        # Set legend title
+        legend_title = rf"{repr(ensemble)}"
+
     else:
         # Set axis labels
         ax.set_xlabel(spacings_config.unfolded_xlabel)
         ax.set_ylabel(spacings_config.unfolded_ylabel)
+
+        # Set legend title
+        legend_title = rf"{repr(ensemble)}" + "\nunfolded"
 
     # Create tick labels for x-axis
     ax.set_xticks(range(1, spacings_config.x_max + 1))
@@ -373,6 +398,19 @@ def plot_nn_spacing_dist(data_path: str, unfold: bool = False) -> None:
 
     # Change font size of y-axis tick labels
     ax.tick_params(axis="y", labelsize=spacings_config.ticklabel_fontsize)
+
+    # Create legend
+    legend = ax.legend(
+        handles=[surmise],
+        labels=[spacings_config.curve_legend],
+        title=legend_title,
+        loc=spacings_config.legend_location,
+        bbox_to_anchor=spacings_config.legend_bbox,
+        fontsize=spacings_config.legend_fontsize,
+        title_fontsize=spacings_config.legend_title_fontsize,
+        frameon=spacings_config.legend_frameon,
+    )
+    legend._legend_box.align = spacings_config.legend_textalignment
 
     # Store plot file name
     if not unfold:
@@ -550,6 +588,23 @@ def plot_form_factors(data_path: str, unfold: bool = False) -> None:
             sff_config.unfolded_xticklabels,
             fontsize=sff_config.ticklabel_fontsize,
         )
+
+        # Create legend
+        legend = ax.legend(
+            handles=[sff_line, csff_line, univ_line],
+            labels=[
+                sff_config.sff_legend,
+                sff_config.csff_legend,
+                sff_config.universal_legend,
+            ],
+            title=rf"{repr(ensemble)}" + "\nunfolded",
+            loc=sff_config.legend_location,
+            bbox_to_anchor=sff_config.legend_bbox,
+            fontsize=sff_config.legend_fontsize,
+            title_fontsize=sff_config.legend_title_fontsize,
+            frameon=sff_config.legend_frameon,
+        )
+        legend._legend_box.align = sff_config.legend_textalignment
 
     # Set y-limits
     ax.set_ylim(ensemble.dim**sff_config.logy_min, ensemble.dim**sff_config.logy_max)
