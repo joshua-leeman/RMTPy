@@ -69,6 +69,14 @@ class SpectralHistogram:
     ticklabel_fontsize: int = 10
     tick_length: int = 6
 
+    # Legend settings
+    legend_location: str = "upper right"
+    legend_bbox: Tuple[float, float] = (0.935, 0.96)
+    legend_fontsize: int = 10
+    legend_title_fontsize: int = 10
+    legend_frameon: bool = False
+    legend_textalignment: str = "left"
+
 
 # =============================
 # 3. NN Level Spacings Data Class
@@ -114,6 +122,14 @@ class NNLevelSpacings:
     # Tick settings
     ticklabel_fontsize: int = 10
     tick_length: int = 6
+
+    # Legend settings
+    legend_location: str = "upper right"
+    legend_bbox: Tuple[float, float] = (0.9, 0.9)
+    legend_fontsize: int = 10
+    legend_title_fontsize: int = 10
+    legend_frameon: bool = False
+    legend_textalignment: str = "left"
 
 
 # =============================
@@ -169,7 +185,7 @@ class SpectralFormFactors:
     # Plot settings
     sff_legend: str = r"SFF"
     csff_legend: str = r"cSFF"
-    universal_legend: str = "theory"
+    universal_legend: str = "universal"
     xlabel: str = r"$\log_D(NJt)$"
     ylabel: str = r"$\log_DK(Jt)$"
     unfolded_xlabel: str = r"$\log_D \tau$"
@@ -190,7 +206,7 @@ class SpectralFormFactors:
 
     # Legend settings
     legend_location: str = "upper right"
-    legend_bbox: Tuple[float, float] = (0.98, 0.9)
+    legend_bbox: Tuple[float, float] = (0.735, 0.9)
     legend_fontsize: int = 10
     legend_title_fontsize: int = 10
     legend_frameon: bool = False
