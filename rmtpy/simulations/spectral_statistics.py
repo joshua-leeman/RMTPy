@@ -860,17 +860,16 @@ class SpectralStatistics(MonteCarlo):
         # Create logtime array depending on unfolding
         if not unfold:
             # Create logtime array based on ensemble parameters
-            times = (
-                np.logspace(
-                    sff_config.logtime_min,
-                    sff_config.logtime_max,
-                    sff_config.logtime_num,
-                    base=self.ensemble.dim,
-                    dtype=np.float64,
-                )
-                / self.ensemble.N
-                / self.ensemble.J
+            times = np.logspace(
+                sff_config.logtime_min,
+                sff_config.logtime_max,
+                sff_config.logtime_num,
+                base=self.ensemble.dim,
+                dtype=np.float64,
             )
+
+            # Normalize times by total spectrum width
+            times = times / (self.ensemble.N * self.ensemble.J)
 
             # Append tick time values
             times = np.append(
@@ -896,8 +895,8 @@ class SpectralStatistics(MonteCarlo):
         else:
             # Create logtime array based on ensemble parameters
             times = np.logspace(
-                sff_config.logtime_min - 1,
-                sff_config.logtime_max - 1,
+                sff_config.unfolded_logtime_min,
+                sff_config.unfolded_logtime_max,
                 sff_config.logtime_num,
                 base=self.ensemble.dim,
                 dtype=np.float64,
