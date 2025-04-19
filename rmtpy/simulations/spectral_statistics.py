@@ -222,18 +222,24 @@ def plot_spectral_hist(data_path: str, unfold: bool = False) -> None:
         )
 
         # Create tick labels for x-axis
-        ax.set_xticks([-ensemble.dim / 2, 0, ensemble.dim / 2])
-        ax.set_xticklabels([r"$-\frac{1}{2}D$", r"$0$", r"$\frac{1}{2}D$"], fontsize=10)
+        ax.set_xticks((-ensemble.dim / 2, 0, ensemble.dim / 2))
+        ax.set_xticklabels(
+            spectral_config.unfolded_xticklabels,
+            fontsize=spectral_config.ticklabel_fontsize,
+        )
 
         # Create minor ticks for x-axis
-        ax.set_xticks([-ensemble.dim / 4, ensemble.dim / 4], minor=True)
+        ax.set_xticks((-ensemble.dim / 4, ensemble.dim / 4), minor=True)
 
         # Create tick labels for y-axis
         ax.set_yticks([0, 1 / ensemble.dim])
-        ax.set_yticklabels([r"$0$", r"$D^{-1}$"], fontsize=10)
+        ax.set_yticklabels(
+            spectral_config.unfolded_yticklabels,
+            fontsize=spectral_config.ticklabel_fontsize,
+        )
 
         # Set minor ticks for y-axis
-        ax.set_yticks([1 / (2 * ensemble.dim), 3 / (2 * ensemble.dim)], minor=True)
+        ax.set_yticks((1 / (2 * ensemble.dim), 3 / (2 * ensemble.dim)), minor=True)
 
     # Set tick markrs all around and inward
     ax.tick_params(
@@ -243,14 +249,20 @@ def plot_spectral_hist(data_path: str, unfold: bool = False) -> None:
         left=True,
         right=True,
         which="both",
-        length=5,
+        length=spectral_config.tick_length,
     )
+
+    # Store plot file name
+    if not unfold:
+        plot_file = spectral_config.plot_filename
+    else:
+        plot_file = spectral_config.unfolded_plot_filename
 
     # Create plot path from data path
     data_path = Path(data_path)
     plot_dir = data_path.parent.parent / "plots"
     plot_dir.mkdir(parents=True, exist_ok=True)
-    plot_path = plot_dir / f"{unfold * 'unfolded_'}{spectral_config.plot_filename}"
+    plot_path = plot_dir / plot_file
 
     # Save plot to file
     plt.savefig(plot_path, dpi=300, bbox_inches="tight")
