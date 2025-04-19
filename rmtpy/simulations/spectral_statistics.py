@@ -26,6 +26,7 @@ from typing import List
 # Third-party imports
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.patches import Patch
 from matplotlib.ticker import LogLocator, NullLocator
 from psutil import virtual_memory
 
@@ -256,10 +257,15 @@ def plot_spectral_hist(data_path: str, unfold: bool = False) -> None:
         length=spectral_config.tick_length,
     )
 
+    # Store histogram patch for legend
+    hist_patch = Patch(
+        color=spectral_config.hist_color, alpha=spectral_config.hist_alpha
+    )
+
     # Create legend
     legend = ax.legend(
-        handles=[density_plot],
-        labels=[spectral_config.curve_legend],
+        handles=[hist_patch, density_plot],
+        labels=[spectral_config.hist_legend, spectral_config.curve_legend],
         title=legend_title,
         loc=spectral_config.legend_location,
         bbox_to_anchor=spectral_config.legend_bbox,
@@ -407,10 +413,15 @@ def plot_nn_spacing_dist(data_path: str, unfold: bool = False) -> None:
     # Change font size of y-axis tick labels
     ax.tick_params(axis="y", labelsize=spacings_config.ticklabel_fontsize)
 
+    # Store histogram patch for legend
+    hist_patch = Patch(
+        color=spacings_config.hist_color, alpha=spacings_config.hist_alpha
+    )
+
     # Create legend
     legend = ax.legend(
-        handles=[surmise],
-        labels=[spacings_config.curve_legend],
+        handles=[hist_patch, surmise],
+        labels=[spacings_config.hist_legend, spacings_config.curve_legend],
         title=legend_title,
         loc=spacings_config.legend_location,
         bbox_to_anchor=spacings_config.legend_bbox,
