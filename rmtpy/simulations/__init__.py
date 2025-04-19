@@ -1,7 +1,6 @@
 # rmtpy.simulations.__init__.py
 """
-This __init__ file sets the environment variables to conduct HPC simulations
-for the RMTpy package.
+This __init__ file sets the environment variables to conduct HPC simulations for the RMTpy package.
 It is grouped into the following sections:
     1. Imports
     2. Environment Variables
