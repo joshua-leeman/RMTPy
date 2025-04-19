@@ -21,12 +21,13 @@ from multiprocessing import Pool
 from pathlib import Path
 from textwrap import dedent
 from time import time
-from typing import List
+from typing import List, Tuple
 
 # Third-party imports
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.patches import Patch
+from matplotlib.axes import Axes
+from matplotlib.figure import Figure
 from matplotlib.ticker import LogLocator, NullLocator
 from psutil import virtual_memory
 
@@ -109,144 +110,78 @@ def _ensemble_from_path(path: str, file_name: str) -> object:
     return ENSEMBLE(**ens_inputs)
 
 
-def plot_spectral_hist(data_path: str, unfold: bool = False) -> None:
-    """
-    Plots the spectral histogram from the given data path.
+def _initialize_plot(dataclass: object, data_path: str) -> Tuple[
+    object,
+    dict,
+    bool,
+    Figure,
+    Axes,
+]:
+    # Check if data is unfolded
+    unfold = "unfolded" in os.path.basename(data_path)
 
-    Parameters
-    ----------
-    data_path : str
-        Path to the data file containing histogram data.
-    unfold : bool, optional
-        Whether to unfold eigenvalues (default is False).
-
-    Raises
-    ------
-    FileNotFoundError
-        If the specified path does not exist.
-    ValueError
-        If the file name does not match the expected name or if the ensemble name is not found in the path.
-    """
     # Reads results path and extracts ensemble
     if not unfold:
-        ensemble = _ensemble_from_path(data_path, spectral_config.data_filename)
+        ensemble = _ensemble_from_path(data_path, dataclass.data_filename)
     else:
-        ensemble = _ensemble_from_path(
-            data_path, spectral_config.unfolded_data_filename
-        )
+        ensemble = _ensemble_from_path(data_path, dataclass.unfolded_data_filename)
 
-    # Load histogram data from file
-    hist_data = np.load(data_path)
-
-    # Unpack histogram data
-    hist_counts = hist_data["hist_counts"]
-    hist_edges = hist_data["hist_edges"]
+    # Load data from file
+    data = np.load(data_path)
 
     # Create figure and axis
     fig, ax = plt.subplots()
 
-    # Set line widths
-    for spine in ax.spines.values():
-        spine.set_linewidth(spectral_config.axes_width)
+    # Return ensemble, data, fig, ax
+    return ensemble, data, unfold, fig, ax
 
-    # Plot histogram
-    ax.hist(
-        hist_edges[:-1],
-        bins=hist_edges,
-        weights=hist_counts,
-        color=spectral_config.hist_color,
-        alpha=spectral_config.hist_alpha,
-    )
 
-    # Create plot based on whether unfolding has occurred
-    if not unfold:
-        # Create array of energy values
-        energies = np.linspace(
-            -ensemble.E0, ensemble.E0, num=spectral_config.density_num
-        )
+def _create_plot(
+    dataclass: object,
+    data_path: str,
+    legend_title: str,
+    fig: Figure,
+    ax: Axes,
+    unfold: bool,
+) -> None:
+    # Set x-axis labels
+    ax.set_xlabel(dataclass.unfolded_xlabel if unfold else dataclass.xlabel)
 
-        # Evaluate theoretical average spectral density
-        density = np.vectorize(ensemble.spectral_density)(energies)
-
-        # Plot theoretical average spectral density
-        (density_plot,) = ax.plot(
-            energies,
-            density,
-            color=spectral_config.curve_color,
-            linewidth=spectral_config.curve_width,
-            zorder=spectral_config.curve_zorder,
-        )
-
-        # Set axis labels and limits
-        ax.set_xlabel(spectral_config.xlabel)
-        ax.set_ylabel(spectral_config.ylabel)
-        ax.set_xlim(
-            -spectral_config.x_range * ensemble.E0,
-            spectral_config.x_range * ensemble.E0,
-        )
-
-        # Create ticks and tick labels for x-axis
-        ax.set_xticks((-ensemble.E0, 0, ensemble.E0))
+    # Set x-tick labels
+    if not unfold and dataclass.has_xticklabels:
+        # Use custom tick labels
         ax.set_xticklabels(
-            spectral_config.xticklabels, fontsize=spectral_config.ticklabel_fontsize
+            dataclass.xticklabels,
+            fontsize=dataclass.ticklabel_fontsize,
         )
-
-        # Create minor ticks for x-axis
-        ax.set_xticks((-ensemble.E0 / 2, ensemble.E0 / 2), minor=True)
-
-        # Change font size of y-axis tick labels
-        ax.tick_params(axis="y", labelsize=spectral_config.ticklabel_fontsize)
-
-        # Set legend title
-        legend_title = rf"{repr(ensemble)}"
+    elif unfold and dataclass.has_unfolded_xticklabels:
+        # Use custom unfolded tick labels
+        ax.set_xticklabels(
+            dataclass.unfolded_xticklabels,
+            fontsize=dataclass.ticklabel_fontsize,
+        )
     else:
-        # Create array of levels
-        energies = np.linspace(
-            -ensemble.dim / 2, ensemble.dim / 2, num=spectral_config.density_num
-        )
+        # Resize default x-tick labels
+        ax.tick_params(axis="x", labelsize=dataclass.ticklabel_fontsize)
 
-        # Evaluate theoretical average spectral density
-        density = np.full_like(energies, 1 / ensemble.dim)
+    # Set y-axis labels
+    ax.set_ylabel(dataclass.unfolded_ylabel if unfold else dataclass.ylabel)
 
-        # Plot theoretical average spectral density
-        (density_plot,) = ax.plot(
-            energies,
-            density,
-            color=spectral_config.curve_color,
-            linewidth=spectral_config.curve_width,
-            zorder=spectral_config.curve_zorder,
-        )
-
-        # Set axis labels and limits
-        ax.set_xlabel(spectral_config.unfolded_xlabel)
-        ax.set_ylabel(spectral_config.unfolded_ylabel)
-        ax.set_xlim(
-            -spectral_config.x_range * ensemble.dim / 2,
-            spectral_config.x_range * ensemble.dim / 2,
-        )
-        ax.set_ylim(0, 1.5 / ensemble.dim)
-
-        # Create tick labels for x-axis
-        ax.set_xticks((-ensemble.dim / 2, 0, ensemble.dim / 2))
-        ax.set_xticklabels(
-            spectral_config.unfolded_xticklabels,
-            fontsize=spectral_config.ticklabel_fontsize,
-        )
-
-        # Create minor ticks for x-axis
-        ax.set_xticks((-ensemble.dim / 4, ensemble.dim / 4), minor=True)
-
-        # Create tick labels for y-axis
-        ax.set_yticks((0, 0.5 / ensemble.dim, 1 / ensemble.dim))
+    # Set y-tick labels
+    if not unfold and dataclass.has_yticklabels:
+        # Use custom tick labels
+        ax.set_yticklabels(dataclass.yticklabels, fontsize=dataclass.ticklabel_fontsize)
+    elif unfold and dataclass.has_unfolded_yticklabels:
+        # Use custom unfolded tick labels
         ax.set_yticklabels(
-            spectral_config.unfolded_yticklabels,
-            fontsize=spectral_config.ticklabel_fontsize,
+            dataclass.unfolded_yticklabels,
+            fontsize=dataclass.ticklabel_fontsize,
         )
+    else:
+        # Resize default y-tick labels
+        ax.tick_params(axis="y", labelsize=dataclass.ticklabel_fontsize)
 
-        # Set legend title
-        legend_title = rf"{repr(ensemble)}" + "\nunfolded"
-
-    # Set tick markrs all around and inward
+    # Set tick marks all around and inward
     ax.tick_params(
         direction="in",
         top=True,
@@ -254,32 +189,36 @@ def plot_spectral_hist(data_path: str, unfold: bool = False) -> None:
         left=True,
         right=True,
         which="both",
-        length=spectral_config.tick_length,
+        length=dataclass.tick_length,
     )
 
-    # Store histogram patch for legend
-    hist_patch = Patch(
-        color=spectral_config.hist_color, alpha=spectral_config.hist_alpha
-    )
+    # Set spine widths
+    for spine in ax.spines.values():
+        spine.set_linewidth(dataclass.axes_width)
+
+    # Set legend handles and labels based on unfolding
+    if not unfold:
+        legend_handles = dataclass.legend_handles
+        legend_labels = dataclass.legend_labels
+    else:
+        legend_handles = dataclass.unfolded_legend_handles
+        legend_labels = dataclass.unfolded_legend_labels
 
     # Create legend
     legend = ax.legend(
-        handles=[hist_patch, density_plot],
-        labels=[spectral_config.hist_legend, spectral_config.curve_legend],
+        handles=legend_handles,
+        labels=legend_labels,
         title=legend_title,
-        loc=spectral_config.legend_location,
-        bbox_to_anchor=spectral_config.legend_bbox,
-        fontsize=spectral_config.legend_fontsize,
-        title_fontsize=spectral_config.legend_title_fontsize,
-        frameon=spectral_config.legend_frameon,
+        loc=dataclass.legend_location,
+        bbox_to_anchor=dataclass.legend_bbox,
+        fontsize=dataclass.legend_fontsize,
+        title_fontsize=dataclass.legend_title_fontsize,
+        frameon=dataclass.legend_frameon,
     )
-    legend._legend_box.align = spectral_config.legend_textalignment
+    legend._legend_box.align = dataclass.legend_textalignment
 
     # Store plot file name
-    if not unfold:
-        plot_file = spectral_config.plot_filename
-    else:
-        plot_file = spectral_config.unfolded_plot_filename
+    plot_file = dataclass.unfolded_plot_filename if unfold else dataclass.plot_filename
 
     # Create plot path from data path
     data_path = Path(data_path)
@@ -294,16 +233,14 @@ def plot_spectral_hist(data_path: str, unfold: bool = False) -> None:
     plt.close(fig)
 
 
-def plot_nn_spacing_dist(data_path: str, unfold: bool = False) -> None:
+def plot_spectral_hist(data_path: str) -> None:
     """
-    Plots the nearest-neighbor level spacing distribution from the given data path.
+    Plots the spectral histogram from the given data path.
 
     Parameters
     ----------
     data_path : str
         Path to the data file containing histogram data.
-    unfold : bool, optional
-        Whether to unfold eigenvalues (default is False).
 
     Raises
     ------
@@ -312,27 +249,115 @@ def plot_nn_spacing_dist(data_path: str, unfold: bool = False) -> None:
     ValueError
         If the file name does not match the expected name or if the ensemble name is not found in the path.
     """
-    # Reads results path and extracts ensemble
-    if not unfold:
-        ensemble = _ensemble_from_path(data_path, spacings_config.data_filename)
-    else:
-        ensemble = _ensemble_from_path(
-            data_path, spacings_config.unfolded_data_filename
-        )
-
-    # Load histrogram data from file
-    hist_data = np.load(data_path)
+    # Initialize plot
+    ensemble, hist_data, unfold, fig, ax = _initialize_plot(spectral_config, data_path)
 
     # Unpack histogram data
     hist_counts = hist_data["hist_counts"]
     hist_edges = hist_data["hist_edges"]
 
-    # Create figure and axis
-    fig, ax = plt.subplots()
+    # Plot histogram
+    ax.hist(
+        hist_edges[:-1],
+        bins=hist_edges,
+        weights=hist_counts,
+        color=spectral_config.hist_color,
+        alpha=spectral_config.hist_alpha,
+    )
 
-    # Set line widths
-    for spine in ax.spines.values():
-        spine.set_linewidth(spacings_config.axes_width)
+    # Create array of levels
+    energies = (
+        np.linspace(
+            -ensemble.dim / 2, ensemble.dim / 2, num=spectral_config.density_num
+        )
+        if unfold
+        else np.linspace(-ensemble.E0, ensemble.E0, num=spectral_config.density_num)
+    )
+
+    # Evaluate theoretical average spectral density
+    density = (
+        np.full_like(energies, 1 / ensemble.dim)
+        if unfold
+        else np.vectorize(ensemble.spectral_density)(energies)
+    )
+
+    # Plot theoretical average spectral density
+    ax.plot(
+        energies,
+        density,
+        color=spectral_config.curve_color,
+        linewidth=spectral_config.curve_width,
+        zorder=spectral_config.curve_zorder,
+    )
+
+    # Set limits and ticks based on unfolding
+    if unfold:
+        # Set x-axis limits
+        ax.set_xlim(
+            -spectral_config.x_range * ensemble.dim / 2,
+            spectral_config.x_range * ensemble.dim / 2,
+        )
+
+        # Set y-axis limits
+        ax.set_ylim(0, 1.5 / ensemble.dim)
+
+        # Create major ticks for x-axis
+        ax.set_xticks((-ensemble.dim / 2, 0, ensemble.dim / 2))
+
+        # Create minor ticks for x-axis
+        ax.set_xticks((-ensemble.dim / 4, ensemble.dim / 4), minor=True)
+
+        # Create major ticks for y-axis
+        ax.set_yticks((0, 0.5 / ensemble.dim, 1 / ensemble.dim))
+    else:
+        # Set x-axis limits
+        ax.set_xlim(
+            -spectral_config.x_range * ensemble.E0,
+            spectral_config.x_range * ensemble.E0,
+        )
+
+        # Create major ticks for x-axis
+        ax.set_xticks((-ensemble.E0, 0, ensemble.E0))
+
+        # Create minor ticks for x-axis
+        ax.set_xticks((-ensemble.E0 / 2, ensemble.E0 / 2), minor=True)
+
+    # Set legend title
+    legend_title = rf"{repr(ensemble)}" + ("\nunfolded" if unfold else "")
+
+    # Finish plot and save it
+    _create_plot(
+        dataclass=spectral_config,
+        data_path=data_path,
+        legend_title=legend_title,
+        fig=fig,
+        ax=ax,
+        unfold=unfold,
+    )
+
+
+def plot_nn_spacing_dist(data_path: str) -> None:
+    """
+    Plots the nearest-neighbor level spacing distribution from the given data path.
+
+    Parameters
+    ----------
+    data_path : str
+        Path to the data file containing histogram data.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the specified path does not exist.
+    ValueError
+        If the file name does not match the expected name or if the ensemble name is not found in the path.
+    """
+    # Initialize plot
+    ensemble, hist_data, unfold, fig, ax = _initialize_plot(spacings_config, data_path)
+
+    # Unpack histogram data
+    hist_counts = hist_data["hist_counts"]
+    hist_edges = hist_data["hist_edges"]
 
     # Plot histogram
     ax.hist(
@@ -351,7 +376,7 @@ def plot_nn_spacing_dist(data_path: str, unfold: bool = False) -> None:
     surmise = ensemble.wigner_surmise(spacings)
 
     # Plot Wigner surmise distribution
-    (surmise,) = ax.plot(
+    ax.plot(
         spacings,
         surmise,
         color=spacings_config.curve_color,
@@ -362,95 +387,27 @@ def plot_nn_spacing_dist(data_path: str, unfold: bool = False) -> None:
     # Set x-limits
     ax.set_xlim(0, spacings_config.x_max)
 
-    # Create labels based on whether unfolding has occurred
-    if not unfold:
-        # Set axis labels and limits
-        ax.set_xlabel(spacings_config.xlabel)
-        ax.set_ylabel(spacings_config.ylabel)
-
-        # Set legend title
-        legend_title = rf"{repr(ensemble)}"
-
-        # Create tick labels for x-axis
-        ax.set_xticks(range(1, spacings_config.x_max + 1))
-        ax.set_xticklabels(
-            [
-                r"$d$" if i == 1 else rf"${i}d$"
-                for i in range(1, spacings_config.x_max + 1)
-            ],
-            fontsize=spacings_config.ticklabel_fontsize,
-        )
-
-    else:
-        # Set axis labels
-        ax.set_xlabel(spacings_config.unfolded_xlabel)
-        ax.set_ylabel(spacings_config.unfolded_ylabel)
-
-        # Set legend title
-        legend_title = rf"{repr(ensemble)}" + "\nunfolded"
-
-        # Create tick labels for x-axis
-        ax.set_xticks(range(1, spacings_config.x_max + 1))
-        ax.set_xticklabels(
-            [rf"${i}.0$" for i in range(1, spacings_config.x_max + 1)],
-            fontsize=spacings_config.ticklabel_fontsize,
-        )
+    # Create major ticks for x-axis
+    ax.set_xticks(spacings_config.major_xticks)
 
     # Create minor ticks for x-axis
-    ax.set_xticks([0.5, 1.5, 2.5, 3.5], minor=True)
+    ax.set_xticks(spacings_config.minor_xticks, minor=True)
 
-    # Set tick marks all around and inward
-    ax.tick_params(
-        direction="in",
-        top=True,
-        bottom=True,
-        left=True,
-        right=True,
-        which="both",
-        length=spacings_config.tick_length,
+    # Set legend title
+    legend_title = rf"{repr(ensemble)}" + ("\nunfolded" if unfold else "")
+
+    # Finish plot and save it
+    _create_plot(
+        dataclass=spacings_config,
+        data_path=data_path,
+        legend_title=legend_title,
+        fig=fig,
+        ax=ax,
+        unfold=unfold,
     )
 
-    # Change font size of y-axis tick labels
-    ax.tick_params(axis="y", labelsize=spacings_config.ticklabel_fontsize)
 
-    # Store histogram patch for legend
-    hist_patch = Patch(
-        color=spacings_config.hist_color, alpha=spacings_config.hist_alpha
-    )
-
-    # Create legend
-    legend = ax.legend(
-        handles=[hist_patch, surmise],
-        labels=[spacings_config.hist_legend, spacings_config.curve_legend],
-        title=legend_title,
-        loc=spacings_config.legend_location,
-        bbox_to_anchor=spacings_config.legend_bbox,
-        fontsize=spacings_config.legend_fontsize,
-        title_fontsize=spacings_config.legend_title_fontsize,
-        frameon=spacings_config.legend_frameon,
-    )
-    legend._legend_box.align = spacings_config.legend_textalignment
-
-    # Store plot file name
-    if not unfold:
-        plot_file = spacings_config.plot_filename
-    else:
-        plot_file = spacings_config.unfolded_plot_filename
-
-    # Create plot path from data path
-    data_path = Path(data_path)
-    plot_dir = data_path.parent.parent / "plots"
-    plot_dir.mkdir(parents=True, exist_ok=True)
-    plot_path = plot_dir / plot_file
-
-    # Save plot to file
-    plt.savefig(plot_path, dpi=300, bbox_inches="tight")
-
-    # Close plot
-    plt.close(fig)
-
-
-def plot_form_factors(data_path: str, unfold: bool = False) -> None:
+def plot_form_factors(data_path: str) -> None:
     """
     Plots the spectral form factors from the given data path.
 
@@ -458,8 +415,6 @@ def plot_form_factors(data_path: str, unfold: bool = False) -> None:
     ----------
     data_path : str
         Path to the data file containing form factors data.
-    unfold : bool, optional
-        Whether to unfold eigenvalues (default is False).
 
     Raises
     ------
@@ -468,26 +423,15 @@ def plot_form_factors(data_path: str, unfold: bool = False) -> None:
     ValueError
         If the file name does not match the expected name or if the ensemble name is not found in the path.
     """
-    # Reads results path and extracts ensemble
-    if not unfold:
-        ensemble = _ensemble_from_path(data_path, sff_config.data_filename)
-    else:
-        ensemble = _ensemble_from_path(data_path, sff_config.unfolded_data_filename)
-
-    # Load form factors data from file
-    form_factors_data = np.load(data_path)
+    # Initialize plot
+    ensemble, form_factors_data, unfold, fig, ax = _initialize_plot(
+        sff_config, data_path
+    )
 
     # Unpack form factors data
     times = form_factors_data["times"]
     sff = form_factors_data["sff"]
     csff = form_factors_data["csff"]
-
-    # Create figure and axis
-    fig, ax = plt.subplots()
-
-    # Set line widths
-    for spine in ax.spines.values():
-        spine.set_linewidth(sff_config.axes_width)
 
     # Set x- and y-scales to logarithmic
     ax.set_xscale("log", base=ensemble.dim)
@@ -506,7 +450,7 @@ def plot_form_factors(data_path: str, unfold: bool = False) -> None:
     )
 
     # Plot spectral form factor
-    (sff_line,) = ax.plot(
+    ax.plot(
         times,
         sff,
         color=sff_config.sff_color,
@@ -516,7 +460,7 @@ def plot_form_factors(data_path: str, unfold: bool = False) -> None:
     )
 
     # Plot connected spectral form factor
-    (csff_line,) = ax.plot(
+    ax.plot(
         times,
         csff,
         color=sff_config.csff_color,
@@ -525,45 +469,29 @@ def plot_form_factors(data_path: str, unfold: bool = False) -> None:
         zorder=sff_config.csff_zorder,
     )
 
-    # Create plot based on whether unfolding has occurred
-    if not unfold:
-        # Create tick time values
-        tick_times = np.logspace(
+    # Create tick time values
+    tick_times = (
+        np.logspace(
+            start=sff_config.unfolded_logtime_min,
+            stop=sff_config.unfolded_logtime_max,
+            num=sff_config.num_ticks,
+            base=ensemble.dim,
+            dtype=np.float64,
+        )
+        if unfold
+        else np.logspace(
             start=sff_config.logtime_min,
             stop=sff_config.logtime_max,
             num=sff_config.num_ticks,
             base=ensemble.dim,
             dtype=np.float64,
         )
+        / (ensemble.N * ensemble.J)
+    )
 
-        # Normalize tick_times by total spectrum width
-        tick_times /= ensemble.N * ensemble.J
-
-        # Set axis labels and limits
-        ax.set_xlabel(sff_config.xlabel)
-        ax.set_ylabel(sff_config.ylabel)
-        ax.set_xlim(tick_times[0], tick_times[-1])
-
-        # Create tick labels for x-axis
-        ax.set_xticks(tick_times[1:-1])
-        ax.set_xticklabels(
-            sff_config.xticklabels, fontsize=sff_config.ticklabel_fontsize
-        )
-
-        # Create legend
-        legend = ax.legend(
-            handles=[sff_line, csff_line],
-            labels=[sff_config.sff_legend, sff_config.csff_legend],
-            title=rf"{repr(ensemble)}",
-            loc=sff_config.legend_location,
-            bbox_to_anchor=sff_config.legend_bbox,
-            fontsize=sff_config.legend_fontsize,
-            title_fontsize=sff_config.legend_title_fontsize,
-            frameon=sff_config.legend_frameon,
-        )
-        legend._legend_box.align = sff_config.legend_textalignment
-
-        # Set major grid lines only on x-axis
+    # Add content to plot based on unfolding
+    if not unfold:
+        # Create major x-axis grid lines
         ax.vlines(
             tick_times,
             ymin=ensemble.dim**-3,
@@ -573,13 +501,12 @@ def plot_form_factors(data_path: str, unfold: bool = False) -> None:
             linewidth=sff_config.grid_linewidth,
             zorder=sff_config.grid_zorder,
         )
-
     else:
         # Calculate universal connected spectral form factor
         universal_csff = np.vectorize(ensemble.universal_csff)(times)
 
         # Plot universal connected spectral form factor
-        (univ_line,) = ax.plot(
+        ax.plot(
             times,
             universal_csff,
             color=sff_config.universal_color,
@@ -587,79 +514,30 @@ def plot_form_factors(data_path: str, unfold: bool = False) -> None:
             zorder=sff_config.universal_zorder,
         )
 
-        # Create tick time values
-        tick_times = np.logspace(
-            sff_config.unfolded_logtime_min,
-            sff_config.unfolded_logtime_max,
-            sff_config.num_ticks,
-            base=ensemble.dim,
-            dtype=np.float64,
-        )
+    # Set x-axis limits
+    ax.set_xlim(tick_times[0], tick_times[-1])
 
-        # Set axis labels and limits
-        ax.set_xlabel(sff_config.unfolded_xlabel)
-        ax.set_ylabel(sff_config.unfolded_ylabel)
-        ax.set_xlim(tick_times[0], tick_times[-1])
-
-        # Create tick labels for x-axis
-        ax.set_xticks(tick_times[1:-1])
-        ax.set_xticklabels(
-            sff_config.unfolded_xticklabels,
-            fontsize=sff_config.ticklabel_fontsize,
-        )
-
-        # Create legend
-        legend = ax.legend(
-            handles=[sff_line, csff_line, univ_line],
-            labels=[
-                sff_config.sff_legend,
-                sff_config.csff_legend,
-                sff_config.universal_legend,
-            ],
-            title=rf"{repr(ensemble)}" + "\nunfolded",
-            loc=sff_config.legend_location,
-            bbox_to_anchor=sff_config.legend_bbox,
-            fontsize=sff_config.legend_fontsize,
-            title_fontsize=sff_config.legend_title_fontsize,
-            frameon=sff_config.legend_frameon,
-        )
-        legend._legend_box.align = sff_config.legend_textalignment
+    # Create ticks for x-axis
+    ax.set_xticks(tick_times[1:-1])
 
     # Set y-limits
     ax.set_ylim(ensemble.dim**sff_config.logy_min, ensemble.dim**sff_config.logy_max)
 
     # Create ticks for y-axis
     ax.set_yticks([ensemble.dim**i for i in range(-2, 1)])
-    ax.set_yticklabels(sff_config.yticklabels, fontsize=sff_config.ticklabel_fontsize)
 
-    # Set tick marks all around and inward
-    ax.tick_params(
-        direction="in",
-        top=True,
-        bottom=True,
-        left=True,
-        right=True,
-        length=sff_config.tick_length,
-        width=sff_config.axes_width,
+    # Set legend title
+    legend_title = rf"{repr(ensemble)}" + ("\nunfolded" if unfold else "")
+
+    # Finish plot and save it
+    _create_plot(
+        dataclass=sff_config,
+        data_path=data_path,
+        legend_title=legend_title,
+        fig=fig,
+        ax=ax,
+        unfold=unfold,
     )
-
-    # Store plot file name
-    if not unfold:
-        plot_file = sff_config.plot_filename
-    else:
-        plot_file = sff_config.unfolded_plot_filename
-
-    # Create plot path from data path
-    data_path = Path(data_path)
-    plot_dir = data_path.parent.parent / "plots"
-    plot_dir.mkdir(parents=True, exist_ok=True)
-    plot_path = plot_dir / plot_file
-
-    # Save plot to file
-    plt.savefig(plot_path, dpi=300, bbox_inches="tight")
-
-    # Close plot
-    plt.close(fig)
 
 
 # =============================
@@ -793,11 +671,12 @@ class SpectralStatistics(MonteCarlo):
             "--unfold",
             nargs="+",
             type=int,
-            choices=[2, 3],
+            choices=[1, 2, 3],
             default=[],
             help=dedent(
                 """
                 Specify which simulation(s) to unfold eigenvalues (must be subset of --run and cannot be 1):
+                    (1) Spectral Histogram
                     (2) NN-Level Spacings
                     (3) Spectral Form Factors
                 """
@@ -1080,7 +959,6 @@ class SpectralStatistics(MonteCarlo):
             os.path.join(
                 output_dir, f"{sim_info['unfold'] * 'unfolded_'}{sim_info['file']}"
             ),
-            unfold=sim_info["unfold"],
         )
 
     def run_spectral_hist(self) -> None:
