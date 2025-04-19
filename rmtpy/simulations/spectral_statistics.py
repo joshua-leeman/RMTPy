@@ -21,7 +21,7 @@ from multiprocessing import Pool
 from pathlib import Path
 from textwrap import dedent
 from time import time
-from typing import Dict, List
+from typing import List
 
 # Third-party imports
 import numpy as np
