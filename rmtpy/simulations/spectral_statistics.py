@@ -116,6 +116,8 @@ def plot_spectral_hist(data_path: str, unfold: bool = False) -> None:
     ----------
     data_path : str
         Path to the data file containing histogram data.
+    unfold : bool, optional
+        Whether to unfold eigenvalues (default is False).
 
     Raises
     ------
@@ -125,9 +127,12 @@ def plot_spectral_hist(data_path: str, unfold: bool = False) -> None:
         If the file name does not match the expected name or if the ensemble name is not found in the path.
     """
     # Reads results path and extracts ensemble
-    ensemble = _ensemble_from_path(
-        data_path, f"{unfold * 'unfolded_'}{spectral_config.data_filename}"
-    )
+    if not unfold:
+        ensemble = _ensemble_from_path(data_path, spectral_config.data_filename)
+    else:
+        ensemble = _ensemble_from_path(
+            data_path, spectral_config.unfolded_data_filename
+        )
 
     # Load histogram data from file
     hist_data = np.load(data_path)
@@ -179,17 +184,17 @@ def plot_spectral_hist(data_path: str, unfold: bool = False) -> None:
             spectral_config.x_range * ensemble.E0,
         )
 
-        # Create tick labels for x-axis
-        ax.set_xticks([-ensemble.E0, 0, ensemble.E0])
+        # Create ticks and tick labels for x-axis
+        ax.set_xticks((-ensemble.E0, 0, ensemble.E0))
         ax.set_xticklabels(
-            [r"$-\frac{1}{2}NJ$", r"$0$", r"$\frac{1}{2}NJ$"], fontsize=10
+            spectral_config.xticklabels, fontsize=spectral_config.ticklabel_fontsize
         )
 
-        # Change font size of y-axis tick labels
-        ax.tick_params(axis="y", labelsize=10)
-
         # Create minor ticks for x-axis
-        ax.set_xticks([-ensemble.E0 / 2, ensemble.E0 / 2], minor=True)
+        ax.set_xticks((-ensemble.E0 / 2, ensemble.E0 / 2), minor=True)
+
+        # Change font size of y-axis tick labels
+        ax.tick_params(axis="y", labelsize=spectral_config.ticklabel_fontsize)
     else:
         # Create array of levels
         energies = np.linspace(
@@ -861,63 +866,51 @@ class SpectralStatistics(MonteCarlo):
         if not unfold:
             # Create logtime array based on ensemble parameters
             times = np.logspace(
-                sff_config.logtime_min,
-                sff_config.logtime_max,
-                sff_config.logtime_num,
+                start=sff_config.logtime_min,
+                stop=sff_config.logtime_max,
+                num=sff_config.num_logtimes,
                 base=self.ensemble.dim,
                 dtype=np.float64,
             )
 
-            # Normalize times by total spectrum width
-            times = times / (self.ensemble.N * self.ensemble.J)
-
-            # Append tick time values
-            times = np.append(
-                times,
-                np.array(
-                    [
-                        1
-                        / self.ensemble.N
-                        / self.ensemble.J
-                        / np.sqrt(self.ensemble.dim),
-                        1 / self.ensemble.N / self.ensemble.J,
-                        np.sqrt(self.ensemble.dim) / self.ensemble.N / self.ensemble.J,
-                        self.ensemble.dim / self.ensemble.N / self.ensemble.J,
-                        self.ensemble.dim ** (3 / 2)
-                        / self.ensemble.N
-                        / self.ensemble.J,
-                    ]
-                ),
+            # Create tick time values
+            tick_times = np.logspace(
+                start=sff_config.logtime_min,
+                stop=sff_config.logtime_max,
+                num=sff_config.num_tick_times,
+                base=self.ensemble.dim,
+                dtype=np.float64,
             )
 
-            # Sort times in ascending order
-            times = np.sort(times)
+            # Normalize times and tick_times by total spectrum width
+            times /= self.ensemble.N * self.ensemble.J
+            tick_times /= self.ensemble.N * self.ensemble.J
+
+            # Append tick_times to times and sort
+            times = np.append(times, tick_times)
+            times = np.unique(times)
         else:
             # Create logtime array based on ensemble parameters
             times = np.logspace(
                 sff_config.unfolded_logtime_min,
                 sff_config.unfolded_logtime_max,
-                sff_config.logtime_num,
+                sff_config.num_logtimes,
                 base=self.ensemble.dim,
                 dtype=np.float64,
             )
 
-            # Append tick time values
-            times = np.append(
-                times,
-                np.array(
-                    [
-                        1 / self.ensemble.dim ** (3 / 2),
-                        1 / self.ensemble.dim,
-                        1 / np.sqrt(self.ensemble.dim),
-                        1,
-                        np.sqrt(self.ensemble.dim),
-                    ]
-                ),
+            # Create tick time values
+            tick_times = np.logspace(
+                sff_config.unfolded_logtime_min,
+                sff_config.unfolded_logtime_max,
+                sff_config.num_tick_times,
+                base=self.ensemble.dim,
+                dtype=np.float64,
             )
 
-            # Sort times in ascending order
-            times = np.sort(times)
+            # Append tick_times to times and sort
+            times = np.append(times, tick_times)
+            times = np.unique(times)
 
         # Allocate memory for form factors
         sff = np.empty_like(times, dtype=np.float64)
