@@ -75,7 +75,7 @@ class SpectralHistogram:
 
     # Legend settings
     legend_location: str = "upper right"
-    legend_bbox: Tuple[float, float] = (0.935, 0.96)
+    legend_bbox: Tuple[float, float] = (0.99, 0.96)
     legend_fontsize: int = 10
     legend_title_fontsize: int = 10
     legend_frameon: bool = False
