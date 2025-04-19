@@ -345,29 +345,20 @@ def plot_nn_spacing_dist(data_path: str, unfold: bool = False) -> None:
         ax.set_xlabel(spacings_config.xlabel)
         ax.set_ylabel(spacings_config.ylabel)
 
-        # Create tick labels for x-axis
-        ax.set_xticks(range(spacings_config.x_max))
-        ax.set_xticklabels(
-            [
-                r"$0$" if i == 0 else r"$d$" if i == 1 else rf"${i}d$"
-                for i in range(spacings_config.x_max)
-            ],
-            fontsize=10,
-        )
-
     else:
         # Set axis labels
         ax.set_xlabel(spacings_config.unfolded_xlabel)
         ax.set_ylabel(spacings_config.unfolded_ylabel)
 
-        # Create tick labels for x-axis
-        ax.set_xticks(range(spacings_config.x_max))
-        ax.set_xticklabels(
-            [rf"${i}$" for i in range(spacings_config.x_max)], fontsize=10
-        )
+    # Create tick labels for x-axis
+    ax.set_xticks(range(spacings_config.x_max))
+    ax.set_xticklabels(
+        [rf"${i}$" for i in range(spacings_config.x_max)],
+        fontsize=spacings_config.ticklabel_fontsize,
+    )
 
-        # Create minor ticks for x-axis
-        ax.set_xticks([0.5, 1.5, 2.5], minor=True)
+    # Create minor ticks for x-axis
+    ax.set_xticks([0.5, 1.5, 2.5], minor=True)
 
     # Set tick marks all around and inward
     ax.tick_params(
@@ -377,14 +368,23 @@ def plot_nn_spacing_dist(data_path: str, unfold: bool = False) -> None:
         left=True,
         right=True,
         which="both",
-        length=5,
+        length=spacings_config.tick_length,
     )
+
+    # Change font size of y-axis tick labels
+    ax.tick_params(axis="y", labelsize=spacings_config.ticklabel_fontsize)
+
+    # Store plot file name
+    if not unfold:
+        plot_file = spacings_config.plot_filename
+    else:
+        plot_file = spacings_config.unfolded_plot_filename
 
     # Create plot path from data path
     data_path = Path(data_path)
     plot_dir = data_path.parent.parent / "plots"
     plot_dir.mkdir(parents=True, exist_ok=True)
-    plot_path = plot_dir / f"{unfold * 'unfolded_'}{spacings_config.plot_filename}"
+    plot_path = plot_dir / plot_file
 
     # Save plot to file
     plt.savefig(plot_path, dpi=300, bbox_inches="tight")
