@@ -232,7 +232,7 @@ def plot_spectral_hist(data_path: str, unfold: bool = False) -> None:
         ax.set_xticks((-ensemble.dim / 4, ensemble.dim / 4), minor=True)
 
         # Create tick labels for y-axis
-        ax.set_yticks([0, 1 / ensemble.dim])
+        ax.set_yticks((0, 1 / ensemble.dim))
         ax.set_yticklabels(
             spectral_config.unfolded_yticklabels,
             fontsize=spectral_config.ticklabel_fontsize,
@@ -279,6 +279,8 @@ def plot_nn_spacing_dist(data_path: str, unfold: bool = False) -> None:
     ----------
     data_path : str
         Path to the data file containing histogram data.
+    unfold : bool, optional
+        Whether to unfold eigenvalues (default is False).
 
     Raises
     ------
@@ -288,9 +290,12 @@ def plot_nn_spacing_dist(data_path: str, unfold: bool = False) -> None:
         If the file name does not match the expected name or if the ensemble name is not found in the path.
     """
     # Reads results path and extracts ensemble
-    ensemble = _ensemble_from_path(
-        data_path, f"{unfold * 'unfolded_'}{spacings_config.data_filename}"
-    )
+    if not unfold:
+        ensemble = _ensemble_from_path(data_path, spacings_config.data_filename)
+    else:
+        ensemble = _ensemble_from_path(
+            data_path, spacings_config.unfolded_data_filename
+        )
 
     # Load histrogram data from file
     hist_data = np.load(data_path)
@@ -350,8 +355,6 @@ def plot_nn_spacing_dist(data_path: str, unfold: bool = False) -> None:
             fontsize=10,
         )
 
-        # Change font size of y-axis tick labels
-        ax.tick_params(axis="y", labelsize=10)
     else:
         # Set axis labels
         ax.set_xlabel(spacings_config.unfolded_xlabel)
