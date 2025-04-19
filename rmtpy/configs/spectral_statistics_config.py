@@ -68,6 +68,15 @@ class SpectralHistogram:
         r"$0$",
         r"$\frac{1}{2}NJ$",
     )
+    unfolded_xticklabels: Tuple[str, 3] = (
+        r"$-\frac{1}{2}D$",
+        r"$0$",
+        r"$\frac{1}{2}D$",
+    )
+    unfolded_yticklabels: Tuple[str, 2] = (
+        r"$0$",
+        r"$D^{-1}$",
+    )
     ticklabel_fontsize: int = 10
 
 
