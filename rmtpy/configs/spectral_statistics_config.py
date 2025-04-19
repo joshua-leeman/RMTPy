@@ -101,8 +101,8 @@ class SpectralFormFactors:
 
     # Simulation parameters
     logtime_num: int = 5000
-    logtime_min: float = -0.75
-    logtime_max: float = 2.00
+    logtime_min: float = -0.5
+    logtime_max: float = 1.5
 
     # Results parameters
     data_filename: str = "form_factors.npz"
@@ -113,25 +113,22 @@ class SpectralFormFactors:
     sff_legend: str = r"$\textrm{SFF}$"
     csff_legend: str = r"$\textrm{cSFF}$"
     universal_legend: str = "theory"
-    xlabel: str = r"$J t$"
-    ylabel: str = r"$K(J t)$"
-    unfolded_xlabel: str = r"$\tau$"
-    unfolded_ylabel: str = r"$K(\tau)$"
+    xlabel: str = r"$\log_D(NJt)$"
+    ylabel: str = r"$\log_DK(Jt)$"
+    unfolded_xlabel: str = r"$\log_D \tau$"
+    unfolded_ylabel: str = r"$\log_D K(\tau)$"
     sff_color: str = "Blue"
     csff_color: str = "Red"
     universal_color: str = "Black"
     sff_alpha: float = 1.0
     csff_alpha: float = 1.0
-    sff_width: float = 1.0
-    csff_width: float = 1.0
-    universal_width: float = 1.0
+    sff_width: float = 1.4
+    csff_width: float = 1.4
+    universal_width: float = 1.4
     axes_width: float = 1.0
-    sff_zorder: int = 3
-    csff_zorder: int = 4
-    universal_zorder: int = 5
-    points_alpha: float = 1.0
-    points_color: str = "Black"
-    points_zorder: int = 6
+    sff_zorder: int = 2
+    csff_zorder: int = 2
+    universal_zorder: int = 2
 
 
 # =============================
