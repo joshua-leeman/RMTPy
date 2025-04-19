@@ -120,7 +120,7 @@ class RMT(ABC):
         if self.N is None:
             return rf"$\textrm{{{self.__class__.__name__}}}\ D={self.dim}$"
         else:
-            return f"$\textrm{{{self.__class__.__name__}}}\ N={self.N}$"
+            return rf"$\textrm{{{self.__class__.__name__}}}\ N={self.N}$"
 
     def __str__(self) -> str:
         """
