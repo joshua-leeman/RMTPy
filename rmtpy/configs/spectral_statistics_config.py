@@ -19,6 +19,8 @@ from typing import Tuple
 
 # Third-party imports
 from matplotlib.pyplot import rcParams
+from matplotlib.lines import Line2D
+from matplotlib.patches import Patch
 
 
 # =============================
@@ -63,17 +65,28 @@ class SpectralHistogram:
     unfolded_ylabel: str = r"$\langle \rho(\xi) \rangle$"
 
     # Tick settings
+    has_xticklabels: bool = True
     xticklabels: Tuple[str, ...] = (r"$-\frac{1}{2}NJ$", r"$0$", r"$\frac{1}{2}NJ$")
+    has_unfolded_xticklabels: bool = True
     unfolded_xticklabels: Tuple[str, ...] = (
         r"$-\frac{1}{2}D$",
         r"$0$",
         r"$\frac{1}{2}D$",
     )
+    has_yticklabels: bool = False
+    has_unfolded_yticklabels: bool = True
     unfolded_yticklabels: Tuple[str, ...] = (r"$0$", r"$\frac{1}{2}D$", r"$D$")
     ticklabel_fontsize: int = 10
     tick_length: int = 6
 
     # Legend settings
+    legend_handles: Tuple[Patch, Line2D] = (
+        Patch(color=hist_color, alpha=hist_alpha, label=hist_legend),
+        Line2D([0], [0], color=curve_color, linewidth=curve_width, label=curve_legend),
+    )
+    legend_labels: Tuple[str, str] = (hist_legend, curve_legend)
+    unfolded_legend_handles: Tuple[Patch, Line2D] = legend_handles
+    unfolded_legend_labels: Tuple[str, str] = legend_labels
     legend_location: str = "upper right"
     legend_bbox: Tuple[float, float] = (0.99, 0.96)
     legend_fontsize: int = 10
@@ -124,10 +137,29 @@ class NNLevelSpacings:
     unfolded_ylabel: str = r"$\langle \rho(s) \rangle$"
 
     # Tick settings
+    has_xticklabels: bool = True
+    xticklabels: Tuple[str, ...] = tuple(
+        [r"$d$" if i == 1 else rf"${i}d$" for i in range(1, x_max + 1)]
+    )
+    has_unfolded_xticklabels: bool = True
+    unfolded_xticklabels: Tuple[str, ...] = tuple(
+        [rf"${i}.0$" for i in range(1, x_max + 1)]
+    )
+    has_yticklabels: bool = False
+    has_unfolded_yticklabels: bool = False
+    major_xticks: Tuple[float, ...] = (1.0, 2.0, 3.0, 4.0)
+    minor_xticks: Tuple[float, ...] = (0.5, 1.5, 2.5, 3.5)
     ticklabel_fontsize: int = 10
     tick_length: int = 6
 
     # Legend settings
+    legend_handles: Tuple[Patch, Line2D] = (
+        Patch(color=hist_color, alpha=hist_alpha, label=hist_legend),
+        Line2D([0], [0], color=curve_color, linewidth=curve_width, label=curve_legend),
+    )
+    legend_labels: Tuple[str, str] = (hist_legend, curve_legend)
+    unfolded_legend_handles: Tuple[Patch, Line2D] = legend_handles
+    unfolded_legend_labels: Tuple[str, str] = legend_labels
     legend_location: str = "upper right"
     legend_bbox: Tuple[float, float] = (0.9, 0.9)
     legend_fontsize: int = 10
@@ -196,17 +228,72 @@ class SpectralFormFactors:
     unfolded_ylabel: str = r"$K(\tau)$"
 
     # Tick settings
+    has_xticklabels: bool = True
     xticklabels: Tuple[str, ...] = (r"$1/N$", r"$\sqrt{D} / N$", r"$D / N$")
+    has_unfolded_xticklabels: bool = True
     unfolded_xticklabels: Tuple[str, ...] = (
         r"$D^{-1}$",
         r"$D^{-1/2}$",
         r"$1$",
     )
+    has_yticklabels: bool = True
     yticklabels: Tuple[str, ...] = (r"$D^{-2}$", r"$D^{-1}$", r"$1$")
+    has_unfolded_yticklabels: bool = True
+    unfolded_yticklabels: Tuple[str, ...] = yticklabels
     ticklabel_fontsize: int = 10
     tick_length: int = 6
 
     # Legend settings
+    legend_handles: Tuple[Line2D, Line2D] = (
+        Line2D(
+            [0],
+            [0],
+            color=sff_color,
+            alpha=sff_alpha,
+            linewidth=sff_width,
+            label=sff_legend,
+        ),
+        Line2D(
+            [0],
+            [0],
+            color=csff_color,
+            alpha=csff_alpha,
+            linewidth=csff_width,
+            label=csff_legend,
+        ),
+    )
+    legend_labels: Tuple[str, str] = (sff_legend, csff_legend)
+    unfolded_legend_handles: Tuple[Line2D, Line2D, Line2D] = (
+        Line2D(
+            [0],
+            [0],
+            color=sff_color,
+            alpha=sff_alpha,
+            linewidth=sff_width,
+            label=sff_legend,
+        ),
+        Line2D(
+            [0],
+            [0],
+            color=csff_color,
+            alpha=csff_alpha,
+            linewidth=csff_width,
+            label=csff_legend,
+        ),
+        Line2D(
+            [0],
+            [0],
+            color=universal_color,
+            alpha=universal_alpha,
+            linewidth=universal_width,
+            label=universal_legend,
+        ),
+    )
+    unfolded_legend_labels: Tuple[str, str, str] = (
+        sff_legend,
+        csff_legend,
+        universal_legend,
+    )
     legend_location: str = "upper right"
     legend_bbox: Tuple[float, float] = (0.735, 0.9)
     legend_fontsize: int = 10
