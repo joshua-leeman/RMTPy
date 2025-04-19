@@ -34,25 +34,32 @@ class SpectralHistogram:
     density_num: int = 1000
     x_range: float = 1.2  # factor of scale
 
-    # Results parameters
+    # File names
     data_filename: str = "spectrum.npz"
     plot_filename: str = "spectrum.png"
+    unfolded_data_filename: str = "unfolded_spectrum.npz"
+    unfolded_plot_filename: str = "unfolded_spectrum.png"
 
-    # Plot settings
-    title: str = "Average Spectral Density"
+    # Histogram graphic parameters
+    hist_color: str = "RoyalBlue"
+    hist_alpha: float = 0.5
+    hist_zorder: int = 1
+
+    # Curve graphic parameters
+    curve_color: str = "Black"
+    curve_width: float = 2.5
+    curve_zorder: int = 2
+
+    # Axes settings
+    axes_width: float = 1.0
+
+    # Plot labeling
     hist_legend: str = "simulation"
     curve_legend: str = "theory"
     xlabel: str = r"$E$"
     ylabel: str = r"$\langle \rho(E) \rangle$"
     unfolded_xlabel: str = r"$\xi$"
     unfolded_ylabel: str = r"$\langle \rho(\xi) \rangle$"
-    hist_color: str = "RoyalBlue"
-    curve_color: str = "Black"
-    hist_alpha: float = 0.5
-    curve_width: float = 2.5
-    axes_width: float = 1.0
-    hist_zorder: int = 1
-    curve_zorder: int = 2
 
 
 # =============================
@@ -69,25 +76,32 @@ class NNLevelSpacings:
     density_num: int = 1000
     x_max: int = 4
 
-    # Results parameters
+    # File names
     data_filename: str = "spacings.npz"
     plot_filename: str = "spacings.png"
+    unfolded_data_filename: str = "unfolded_spacings.npz"
+    unfolded_plot_filename: str = "unfolded_spacings.png"
 
-    # Plot settings
-    title: str = "NNS Distribution"
+    # Histogram graphic parameters
+    hist_color: str = "Orange"
+    hist_alpha: float = 0.5
+    hist_zorder: int = 1
+
+    # Curve graphic parameters
+    curve_color: str = "Black"
+    curve_width: float = 2.5
+    curve_zorder: int = 2
+
+    # Axes settings
+    axes_width: float = 1.0
+
+    # Plot labeling
     hist_legend: str = "simulation"
     curve_legend: str = "surmise"
     xlabel: str = r"$\varepsilon$"
     ylabel: str = r"$\langle \rho(\varepsilon / d) \rangle$"
     unfolded_xlabel: str = r"$s$"
     unfolded_ylabel: str = r"$\langle \rho(s) \rangle$"
-    hist_color: str = "Orange"
-    curve_color: str = "Black"
-    hist_alpha: float = 0.5
-    curve_width: float = 2.5
-    axes_width: float = 1.0
-    hist_zorder: int = 1
-    curve_zorder: int = 2
 
 
 # =============================
@@ -103,13 +117,37 @@ class SpectralFormFactors:
     logtime_num: int = 5000
     logtime_min: float = -0.5
     logtime_max: float = 1.5
+    unfolded_logtime_min: float = -1.5
+    unfolded_logtime_max: float = 0.5
 
-    # Results parameters
+    # File names
     data_filename: str = "form_factors.npz"
     plot_filename: str = "form_factors.png"
+    unfolded_data_filename: str = "unfolded_form_factors.npz"
+    unfolded_plot_filename: str = "unfolded_form_factors.png"
 
-    # Plot settings
-    title: str = "Spectral Form Factors"
+    # SFF curve parameters
+    sff_color: str = "Blue"
+    sff_alpha: float = 1.0
+    sff_width: float = 1.4
+    sff_zorder: int = 2
+
+    # cSFF curve parameters
+    csff_color: str = "Red"
+    csff_alpha: float = 1.0
+    csff_width: float = 1.4
+    csff_zorder: int = 2
+
+    # Universal curve parameters
+    universal_color: str = "Black"
+    universal_alpha: float = 1.0
+    universal_width: float = 1.4
+    universal_zorder: int = 2
+
+    # Axes settings
+    axes_width: float = 1.0
+
+    # Plot labeling
     sff_legend: str = r"$\textrm{SFF}$"
     csff_legend: str = r"$\textrm{cSFF}$"
     universal_legend: str = "theory"
@@ -117,18 +155,6 @@ class SpectralFormFactors:
     ylabel: str = r"$\log_DK(Jt)$"
     unfolded_xlabel: str = r"$\log_D \tau$"
     unfolded_ylabel: str = r"$\log_D K(\tau)$"
-    sff_color: str = "Blue"
-    csff_color: str = "Red"
-    universal_color: str = "Black"
-    sff_alpha: float = 1.0
-    csff_alpha: float = 1.0
-    sff_width: float = 1.4
-    csff_width: float = 1.4
-    universal_width: float = 1.4
-    axes_width: float = 1.0
-    sff_zorder: int = 2
-    csff_zorder: int = 2
-    universal_zorder: int = 2
 
 
 # =============================
@@ -141,6 +167,7 @@ sff_config = SpectralFormFactors()
 
 # Set matplotlib rcParams for plots
 rcParams["text.usetex"] = True
+rcParams["axes.axisbelow"] = False
 rcParams["font.family"] = "serif"
 rcParams["font.serif"] = "Latin Modern Roman"
 rcParams["font.size"] = 12
