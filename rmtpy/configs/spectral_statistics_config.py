@@ -60,23 +60,12 @@ class SpectralHistogram:
     xlabel: str = r"$E$"
     ylabel: str = r"$\langle \rho(E) \rangle$"
     unfolded_xlabel: str = r"$\xi$"
-    unfolded_ylabel: str = r"$\langle \rho(\xi) \rangle$"
+    unfolded_ylabel: str = r"$D \langle \rho(\xi) \rangle$"
 
     # Tick labeling
-    xticklabels: Tuple[str, 3] = (
-        r"$-\frac{1}{2}NJ$",
-        r"$0$",
-        r"$\frac{1}{2}NJ$",
-    )
-    unfolded_xticklabels: Tuple[str, 3] = (
-        r"$-\frac{1}{2}D$",
-        r"$0$",
-        r"$\frac{1}{2}D$",
-    )
-    unfolded_yticklabels: Tuple[str, 2] = (
-        r"$0$",
-        r"$D^{-1}$",
-    )
+    xticklabels: Tuple[str, 3] = (r"$-0.5$", r"$0$", r"$0.5$")
+    unfolded_xticklabels: Tuple[str, 3] = (r"$-0.5$", r"$0$", r"$0.5$")
+    unfolded_yticklabels: Tuple[str, 2] = (r"$0$", r"$1.0$")
     ticklabel_fontsize: int = 10
     tick_length: int = 6
 
@@ -117,10 +106,14 @@ class NNLevelSpacings:
     # Plot labeling
     hist_legend: str = "simulation"
     curve_legend: str = "surmise"
-    xlabel: str = r"$\varepsilon$"
+    xlabel: str = r"$\varepsilon / d$"
     ylabel: str = r"$\langle \rho(\varepsilon / d) \rangle$"
     unfolded_xlabel: str = r"$s$"
     unfolded_ylabel: str = r"$\langle \rho(s) \rangle$"
+
+    # Tick labeling
+    ticklabel_fontsize: int = 10
+    tick_length: int = 6
 
 
 # =============================
