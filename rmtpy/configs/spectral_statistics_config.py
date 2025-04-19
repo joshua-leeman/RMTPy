@@ -48,7 +48,7 @@ class SpectralHistogram:
 
     # Curve graphic parameters
     curve_color: str = "Black"
-    curve_width: float = 2.5
+    curve_width: float = 1.5
     curve_zorder: int = 2
 
     # Axes settings
@@ -57,7 +57,7 @@ class SpectralHistogram:
     # Plot labeling
     hist_legend: str = "simulation"
     curve_legend: str = "theory"
-    xlabel: str = r"$E / NJ$"
+    xlabel: str = r"$E / (NJ)$"
     ylabel: str = r"$\langle \rho(E) \rangle$"
     unfolded_xlabel: str = r"$\xi / D$"
     unfolded_ylabel: str = r"$D \langle \rho(\xi) \rangle$"
@@ -97,7 +97,7 @@ class NNLevelSpacings:
 
     # Curve graphic parameters
     curve_color: str = "Black"
-    curve_width: float = 2.5
+    curve_width: float = 1.5
     curve_zorder: int = 2
 
     # Axes settings
@@ -156,7 +156,7 @@ class SpectralFormFactors:
     # Universal curve parameters
     universal_color: str = "Black"
     universal_alpha: float = 1.0
-    universal_width: float = 1.4
+    universal_width: float = 1.5
     universal_zorder: int = 2
 
     # Axes settings
