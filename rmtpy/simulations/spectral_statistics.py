@@ -14,6 +14,7 @@ It is grouped into the following sections:
 # =============================
 # Standard library imports
 import os
+import re
 from argparse import ArgumentParser
 from ast import literal_eval
 from importlib import import_module
@@ -32,6 +33,7 @@ from matplotlib.ticker import LogLocator, NullLocator
 from psutil import virtual_memory
 
 # Local application imports
+from rmtpy.ensembles import get_ensemble
 from rmtpy.simulations._mc import MonteCarlo
 from rmtpy.configs.spectral_statistics_config import (
     spectral_config,
@@ -77,37 +79,23 @@ def _ensemble_from_path(path: str, file_name: str) -> object:
     # Initialize metadata dictionary
     metadata = {}
 
-    # Read file path and extract metadata
-    for datum in path.split("/"):
-        if "=" in datum:
-            split_datum = datum.split("=")
-            metadata[split_datum[0]] = literal_eval(split_datum[1])
-
-    # Retrieve list of valid ensembles
-    ensemble_list = [
-        file.rstrip(".py")
-        for file in os.listdir(f"rmtpy/ensembles")
-        if file.endswith(".py") and not file.startswith("_")
-    ]
-
     # Grabs ensemble name from path
     try:
-        ensemble_name = next(
-            datum for datum in path.split("/") if datum in ensemble_list
-        )
+        ensemble_name = next(datum for datum in path.split("/")[2:])
     except StopIteration:
-        raise ValueError(f"Ensemble name not found in path: {path}")
+        raise ValueError(f"Empty path given.")
 
-    # Copy metadata as ensemble inputs and pop realizations
-    ens_inputs = metadata.copy()
-    ens_inputs.pop("realizs")
+    # Extract ensemble name and metadata from path
+    for part in Path(path).parts:
+        datum = re.fullmatch(r"(?P<key>\w+)=(?P<val>.+)", part)
+        if datum is not None:
+            metadata[datum.group("key")] = literal_eval(datum.group("val"))
 
-    # Import ensemble module and class
-    module = import_module(f"rmtpy.ensembles.{ensemble_name}")
-    ENSEMBLE = getattr(module, module.class_name)
+    # Pop realizations from metadata
+    metadata.pop("realizs", None)
 
     # Return initialized ensemble
-    return ENSEMBLE(**ens_inputs)
+    return get_ensemble(ensemble_name, **metadata)
 
 
 def _initialize_plot(dataclass: object, data_path: str) -> Tuple[
