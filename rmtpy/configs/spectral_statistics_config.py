@@ -57,15 +57,19 @@ class SpectralHistogram:
     # Plot settings
     hist_legend: str = "simulation"
     curve_legend: str = "theory"
-    xlabel: str = r"$E / (NJ)$"
+    xlabel: str = r"$E$"
     ylabel: str = r"$\langle \rho(E) \rangle$"
-    unfolded_xlabel: str = r"$\xi / D$"
-    unfolded_ylabel: str = r"$D \langle \rho(\xi) \rangle$"
+    unfolded_xlabel: str = r"$\xi$"
+    unfolded_ylabel: str = r"$\langle \rho(\xi) \rangle$"
 
     # Tick settings
-    xticklabels: Tuple[str, ...] = (r"$-0.5$", r"$0$", r"$0.5$")
-    unfolded_xticklabels: Tuple[str, ...] = (r"$-0.5$", r"$0$", r"$0.5$")
-    unfolded_yticklabels: Tuple[str, ...] = (r"$0$", r"0.5", r"$1.0$", r"$1.5$")
+    xticklabels: Tuple[str, ...] = (r"$-\frac{1}{2}NJ$", r"$0$", r"$\frac{1}{2}NJ$")
+    unfolded_xticklabels: Tuple[str, ...] = (
+        r"$-\frac{1}{2}D$",
+        r"$0$",
+        r"$\frac{1}{2}D$",
+    )
+    unfolded_yticklabels: Tuple[str, ...] = (r"$0$", r"$\frac{1}{2}D$", r"$D$")
     ticklabel_fontsize: int = 10
     tick_length: int = 6
 
@@ -114,8 +118,8 @@ class NNLevelSpacings:
     # Plot settings
     hist_legend: str = "simulation"
     curve_legend: str = "surmise"
-    xlabel: str = r"$\varepsilon / d$"
-    ylabel: str = r"$\langle \rho(\varepsilon / d) \rangle$"
+    xlabel: str = r"$\varepsilon$"
+    ylabel: str = r"$\langle \rho(\varepsilon) \rangle$"
     unfolded_xlabel: str = r"$s$"
     unfolded_ylabel: str = r"$\langle \rho(s) \rangle$"
 
@@ -186,21 +190,19 @@ class SpectralFormFactors:
     sff_legend: str = r"SFF"
     csff_legend: str = r"cSFF"
     universal_legend: str = "universal"
-    xlabel: str = r"$\log_D(NJt)$"
-    ylabel: str = r"$\log_DK(Jt)$"
-    unfolded_xlabel: str = r"$\log_D \tau$"
-    unfolded_ylabel: str = r"$\log_D K(\tau)$"
+    xlabel: str = r"$Jt$"
+    ylabel: str = r"$K(Jt)$"
+    unfolded_xlabel: str = r"$\tau$"
+    unfolded_ylabel: str = r"$K(\tau)$"
 
     # Tick settings
-    xticklabels: Tuple[str, ...] = (r"$-0.5$", r"$0$", r"$0.5$", r"$1$", r"$1.5$")
+    xticklabels: Tuple[str, ...] = (r"$1/N$", r"$\sqrt{D} / N$", r"$D / N$")
     unfolded_xticklabels: Tuple[str, ...] = (
-        r"$-1.5$",
-        r"$-1$",
-        r"$-0.5$",
-        r"$0$",
-        r"$0.5$",
+        r"$D^{-1}$",
+        r"$D^{-1/2}$",
+        r"$1$",
     )
-    yticklabels: Tuple[str, ...] = (r"$-2$", r"$-1$", r"$0$")
+    yticklabels: Tuple[str, ...] = (r"$D^{-2}$", r"$D^{-1}$", r"$1$")
     ticklabel_fontsize: int = 10
     tick_length: int = 6
 
