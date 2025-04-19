@@ -181,7 +181,12 @@ def plot_spectral_hist(data_path: str, unfold: bool = False) -> None:
 
         # Create tick labels for x-axis
         ax.set_xticks([-ensemble.E0, 0, ensemble.E0])
-        ax.set_xticklabels([r"$-\frac{1}{2}NJ$", r"$0$", r"$\frac{1}{2}NJ$"])
+        ax.set_xticklabels(
+            [r"$-\frac{1}{2}NJ$", r"$0$", r"$\frac{1}{2}NJ$"], fontsize=10
+        )
+
+        # Change font size of y-axis tick labels
+        ax.tick_params(axis="y", labelsize=10)
 
         # Create minor ticks for x-axis
         ax.set_xticks([-ensemble.E0 / 2, ensemble.E0 / 2], minor=True)
@@ -213,14 +218,14 @@ def plot_spectral_hist(data_path: str, unfold: bool = False) -> None:
 
         # Create tick labels for x-axis
         ax.set_xticks([-ensemble.dim / 2, 0, ensemble.dim / 2])
-        ax.set_xticklabels([r"$-\frac{1}{2}D$", r"$0$", r"$\frac{1}{2}D$"])
+        ax.set_xticklabels([r"$-\frac{1}{2}D$", r"$0$", r"$\frac{1}{2}D$"], fontsize=10)
 
         # Create minor ticks for x-axis
         ax.set_xticks([-ensemble.dim / 4, ensemble.dim / 4], minor=True)
 
         # Create tick labels for y-axis
         ax.set_yticks([0, 1 / ensemble.dim])
-        ax.set_yticklabels([r"$0$", r"$D^{-1}$"])
+        ax.set_yticklabels([r"$0$", r"$D^{-1}$"], fontsize=10)
 
         # Set minor ticks for y-axis
         ax.set_yticks([1 / (2 * ensemble.dim), 3 / (2 * ensemble.dim)], minor=True)
@@ -324,8 +329,12 @@ def plot_nn_spacing_dist(data_path: str, unfold: bool = False) -> None:
             [
                 r"$0$" if i == 0 else r"$d$" if i == 1 else rf"${i}d$"
                 for i in range(spacings_config.x_max)
-            ]
+            ],
+            fontsize=10,
         )
+
+        # Change font size of y-axis tick labels
+        ax.tick_params(axis="y", labelsize=10)
     else:
         # Set axis labels
         ax.set_xlabel(spacings_config.unfolded_xlabel)
@@ -333,7 +342,9 @@ def plot_nn_spacing_dist(data_path: str, unfold: bool = False) -> None:
 
         # Create tick labels for x-axis
         ax.set_xticks(range(spacings_config.x_max))
-        ax.set_xticklabels([rf"${i}$" for i in range(spacings_config.x_max)])
+        ax.set_xticklabels(
+            [rf"${i}$" for i in range(spacings_config.x_max)], fontsize=10
+        )
 
         # Create minor ticks for x-axis
         ax.set_xticks([0.5, 1.5, 2.5], minor=True)
@@ -394,6 +405,8 @@ def plot_form_factors(data_path: str, unfold: bool = False) -> None:
     # Create figure and axis
     fig, ax = plt.subplots()
 
+    ax.set_axisbelow(False)
+
     # Set line widths
     for spine in ax.spines.values():
         spine.set_linewidth(sff_config.axes_width)
@@ -411,7 +424,7 @@ def plot_form_factors(data_path: str, unfold: bool = False) -> None:
     ax.yaxis.set_major_locator(LogLocator(base=ensemble.dim, numticks=6))
 
     # Plot spectral form factor
-    ax.plot(
+    (sff_line,) = ax.plot(
         times,
         sff,
         color=sff_config.sff_color,
@@ -421,7 +434,7 @@ def plot_form_factors(data_path: str, unfold: bool = False) -> None:
     )
 
     # Plot connected spectral form factor
-    ax.plot(
+    (csff_line,) = ax.plot(
         times,
         csff,
         color=sff_config.csff_color,
@@ -439,49 +452,62 @@ def plot_form_factors(data_path: str, unfold: bool = False) -> None:
             ensemble.dim**sff_config.logtime_min / ensemble.N / ensemble.J,
             ensemble.dim**sff_config.logtime_max / ensemble.N / ensemble.J,
         )
-        ax.set_ylim(ensemble.dim ** (-2.10), ensemble.dim**0.10)
 
         # Store tick times and form factor values
         tick_times = np.array(
             [
+                1 / ensemble.N / ensemble.J / np.sqrt(ensemble.dim),
                 1 / ensemble.N / ensemble.J,
-                1,
+                np.sqrt(ensemble.dim) / ensemble.N / ensemble.J,
                 ensemble.dim / ensemble.N / ensemble.J,
-                ensemble.dim**2 / ensemble.N / ensemble.J,
+                ensemble.dim ** (3 / 2) / ensemble.N / ensemble.J,
             ]
         )
-        indices = np.searchsorted(times, tick_times)
-        tick_sff = sff[indices]
 
         # Create tick labels for x-axis
         ax.set_xticks(tick_times)
-        ax.set_xticklabels([r"$1 / N$", r"$1$", r"$D / N$", r"$D^2 / N$"])
-
-        # Plot tick points
-        ax.scatter(
-            tick_times,
-            tick_sff,
-            color=sff_config.points_color,
-            alpha=sff_config.points_alpha,
-            zorder=sff_config.points_zorder,
+        ax.set_xticklabels(
+            # [
+            #     r"$D^{-1/2} / N$",
+            #     r"$1 / N$",
+            #     r"$D^{1/2} / N$",
+            #     r"$D / N$",
+            #     r"$D^{3/2} / N$",
+            # ],
+            [r"$-0.5$", r"$0$", r"$0.5$", r"$1$", r"$1.5$"],
+            fontsize=10,
         )
 
-        # Vertical dotted lines from each tick point to x-axis
-        for x, y in zip(tick_times, tick_sff):
-            ax.axvline(
-                x=x,
-                color=sff_config.points_color,
-                alpha=sff_config.points_alpha,
-                zorder=sff_config.points_zorder,
-                linestyle="dotted",
-            )
+        # Create legend
+        legend = ax.legend(
+            handles=[sff_line, csff_line],
+            labels=[r"SFF", r"cSFF"],
+            title=rf"{repr(ensemble)}",
+            loc="upper right",
+            bbox_to_anchor=(0.98, 0.9),
+            fontsize=10,
+            title_fontsize=10,
+            frameon=False,
+        )
+        legend._legend_box.align = "left"
+
+        # Set major grid lines only on x-axis
+        ax.vlines(
+            tick_times,
+            ymin=ensemble.dim**-3,
+            ymax=ensemble.dim,
+            color=plt.rcParams["grid.color"],
+            linestyle="dotted",
+            linewidth=plt.rcParams["grid.linewidth"],
+            zorder=0,
+        )
 
     else:
         # Calculate universal connected spectral form factor
         universal_csff = np.vectorize(ensemble.universal_csff)(times)
 
         # Plot universal connected spectral form factor
-        ax.plot(
+        (univ_line,) = ax.plot(
             times,
             universal_csff,
             color=sff_config.universal_color,
@@ -496,24 +522,32 @@ def plot_form_factors(data_path: str, unfold: bool = False) -> None:
             ensemble.dim ** (sff_config.logtime_min - 1),
             ensemble.dim ** (sff_config.logtime_max - 1),
         )
-        ax.set_ylim(ensemble.dim ** (-2.10), ensemble.dim**0.10)
+
+        # Store tick times and form factor values
+        tick_times = np.array(
+            [
+                1 / ensemble.dim ** (3 / 2),
+                1 / ensemble.dim,
+                1 / np.sqrt(ensemble.dim),
+                1,
+                np.sqrt(ensemble.dim),
+            ]
+        )
 
         # Create tick labels for x-axis
-        ax.set_xticks(np.array([ensemble.dim**-1, 1, ensemble.dim]))
-        ax.set_xticklabels([r"$D^{-1}$", r"$1$", r"$D$"])
+        ax.set_xticks(tick_times)
+        ax.set_xticklabels(
+            # [r"$D^{-3/2}$", r"$D^{-1}$", r"$D^{-1/2}$", r"$1$", r"$D^{1/2}$"],
+            [r"$-1.5$", r"$-1$", r"$-0.5$", r"$0$", r"$0.5$"],
+            fontsize=10,
+        )
 
-    # Plot horizontal line at y=D^{-1}
-    ax.axhline(
-        ensemble.dim**-1,
-        color=sff_config.universal_color,
-        linewidth=sff_config.universal_width,
-        zorder=sff_config.universal_zorder,
-        linestyle="dashed",
-    )
+    # Set y-limits
+    ax.set_ylim(ensemble.dim ** (-2.20), ensemble.dim**0.20)
 
     # Create ticks for y-axis
     ax.set_yticks([ensemble.dim**i for i in range(-2, 1)])
-    ax.set_yticklabels([r"$D^{-2}$", r"$D^{-1}$", r"$1$"])
+    ax.set_yticklabels([r"$-2$", r"$-1$", r"$0$"], fontsize=10)
 
     # Set tick marks all around and inward
     ax.tick_params(
@@ -522,6 +556,8 @@ def plot_form_factors(data_path: str, unfold: bool = False) -> None:
         bottom=True,
         left=True,
         right=True,
+        length=6,
+        width=sff_config.axes_width,
     )
 
     # Create plot path from data path
@@ -841,10 +877,16 @@ class SpectralStatistics(MonteCarlo):
                 times,
                 np.array(
                     [
+                        1
+                        / self.ensemble.N
+                        / self.ensemble.J
+                        / np.sqrt(self.ensemble.dim),
                         1 / self.ensemble.N / self.ensemble.J,
-                        1,
+                        np.sqrt(self.ensemble.dim) / self.ensemble.N / self.ensemble.J,
                         self.ensemble.dim / self.ensemble.N / self.ensemble.J,
-                        self.ensemble.dim**2 / self.ensemble.N / self.ensemble.J,
+                        self.ensemble.dim ** (3 / 2)
+                        / self.ensemble.N
+                        / self.ensemble.J,
                     ]
                 ),
             )
@@ -866,9 +908,11 @@ class SpectralStatistics(MonteCarlo):
                 times,
                 np.array(
                     [
+                        1 / self.ensemble.dim ** (3 / 2),
                         1 / self.ensemble.dim,
+                        1 / np.sqrt(self.ensemble.dim),
                         1,
-                        self.ensemble.dim,
+                        np.sqrt(self.ensemble.dim),
                     ]
                 ),
             )
