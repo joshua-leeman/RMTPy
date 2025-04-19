@@ -223,6 +223,7 @@ def plot_spectral_hist(data_path: str, unfold: bool = False) -> None:
             -spectral_config.x_range * ensemble.dim / 2,
             spectral_config.x_range * ensemble.dim / 2,
         )
+        ax.set_ylim(0, 1.5 / ensemble.dim)
 
         # Create tick labels for x-axis
         ax.set_xticks((-ensemble.dim / 2, 0, ensemble.dim / 2))
@@ -235,14 +236,11 @@ def plot_spectral_hist(data_path: str, unfold: bool = False) -> None:
         ax.set_xticks((-ensemble.dim / 4, ensemble.dim / 4), minor=True)
 
         # Create tick labels for y-axis
-        ax.set_yticks((0, 0.5 / ensemble.dim, 1 / ensemble.dim, 1.5 / ensemble.dim))
+        ax.set_yticks((0, 0.5 / ensemble.dim, 1 / ensemble.dim))
         ax.set_yticklabels(
             spectral_config.unfolded_yticklabels,
             fontsize=spectral_config.ticklabel_fontsize,
         )
-
-        # Set minor ticks for y-axis
-        ax.set_yticks((1 / (2 * ensemble.dim), 3 / (2 * ensemble.dim)), minor=True)
 
         # Set legend title
         legend_title = rf"{repr(ensemble)}" + "\nunfolded"
@@ -367,6 +365,16 @@ def plot_nn_spacing_dist(data_path: str, unfold: bool = False) -> None:
         # Set legend title
         legend_title = rf"{repr(ensemble)}"
 
+        # Create tick labels for x-axis
+        ax.set_xticks(range(1, spacings_config.x_max + 1))
+        ax.set_xticklabels(
+            [
+                r"$d$" if i == 1 else rf"${i}d$"
+                for i in range(1, spacings_config.x_max + 1)
+            ],
+            fontsize=spacings_config.ticklabel_fontsize,
+        )
+
     else:
         # Set axis labels
         ax.set_xlabel(spacings_config.unfolded_xlabel)
@@ -375,12 +383,12 @@ def plot_nn_spacing_dist(data_path: str, unfold: bool = False) -> None:
         # Set legend title
         legend_title = rf"{repr(ensemble)}" + "\nunfolded"
 
-    # Create tick labels for x-axis
-    ax.set_xticks(range(1, spacings_config.x_max + 1))
-    ax.set_xticklabels(
-        [rf"${i}.0$" for i in range(1, spacings_config.x_max + 1)],
-        fontsize=spacings_config.ticklabel_fontsize,
-    )
+        # Create tick labels for x-axis
+        ax.set_xticks(range(1, spacings_config.x_max + 1))
+        ax.set_xticklabels(
+            [rf"${i}.0$" for i in range(1, spacings_config.x_max + 1)],
+            fontsize=spacings_config.ticklabel_fontsize,
+        )
 
     # Create minor ticks for x-axis
     ax.set_xticks([0.5, 1.5, 2.5, 3.5], minor=True)
@@ -526,7 +534,7 @@ def plot_form_factors(data_path: str, unfold: bool = False) -> None:
         ax.set_xlim(tick_times[0], tick_times[-1])
 
         # Create tick labels for x-axis
-        ax.set_xticks(tick_times)
+        ax.set_xticks(tick_times[1:-1])
         ax.set_xticklabels(
             sff_config.xticklabels, fontsize=sff_config.ticklabel_fontsize
         )
@@ -583,7 +591,7 @@ def plot_form_factors(data_path: str, unfold: bool = False) -> None:
         ax.set_xlim(tick_times[0], tick_times[-1])
 
         # Create tick labels for x-axis
-        ax.set_xticks(tick_times)
+        ax.set_xticks(tick_times[1:-1])
         ax.set_xticklabels(
             sff_config.unfolded_xticklabels,
             fontsize=sff_config.ticklabel_fontsize,
