@@ -41,7 +41,7 @@ from rmtpy.configs.spectral_statistics_config import (
 # =============================
 # 2. Plotting Functions
 # =============================
-def _ensemble_from_path(path: str, file_name: str) -> dict:
+def _ensemble_from_path(path: str, file_name: str) -> object:
     """
     Determines the ensemble from the given path of data file.
 
@@ -232,7 +232,7 @@ def plot_spectral_hist(data_path: str, unfold: bool = False) -> None:
         ax.set_xticks((-ensemble.dim / 4, ensemble.dim / 4), minor=True)
 
         # Create tick labels for y-axis
-        ax.set_yticks((0, 1 / ensemble.dim))
+        ax.set_yticks((0, 0.5 / ensemble.dim, 1 / ensemble.dim, 1.5 / ensemble.dim))
         ax.set_yticklabels(
             spectral_config.unfolded_yticklabels,
             fontsize=spectral_config.ticklabel_fontsize,
@@ -351,9 +351,9 @@ def plot_nn_spacing_dist(data_path: str, unfold: bool = False) -> None:
         ax.set_ylabel(spacings_config.unfolded_ylabel)
 
     # Create tick labels for x-axis
-    ax.set_xticks(range(spacings_config.x_max))
+    ax.set_xticks(range(1, spacings_config.x_max + 1))
     ax.set_xticklabels(
-        [rf"${i}.0$" for i in range(spacings_config.x_max + 1)],
+        [rf"${i}.0$" for i in range(1, spacings_config.x_max + 1)],
         fontsize=spacings_config.ticklabel_fontsize,
     )
 
@@ -401,6 +401,8 @@ def plot_form_factors(data_path: str, unfold: bool = False) -> None:
     ----------
     data_path : str
         Path to the data file containing form factors data.
+    unfold : bool, optional
+        Whether to unfold eigenvalues (default is False).
 
     Raises
     ------
@@ -410,9 +412,10 @@ def plot_form_factors(data_path: str, unfold: bool = False) -> None:
         If the file name does not match the expected name or if the ensemble name is not found in the path.
     """
     # Reads results path and extracts ensemble
-    ensemble = _ensemble_from_path(
-        data_path, f"{unfold * 'unfolded_'}{sff_config.data_filename}"
-    )
+    if not unfold:
+        ensemble = _ensemble_from_path(data_path, sff_config.data_filename)
+    else:
+        ensemble = _ensemble_from_path(data_path, sff_config.unfolded_data_filename)
 
     # Load form factors data from file
     form_factors_data = np.load(data_path)
@@ -424,8 +427,6 @@ def plot_form_factors(data_path: str, unfold: bool = False) -> None:
 
     # Create figure and axis
     fig, ax = plt.subplots()
-
-    ax.set_axisbelow(False)
 
     # Set line widths
     for spine in ax.spines.values():
@@ -440,8 +441,12 @@ def plot_form_factors(data_path: str, unfold: bool = False) -> None:
     ax.yaxis.set_minor_locator(NullLocator())
 
     # Limit number of major ticks on x- and y-axis
-    ax.xaxis.set_major_locator(LogLocator(base=ensemble.dim, numticks=6))
-    ax.yaxis.set_major_locator(LogLocator(base=ensemble.dim, numticks=6))
+    ax.xaxis.set_major_locator(
+        LogLocator(base=ensemble.dim, numticks=sff_config.num_ticks)
+    )
+    ax.yaxis.set_major_locator(
+        LogLocator(base=ensemble.dim, numticks=sff_config.num_ticks)
+    )
 
     # Plot spectral form factor
     (sff_line,) = ax.plot(
@@ -465,61 +470,51 @@ def plot_form_factors(data_path: str, unfold: bool = False) -> None:
 
     # Create plot based on whether unfolding has occurred
     if not unfold:
+        # Create tick time values
+        tick_times = np.logspace(
+            start=sff_config.logtime_min,
+            stop=sff_config.logtime_max,
+            num=sff_config.num_ticks,
+            base=ensemble.dim,
+            dtype=np.float64,
+        )
+
+        # Normalize tick_times by total spectrum width
+        tick_times /= ensemble.N * ensemble.J
+
         # Set axis labels and limits
         ax.set_xlabel(sff_config.xlabel)
         ax.set_ylabel(sff_config.ylabel)
-        ax.set_xlim(
-            ensemble.dim**sff_config.logtime_min / ensemble.N / ensemble.J,
-            ensemble.dim**sff_config.logtime_max / ensemble.N / ensemble.J,
-        )
-
-        # Store tick times and form factor values
-        tick_times = np.array(
-            [
-                1 / ensemble.N / ensemble.J / np.sqrt(ensemble.dim),
-                1 / ensemble.N / ensemble.J,
-                np.sqrt(ensemble.dim) / ensemble.N / ensemble.J,
-                ensemble.dim / ensemble.N / ensemble.J,
-                ensemble.dim ** (3 / 2) / ensemble.N / ensemble.J,
-            ]
-        )
+        ax.set_xlim(tick_times[0], tick_times[-1])
 
         # Create tick labels for x-axis
         ax.set_xticks(tick_times)
         ax.set_xticklabels(
-            # [
-            #     r"$D^{-1/2} / N$",
-            #     r"$1 / N$",
-            #     r"$D^{1/2} / N$",
-            #     r"$D / N$",
-            #     r"$D^{3/2} / N$",
-            # ],
-            [r"$-0.5$", r"$0$", r"$0.5$", r"$1$", r"$1.5$"],
-            fontsize=10,
+            sff_config.xticklabels, fontsize=sff_config.ticklabel_fontsize
         )
 
         # Create legend
         legend = ax.legend(
             handles=[sff_line, csff_line],
-            labels=[r"SFF", r"cSFF"],
+            labels=[sff_config.sff_legend, sff_config.csff_legend],
             title=rf"{repr(ensemble)}",
-            loc="upper right",
-            bbox_to_anchor=(0.98, 0.9),
-            fontsize=10,
-            title_fontsize=10,
-            frameon=False,
+            loc=sff_config.legend_location,
+            bbox_to_anchor=sff_config.legend_bbox,
+            fontsize=sff_config.legend_fontsize,
+            title_fontsize=sff_config.legend_title_fontsize,
+            frameon=sff_config.legend_frameon,
         )
-        legend._legend_box.align = "left"
+        legend._legend_box.align = sff_config.legend_textalignment
 
         # Set major grid lines only on x-axis
         ax.vlines(
             tick_times,
             ymin=ensemble.dim**-3,
             ymax=ensemble.dim,
-            color=plt.rcParams["grid.color"],
-            linestyle="dotted",
-            linewidth=plt.rcParams["grid.linewidth"],
-            zorder=0,
+            color=sff_config.grid_color,
+            linestyle=sff_config.grid_linestyle,
+            linewidth=sff_config.grid_linewidth,
+            zorder=sff_config.grid_zorder,
         )
 
     else:
@@ -535,39 +530,33 @@ def plot_form_factors(data_path: str, unfold: bool = False) -> None:
             zorder=sff_config.universal_zorder,
         )
 
+        # Create tick time values
+        tick_times = np.logspace(
+            sff_config.unfolded_logtime_min,
+            sff_config.unfolded_logtime_max,
+            sff_config.num_ticks,
+            base=ensemble.dim,
+            dtype=np.float64,
+        )
+
         # Set axis labels and limits
         ax.set_xlabel(sff_config.unfolded_xlabel)
         ax.set_ylabel(sff_config.unfolded_ylabel)
-        ax.set_xlim(
-            ensemble.dim ** (sff_config.logtime_min - 1),
-            ensemble.dim ** (sff_config.logtime_max - 1),
-        )
-
-        # Store tick times and form factor values
-        tick_times = np.array(
-            [
-                1 / ensemble.dim ** (3 / 2),
-                1 / ensemble.dim,
-                1 / np.sqrt(ensemble.dim),
-                1,
-                np.sqrt(ensemble.dim),
-            ]
-        )
+        ax.set_xlim(tick_times[0], tick_times[-1])
 
         # Create tick labels for x-axis
         ax.set_xticks(tick_times)
         ax.set_xticklabels(
-            # [r"$D^{-3/2}$", r"$D^{-1}$", r"$D^{-1/2}$", r"$1$", r"$D^{1/2}$"],
-            [r"$-1.5$", r"$-1$", r"$-0.5$", r"$0$", r"$0.5$"],
-            fontsize=10,
+            sff_config.unfolded_xticklabels,
+            fontsize=sff_config.ticklabel_fontsize,
         )
 
     # Set y-limits
-    ax.set_ylim(ensemble.dim ** (-2.20), ensemble.dim**0.20)
+    ax.set_ylim(ensemble.dim**sff_config.logy_min, ensemble.dim**sff_config.logy_max)
 
     # Create ticks for y-axis
     ax.set_yticks([ensemble.dim**i for i in range(-2, 1)])
-    ax.set_yticklabels([r"$-2$", r"$-1$", r"$0$"], fontsize=10)
+    ax.set_yticklabels(sff_config.yticklabels, fontsize=sff_config.ticklabel_fontsize)
 
     # Set tick marks all around and inward
     ax.tick_params(
@@ -576,15 +565,21 @@ def plot_form_factors(data_path: str, unfold: bool = False) -> None:
         bottom=True,
         left=True,
         right=True,
-        length=6,
+        length=sff_config.tick_length,
         width=sff_config.axes_width,
     )
+
+    # Store plot file name
+    if not unfold:
+        plot_file = sff_config.plot_filename
+    else:
+        plot_file = sff_config.unfolded_plot_filename
 
     # Create plot path from data path
     data_path = Path(data_path)
     plot_dir = data_path.parent.parent / "plots"
     plot_dir.mkdir(parents=True, exist_ok=True)
-    plot_path = plot_dir / f"{unfold * 'unfolded_'}{sff_config.plot_filename}"
+    plot_path = plot_dir / plot_file
 
     # Save plot to file
     plt.savefig(plot_path, dpi=300, bbox_inches="tight")
@@ -845,6 +840,8 @@ class SpectralStatistics(MonteCarlo):
         ----------
         levels : np.ndarray
             Eigenvalue sample.
+        unfold : bool, optional
+            Whether to unfold eigenvalues (default is False).
         """
         # Create histogram using levels as data
         self._create_hist(data=levels, dataclass=spectral_config, unfold=unfold)
@@ -876,6 +873,8 @@ class SpectralStatistics(MonteCarlo):
         ----------
         levels : np.ndarray
             Eigenvalue sample.
+        unfold : bool, optional
+            Whether to unfold eigenvalues (default is False).
         """
         # Create logtime array depending on unfolding
         if not unfold:
@@ -892,7 +891,7 @@ class SpectralStatistics(MonteCarlo):
             tick_times = np.logspace(
                 start=sff_config.logtime_min,
                 stop=sff_config.logtime_max,
-                num=sff_config.num_tick_times,
+                num=sff_config.num_ticks,
                 base=self.ensemble.dim,
                 dtype=np.float64,
             )
@@ -918,7 +917,7 @@ class SpectralStatistics(MonteCarlo):
             tick_times = np.logspace(
                 sff_config.unfolded_logtime_min,
                 sff_config.unfolded_logtime_max,
-                sff_config.num_tick_times,
+                sff_config.num_ticks,
                 base=self.ensemble.dim,
                 dtype=np.float64,
             )
@@ -978,8 +977,6 @@ class SpectralStatistics(MonteCarlo):
             Simulation number.
         levels : np.ndarray, optional
             Eigenvalue sample (default is None).
-        unfold : bool, optional
-            Whether to unfold eigenvalues (default is False).
 
         Raises
         ------
@@ -1013,11 +1010,6 @@ class SpectralStatistics(MonteCarlo):
     def run_spectral_hist(self) -> None:
         """
         Run the spectral histogram simulation.
-
-        Parameters
-        ----------
-        unfold : bool, optional
-            Whether to unfold eigenvalues (default is False).
         """
         # Run spectral histogram simulation
         self._run_simulation(1)
@@ -1025,11 +1017,6 @@ class SpectralStatistics(MonteCarlo):
     def run_nn_spacing_dist(self) -> None:
         """
         Run the nearest-neighbor level spacing distribution simulation.
-
-        Parameters
-        ----------
-        unfold : bool, optional
-            Whether to unfold eigenvalues (default is False).
         """
         # Run nearest neighbor spacing distribution simulation
         self._run_simulation(2)
@@ -1037,11 +1024,6 @@ class SpectralStatistics(MonteCarlo):
     def run_form_factors(self) -> None:
         """
         Run the spectral form factors simulation.
-
-        Parameters
-        ----------
-        unfold : bool, optional
-            Whether to unfold eigenvalues (default is False).
         """
         # Run spectral form factors simulation
         self._run_simulation(3)
