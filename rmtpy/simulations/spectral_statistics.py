@@ -771,6 +771,7 @@ class SpectralStatistics(MonteCarlo):
         """
         # Add arguments for which simulation(s) to run
         parser.add_argument(
+            "-run",
             "--run",
             nargs="+",
             type=int,
@@ -788,6 +789,7 @@ class SpectralStatistics(MonteCarlo):
 
         # Add arguments for which simulation(s) to unfold eigenvalues
         parser.add_argument(
+            "-unfold",
             "--unfold",
             nargs="+",
             type=int,
