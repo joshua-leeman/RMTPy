@@ -57,9 +57,9 @@ class SpectralHistogram:
     # Plot labeling
     hist_legend: str = "simulation"
     curve_legend: str = "theory"
-    xlabel: str = r"$E$"
+    xlabel: str = r"$E / NJ$"
     ylabel: str = r"$\langle \rho(E) \rangle$"
-    unfolded_xlabel: str = r"$\xi$"
+    unfolded_xlabel: str = r"$\xi / D$"
     unfolded_ylabel: str = r"$D \langle \rho(\xi) \rangle$"
 
     # Tick labeling
