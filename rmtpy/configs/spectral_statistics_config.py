@@ -48,13 +48,13 @@ class SpectralHistogram:
 
     # Curve graphic parameters
     curve_color: str = "Black"
-    curve_width: float = 1.5
+    curve_width: float = 2.0
     curve_zorder: int = 2
 
     # Axes settings
     axes_width: float = 1.0
 
-    # Plot labeling
+    # Plot settings
     hist_legend: str = "simulation"
     curve_legend: str = "theory"
     xlabel: str = r"$E / (NJ)$"
@@ -62,10 +62,10 @@ class SpectralHistogram:
     unfolded_xlabel: str = r"$\xi / D$"
     unfolded_ylabel: str = r"$D \langle \rho(\xi) \rangle$"
 
-    # Tick labeling
-    xticklabels: Tuple[str, 3] = (r"$-0.5$", r"$0$", r"$0.5$")
-    unfolded_xticklabels: Tuple[str, 3] = (r"$-0.5$", r"$0$", r"$0.5$")
-    unfolded_yticklabels: Tuple[str, 2] = (r"$0$", r"$1.0$")
+    # Tick settings
+    xticklabels: Tuple[str, ...] = (r"$-0.5$", r"$0$", r"$0.5$")
+    unfolded_xticklabels: Tuple[str, ...] = (r"$-0.5$", r"$0$", r"$0.5$")
+    unfolded_yticklabels: Tuple[str, ...] = (r"$0$", r"0.5", r"$1.0$", r"$1.5$")
     ticklabel_fontsize: int = 10
     tick_length: int = 6
 
@@ -97,13 +97,13 @@ class NNLevelSpacings:
 
     # Curve graphic parameters
     curve_color: str = "Black"
-    curve_width: float = 1.5
+    curve_width: float = 2.0
     curve_zorder: int = 2
 
     # Axes settings
     axes_width: float = 1.0
 
-    # Plot labeling
+    # Plot settings
     hist_legend: str = "simulation"
     curve_legend: str = "surmise"
     xlabel: str = r"$\varepsilon / d$"
@@ -111,7 +111,7 @@ class NNLevelSpacings:
     unfolded_xlabel: str = r"$s$"
     unfolded_ylabel: str = r"$\langle \rho(s) \rangle$"
 
-    # Tick labeling
+    # Tick settings
     ticklabel_fontsize: int = 10
     tick_length: int = 6
 
@@ -133,7 +133,7 @@ class SpectralFormFactors:
     unfolded_logtime_max: float = 0.5
 
     # Number of tick times
-    num_tick_times: int = 5
+    num_ticks: int = 5
 
     # File names
     data_filename: str = "form_factors.npz"
@@ -144,13 +144,13 @@ class SpectralFormFactors:
     # SFF curve parameters
     sff_color: str = "Blue"
     sff_alpha: float = 1.0
-    sff_width: float = 1.4
+    sff_width: float = 1.0
     sff_zorder: int = 2
 
     # cSFF curve parameters
     csff_color: str = "Red"
     csff_alpha: float = 1.0
-    csff_width: float = 1.4
+    csff_width: float = 1.0
     csff_zorder: int = 2
 
     # Universal curve parameters
@@ -162,14 +162,46 @@ class SpectralFormFactors:
     # Axes settings
     axes_width: float = 1.0
 
-    # Plot labeling
-    sff_legend: str = r"$\textrm{SFF}$"
-    csff_legend: str = r"$\textrm{cSFF}$"
+    # y-axis limits
+    logy_min: float = -2.2
+    logy_max: float = 0.2
+
+    # Plot settings
+    sff_legend: str = r"$SFF$"
+    csff_legend: str = r"$cSFF$"
     universal_legend: str = "theory"
     xlabel: str = r"$\log_D(NJt)$"
     ylabel: str = r"$\log_DK(Jt)$"
     unfolded_xlabel: str = r"$\log_D \tau$"
     unfolded_ylabel: str = r"$\log_D K(\tau)$"
+
+    # Tick settings
+    xticklabels: Tuple[str, ...] = (r"$-0.5$", r"$0$", r"$0.5$", r"$1$", r"$1.5$")
+    unfolded_xticklabels: Tuple[str, ...] = (
+        r"$-1.5$",
+        r"$-1$",
+        r"$-0.5$",
+        r"$0$",
+        r"$0.5$",
+    )
+    yticklabels: Tuple[str, ...] = (r"$-2$", r"$-1$", r"$0$")
+    ticklabel_fontsize: int = 10
+    tick_length: int = 6
+
+    # Legend settings
+    legend_location: str = "upper right"
+    legend_bbox: Tuple[float, float] = (0.98, 0.9)
+    legend_fontsize: int = 10
+    legend_title_fontsize: int = 10
+    legend_frameon: bool = False
+    legend_textalignment: str = "left"
+
+    # Grid line settings
+    grid_color: str = rcParams["grid.color"]
+    grid_linestyle: str = "dotted"
+    grid_linewidth: float = rcParams["grid.linewidth"]
+    grid_alpha: float = 1.0
+    grid_zorder: int = 0
 
 
 # =============================
