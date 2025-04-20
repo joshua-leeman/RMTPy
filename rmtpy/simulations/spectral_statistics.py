@@ -36,9 +36,9 @@ from psutil import virtual_memory
 from rmtpy.ensembles import get_ensemble
 from rmtpy.simulations._mc import MonteCarlo
 from rmtpy.configs.spectral_statistics_config import (
-    spectral_config,
-    spacings_config,
     sff_config,
+    spacings_config,
+    spectral_config,
 )
 
 
