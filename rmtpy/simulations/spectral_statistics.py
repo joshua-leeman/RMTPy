@@ -22,7 +22,7 @@ from multiprocessing import Pool
 from pathlib import Path
 from textwrap import dedent
 from time import time
-from typing import List, Tuple
+from typing import Any, List, Tuple
 
 # Third-party imports
 import numpy as np
@@ -98,8 +98,8 @@ def _ensemble_from_path(path: str, file_name: str) -> object:
     return get_ensemble(ensemble_name, **metadata)
 
 
-def _initialize_plot(dataclass: object, data_path: str) -> Tuple[
-    object,
+def _initialize_plot(dataclass: Any, data_path: str) -> Tuple[
+    Any,
     dict,
     bool,
     Figure,
@@ -125,7 +125,7 @@ def _initialize_plot(dataclass: object, data_path: str) -> Tuple[
 
 
 def _create_plot(
-    dataclass: object,
+    dataclass: Any,
     data_path: str,
     legend_title: str,
     fig: Figure,
@@ -203,14 +203,14 @@ def _create_plot(
         title_fontsize=dataclass.legend_title_fontsize,
         frameon=dataclass.legend_frameon,
     )
-    legend._legend_box.align = dataclass.legend_textalignment
+    legend._legend_box.align = dataclass.legend_textalignment  # type: ignore[attr-defined]
 
     # Store plot file name
     plot_file = dataclass.unfolded_plot_filename if unfold else dataclass.plot_filename
 
     # Create plot path from data path
-    data_path = Path(data_path)
-    plot_dir = data_path.parent.parent / "plots"
+    data_Path = Path(data_path)
+    plot_dir = data_Path.parent.parent / "plots"
     plot_dir.mkdir(parents=True, exist_ok=True)
     plot_path = plot_dir / plot_file
 
@@ -726,26 +726,21 @@ class SpectralStatistics(MonteCarlo):
         # Distribute remainder realizations
         realizs_array[:remainder] += 1
 
-        # Initialize list of worker arguments
-        worker_args = [None for _ in range(self.workers)]
-
-        # Loop over worker argument list
-        for i in range(self.workers):
-            # Write worker dictionary argument
-            worker_args[i] = {
-                "ens_args": self._ens_args,
-                "sim_args": {"realizs": realizs_array[i]},
-            }
+        # Create list of worker arguments
+        worker_args = [
+            {"ens_args": self._ens_args, "sim_args": {"realizs": realizs_array[i]}}
+            for i in range(self.workers)
+        ]
 
         # Run workers in parallel
         with Pool(processes=self.workers) as pool:
-            eigenvals = np.vstack(pool.map(self._worker_func, worker_args))
+            eigenvals = np.vstack(pool.map(self._worker_func, worker_args))  # type: ignore
 
         # Return eigenvalues
         return eigenvals
 
     def _create_hist(
-        self, data: np.ndarray, dataclass: object, unfold: bool = False
+        self, data: np.ndarray, dataclass: Any, unfold: bool = False
     ) -> None:
         """
         Creates a histogram from the given data and saves it to a file.
@@ -754,7 +749,7 @@ class SpectralStatistics(MonteCarlo):
         ----------
         data : np.ndarray
             Data to create the histogram from.
-        dataclass : object
+        dataclass : Any
             Configuration class containing histogram parameters.
         """
         # Calculate normalized histogram of data
@@ -915,7 +910,7 @@ class SpectralStatistics(MonteCarlo):
             csff=csff,
         )
 
-    def _run_simulation(self, sim_num: int, levels: np.ndarray = None) -> None:
+    def _run_simulation(self, sim_num: int, levels: np.ndarray = None) -> None:  # type: ignore[assignment]
         """
         Run a simulation and save the results.
 
@@ -942,7 +937,7 @@ class SpectralStatistics(MonteCarlo):
                 levels = self.ensemble.unfold(levels)
 
         # Run simulation functionm
-        sim_info["func"](levels, unfold=sim_info["unfold"])
+        sim_info["func"](levels, unfold=sim_info["unfold"])  # type: ignore[operator]
 
         # Determine output directory
         output_dir = self._create_output_dir(res_type="data")
@@ -950,9 +945,9 @@ class SpectralStatistics(MonteCarlo):
         # Run plot function
         sim_info["plot"](
             os.path.join(
-                output_dir, f"{sim_info['unfold'] * 'unfolded_'}{sim_info['file']}"
+                output_dir, f"{sim_info['unfold'] * 'unfolded_'}{sim_info['file']}"  # type: ignore[operator]
             ),
-        )
+        )  # type: ignore[operator]
 
     def run_spectral_hist(self) -> None:
         """
