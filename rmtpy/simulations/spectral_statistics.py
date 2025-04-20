@@ -949,27 +949,6 @@ class SpectralStatistics(MonteCarlo):
             ),
         )  # type: ignore[operator]
 
-    def run_spectral_hist(self) -> None:
-        """
-        Run the spectral histogram simulation.
-        """
-        # Run spectral histogram simulation
-        self._run_simulation(1)
-
-    def run_nn_spacing_dist(self) -> None:
-        """
-        Run the nearest-neighbor level spacing distribution simulation.
-        """
-        # Run nearest neighbor spacing distribution simulation
-        self._run_simulation(2)
-
-    def run_form_factors(self) -> None:
-        """
-        Run the spectral form factors simulation.
-        """
-        # Run spectral form factors simulation
-        self._run_simulation(3)
-
     def run(self) -> None:
         """
         Run all specified simulations.
