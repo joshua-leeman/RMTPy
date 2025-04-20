@@ -528,6 +528,8 @@ class SpectralMixin:
 
         # Return GSE connected spectral form factor if beta = 4
         elif self.beta == 4:
+            if t == 1:
+                return np.nan
             if t <= 2:
                 return (t - t / 2 * np.log(abs(t - 1))) / self.dim
             else:
