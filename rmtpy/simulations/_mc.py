@@ -59,19 +59,21 @@ class MonteCarlo(ABC):
         ensemble: dict,
         realizs: int = 1,
         workers: int = 1,
-        memory: float = virtual_memory().total // 2**30,
+        memory: float = (0.9 * virtual_memory().total) // 2**30,
     ) -> None:
         """
         Initialize the Monte Carlo simulation.
 
         Parameters
         ----------
-        ens_args : dict
-            Input parameters for the ensemble.
-        sim_args : dict, optional
-            Input parameters for the simulation. (default is {})
-        spec_args : dict, optional
-            Specifications for the job. (default is {})
+        ensemble : dict
+            Random matrix ensemble parameters.
+        realizs : int, optional
+            Number of realizations (default is 1).
+        workers : int, optional
+            Number of workers (default is 1).
+        memory : float, optional
+            Memory allocated for simulation in GiB (default is 90% of total memory).
         """
         # Clean ensemble name in ens_args
         ensemble["name"] = re.sub(r"\W+", "", ensemble["name"]).strip().lower()
