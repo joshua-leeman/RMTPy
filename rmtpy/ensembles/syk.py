@@ -12,7 +12,8 @@ It is grouped into the following sections:
 # 1. Imports
 # =============================
 # Standard library imports
-from math import pi, comb, factorial, prod, sqrt
+import itertools
+from math import pi, comb, prod, sqrt
 from typing import List
 
 # Third-party imports
@@ -172,7 +173,7 @@ class SYK(Ensemble):
             else:
                 return majorana
 
-    def generate(self):
+    def generate(self) -> np.ndarray:
         """
         Return a random SYK Hamiltonian.
 
@@ -185,51 +186,31 @@ class SYK(Ensemble):
         if not hasattr(self, "_majorana"):
             self._majorana = self._create_majoranas()
 
-        # Initialize indices and products for Majorana operators
-        indices = list(range(self.q))
-        products = [None for _ in range(self.q)]
+        # Pre-draw all random coefficients
+        coeffs = self._rng.standard_normal(
+            size=comb(self.N, self.q), dtype=self.real_dtype
+        )
 
-        # Fill products with initial products of Majorana operators
-        products[0] = self.majorana[indices[0]]
-        for i in range(1, self.q):
-            products[i] = products[i - 1].dot(self.majorana[indices[i]])
+        # Initialize sparse SYK Hamiltonian
+        H = csr_matrix((self.dim, self.dim), dtype=self.dtype)
 
-        # Initialize Hamiltonian
-        H = np.zeros((self.dim, self.dim), dtype=self.dtype)
+        # Generate and sum q-body operators
+        for coeff, idx_tuple in zip(
+            coeffs, itertools.combinations(range(self.N), self.q)
+        ):
+            # Build q-body operator
+            q_body = self.majorana[idx_tuple[0]]
+            for idx in idx_tuple[1:]:
+                q_body = q_body.dot(self.majorana[idx])
 
-        # Generate random matrix elements through loop
-        while True:
-            # Add currect product to SYK Hamiltonian
-            H += (
-                self._rng.standard_normal(dtype=self.real_dtype)
-                * products[-1][: self.dim, : self.dim]
-            ).toarray()
+            # Add to Hamiltonian
+            H += coeff * q_body[: self.dim, : self.dim]
 
-            # Generate next combination of indices
-            for i in reversed(range(self.q)):
-                # If index is less than maximum index, increment it, and break
-                if indices[i] < self.N - self.q + i:
-                    indices[i] += 1
-                    for j in range(i + 1, self.q):
-                        indices[j] = indices[j - 1] + 1
-                    break
-            else:
-                # If all indices have been processed, break loop
-                break
-
-            # Update products with new indices
-            if i == 0:
-                products[0] = self.majorana[indices[0]]
-            else:
-                products[i] = products[i - 1].dot(self.majorana[indices[i]])
-
-            # Update products at indices greater than changed index
-            for j in range(i + 1, self.q):
-                products[j] = products[j - 1].dot(self.majorana[indices[j]])
-
-        # Scalle and return SYK Hamiltonian
+        # Scale Hamiltonian by standard deviation and global phase
         H *= 1j ** (self.q * (self.q - 1) / 2) * self.sigma
-        return H
+
+        # Return SYK Hamiltonian as a dense matrix
+        return H.toarray()
 
     def spectral_density(self, eigval: float, num_terms: int = 100) -> float:
         """
