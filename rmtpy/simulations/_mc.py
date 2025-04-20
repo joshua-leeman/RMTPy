@@ -16,12 +16,14 @@ import re
 from abc import ABC, abstractmethod
 from argparse import ArgumentParser
 from ast import literal_eval
-from importlib import import_module
 from textwrap import dedent
 from time import strftime
 
 # Third-party imports
 from psutil import cpu_count, virtual_memory
+
+# Local application imports
+from rmtpy.ensembles import get_ensemble
 
 
 # =============================
@@ -83,9 +85,7 @@ class MonteCarlo(ABC):
         ens_inputs.pop("name")
 
         # Import and initialize ensemble
-        module = import_module(f"rmtpy.ensembles.{ensemble['name']}")
-        ENSEMBLE = getattr(module, module.class_name)
-        self._ensemble = ENSEMBLE(**ens_inputs)
+        self._ensemble = get_ensemble(ensemble["name"], **ens_inputs)
 
         # Reorder ensemble input and and store
         self._ens_args = {
@@ -199,24 +199,6 @@ class MonteCarlo(ABC):
         ValueError
             If the Monte Carlo simulation is not valid and explains why.
         """
-        # Retrieve list of valid ensembles
-        ensemble_list = [
-            file.rstrip(".py")
-            for file in os.listdir(f"rmtpy/ensembles")
-            if file.endswith(".py") and not file.startswith("_")
-        ]
-
-        # Check if ensemble is valid
-        if self._ens_args["name"] not in ensemble_list:
-            raise ValueError(
-                dedent(
-                    f"""
-                    Ensemble '{self._ens_args["name"]}' is not valid.
-                    Valid ensembles are: {ensemble_list}
-                    """
-                )
-            )
-
         # Check if number of realizations is valid
         if (
             not isinstance(self._realizs, (int, float))
