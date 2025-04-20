@@ -231,7 +231,7 @@ class MonteCarlo(ABC):
             not isinstance(self._workers, (int, float))
             or self._workers < 1
             or self._workers != int(self._workers)
-            or self._workers > self._max_workers
+            or self._workers > self._max_workers  # type: ignore[operator]
         ):
             raise ValueError(
                 f"Number of workers must be a positive integer less than or equal to {self._max_workers}."
