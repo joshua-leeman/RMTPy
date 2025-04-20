@@ -13,7 +13,7 @@ It is grouped into the following sections:
 # =============================
 # Standard library imports
 import itertools
-from math import pi, comb, prod, sqrt
+from math import pi, comb, sqrt
 from typing import List
 
 # Third-party imports
