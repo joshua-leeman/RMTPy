@@ -226,29 +226,54 @@ class SYK(Ensemble):
         float
             Mean spectral density at the given eigenvalue.
         """
-        # Check if eigenvalue is within support
-        if abs(eigval) < self._E0:
-            # Approximate mean spectral density's infinite product
-            product = prod(
-                (
-                    1
-                    - (eigval / self._E0 * 2) ** 2
-                    * self.eta ** (k + 1)
-                    / (1 + self.eta ** (k + 1)) ** 2
-                )
-                * ((1 - self.eta ** (2 * k + 2)) / (1 - self.eta ** (2 * k + 1)))
-                for k in range(num_terms)
-            ) * sqrt(1 - self.eta)
-
-            # Return SYK mean spectral density at eigenvalue
-            return (
-                product
-                * sqrt(1 - (eigval / self._E0) ** 2)
-                / (pi * sqrt(comb(self.N, self.q)) * self.sigma)
-            )
-        else:
-            # If eigenvalue is outside support, return 0
+        # Return zero if eigenvalue is outside support
+        if abs(eigval) > self._E0:
             return 0.0
+
+        # Create vector of term indices
+        k = np.arange(num_terms)
+
+        # term1 = 1 - (2E/E0)**2 * eta**(k+1)/(1 + eta**(k+1))**2
+        etak1 = self.eta ** (k + 1)
+        term1 = 1 - (2 * eigval / self._E0) ** 2 * etak1 / (1.0 + etak1) ** 2
+
+        # term2 = (1 - eta**(2*k+2))/(1 - eta**(2*k+1))
+        term2 = (1.0 - self.eta ** (2 * k + 2)) / (1.0 - self.eta ** (2 * k + 1))
+
+        # Sum logarithm of terms
+        logP = np.log(term1) + np.log(term2)
+        logP = np.sum(logP) + 0.5 * np.log(1.0 - self.eta)
+
+        # Construct product and final result
+        P = np.exp(logP) * np.sqrt(1.0 - (eigval / self._E0) ** 2)
+        P /= pi * sqrt(comb(self.N, self.q)) * self.sigma
+
+        # Return mean spectral density at eigenvalue
+        return P
+
+        # # Check if eigenvalue is within support
+        # if abs(eigval) < self._E0:
+        #     # Approximate mean spectral density's infinite product
+        #     product = prod(
+        #         (
+        #             1
+        #             - (eigval / self._E0 * 2) ** 2
+        #             * self.eta ** (k + 1)
+        #             / (1 + self.eta ** (k + 1)) ** 2
+        #         )
+        #         * ((1 - self.eta ** (2 * k + 2)) / (1 - self.eta ** (2 * k + 1)))
+        #         for k in range(num_terms)
+        #     ) * sqrt(1 - self.eta)
+
+        #     # Return SYK mean spectral density at eigenvalue
+        #     return (
+        #         product
+        #         * sqrt(1 - (eigval / self._E0) ** 2)
+        #         / (pi * sqrt(comb(self.N, self.q)) * self.sigma)
+        #     )
+        # else:
+        #     # If eigenvalue is outside support, return 0
+        #     return 0.0
 
     @property
     def q(self):
