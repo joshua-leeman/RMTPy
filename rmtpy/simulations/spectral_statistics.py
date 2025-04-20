@@ -17,7 +17,6 @@ import os
 import re
 from argparse import ArgumentParser
 from ast import literal_eval
-from importlib import import_module
 from multiprocessing import Pool
 from pathlib import Path
 from textwrap import dedent
@@ -554,7 +553,7 @@ class SpectralStatistics(MonteCarlo):
         realizations: int = 1,
         workers: int = 1,
         memory: int = virtual_memory().total // 2**30,
-        run: List[int] = [],
+        runs: List[int] = [],
         unfold: List[int] = [],
     ) -> None:
         """
@@ -570,8 +569,8 @@ class SpectralStatistics(MonteCarlo):
             Number of workers (default is 1).
         memory : int, optional
             Memory allocated for simulation in bytes (default is total system memory).
-        run : list of int, optional
-            List of simulations to run (default is [1, 2, 3]).
+        runs : list of int, optional
+            List of simulations to run (default is empty list).
         unfold : list of int, optional
             List of simulations to unfold eigenvalues (default is empty list).
 
@@ -580,40 +579,43 @@ class SpectralStatistics(MonteCarlo):
         ValueError
             If unfold is not a subset of run or if 1 is included in unfold.
         """
+        # Store runs and unfold arguments
+        self._runs = runs
+        self._unfold = unfold
 
-        # Validate unfold is a subset of run
-        if not set(unfold).issubset(set(run)):
+        # Validate unfold is a subset of runs
+        if not set(unfold).issubset(set(runs)):
             raise ValueError("Unfold must be a subset of run.")
 
         # Initialize Monte Carlo simulation
         super().__init__(ensemble, realizations, workers, memory)
 
-        # If run is empty, denote all flag and set run to all simulations
-        if not run:
+        # If runs is empty, denote all flag and set run to all simulations
+        if not runs:
             self._all = True
-            run = [1, 2, 3]
+            self._runs = [1, 2, 3]
         else:
             self._all = False
 
         # Store job arguments in dictionary
         self._job = {
             1: {
-                "do": 1 in run,
-                "unfold": 1 in unfold,
+                "do": 1 in self._runs,
+                "unfold": 1 in self._unfold,
                 "func": self._spectral_hist,
                 "plot": plot_spectral_hist,
                 "file": spectral_config.data_filename,
             },
             2: {
-                "do": 2 in run,
-                "unfold": 2 in unfold,
+                "do": 2 in self._runs,
+                "unfold": 2 in self._unfold,
                 "func": self._nn_spacing_dist,
                 "plot": plot_nn_spacing_dist,
                 "file": spacings_config.data_filename,
             },
             3: {
-                "do": 3 in run,
-                "unfold": 3 in unfold,
+                "do": 3 in self._runs,
+                "unfold": 3 in self._unfold,
                 "func": self._form_factors,
                 "plot": plot_form_factors,
                 "file": sff_config.data_filename,
@@ -637,8 +639,8 @@ class SpectralStatistics(MonteCarlo):
         """
         # Add arguments for which simulation(s) to run
         parser.add_argument(
-            "-run",
-            "--run",
+            "-runs",
+            "--runs",
             nargs="+",
             type=int,
             choices=[1, 2, 3],
@@ -698,9 +700,7 @@ class SpectralStatistics(MonteCarlo):
         ens_inputs.pop("name")
 
         # Initialize ensemble
-        module = import_module(f"rmtpy.ensembles.{ens_args['name']}")
-        ENSEMBLE = getattr(module, module.class_name)
-        ensemble = ENSEMBLE(**ens_inputs)
+        ensemble = get_ensemble(ens_args["name"], **ens_inputs)
 
         # Unpack simulation arguments
         realizs = sim_args["realizs"]
@@ -982,6 +982,76 @@ class SpectralStatistics(MonteCarlo):
 
         # Print elapsed time
         print(f"Spectral statistics completed in {elapsed_time:.2f} seconds.")
+
+    @property
+    def runs(self) -> List[int]:
+        """
+        Get the list of simulations to run.
+
+        Returns
+        -------
+        List[int]
+            List of simulation numbers to run.
+        """
+        return self._runs
+
+    @property
+    def unfold(self) -> List[int]:
+        """
+        Get the list of simulations to unfold.
+
+        Returns
+        -------
+        List[int]
+            List of simulation numbers to unfold.
+        """
+        return self._unfold
+
+    @runs.setter
+    def runs(self, runs: List[int]) -> None:
+        """
+        Set the list of simulations to run.
+
+        Parameters
+        ----------
+        runs : List[int]
+            List of simulation numbers to run.
+        """
+        # Replace current run list with new one
+        self._runs = runs
+
+        # Reinitialize SpectralStatistics object
+        self.__init__(
+            ensemble=self.ensemble,
+            realizations=self.realizs,
+            workers=self.workers,
+            memory=self.memory,
+            runs=runs,
+            unfold=self.unfold,
+        )
+
+    @unfold.setter
+    def unfold(self, unfold: List[int]) -> None:
+        """
+        Set the list of simulations to unfold.
+
+        Parameters
+        ----------
+        unfold : List[int]
+            List of simulation numbers to unfold.
+        """
+        # Replace current unfold list with new one
+        self._unfold = unfold
+
+        # Reinitialize SpectralStatistics object
+        self.__init__(
+            ensemble=self.ensemble,
+            realizations=self.realizs,
+            workers=self.workers,
+            memory=self.memory,
+            runs=self.runs,
+            unfold=unfold,
+        )
 
 
 # =============================
