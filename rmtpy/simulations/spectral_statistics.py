@@ -873,28 +873,33 @@ class SpectralStatistics(MonteCarlo):
         sff = np.empty_like(times, dtype=np.float64)
         csff = np.empty_like(times, dtype=np.float64)
 
+        # Calculate leftover memory for each batch
+        leftover_memory = (
+            self.memory
+            - (times.size + self.realizs * self.ensemble.dim)
+            * np.dtype(np.float64).itemsize
+        )  # in bytes
+
         # Determine the number of batches based on memory
-        num_batches = np.ceil(
+        num_chunks = np.ceil(
             times.size
             * self.realizs
             * self.ensemble.dim
             * np.dtype(np.float64).itemsize
-            / self.memory
+            / leftover_memory
         ).astype(int)
 
-        # Split logtimes into batches
-        batched_times = np.array_split(times, num_batches)
+        # Create chucks generator
+        def chunks(array, size):
+            for i in range(0, len(array), size):
+                yield i, array[i : i + size]
 
-        # Loop over batches and calculate form factors
-        index = 0
-        for batch in batched_times:
-            # Calculate and store form factors
-            sff[index : index + batch.size], csff[index : index + batch.size] = (
-                self.ensemble.form_factors(times=batch, levels=levels)
+        # Loop over chunks and evaluate form factors
+        for i, chunk in chunks(times, num_chunks):
+            # Calculate form factors for the current chunk
+            sff[i : i + len(chunk)], csff[i : i + len(chunk)] = (
+                self.ensemble.form_factors(levels=levels, times=chunk)
             )
-
-            # Increment index
-            index += batch.size
 
         # Create output directory and store results path
         output_dir = self._create_output_dir(res_type="data")
