@@ -31,7 +31,7 @@ degen = 2
 
 
 # =============================
-# 2. Ensemble Class
+# 3. Ensemble Class
 # =============================
 class GSE(Tenfold):
     """
@@ -124,10 +124,3 @@ class GSE(Tenfold):
 
         # Return GSE matrix
         return H
-
-    @property
-    def degen(self) -> int:
-        """
-        Degeneracy of the ensemble's eigenvalues.
-        """
-        return self._degen
