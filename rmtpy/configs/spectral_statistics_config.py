@@ -33,7 +33,7 @@ class SpectralHistogram:
     """
 
     # Simulation parameters
-    num_bins: int = 100
+    num_bins: int = 250
     density_num: int = 1000
     x_range: float = 1.2  # factor of J
 
