@@ -39,6 +39,17 @@ class SYK(Ensemble):
     The Sachdev-Ye-Kitaev (SYK) ensemble class.
     Inherits from the Ensemble class.
 
+    Attributes
+    ----------
+    q : int
+        Number of Majorana fermions.
+    N : int
+        Number of Majorana fermions.
+    J : float
+        Energy scale of interactions (default is 1.0).
+    sigma : float
+        Standard deviation of the couplings.
+
     Methods
     -------
     generate() -> np.ndarray
@@ -82,7 +93,7 @@ class SYK(Ensemble):
             (-1) ** (q - k) * comb(q, k) * comb(N - q, q - k) for k in range(q + 1)
         ) / comb(N, q)
 
-        # Calculate standard deviation of matrix elements
+        # Calculate standard deviation of couplings
         self._sigma = N * J * np.sqrt((1 - self.eta) / comb(N, q)) / 4
 
         # Initialize ensemble class
@@ -264,7 +275,7 @@ class SYK(Ensemble):
     @property
     def sigma(self):
         """
-        Standard deviation of the matrix elements.
+        Standard deviation of the couplings.
         """
         return self._sigma
 
