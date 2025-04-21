@@ -627,8 +627,10 @@ class Tenfold(Ensemble):
         # Set Dyson index
         self._beta = beta
 
-        # Calculate standard deviation of matrix elements
-        self._sigma = self.N * self.J / 2 / np.sqrt(2 * self.beta * self.dim)
+        # Calculate standard deviation of real and imaginary parts of matrix elements
+        self._sigma = (
+            self.N * self.J * np.sqrt(self.degeneracy / 8 / self.beta / self.dim)
+        )
 
     def spectral_density(self, eigval: float) -> float:
         """
