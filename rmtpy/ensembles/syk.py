@@ -13,7 +13,7 @@ It is grouped into the following sections:
 # =============================
 # Standard library imports
 import itertools
-from math import pi, comb, sqrt
+from math import comb
 from typing import List
 
 # Third-party imports
@@ -83,7 +83,7 @@ class SYK(Ensemble):
         ) / comb(N, q)
 
         # Calculate standard deviation of matrix elements
-        self._sigma = N * J * sqrt((1 - self.eta) / comb(N, q)) / 4
+        self._sigma = N * J * np.sqrt((1 - self.eta) / comb(N, q)) / 4
 
         # Initialize ensemble class
         super().__init__(N=N, J=J, dtype=dtype)
@@ -242,7 +242,7 @@ class SYK(Ensemble):
 
         # Construct product and final result
         P = np.exp(logP) * np.sqrt(1.0 - (eigval / self._E0) ** 2)
-        P /= pi * sqrt(comb(self.N, self.q)) * self.sigma
+        P /= np.pi * np.sqrt(comb(self.N, self.q)) * self.sigma
 
         # Return mean spectral density at eigenvalue
         return P
