@@ -314,7 +314,7 @@ class SYK(Ensemble):
         return self._majorana
 
     @property
-    def degeneracy(self):
+    def degen(self):
         """
         Degeneracy of the ensemble's eigenvalues.
         """
