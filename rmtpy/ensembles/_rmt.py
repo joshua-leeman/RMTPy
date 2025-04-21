@@ -298,6 +298,21 @@ class RMT(ABC):
         return self._E0
 
     @property
+    def universal_class(self) -> str:
+        """
+        Universal class of the ensemble.
+        """
+        # Create a dictionary to map Dyson index to universal class
+        universal_classes = {
+            0: "Poisson",
+            1: "GOE",
+            2: "GUE",
+            4: "GSE",
+        }
+        # Return the universal class based on the Dyson index
+        return universal_classes.get(self.beta, "Unknown")
+
+    @property
     def dtype(self) -> type:
         """
         Data type of the matrix.
@@ -481,9 +496,13 @@ class SpectralMixin:
         float
             Wigner surmise value for the given spacing
         """
+
         # If Dyson index is zero, return Poisson surmise
         if self.beta == 0:
             return np.exp(-s)
+
+        # Scale spacing by degeneracy
+        s = s / self.degen
 
         # Calculate Wigner surmise
         a = gamma((self.beta + 2) / 2) ** (self.beta + 1) / gamma(
@@ -492,7 +511,7 @@ class SpectralMixin:
         b = (gamma((self.beta + 2) / 2) / gamma((self.beta + 1) / 2)) ** 2
 
         # Return Wigner surmise at given spacing
-        return 2 * a * s**self.beta * np.exp(-b * s**2)
+        return 2 * a * s**self.beta * np.exp(-b * s**2) / self.degen
 
     def universal_csff(self, tau: float) -> float:
         """
