@@ -267,9 +267,7 @@ class RMT(ABC):
             Unfolded eigenvalue
         """
         # Return unfolded eigenvalue about spectrum's center
-        return (
-            self.dim * (self.cumulative_density(eigenvalue) - 1 / 2) / self.degeneracy
-        )
+        return self.dim * (self.cumulative_density(eigenvalue) - 1 / 2)
 
     @property
     def N(self) -> int:
@@ -488,50 +486,54 @@ class SpectralMixin:
             return np.exp(-s)
 
         # Calculate Wigner surmise
-        a = (
-            2
-            * gamma((self.beta + 2) / 2) ** (self.beta + 1)
-            / gamma((self.beta + 1) / 2) ** (self.beta + 2)
-        )
+        a = gamma((self.beta + 2) / 2) ** (self.beta + 1) / gamma(
+            (self.beta + 1) / 2
+        ) ** (self.beta + 2)
         b = (gamma((self.beta + 2) / 2) / gamma((self.beta + 1) / 2)) ** 2
 
         # Return Wigner surmise at given spacing
-        return a * s**self.beta * np.exp(-b * s**2)
+        return 2 * a * s**self.beta * np.exp(-b * s**2)
 
-    def universal_csff(self, t: float) -> float:
+    def universal_csff(self, tau: float) -> float:
         """
-        Calculate the universal connected spectral form factor at time t.
+        Calculate the universal connected spectral form factor at unfolded time tau.
 
         Parameters
         ----------
-        t : float
-            Time parameter for the spectral form factor
+        tau : float
+            Unfolded Time parameter for the spectral form factor
 
         Returns
         -------
         float
-            Universal connected spectral form factor at time t
+            Universal connected spectral form factor at time tau
         """
         # Return GOE connected spectral form factor if beta = 1
         if self.beta == 1:
-            if t <= 1:
-                return (2 * t - t * np.log(2 * t + 1)) / self.dim
+            # Calculate connected spectral form factor
+            if tau <= 1:
+                return (2 * tau - tau * np.log(2 * tau + 1)) / self.dim
             else:
-                return (2 - t * np.log((2 * t + 1) / (2 * t - 1))) / self.dim
+                return (2 - tau * np.log((2 * tau + 1) / (2 * tau - 1))) / self.dim
 
         # Return GUE connected spectral form factor if beta = 2
         elif self.beta == 2:
-            if t <= 1:
-                return t / self.dim
+            # Calculate connected spectral form factor
+            if tau <= 1:
+                return tau / self.dim
             else:
                 return 1.0 / self.dim
 
         # Return GSE connected spectral form factor if beta = 4
         elif self.beta == 4:
-            if t == 1:
+            # Rescale time parameter to account for degeneracy
+            tau *= self.degeneracy
+
+            # Calculate connected spectral form factor
+            if tau == 1:
                 return np.nan
-            if t <= 2:
-                return (t - t / 2 * np.log(abs(t - 1))) / self.dim
+            if tau <= 2:
+                return (tau - tau / 2 * np.log(abs(tau - 1))) / self.dim
             else:
                 return 2.0 / self.dim
 
