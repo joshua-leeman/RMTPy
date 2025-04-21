@@ -14,7 +14,7 @@ It is grouped into the following sections:
 # 1. Imports
 # =============================
 # Standard library imports
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Tuple
 
 # Third-party imports
@@ -81,8 +81,8 @@ class SpectralHistogram:
 
     # Legend settings
     legend_handles: Tuple[Patch, Line2D] = (
-        Patch(color=hist_color, alpha=hist_alpha, label=hist_legend),
-        Line2D([0], [0], color=curve_color, linewidth=curve_width, label=curve_legend),
+        Patch(color=hist_color, alpha=hist_alpha),
+        Line2D([0], [0], color=curve_color, linewidth=curve_width),
     )
     legend_labels: Tuple[str, str] = (hist_legend, curve_legend)
     unfolded_legend_handles: Tuple[Patch, Line2D] = legend_handles
@@ -103,6 +103,9 @@ class NNLevelSpacings:
     """
     Data class for nearest neighbor level spacings simulation parameters.
     """
+
+    # Set universal class at initialization
+    universal_class: str = field(init=False)
 
     # Simulation parameters
     num_bins: int = 100
@@ -154,18 +157,28 @@ class NNLevelSpacings:
 
     # Legend settings
     legend_handles: Tuple[Patch, Line2D] = (
-        Patch(color=hist_color, alpha=hist_alpha, label=hist_legend),
-        Line2D([0], [0], color=curve_color, linewidth=curve_width, label=curve_legend),
+        Patch(color=hist_color, alpha=hist_alpha),
+        Line2D([0], [0], color=curve_color, linewidth=curve_width),
     )
     legend_labels: Tuple[str, str] = (hist_legend, curve_legend)
     unfolded_legend_handles: Tuple[Patch, Line2D] = legend_handles
     unfolded_legend_labels: Tuple[str, str] = legend_labels
     legend_location: str = "upper right"
-    legend_bbox: Tuple[float, float] = (0.9, 0.9)
+    legend_bbox: Tuple[float, float] = (0.94, 0.9)
     legend_fontsize: int = 10
     legend_title_fontsize: int = 10
     legend_frameon: bool = False
     legend_textalignment: str = "left"
+
+    # Set attributes depending on universal class
+    def _set_universal_class(self, universal_class: str):
+        # Store universal class
+        self.universal_class = universal_class
+
+        # Set universal class-specific attributes
+        self.curve_legend = f"{universal_class} surmise"
+        self.legend_labels = (self.hist_legend, self.curve_legend)
+        self.unfolded_legend_labels = self.legend_labels
 
 
 # =============================
@@ -176,6 +189,9 @@ class SpectralFormFactors:
     """
     Data class for spectral form factors simulation parameters
     """
+
+    # Set universal class at initialization
+    universal_class: str = field(init=False)
 
     # Simulation parameters
     num_logtimes: int = 5000
@@ -251,7 +267,6 @@ class SpectralFormFactors:
             color=sff_color,
             alpha=sff_alpha,
             linewidth=sff_width,
-            label=sff_legend,
         ),
         Line2D(
             [0],
@@ -259,7 +274,6 @@ class SpectralFormFactors:
             color=csff_color,
             alpha=csff_alpha,
             linewidth=csff_width,
-            label=csff_legend,
         ),
     )
     legend_labels: Tuple[str, str] = (sff_legend, csff_legend)
@@ -270,7 +284,6 @@ class SpectralFormFactors:
             color=sff_color,
             alpha=sff_alpha,
             linewidth=sff_width,
-            label=sff_legend,
         ),
         Line2D(
             [0],
@@ -278,7 +291,6 @@ class SpectralFormFactors:
             color=csff_color,
             alpha=csff_alpha,
             linewidth=csff_width,
-            label=csff_legend,
         ),
         Line2D(
             [0],
@@ -286,7 +298,6 @@ class SpectralFormFactors:
             color=universal_color,
             alpha=universal_alpha,
             linewidth=universal_width,
-            label=universal_legend,
         ),
     )
     unfolded_legend_labels: Tuple[str, str, str] = (
@@ -307,6 +318,19 @@ class SpectralFormFactors:
     grid_linewidth: float = rcParams["grid.linewidth"]
     grid_alpha: float = 1.0
     grid_zorder: int = 0
+
+    # Set attributes depending on universal class
+    def _set_universal_class(self, universal_class: str):
+        # Store universal class
+        self.universal_class = universal_class
+
+        # Set universal class-specific attributes
+        self.universal_legend = f"{universal_class} limit"
+        self.unfolded_legend_labels = (
+            self.sff_legend,
+            self.csff_legend,
+            self.universal_legend,
+        )
 
 
 # =============================
