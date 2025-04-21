@@ -38,6 +38,11 @@ class GOE(Tenfold):
     The Gaussian Orthogonal Ensemble (GOE) class.
     Inherits from the Tenfold class.
 
+    Attributes
+    ----------
+    sigma : float
+        Standard deviation of the matrix elements
+
     Methods
     -------
     generate() -> np.ndarray
@@ -71,6 +76,9 @@ class GOE(Tenfold):
         # Initialize tenfold ensemble
         super().__init__(beta=beta, N=N, dim=dim, J=J, dtype=dtype)
 
+        # Calculate standard deviation of real matrix elements
+        self._sigma = self.N * self.J / 2 / np.sqrt(2 * self.dim)
+
     def generate(self) -> np.ndarray:
         """
         Return a random matrix from the GOE.
@@ -95,3 +103,10 @@ class GOE(Tenfold):
 
         # Return GOE matrix
         return H
+
+    @property
+    def sigma(self) -> float:
+        """
+        Standard deviation of the matrix elements.
+        """
+        return self._sigma
