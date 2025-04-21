@@ -31,7 +31,7 @@ degen = 1
 
 
 # =============================
-# 2. Ensemble Class
+# 3. Ensemble Class
 # =============================
 class GOE(Tenfold):
     """
@@ -95,10 +95,3 @@ class GOE(Tenfold):
 
         # Return GOE matrix
         return H
-
-    @property
-    def degen(self) -> int:
-        """
-        Degeneracy of the ensemble's eigenvalues.
-        """
-        return self._degen
