@@ -603,8 +603,6 @@ class Tenfold(Ensemble):
     ----------
     beta : int
         Dyson index (symmetry class)
-    sigma : float
-        Standard deviation of the matrix elements
     E0 : float
         Ground state energy
 
@@ -645,9 +643,6 @@ class Tenfold(Ensemble):
         # Initialize RMT ensemble
         super().__init__(N=N, dim=dim, J=J, dtype=dtype)
 
-        # Calculate standard deviation of real and imaginary parts of matrix elements
-        self._sigma = self.N * self.J * np.sqrt(self.degen / 8 / self.beta / self.dim)
-
     def spectral_density(self, eigval: float) -> float:
         """
         Calculate the mean spectral density at a given eigenvalue.
@@ -667,10 +662,3 @@ class Tenfold(Ensemble):
             return np.sqrt(1 - (eigval / self.E0) ** 2) / (np.pi * self.E0 / 2)
         else:
             return 0.0
-
-    @property
-    def sigma(self) -> float:
-        """
-        Standard deviation of the matrix elements.
-        """
-        return self._sigma
