@@ -461,7 +461,7 @@ class SpectralMixin:
 
         # Calculate complex exponentials
         exponentials = np.multiply(times[:, None, None], levels)
-        exponentials = (-1j * 2 * np.pi) * exponentials
+        exponentials = -1j * exponentials
         np.exp(exponentials, out=exponentials)
 
         # Calculate partition function and its mean
@@ -477,7 +477,11 @@ class SpectralMixin:
         sff /= self.dim**2
         csff /= self.dim**2
 
-        # Return spectral form factors
+        # # Calculate scale and connected scale parameters
+        # scale = 1 - self.dim**2 / (self.dim - 1) / (self.dim + self.beta) * (1 - sff)
+        # c_scale = 1 - self.dim**2 / (self.dim - 1) / (self.dim + self.beta) * (1 - csff)
+
+        # Return spectral form factors and scale parameters
         return sff, csff
 
     def wigner_surmise(self, s: float) -> float:
@@ -525,6 +529,9 @@ class SpectralMixin:
         float
             Universal connected spectral form factor at time tau
         """
+        # Normalize tau w.r.t. Heisenberg time 2π
+        tau = tau / (2 * np.pi)
+
         # Return GOE connected spectral form factor if beta = 1
         if self.beta == 1:
             # Calculate connected spectral form factor
