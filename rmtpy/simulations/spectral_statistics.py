@@ -344,6 +344,10 @@ def plot_spectral_hist(data_path: str) -> None:
             spectral_config.x_range * ensemble.E0,
         )
 
+        # Adjust y-axis limits only for Poisson ensemble
+        if ensemble.__class__.__name__ == "Poisson":
+            ax.set_ylim(0, 1.5 / ensemble.N / ensemble.J)
+
         # Create major ticks for x-axis
         ax.set_xticks((-ensemble.E0, 0, ensemble.E0))
 
@@ -351,7 +355,7 @@ def plot_spectral_hist(data_path: str) -> None:
         ax.set_xticks((-ensemble.E0 / 2, ensemble.E0 / 2), minor=True)
 
     # Set legend title
-    legend_title = rf"{repr(ensemble)}" + ("\nunfolded" if unfold else "")
+    legend_title = rf"{ensemble}" + ("\nunfolded" if unfold else "")
 
     # Finish plot and save it
     _create_plot(
@@ -425,7 +429,7 @@ def plot_nn_spacing_dist(data_path: str) -> None:
     ax.set_xticks(spacings_config.minor_xticks, minor=True)
 
     # Set legend title
-    legend_title = rf"{repr(ensemble)}" + ("\nunfolded" if unfold else "")
+    legend_title = rf"{ensemble}" + ("\nunfolded" if unfold else "")
 
     # Finish plot and save it
     _create_plot(
@@ -561,7 +565,7 @@ def plot_form_factors(data_path: str) -> None:
     ax.set_yticks([ensemble.dim**i for i in range(-2, 1)])
 
     # Set legend title
-    legend_title = rf"{repr(ensemble)}" + ("\nunfolded" if unfold else "")
+    legend_title = rf"{ensemble}" + ("\nunfolded" if unfold else "")
 
     # Finish plot and save it
     _create_plot(
