@@ -477,9 +477,8 @@ class SpectralMixin:
         sff /= self.dim**2
         csff /= self.dim**2
 
-        # # Calculate scale and connected scale parameters
+        # # Calculate scale parameter
         # scale = 1 - self.dim**2 / (self.dim - 1) / (self.dim + self.beta) * (1 - sff)
-        # c_scale = 1 - self.dim**2 / (self.dim - 1) / (self.dim + self.beta) * (1 - csff)
 
         # Return spectral form factors and scale parameters
         return sff, csff
