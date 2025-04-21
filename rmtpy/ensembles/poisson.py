@@ -39,6 +39,11 @@ class Poisson(Ensemble):
     The Poisson ensemble class.
     Inherits from the Ensemble class.
 
+    Attributes
+    ----------
+    sigma : float
+        Standard deviation of the real eigenvalues.
+
     Methods
     -------
     generate() -> np.ndarray
@@ -121,6 +126,6 @@ class Poisson(Ensemble):
     @property
     def sigma(self) -> float:
         """
-        Standard deviation of the matrix elements.
+        Standard deviation of the real eigenvalues.
         """
         return self._sigma
