@@ -135,7 +135,7 @@ class NNLevelSpacings:
     hist_legend: str = "simulation"
     curve_legend: str = "surmise"
     xlabel: str = r"$\varepsilon$"
-    ylabel: str = r"$\langle \rho(\varepsilon) \rangle$"
+    ylabel: str = r"$\langle \rho(\varepsilon / d) \rangle$"
     unfolded_xlabel: str = r"$s$"
     unfolded_ylabel: str = r"$\langle \rho(s) \rangle$"
 
@@ -238,9 +238,9 @@ class SpectralFormFactors:
     sff_legend: str = r"SFF"
     csff_legend: str = r"cSFF"
     universal_legend: str = "universal"
-    xlabel: str = r"$Jt$"
-    ylabel: str = r"$K(Jt)$"
-    unfolded_xlabel: str = r"$\tau$"
+    xlabel: str = r"$Jt / 2\pi$"
+    ylabel: str = r"$K(t)$"
+    unfolded_xlabel: str = r"$\tau / 2\pi$"
     unfolded_ylabel: str = r"$K(\tau)$"
 
     # Tick settings
