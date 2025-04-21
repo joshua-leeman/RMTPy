@@ -103,7 +103,7 @@ class GSE(Tenfold):
         H[:bdim, bdim:].real = self._rng.standard_normal(
             (bdim, bdim), dtype=self.real_dtype
         )
-        H[:bdim, bdim:].imag = -self._rng.standard_normal(
+        H[:bdim, bdim:].imag = self._rng.standard_normal(
             (bdim, bdim), dtype=self.real_dtype
         )
         np.subtract(
