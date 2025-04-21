@@ -38,11 +38,6 @@ class BdGC(Tenfold):
     The Bogoliubov-de Gennes C Ensemble (BdG(C)) class.
     Inherits from the Tenfold class.
 
-    Attributes
-    ----------
-    sigma : float
-        Standard deviation of the matrix elements
-
     Methods
     -------
     generate() -> np.ndarray
@@ -75,9 +70,6 @@ class BdGC(Tenfold):
 
         # Initialize tenfold ensemble
         super().__init__(beta=beta, N=N, dim=dim, J=J, dtype=dtype)
-
-        # Set standard deviation of matrix element parts
-        self._sigma = self.N * self.J / 2 / np.sqrt(4 * self.dim)
 
     def generate(self) -> np.ndarray:
         """
@@ -127,15 +119,8 @@ class BdGC(Tenfold):
         np.conjugate(H[:bdim, :bdim], out=H[bdim:, bdim:])
         np.negative(H[bdim:, bdim:], out=H[bdim:, bdim:])
 
-        # Halve and scale matrix by standard deviation in place
-        H *= self.sigma / 2
+        # Halve and scale matrix by complex standard deviation in place
+        H *= self.sigma / 2 / np.sqrt(2)
 
         # Return BdG(C) matrix
         return H
-
-    @property
-    def sigma(self) -> float:
-        """
-        Standard deviation of the matrix elements.
-        """
-        return self._sigma
