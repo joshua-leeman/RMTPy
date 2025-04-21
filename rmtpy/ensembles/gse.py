@@ -38,6 +38,11 @@ class GSE(Tenfold):
     The Gaussian Symplectic Ensemble (GSE) class.
     Inherits from the Tenfold class.
 
+    Attributes
+    ----------
+    sigma : float
+        Standard deviation of the matrix elements
+
     Methods
     -------
     generate() -> np.ndarray
@@ -70,6 +75,9 @@ class GSE(Tenfold):
 
         # Initialize tenfold ensemble
         super().__init__(beta=beta, N=N, dim=dim, J=J, dtype=dtype)
+
+        # Calculate standard deviation of matrix element parts
+        self._sigma = self.N * self.J / 2 / np.sqrt(4 * self.dim)
 
     def generate(self) -> np.ndarray:
         """
@@ -124,3 +132,10 @@ class GSE(Tenfold):
 
         # Return GSE matrix
         return H
+
+    @property
+    def sigma(self) -> float:
+        """
+        Standard deviation of the matrix elements.
+        """
+        return self._sigma
