@@ -65,11 +65,11 @@ class GOE(Tenfold):
         dtype : type, optional
             Data type of the matrix elements (default is np.complex128)
         """
-        # Initialize tenfold ensemble
-        super().__init__(beta=beta, N=N, dim=dim, J=J, dtype=dtype)
-
         # Set degeneracy of eigenvalues
         self._degeneracy = degeneracy
+
+        # Initialize tenfold ensemble
+        super().__init__(beta=beta, N=N, dim=dim, J=J, dtype=dtype)
 
     def generate(self) -> np.ndarray:
         """
@@ -84,13 +84,13 @@ class GOE(Tenfold):
         H = np.empty((self.dim, self.dim), dtype=self.dtype)
 
         # Generate standard normal numbers for real parts and zeros for imaginary parts
-        H.real = self._rng.standard_normal((self.dim, self.dim), dtype=self.real_dtype)
-        H.imag = np.zeros((self.dim, self.dim), dtype=self.real_dtype)
+        H.real = self._rng.standard_normal(H.shape, dtype=self.real_dtype)
+        H.imag = np.zeros(H.shape, dtype=self.real_dtype)
 
         # Symmetrize matrix in-place
         np.add(H, H.T, out=H)
 
-        # Scale matrix in-place
+        # Halve and scale matrix by standard deviation in-place
         H *= self.sigma / 2
 
         # Return GOE matrix
