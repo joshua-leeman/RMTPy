@@ -115,21 +115,21 @@ class RMT(ABC):
 
     def __repr__(self) -> str:
         """
+        String representation of the ensemble.
+        """
+        if self.N is None:
+            return f"{self.__class__.__name__}(dim={self.dim}, J={self.J})"
+        else:
+            return f"{self.__class__.__name__}(N={self.N}, J={self.J})"
+
+    def __str__(self) -> str:
+        """
         LaTeX representation of the ensemble.
         """
         if self.N is None:
             return rf"$\textrm{{{self.__class__.__name__}}}\ D={self.dim}$"
         else:
             return rf"$\textrm{{{self.__class__.__name__}}}\ N={self.N}$"
-
-    def __str__(self) -> str:
-        """
-        String representation of the ensemble.
-        """
-        if self.N is None:
-            return f"{self.__class__.__name__} (dim={self.dim}, J={self.J})"
-        else:
-            return f"{self.__class__.__name__} (N={self.N}, J={self.J})"
 
     def _check_ensemble(self) -> None:
         """
@@ -334,7 +334,6 @@ class RMT(ABC):
         return self._matrix_memory
 
     @property
-    @abstractmethod
     def beta(self) -> int:
         """
         Dyson index (symmetry class).
@@ -342,15 +341,14 @@ class RMT(ABC):
             2: Unitary
             4: Symplectic
         """
-        pass
+        return self._beta
 
     @property
-    @abstractmethod
     def degen(self) -> int:
         """
         Degeneracy of the ensemble's eigenvalues.
         """
-        pass
+        return self._degen
 
 
 # =============================
@@ -640,18 +638,19 @@ class Tenfold(Ensemble):
         dtype : type, optional
             Data type of the matrix (default is np.complex128)
         """
-        # Initialize RMT ensemble
-        super().__init__(N=N, dim=dim, J=J, dtype=dtype)
 
         # Set Dyson index
         self._beta = beta
+
+        # Initialize RMT ensemble
+        super().__init__(N=N, dim=dim, J=J, dtype=dtype)
 
         # Calculate standard deviation of real and imaginary parts of matrix elements
         self._sigma = self.N * self.J * np.sqrt(self.degen / 8 / self.beta / self.dim)
 
     def spectral_density(self, eigval: float) -> float:
         """
-        Calculate the mean spectral density at eigenvalue.
+        Calculate the mean spectral density at a given eigenvalue.
 
         Parameters
         ----------
@@ -668,16 +667,6 @@ class Tenfold(Ensemble):
             return np.sqrt(1 - (eigval / self.E0) ** 2) / (np.pi * self.E0 / 2)
         else:
             return 0.0
-
-    @property
-    def beta(self) -> int:
-        """
-        Dyson index (symmetry class).
-            1: Orthogonal
-            2: Unitary
-            4: Symplectic
-        """
-        return self._beta
 
     @property
     def sigma(self) -> float:
