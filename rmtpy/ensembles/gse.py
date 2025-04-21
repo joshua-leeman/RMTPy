@@ -27,7 +27,7 @@ class_name = "GSE"
 beta = 4
 
 # Degeneracy of eigenvalues
-degeneracy = 2
+degen = 2
 
 
 # =============================
@@ -66,7 +66,7 @@ class GSE(Tenfold):
             Data type of the matrix elements (default is np.complex128)
         """
         # Set degeneracy of eigenvalues
-        self._degeneracy = degeneracy
+        self._degen = degen
 
         # Initialize tenfold ensemble
         super().__init__(beta=beta, N=N, dim=dim, J=J, dtype=dtype)
@@ -126,8 +126,8 @@ class GSE(Tenfold):
         return H
 
     @property
-    def degeneracy(self) -> int:
+    def degen(self) -> int:
         """
         Degeneracy of the ensemble's eigenvalues.
         """
-        return self._degeneracy
+        return self._degen
