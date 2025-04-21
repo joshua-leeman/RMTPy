@@ -516,6 +516,7 @@ def plot_form_factors(data_path: str) -> None:
             base=ensemble.dim,
             dtype=np.float64,
         )
+        * (2 * np.pi)
         if unfold
         else np.logspace(
             start=sff_config.logtime_min,
@@ -525,6 +526,7 @@ def plot_form_factors(data_path: str) -> None:
             dtype=np.float64,
         )
         / (ensemble.N * ensemble.J)
+        * (2 * np.pi)
     )
 
     # Add content to plot based on unfolding
@@ -876,22 +878,8 @@ class SpectralStatistics(MonteCarlo):
                 dtype=np.float64,
             )
 
-            # Create tick time values
-            tick_times = np.logspace(
-                start=sff_config.logtime_min,
-                stop=sff_config.logtime_max,
-                num=sff_config.num_ticks,
-                base=self.ensemble.dim,
-                dtype=np.float64,
-            )
-
-            # Normalize times and tick_times by total spectrum width
-            times /= self.ensemble.N * self.ensemble.J
-            tick_times /= self.ensemble.N * self.ensemble.J
-
-            # Append tick_times to times and sort
-            times = np.append(times, tick_times)
-            times = np.unique(times)
+            # Normalize times and tick_times by total spectrum width and 2π
+            times /= self.ensemble.N * self.ensemble.J / (2 * np.pi)
         else:
             # Create logtime array based on ensemble parameters
             times = np.logspace(
@@ -902,18 +890,8 @@ class SpectralStatistics(MonteCarlo):
                 dtype=np.float64,
             )
 
-            # Create tick time values
-            tick_times = np.logspace(
-                sff_config.unfolded_logtime_min,
-                sff_config.unfolded_logtime_max,
-                sff_config.num_ticks,
-                base=self.ensemble.dim,
-                dtype=np.float64,
-            )
-
-            # Append tick_times to times and sort
-            times = np.append(times, tick_times)
-            times = np.unique(times)
+            # Normalize times and tick_times by 2π
+            times *= 2 * np.pi
 
         # Allocate memory for form factors
         sff = np.empty_like(times, dtype=np.float64)
