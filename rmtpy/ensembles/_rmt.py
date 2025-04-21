@@ -46,7 +46,7 @@ class RMT(ABC):
         Real data type of the matrix
     beta : int
         Dyson index (symmetry class)
-    degeneracy : int
+    degen : int
         Degeneracy of the ensemble's eigenvalues
     E0 : float
         Ground state energy
@@ -331,7 +331,7 @@ class RMT(ABC):
 
     @property
     @abstractmethod
-    def degeneracy(self) -> int:
+    def degen(self) -> int:
         """
         Degeneracy of the ensemble's eigenvalues.
         """
@@ -414,12 +414,12 @@ class SpectralMixin:
         spacings = np.diff(levels, axis=1)
 
         # If degeneracy greater than one, clean spacings
-        if self.degeneracy > 1:
+        if self.degen > 1:
             # Remove near-duplicate spacings
-            spacings = spacings[:, 1 :: self.degeneracy]
+            spacings = spacings[:, 1 :: self.degen]
 
             # Duplicate spacings with degeneracy
-            spacings = np.repeat(spacings, self.degeneracy, axis=1)
+            spacings = np.repeat(spacings, self.degen, axis=1)
 
         # Return nearest-neighbor level spacings
         return spacings
@@ -526,16 +526,14 @@ class SpectralMixin:
 
         # Return GSE connected spectral form factor if beta = 4
         elif self.beta == 4:
-            # Rescale time parameter to account for degeneracy
-            tau *= self.degeneracy
-
             # Calculate connected spectral form factor
-            if tau == 1:
+            if self.degen * tau == 1:
                 return np.nan
-            if tau <= 2:
-                return (tau - tau / 2 * np.log(abs(tau - 1))) / self.dim
+            if self.degen * tau <= 2:
+                log_term = np.log(abs(self.degen * tau - 1))
+                return self.degen * (tau - tau / 2 * log_term) / self.dim
             else:
-                return 2.0 / self.dim
+                return float(self.degen) / self.dim
 
         # Return unity for other Dyson indices
         else:
@@ -630,9 +628,7 @@ class Tenfold(Ensemble):
         self._beta = beta
 
         # Calculate standard deviation of real and imaginary parts of matrix elements
-        self._sigma = (
-            self.N * self.J * np.sqrt(self.degeneracy / 8 / self.beta / self.dim)
-        )
+        self._sigma = self.N * self.J * np.sqrt(self.degen / 8 / self.beta / self.dim)
 
     def spectral_density(self, eigval: float) -> float:
         """
