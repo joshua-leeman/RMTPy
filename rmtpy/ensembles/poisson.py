@@ -90,7 +90,7 @@ class Poisson(Ensemble):
         # Generate standard uniformly-distributed random eigenvalues
         eigvals = self._rng.random(self.dim, dtype=self.real_dtype)
 
-        # Shift and scale eigenvalues by standard deviation in-place
+        # Shift and scale eigenvalues by standard deviation in place
         eigvals -= 0.5
         eigvals *= self._sigma
 
