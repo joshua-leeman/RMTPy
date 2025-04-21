@@ -87,10 +87,10 @@ class GUE(Tenfold):
         H.real = self._rng.standard_normal(H.shape, dtype=self.real_dtype)
         H.imag = self._rng.standard_normal(H.shape, dtype=self.real_dtype)
 
-        # Adjoint matrix in-place
+        # Adjoint matrix in place
         np.add(H, H.T.conj(), out=H)
 
-        # Halve and scale matrix by standard deviation in-place
+        # Halve and scale matrix by standard deviation in place
         H *= self.sigma / 2
 
         # Return GUE matrix
