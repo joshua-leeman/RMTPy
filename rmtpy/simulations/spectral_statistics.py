@@ -801,7 +801,7 @@ class SpectralStatistics(MonteCarlo):
             spacings /= np.mean(spacings)
         # Else if Dyson index is 4, divide spacings by Kramer degeneracy
         elif self.ensemble.beta == 4:
-            spacings /= self.ensemble.degeneracy
+            spacings /= self.ensemble.degen
 
         # Create histogram using spacings as data
         self._create_hist(data=spacings, dataclass=spacings_config, unfold=unfold)
