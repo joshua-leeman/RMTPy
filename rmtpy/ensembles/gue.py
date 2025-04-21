@@ -38,6 +38,11 @@ class GUE(Tenfold):
     The Gaussian Unitary Ensemble (GUE) class.
     Inherits from the Tenfold class.
 
+    Attributes
+    ----------
+    sigma : float
+        Standard deviation of the matrix elements
+
     Methods
     -------
     generate() -> np.ndarray
@@ -71,6 +76,9 @@ class GUE(Tenfold):
         # Initialize tenfold ensemble
         super().__init__(beta=beta, N=N, dim=dim, J=J, dtype=dtype)
 
+        # Calculate standard deviation of matrix element parts
+        self._sigma = self.N * self.J / 2 / np.sqrt(4 * self.dim)
+
     def generate(self) -> np.ndarray:
         """
         Return a random matrix from the GUE.
@@ -95,3 +103,10 @@ class GUE(Tenfold):
 
         # Return GUE matrix
         return H
+
+    @property
+    def sigma(self) -> float:
+        """
+        Standard deviation of the matrix elements.
+        """
+        return self._sigma
