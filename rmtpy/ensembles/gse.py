@@ -127,7 +127,7 @@ class GSE(Tenfold):
         # Write bottom-right block as complex conjugate of top-left block
         np.conjugate(H[:bdim, :bdim], out=H[bdim:, bdim:])
 
-        # Halve and scale matrix by standard deviation in-place
+        # Halve and scale matrix by standard deviation in place
         H *= self.sigma / 2
 
         # Return GSE matrix
