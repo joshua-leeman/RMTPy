@@ -295,7 +295,7 @@ class SpectralFormFactors:
         universal_legend,
     )
     legend_location: str = "upper right"
-    legend_bbox: Tuple[float, float] = (0.735, 0.9)
+    legend_bbox: Tuple[float, float] = (0.735, 0.95)
     legend_fontsize: int = 10
     legend_title_fontsize: int = 10
     legend_frameon: bool = False
