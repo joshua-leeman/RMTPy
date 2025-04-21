@@ -36,8 +36,8 @@ from rmtpy.ensembles import get_ensemble
 from rmtpy.simulations._mc import MonteCarlo
 from rmtpy.configs.spectral_statistics_config import (
     sff_config,
-    spacings_config,
     spectral_config,
+    spacings_config,
 )
 
 
@@ -104,6 +104,28 @@ def _initialize_plot(dataclass: Any, data_path: str) -> Tuple[
     Figure,
     Axes,
 ]:
+    """
+    Initializes the plot by loading data and creating a figure and axis.
+
+    Parameters
+    ----------
+    dataclass : Any
+        Configuration class containing plot parameters.
+    data_path : str
+        Path to the data file containing histogram data.
+
+    Returns
+    -------
+    Tuple[Any, dict, bool, Figure, Axes]
+        Tuple containing the ensemble object, data dictionary, unfold flag, figure, and axis.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the specified path does not exist.
+    ValueError
+        If the file name does not match the expected name or if the ensemble name is not found in the path.
+    """
     # Check if data is unfolded
     unfold = "unfolded" in os.path.basename(data_path)
 
@@ -131,6 +153,24 @@ def _create_plot(
     ax: Axes,
     unfold: bool,
 ) -> None:
+    """
+    Creates a plot with specified parameters and saves it to a file.
+
+    Parameters
+    ----------
+    dataclass : Any
+        Configuration class containing plot parameters.
+    data_path : str
+        Path to the data file containing histogram data.
+    legend_title : str
+        Title for the legend.
+    fig : Figure
+        Figure object for the plot.
+    ax : Axes
+        Axes object for the plot.
+    unfold : bool
+        Flag indicating whether the data is unfolded or not.
+    """
     # Set x-axis labels
     ax.set_xlabel(dataclass.unfolded_xlabel if unfold else dataclass.xlabel)
 
@@ -236,6 +276,7 @@ def plot_spectral_hist(data_path: str) -> None:
     ValueError
         If the file name does not match the expected name or if the ensemble name is not found in the path.
     """
+
     # Initialize plot
     ensemble, hist_data, unfold, fig, ax = _initialize_plot(spectral_config, data_path)
 
@@ -342,6 +383,9 @@ def plot_nn_spacing_dist(data_path: str) -> None:
     # Initialize plot
     ensemble, hist_data, unfold, fig, ax = _initialize_plot(spacings_config, data_path)
 
+    # Update simulation configuration with universal class
+    spacings_config._set_universal_class(ensemble.universal_class)
+
     # Unpack histogram data
     hist_counts = hist_data["hist_counts"]
     hist_edges = hist_data["hist_edges"]
@@ -414,6 +458,9 @@ def plot_form_factors(data_path: str) -> None:
     ensemble, form_factors_data, unfold, fig, ax = _initialize_plot(
         sff_config, data_path
     )
+
+    # Update simulation configuration with universal class
+    sff_config._set_universal_class(ensemble.universal_class)
 
     # Unpack form factors data
     times = form_factors_data["times"]
@@ -796,12 +843,9 @@ class SpectralStatistics(MonteCarlo):
         # Calculate nearst neighbor spacings
         spacings = self.ensemble.nn_spacings(levels=levels)
 
-        # If unfolding is not requested, divide spacings by mean level spacing
+        # If unfolding is not requested, divide spacings by effective mean level spacing
         if not unfold:
-            spacings /= np.mean(spacings)
-        # Else if Dyson index is 4, divide spacings by Kramer degeneracy
-        elif self.ensemble.beta == 4:
-            spacings /= self.ensemble.degen
+            spacings /= np.mean(spacings) / self.ensemble.degen
 
         # Create histogram using spacings as data
         self._create_hist(data=spacings, dataclass=spacings_config, unfold=unfold)
