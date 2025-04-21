@@ -32,7 +32,7 @@ class_name = "SYK"
 
 
 # =============================
-# 2. Ensemble Class
+# 3. Ensemble Class
 # =============================
 class SYK(Ensemble):
     """
@@ -68,10 +68,14 @@ class SYK(Ensemble):
         dtype : type, optional
             Data type of the matrix elements (default is np.complex128).
         """
-        # Set SYK parameters
+        # Set SYK q-parameter
         self._q = q
-        self._N = N
-        self._J = J
+
+        # Determine Dyson index
+        self._beta = {(0, 0): 1, (0, 4): 4}.get((q % 4, N % 8), 2) if q > 2 else 0
+
+        # Set degeneracy of eigenvalues
+        self._degen = 2 if self.beta == 4 else 1
 
         # Calculate suppression factor
         self._eta = np.sum(
@@ -84,28 +88,20 @@ class SYK(Ensemble):
         # Initialize ensemble class
         super().__init__(N=N, J=J, dtype=dtype)
 
-        # Check if SYK parameters are valid
-        self._check_ensemble()
-
-        # Determine Dyson index
-        self._beta = (
-            {(0, 0): 1, (0, 4): 4}.get((self.q % 4, self.N % 8), 2) if q > 2 else 0
-        )
-
         # Set order of SYK arguments
         self._arg_order = ["name", "q", "N", "J"]
 
     def __repr__(self) -> str:
         """
-        LaTeX representation of the SYK ensemble.
+        String representation of the SYK ensemble.
         """
-        return rf"$\textrm{{{self.__class__.__name__}}}_{self.q}\ N={self.N}$"
+        return f"{self.__class__.__name__}(q={self.q}, N={self.N}, J={self.J})"
 
     def __str__(self) -> str:
         """
-        String representation of the SYK ensemble.
+        LaTeX representation of the SYK ensemble.
         """
-        return f"{self.__class__.__name__} (q={self.q}, N={self.N}, J={self.J})"
+        return rf"$\textrm{{{self.__class__.__name__}}}_{self.q}\ N={self.N}$"
 
     def _check_ensemble(self) -> None:
         """
@@ -214,7 +210,7 @@ class SYK(Ensemble):
 
     def spectral_density(self, eigval: float, num_terms: int = 100) -> float:
         """
-        Calculate the mean spectral density at eigenvalue.
+        Calculate the mean spectral density at a given eigenvalue.
 
         Parameters
         ----------
@@ -251,30 +247,6 @@ class SYK(Ensemble):
         # Return mean spectral density at eigenvalue
         return P
 
-        # # Check if eigenvalue is within support
-        # if abs(eigval) < self._E0:
-        #     # Approximate mean spectral density's infinite product
-        #     product = prod(
-        #         (
-        #             1
-        #             - (eigval / self._E0 * 2) ** 2
-        #             * self.eta ** (k + 1)
-        #             / (1 + self.eta ** (k + 1)) ** 2
-        #         )
-        #         * ((1 - self.eta ** (2 * k + 2)) / (1 - self.eta ** (2 * k + 1)))
-        #         for k in range(num_terms)
-        #     ) * sqrt(1 - self.eta)
-
-        #     # Return SYK mean spectral density at eigenvalue
-        #     return (
-        #         product
-        #         * sqrt(1 - (eigval / self._E0) ** 2)
-        #         / (pi * sqrt(comb(self.N, self.q)) * self.sigma)
-        #     )
-        # else:
-        #     # If eigenvalue is outside support, return 0
-        #     return 0.0
-
     @property
     def q(self):
         """
@@ -290,16 +262,6 @@ class SYK(Ensemble):
         return self._eta
 
     @property
-    def beta(self):
-        """
-        Dyson index (symmetry class).
-            1: Orthogonal
-            2: Unitary
-            4: Symplectic
-        """
-        return self._beta
-
-    @property
     def sigma(self):
         """
         Standard deviation of the matrix elements.
@@ -312,10 +274,3 @@ class SYK(Ensemble):
         Majorana operators.
         """
         return self._majorana
-
-    @property
-    def degen(self):
-        """
-        Degeneracy of the ensemble's eigenvalues.
-        """
-        return 2 if self.beta == 4 else 1
