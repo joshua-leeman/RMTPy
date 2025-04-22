@@ -60,9 +60,13 @@ class SpectralHistogram:
     hist_legend: str = "simulation"
     curve_legend: str = "theory"
     xlabel: str = r"$E$"
-    ylabel: str = r"$\langle \rho(E) \rangle$"
+    ylabel: str = (
+        r"$\langle\hspace{-0.75ex}\langle f(E) \rangle\hspace{-0.75ex}\rangle$"
+    )
     unfolded_xlabel: str = r"$\xi$"
-    unfolded_ylabel: str = r"$\langle \rho(\xi) \rangle$"
+    unfolded_ylabel: str = (
+        r"$\langle\hspace{-0.75ex}\langle f(\xi) \rangle\hspace{-0.7ex}\rangle$"
+    )
 
     # Tick settings
     has_xticklabels: bool = True
@@ -135,9 +139,13 @@ class NNLevelSpacings:
     hist_legend: str = "simulation"
     curve_legend: str = "surmise"
     xlabel: str = r"$\varepsilon$"
-    ylabel: str = r"$\langle \rho(\varepsilon / d) \rangle$"
+    ylabel: str = (
+        r"$\langle\hspace{-0.75ex}\langle f(\varepsilon / d) \rangle\hspace{-0.75ex}\rangle$"
+    )
     unfolded_xlabel: str = r"$s$"
-    unfolded_ylabel: str = r"$\langle \rho(s) \rangle$"
+    unfolded_ylabel: str = (
+        r"$\langle\hspace{-0.75ex}\langle f(s) \rangle\hspace{-0.725ex}\rangle$"
+    )
 
     # Tick settings
     has_xticklabels: bool = True
