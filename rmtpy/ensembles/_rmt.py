@@ -5,8 +5,9 @@ It is grouped into the following sections:
     1. Imports
     2. RMT Class
     3. Spectral Mixin
-    4. Ensemble Class
-    5. Tenfold Class
+    4. CDO Mixin
+    5. Ensemble Class
+    6. Tenfold Class
 """
 
 
@@ -557,12 +558,89 @@ class SpectralMixin:
 
 
 # =============================
-# 4. Ensemble Class
+# 4. CDO Mixin
 # =============================
-class Ensemble(RMT, SpectralMixin):
+class CDOMixin:
+    def evolve_state(
+        self,
+        state: np.ndarray,
+        times: np.ndarray,
+        realizs: int = 1,
+        unfold: bool = False,
+    ) -> np.ndarray:
+        # Initialize memory to store evolved states
+        evolved_states = np.empty((realizs, times.size, self.dim), dtype=self.dtype)
+
+        # Loop over realizations
+        for r in range(realizs):
+            # Diagonalize random Hamiltonian
+            eigvals, eigvecs = eigvalsh(
+                self.generate(), overwrite_a=True, check_finite=False, driver="evr"
+            )
+
+            # If unfolding is requested, unfold the eigenvalues
+            if unfold:
+                eigvals = np.vectorize(self.unfold)(eigvals)
+
+            # Rotate initial state into eigenbasis
+            rotated_state = np.matmul(eigvecs.conj().T, state)
+
+            # Outer-multiply eigenvalues and times, exponentiate, then broadcast multiply
+            np.outer(times, eigvals, out=evolved_states[r, :, :])
+            np.exp(-1j * evolved_states[r, :, :], out=evolved_states[r, :, :])
+            np.multiply(
+                evolved_states[r, :, :], rotated_state, out=evolved_states[r, :, :]
+            )
+
+            # Rotate back to original basis
+            np.matmul(evolved_states[r, :, :], eigvecs.T, out=evolved_states[r, :, :])
+
+        # Return evolved states
+        return evolved_states.transpose(1, 0, 2)
+
+    def compute_cdo(self, states: np.ndarray) -> np.ndarray:
+        # Unpack number of realizations
+        realizs = states.shape[1]
+
+        # Compute CDOs
+        cdo = np.matmul(states.conj().transpose(0, 2, 1), states)
+        cdo /= realizs
+
+        # Return CDOs
+        return cdo
+
+    def cdo_probabilities(self, cdo: np.ndarray) -> np.ndarray:
+        # Compute and return probabilities from CDO
+        return np.diagonal(cdo, axis1=1, axis2=2).real.T
+
+    def cdo_purity(self, cdo: np.ndarray) -> np.ndarray:
+        # Compute and return purity from CDO
+        return np.sum(self.cdo_probabilities(cdo) ** 2, axis=1)
+
+    def cdo_entropy(self, cdo: np.ndarray) -> np.ndarray:
+        # Compute eigenvalues of CDO
+        eigvals = np.linalg.eigvalsh(cdo)
+
+        # Compute and return von Neumann entropy
+        return -np.sum(eigvals * np.log(eigvals), axis=1)
+
+    def expectation_value(self, cdo: np.ndarray, observable: np.ndarray) -> np.ndarray:
+        # Right-multiply observable with CDOs
+        cdo = cdo @ observable
+
+        # Evaluate trace of CDOs and return
+        return np.trace(cdo, axis1=1, axis2=2).real
+
+
+# =============================
+# 5. Ensemble Class
+# =============================
+class Ensemble(RMT, SpectralMixin, CDOMixin):
     """
     Random matrix theory (RMT) ensemble class.
-    Inherits from the RMT base class and the Spectral Mixin class.
+    Inherits from the RMT base class and the following Mixin class:
+        - SpectralMixin: for spectral properties
+        - CDOMixin: for time evolution of states
     """
 
     def __init__(
@@ -591,7 +669,7 @@ class Ensemble(RMT, SpectralMixin):
 
 
 # =============================
-# 5. Tenfold Class
+# 6. Tenfold Class
 # =============================
 class Tenfold(Ensemble):
     """
