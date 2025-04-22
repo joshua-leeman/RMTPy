@@ -921,7 +921,7 @@ class SpectralStatistics(MonteCarlo):
         # Loop over chunks and evaluate form factors
         for i, chunk in chunks(times, num_chunks):
             # Calculate form factors for the current chunk
-            sff[i : i + len(chunk)], csff[i : i + len(chunk)] = (
+            (sff[i : i + len(chunk)], csff[i : i + len(chunk)]) = (
                 self.ensemble.form_factors(levels=levels, times=chunk)
             )
 
