@@ -22,7 +22,7 @@ from typing import Tuple
 import numpy as np
 from scipy.integrate import cumulative_trapezoid
 from scipy.interpolate import interp1d
-from scipy.linalg import eigvalsh
+from scipy.linalg import eigh, eigvalsh
 from scipy.special import gamma
 
 
@@ -561,7 +561,7 @@ class SpectralMixin:
 # 4. CDO Mixin
 # =============================
 class CDOMixin:
-    def evolve_state(
+    def evolve_pure_state(
         self,
         state: np.ndarray,
         times: np.ndarray,
@@ -574,7 +574,7 @@ class CDOMixin:
         # Loop over realizations
         for r in range(realizs):
             # Diagonalize random Hamiltonian
-            eigvals, eigvecs = eigvalsh(
+            eigvals, eigvecs = eigh(
                 self.generate(), overwrite_a=True, check_finite=False, driver="evr"
             )
 
@@ -598,16 +598,65 @@ class CDOMixin:
         # Return evolved states
         return evolved_states.transpose(1, 0, 2)
 
-    def compute_cdo(self, states: np.ndarray) -> np.ndarray:
+    def time_cdo(self, evolved_states: np.ndarray) -> np.ndarray:
         # Unpack number of realizations
-        realizs = states.shape[1]
+        realizs = evolved_states.shape[1]
 
         # Compute CDOs
-        cdo = np.matmul(states.conj().transpose(0, 2, 1), states)
+        cdo = np.matmul(evolved_states.conj().transpose(0, 2, 1), evolved_states)
         cdo /= realizs
 
         # Return CDOs
         return cdo
+
+    def thermal_cdo(self, betas: np.ndarray, realizs: int = 1) -> np.ndarray:
+        # Initialize memory to store thermal CDOs
+        cdo = np.zeros((betas.size, self.dim, self.dim), dtype=self.dtype)
+
+        # Initialize memory to store average energy
+        average_energy = np.zeros((betas.size,), dtype=self.real_dtype)
+
+        # Initialize memory to store free energy
+        free_energy = np.zeros((betas.size,), dtype=self.real_dtype)
+
+        # Loop over realizations
+        for r in range(realizs):
+            # Diagonalize random Hamiltonian
+            eigvals, eigvecs = eigh(
+                self.generate(), overwrite_a=True, check_finite=False, driver="evr"
+            )
+
+            # Compute unnormalized thermal weights
+            weights = np.exp(np.outer(-betas, eigvals))
+
+            # Compute partition function
+            Z = np.sum(weights, axis=1, keepdims=True)
+
+            # Normalize weights
+            weights /= Z
+
+            # Compute realization of thermal density operator
+            cdo += np.einsum(
+                "bm,im,jm->bij", weights, eigvecs, eigvecs.conj(), optimize="optimal"
+            )
+
+            # Compute average energy
+            average_energy += np.sum(weights * eigvals, axis=1)
+
+            # Compute average logarithm of partition function
+            free_energy += np.log(Z)
+
+        # Normalize thermal CDO
+        cdo /= realizs
+
+        # Normalize average energy
+        average_energy /= realizs
+
+        # Normalize logarithm of partition function and divide by inverse temperature
+        free_energy /= -betas * realizs
+
+        # Return thermal CDO and thermal potentials
+        return cdo, average_energy, self.cdo_entropy(cdo), free_energy
 
     def cdo_probabilities(self, cdo: np.ndarray) -> np.ndarray:
         # Compute and return probabilities from CDO
@@ -626,10 +675,10 @@ class CDOMixin:
 
     def expectation_value(self, cdo: np.ndarray, observable: np.ndarray) -> np.ndarray:
         # Right-multiply observable with CDOs
-        cdo = cdo @ observable
+        products = cdo @ observable
 
-        # Evaluate trace of CDOs and return
-        return np.trace(cdo, axis1=1, axis2=2).real
+        # Evaluate trace of each product and return
+        return np.trace(products, axis1=1, axis2=2).real
 
 
 # =============================
