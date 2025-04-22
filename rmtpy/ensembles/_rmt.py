@@ -465,22 +465,15 @@ class SpectralMixin:
         np.exp(exponentials, out=exponentials)
 
         # Calculate partition function and its mean
-        partition_func = np.sum(exponentials, axis=2)
-        mean_partition_func = np.mean(partition_func, axis=1)
+        Z = np.sum(exponentials, axis=2)
+        mean_Z = np.mean(Z, axis=1)
 
         # Calculate spectral form factor parts
-        sff = np.abs(mean_partition_func) ** 2  # disconnected part
-        csff = np.var(partition_func, axis=1)  # connected part
+        sff = np.abs(mean_Z) ** 2 / self.dim**2  # disconnected part
+        csff = np.var(Z, axis=1) / self.dim**2  # connected part
         sff += csff  # total
 
-        # Normalize spectral form factors
-        sff /= self.dim**2
-        csff /= self.dim**2
-
-        # # Calculate scale parameter
-        # scale = 1 - self.dim**2 / (self.dim - 1) / (self.dim + self.beta) * (1 - sff)
-
-        # Return spectral form factors and scale parameters
+        # Return spectral form factors
         return sff, csff
 
     def wigner_surmise(self, s: float) -> float:
@@ -521,7 +514,7 @@ class SpectralMixin:
         Parameters
         ----------
         tau : float
-            Unfolded Time parameter for the spectral form factor
+            Unfolded time for the spectral form factor
 
         Returns
         -------
