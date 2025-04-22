@@ -76,7 +76,7 @@ class SpectralHistogram:
     has_yticklabels: bool = False
     has_unfolded_yticklabels: bool = True
     unfolded_yticklabels: Tuple[str, ...] = (r"$0$", r"$\frac{1}{2}D$", r"$D$")
-    ticklabel_fontsize: int = 10
+    ticklabel_fontsize: int = 9
     tick_length: int = 6
 
     # Legend settings
@@ -152,7 +152,7 @@ class NNLevelSpacings:
     has_unfolded_yticklabels: bool = False
     major_xticks: Tuple[float, ...] = (1.0, 2.0, 3.0, 4.0)
     minor_xticks: Tuple[float, ...] = (0.5, 1.5, 2.5, 3.5)
-    ticklabel_fontsize: int = 10
+    ticklabel_fontsize: int = 9
     tick_length: int = 6
 
     # Legend settings
@@ -238,25 +238,29 @@ class SpectralFormFactors:
     sff_legend: str = r"SFF"
     csff_legend: str = r"cSFF"
     universal_legend: str = "universal"
-    xlabel: str = r"$Jt / 2\pi$"
+    xlabel: str = r"$Jt$"
     ylabel: str = r"$K(t)$"
-    unfolded_xlabel: str = r"$\tau / 2\pi$"
+    unfolded_xlabel: str = r"$\tau$"
     unfolded_ylabel: str = r"$K(\tau)$"
 
     # Tick settings
     has_xticklabels: bool = True
-    xticklabels: Tuple[str, ...] = (r"$1/N$", r"$\sqrt{D} / N$", r"$D / N$")
+    xticklabels: Tuple[str, ...] = (
+        r"$2\pi / N$",
+        r"$2\pi \sqrt{D} / N$",
+        r"$2\pi D / N$",
+    )
     has_unfolded_xticklabels: bool = True
     unfolded_xticklabels: Tuple[str, ...] = (
-        r"$D^{-1}$",
-        r"$D^{-1/2}$",
-        r"$1$",
+        r"$2\pi / D$",
+        r"$2\pi / \sqrt{D}$",
+        r"$2\pi$",
     )
     has_yticklabels: bool = True
     yticklabels: Tuple[str, ...] = (r"$D^{-2}$", r"$D^{-1}$", r"$1$")
     has_unfolded_yticklabels: bool = True
     unfolded_yticklabels: Tuple[str, ...] = yticklabels
-    ticklabel_fontsize: int = 10
+    ticklabel_fontsize: int = 9
     tick_length: int = 6
 
     # Legend settings
