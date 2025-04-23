@@ -159,6 +159,22 @@ class EvolveCDO(MonteCarlo):
             },
         }
 
+    @staticmethod
+    def _parse_args(parser: ArgumentParser) -> dict:
+        """
+        Parse command line arguments for the EvolveCDO simulation class.
+
+        Parameters
+        ----------
+        parser : ArgumentParser
+            Argument parser object.
+
+        Returns
+        -------
+        dict
+            Parsed arguments as a dictionary.
+        """
+
 
 # =============================
 # 4. Main Function
