@@ -61,7 +61,7 @@ class MonteCarlo(ABC):
         ensemble: dict,
         realizs: int = 1,
         workers: int = 1,
-        memory: float = (0.9 * virtual_memory().total) // 2**30,
+        memory: float = virtual_memory().available // 2**30,
     ) -> None:
         """
         Initialize the Monte Carlo simulation.
@@ -97,7 +97,7 @@ class MonteCarlo(ABC):
 
         # Store system specifications
         self._max_workers = cpu_count(logical=False)
-        self._max_memory = virtual_memory().total  # in bytes
+        self._max_memory = virtual_memory().available  # in bytes
 
         # Store job specifications
         self._workers = workers
