@@ -21,6 +21,7 @@ from multiprocessing import Pool
 from pathlib import Path
 from textwrap import dedent
 from time import time
+from typing import Any, List
 
 # Third-party imports
 import numpy as np
@@ -69,6 +70,17 @@ class EvolveCDO(MonteCarlo):
     run() -> None
         Runs all specified simulations.
     """
+
+    def __init__(
+        self,
+        ensemble: dict,
+        realizations: int = 1,
+        workers: int = 1,
+        memory: int = virtual_memory().available // 2**30,
+        runs: List[int] = [],
+        unfold: List[int] = [],
+    ) -> None:
+        pass
 
 
 # =============================
