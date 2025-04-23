@@ -58,7 +58,17 @@ def plot_expectation(data_path: str) -> None:
 # 3. Evolve CDO Class
 # =============================
 class EvolveCDO(MonteCarlo):
-    pass
+    """
+    EvolveCDO class for performing Monte Carlo simulations to obtain the quantum-statistical time evolution of chaotic density operators (CDOs).
+    Inherits from the MonteCarlo class.
+
+    Methods
+    -------
+    run_simulation() -> None
+        Runs a specific simulation and save the results.
+    run() -> None
+        Runs all specified simulations.
+    """
 
 
 # =============================
