@@ -7,3 +7,17 @@ It is grouped into the following sections:
     3. Evolve CDO Class
     4. Main Function
 """
+
+
+# =============================
+# 1. Imports
+# =============================
+# Standard library imports
+import os
+import re
+from argparse import ArgumentParser
+from ast import literal_eval
+from multiprocessing import Pool
+from pathlib import Path
+from textwrap import dedent
+from time import time
