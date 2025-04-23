@@ -23,7 +23,7 @@ from time import strftime
 from psutil import cpu_count, virtual_memory
 
 # Local application imports
-from rmtpy.ensembles import get_ensemble
+from rmtpy.utils import get_ensemble
 
 
 # =============================
