@@ -123,7 +123,7 @@ class EvolveCDO(MonteCarlo):
         # If runs is empty, denote all flag and set run to all simulations
         if not runs:
             self._all = True
-            self._runs = [1, 2, 3]
+            self._runs = [1, 2, 3, 4]
         else:
             self._all = False
 
@@ -174,6 +174,46 @@ class EvolveCDO(MonteCarlo):
         dict
             Parsed arguments as a dictionary.
         """
+        # Add arguments for which simulation(s) to run
+        parser.add_argument(
+            "-runs",
+            "--runs",
+            nargs="+",
+            type=int,
+            choices=[1, 2, 3, 4],
+            default=[],
+            help=dedent(
+                """
+                Specify which simulation(s) to run:
+                    (1) Probabilities Evolution
+                    (2) Purity Evolution
+                    (3) Entropy Evolution
+                    (4) Expectation Value Evolution
+                """
+            ),
+        )
+
+        # Add arguments for which simulation(s) to unfold eigenvalues
+        parser.add_argument(
+            "-unfold",
+            "--unfold",
+            nargs="+",
+            type=int,
+            choices=[1, 2, 3, 4],
+            default=[],
+            help=dedent(
+                """
+                Specify which simulation(s) to unfold eigenvalues (must be subset of --run and cannot be 1):
+                    (1) Probabilities Evolution
+                    (2) Purity Evolution
+                    (3) Entropy Evolution
+                    (4) Expectation Value Evolution
+                """
+            ),
+        )
+
+        # Send parser to Monte Carlo simulation class and return arguments
+        return MonteCarlo._parse_args(parser)
 
 
 # =============================
