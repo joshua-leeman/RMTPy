@@ -394,7 +394,7 @@ class SpectralMixin:
         for r in range(realizs):
             # Compute eigenvalues of random matrix
             eigenvals[r, :] = eigvalsh(
-                self.generate(), overwrite_a=True, check_finite=False, driver="heevr"
+                self.generate(), overwrite_a=True, check_finite=False, driver="evr"
             )
 
         # Return eigenvalues
@@ -575,7 +575,7 @@ class CDOMixin:
         for r in range(realizs):
             # Diagonalize random Hamiltonian
             eigvals, eigvecs = eigh(
-                self.generate(), overwrite_a=True, check_finite=False, driver="heevr"
+                self.generate(), overwrite_a=True, check_finite=False, driver="evr"
             )
 
             # If unfolding is requested, unfold the eigenvalues
@@ -623,7 +623,7 @@ class CDOMixin:
         for r in range(realizs):
             # Diagonalize random Hamiltonian
             eigvals, eigvecs = eigh(
-                self.generate(), overwrite_a=True, check_finite=False, driver="heevr"
+                self.generate(), overwrite_a=True, check_finite=False, driver="evr"
             )
 
             # Compute unnormalized thermal weights
