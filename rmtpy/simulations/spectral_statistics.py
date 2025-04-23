@@ -368,12 +368,8 @@ class SpectralStatistics(MonteCarlo):
 
     Methods
     -------
-    run_spectral_hist(unfold: bool = False)
-        Run the spectral histogram simulation.
-    run_nn_spacing_dist(unfold: bool = False)
-        Run the nearest-neighbor level spacing distribution simulation.
-    run_form_factors(unfold: bool = False)
-        Run the spectral form factors simulation.
+    run_simulation(sim_num, levels=None)
+        Run a specific simulation and save the results.
     run()
         Run all specified simulations.
     """
@@ -717,7 +713,7 @@ class SpectralStatistics(MonteCarlo):
             csff=csff,
         )
 
-    def _run_simulation(self, sim_num: int, levels: np.ndarray = None) -> None:  # type: ignore[assignment]
+    def run_simulation(self, sim_num: int, levels: np.ndarray = None) -> None:  # type: ignore[assignment]
         """
         Run a simulation and save the results.
 
@@ -769,7 +765,7 @@ class SpectralStatistics(MonteCarlo):
         # Run each specified simulation that does not require unfolding
         for sim_num in self._job:
             if self._job[sim_num]["do"] and not self._job[sim_num]["unfold"]:
-                self._run_simulation(sim_num, levels)
+                self.run_simulation(sim_num, levels)
 
         # Unfold eigenvalues if specified
         if any(self._job[sim_num]["unfold"] for sim_num in self._job):
@@ -782,7 +778,7 @@ class SpectralStatistics(MonteCarlo):
         # Run each specified simulation that requires unfolding
         for sim_num in self._job:
             if self._job[sim_num]["do"] and self._job[sim_num]["unfold"]:
-                self._run_simulation(sim_num, levels)
+                self.run_simulation(sim_num, levels)
 
         # Stop timer and store elapsed time
         elapsed_time = time() - start_time
