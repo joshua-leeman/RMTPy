@@ -379,7 +379,7 @@ class SpectralStatistics(MonteCarlo):
         ensemble: dict,
         realizations: int = 1,
         workers: int = 1,
-        memory: int = virtual_memory().total // 2**30,
+        memory: int = virtual_memory().available // 2**30,
         runs: List[int] = [],
         unfold: List[int] = [],
     ) -> None:
