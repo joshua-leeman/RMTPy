@@ -21,3 +21,11 @@ from multiprocessing import Pool
 from pathlib import Path
 from textwrap import dedent
 from time import time
+
+# Third-party imports
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.axes import Axes
+from matplotlib.figure import Figure
+from matplotlib.ticker import LogLocator, NullLocator
+from psutil import virtual_memory
