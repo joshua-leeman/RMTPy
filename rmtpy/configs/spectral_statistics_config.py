@@ -70,7 +70,7 @@ class SpectralHistogram:
 
     # Tick settings
     has_xticklabels: bool = True
-    xticklabels: Tuple[str, ...] = (r"$-\frac{1}{2}NJ$", r"$0$", r"$\frac{1}{2}NJ$")
+    xticklabels: Tuple[str, ...] = (r"$-NJ$", r"$0$", r"$NJ$")
     has_unfolded_xticklabels: bool = True
     unfolded_xticklabels: Tuple[str, ...] = (
         r"$-\frac{1}{2}D$",
@@ -254,9 +254,9 @@ class SpectralFormFactors:
     # Tick settings
     has_xticklabels: bool = True
     xticklabels: Tuple[str, ...] = (
-        r"$2\pi / N$",
-        r"$2\pi \sqrt{D} / N$",
-        r"$2\pi D / N$",
+        r"$\pi / N$",
+        r"$\pi \sqrt{D} / N$",
+        r"$\pi D / N$",
     )
     has_unfolded_xticklabels: bool = True
     unfolded_xticklabels: Tuple[str, ...] = (

@@ -94,7 +94,7 @@ class SYK(Ensemble):
         ) / comb(N, q)
 
         # Calculate standard deviation of couplings
-        self._sigma = N * J * np.sqrt((1 - self.eta) / comb(N, q)) / 4
+        self._sigma = N * J * np.sqrt((1 - self.eta) / comb(N, q)) / 2
 
         # Initialize ensemble class
         super().__init__(N=N, J=J, dtype=dtype)

@@ -91,7 +91,7 @@ class GUE(Tenfold):
         np.add(H, H.T.conj(), out=H)
 
         # Halve and scale matrix by complex standard deviation in place
-        H *= self.sigma / 2 / np.sqrt(2)
+        H *= self.sigma / np.sqrt(2) / 2
 
         # Return GUE matrix
         return H

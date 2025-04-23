@@ -525,7 +525,7 @@ def plot_form_factors(data_path: str) -> None:
             base=ensemble.dim,
             dtype=np.float64,
         )
-        / (ensemble.N * ensemble.J)
+        / (2 * ensemble.N * ensemble.J)
         * (2 * np.pi)
     )
 
@@ -879,7 +879,7 @@ class SpectralStatistics(MonteCarlo):
             )
 
             # Normalize times and tick_times by total spectrum width and 2π
-            times /= self.ensemble.N * self.ensemble.J / (2 * np.pi)
+            times /= 2 * self.ensemble.N * self.ensemble.J / (2 * np.pi)
         else:
             # Create logtime array based on ensemble parameters
             times = np.logspace(

@@ -120,7 +120,7 @@ class BdGC(Tenfold):
         np.negative(H[bdim:, bdim:], out=H[bdim:, bdim:])
 
         # Halve and scale matrix by complex standard deviation in place
-        H *= self.sigma / 2 / np.sqrt(2)
+        H *= self.sigma / np.sqrt(2) / 2
 
         # Return BdG(C) matrix
         return H

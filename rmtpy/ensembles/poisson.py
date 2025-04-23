@@ -81,7 +81,7 @@ class Poisson(Ensemble):
         super().__init__(N=N, dim=dim, J=J, dtype=dtype)
 
         # Calculate standard deviation of non-zero diagonal matrix elements
-        self._sigma = self.N * self.J
+        self._sigma = 2 * self.N * self.J
 
     def generate(self) -> np.ndarray:
         """

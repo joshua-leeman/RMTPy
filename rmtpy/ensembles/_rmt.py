@@ -91,7 +91,7 @@ class RMT(ABC):
         self._J = J
 
         # Calculate ground state energy
-        self._E0 = self.N * self.J / 2
+        self._E0 = self.N * self.J
 
         # Store data type
         self._dtype = dtype
@@ -772,7 +772,7 @@ class Tenfold(Ensemble):
         super().__init__(N=N, dim=dim, J=J, dtype=dtype)
 
         # Calculate complex standard deviation of matrix elements
-        self._sigma = self.N * self.J / 2 / np.sqrt(2 * self.dim)
+        self._sigma = self.N * self.J / np.sqrt(2 * self.dim)
 
     def spectral_density(self, eigval: float) -> float:
         """
