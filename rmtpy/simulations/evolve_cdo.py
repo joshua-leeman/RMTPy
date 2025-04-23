@@ -215,6 +215,16 @@ class EvolveCDO(MonteCarlo):
         # Send parser to Monte Carlo simulation class and return arguments
         return MonteCarlo._parse_args(parser)
 
+    def _realize_evolved_states(self) -> np.ndarray:
+        """
+        Divides times among workers and runs the simulation in parallel.
+
+        Returns
+        -------
+        np.ndarray
+            Sample of evolved states.
+        """
+
 
 # =============================
 # 4. Main Function
