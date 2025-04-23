@@ -18,6 +18,7 @@ from argparse import ArgumentParser
 from ast import literal_eval
 from textwrap import dedent
 from time import strftime
+from typing import List
 
 # Third-party imports
 from psutil import cpu_count, virtual_memory
@@ -62,6 +63,8 @@ class MonteCarlo(ABC):
         realizs: int = 1,
         workers: int = 1,
         memory: float = virtual_memory().available // 2**30,
+        runs: List[str] = [],
+        unfold: List[str] = [],
     ) -> None:
         """
         Initialize the Monte Carlo simulation.
@@ -76,6 +79,10 @@ class MonteCarlo(ABC):
             Number of workers (default is 1).
         memory : float, optional
             Memory allocated for simulation in GiB (default is 90% of total memory).
+        runs : list of int, optional
+            List of simulations to run (default is empty list).
+        unfold : list of int, optional
+            List of simulations to unfold eigenvalues (default is empty list).
         """
         # Clean ensemble name in ens_args
         ensemble["name"] = re.sub(r"\W+", "", ensemble["name"]).strip().lower()
@@ -97,11 +104,15 @@ class MonteCarlo(ABC):
 
         # Store system specifications
         self._max_workers = cpu_count(logical=False)
-        self._max_memory = virtual_memory().available  # in bytes
+        self._max_memory = virtual_memory().total  # in bytes
 
         # Store job specifications
         self._workers = workers
         self._memory = memory  # in GiB
+
+        # Store runs and unfold arguments
+        self._runs = runs
+        self._unfold = unfold
 
         # Check if Monte Carlo simulation is valid
         self._check_mc()
@@ -170,15 +181,15 @@ class MonteCarlo(ABC):
         )
 
         # Store total memory in GiB
-        total_memory = virtual_memory().total // 2**30
+        max_memory = virtual_memory().available // 2**30
 
         # Add memory argument
         parser.add_argument(
             "-m",
             "--memory",
             type=int,
-            default=total_memory,
-            help=f"memory allocated for simulation in GiB (default is {total_memory})",
+            default=max_memory,
+            help=f"memory allocated for simulation in GiB (default is {max_memory})",
         )
 
         # Parse arguments into dictionary
@@ -248,6 +259,10 @@ class MonteCarlo(ABC):
             )
         else:
             self._workers = min(self.workers, self.memory // self.calc_memory)
+
+        # Validate unfold is a subset of runs
+        if not set(self.unfold).issubset(set(self.runs)):
+            raise ValueError("Unfold must be a subset of run.")
 
     def _create_output_dir(self, res_type: str = "") -> str:
         """
@@ -326,8 +341,79 @@ class MonteCarlo(ABC):
         return self._memory
 
     @property
+    def runs(self) -> List[int]:
+        """
+        Get the list of simulations to run.
+
+        Returns
+        -------
+        List[int]
+            List of simulation numbers to run.
+        """
+        return self._runs
+
+    @property
+    def unfold(self) -> List[int]:
+        """
+        Get the list of simulations to unfold.
+
+        Returns
+        -------
+        List[int]
+            List of simulation numbers to unfold.
+        """
+        return self._unfold
+
+    @runs.setter
+    def runs(self, runs: List[int]) -> None:
+        """
+        Set the list of simulations to run.
+
+        Parameters
+        ----------
+        runs : List[int]
+            List of simulation numbers to run.
+        """
+        # Replace current run list with new one
+        self._runs = runs
+
+        # Reinitialize MonteCarlo object
+        self.__init__(
+            ensemble=self.ensemble,
+            realizations=self.realizs,
+            workers=self.workers,
+            memory=self.memory,
+            runs=runs,
+            unfold=self.unfold,
+        )
+
+    @unfold.setter
+    def unfold(self, unfold: List[int]) -> None:
+        """
+        Set the list of simulations to unfold.
+
+        Parameters
+        ----------
+        unfold : List[int]
+            List of simulation numbers to unfold.
+        """
+        # Replace current unfold list with new one
+        self._unfold = unfold
+
+        # Reinitialize MonteCarlo object
+        self.__init__(
+            ensemble=self.ensemble,
+            realizations=self.realizs,
+            workers=self.workers,
+            memory=self.memory,
+            runs=self.runs,
+            unfold=unfold,
+        )
+
+    @property
+    @abstractmethod
     def calc_memory(self):
         """
-        Memory required for calculations. [bytes]
+        Memory required for the simulation in bytes.
         """
-        return 4 * self._ensemble.matrix_memory
+        pass

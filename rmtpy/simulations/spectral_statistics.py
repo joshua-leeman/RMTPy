@@ -406,16 +406,15 @@ class SpectralStatistics(MonteCarlo):
         ValueError
             If unfold is not a subset of run or if 1 is included in unfold.
         """
-        # Store runs and unfold arguments
-        self._runs = runs
-        self._unfold = unfold
-
-        # Validate unfold is a subset of runs
-        if not set(unfold).issubset(set(runs)):
-            raise ValueError("Unfold must be a subset of run.")
-
         # Initialize Monte Carlo simulation
-        super().__init__(ensemble, realizations, workers, memory)
+        super().__init__(
+            ensemble=ensemble,
+            realizs=realizations,
+            workers=workers,
+            memory=memory,
+            runs=runs,
+            unfold=unfold,
+        )
 
         # If runs is empty, denote all flag and set run to all simulations
         if not runs:
@@ -787,74 +786,11 @@ class SpectralStatistics(MonteCarlo):
         print(f"Spectral statistics completed in {elapsed_time:.2f} seconds.")
 
     @property
-    def runs(self) -> List[int]:
+    def calc_memory(self) -> int:
         """
-        Get the list of simulations to run.
-
-        Returns
-        -------
-        List[int]
-            List of simulation numbers to run.
+        Memory required for the simulation in bytes.
         """
-        return self._runs
-
-    @property
-    def unfold(self) -> List[int]:
-        """
-        Get the list of simulations to unfold.
-
-        Returns
-        -------
-        List[int]
-            List of simulation numbers to unfold.
-        """
-        return self._unfold
-
-    @runs.setter
-    def runs(self, runs: List[int]) -> None:
-        """
-        Set the list of simulations to run.
-
-        Parameters
-        ----------
-        runs : List[int]
-            List of simulation numbers to run.
-        """
-        # Replace current run list with new one
-        self._runs = runs
-
-        # Reinitialize SpectralStatistics object
-        self.__init__(
-            ensemble=self.ensemble,
-            realizations=self.realizs,
-            workers=self.workers,
-            memory=self.memory,
-            runs=runs,
-            unfold=self.unfold,
-        )
-
-    @unfold.setter
-    def unfold(self, unfold: List[int]) -> None:
-        """
-        Set the list of simulations to unfold.
-
-        Parameters
-        ----------
-        unfold : List[int]
-            List of simulation numbers to unfold.
-        """
-        # Replace current unfold list with new one
-        self._unfold = unfold
-
-        # Reinitialize SpectralStatistics object
-        self.__init__(
-            ensemble=self.ensemble,
-            realizations=self.realizs,
-            workers=self.workers,
-            memory=self.memory,
-            runs=self.runs,
-            unfold=unfold,
-        )
+        return self.ensemble.matrix_memory + 300 * np.sqrt(self.ensemble.matrix_memory)
 
 
 # =============================
