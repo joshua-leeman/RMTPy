@@ -31,5 +31,4 @@ from matplotlib.ticker import LogLocator, NullLocator
 from psutil import virtual_memory
 
 # Local application imports
-from rmtpy.ensembles import get_ensemble
 from rmtpy.simulations._mc import MonteCarlo
