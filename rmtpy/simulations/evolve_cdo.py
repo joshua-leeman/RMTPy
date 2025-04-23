@@ -34,6 +34,12 @@ from psutil import virtual_memory
 # Local application imports
 from rmtpy.utils import get_ensemble, _create_plot, _initialize_plot
 from rmtpy.simulations._mc import MonteCarlo
+from rmtpy.configs import (
+    probabilities_config,
+    purity_config,
+    entropy_config,
+    expectation_config,
+)
 
 
 # =============================
@@ -80,7 +86,78 @@ class EvolveCDO(MonteCarlo):
         runs: List[int] = [],
         unfold: List[int] = [],
     ) -> None:
-        pass
+        """
+        Initialize the EvolveCDO simulation class.
+
+        Parameters
+        ----------
+        ensemble : dict
+            Ensemble parameters.
+        realizations : int, optional
+            Number of realizations (default is 1).
+        workers : int, optional
+            Number of workers (default is 1).
+        memory : int, optional
+            Memory allocated for simulation in bytes (default is total system memory).
+        runs : list of int, optional
+            List of simulations to run (default is empty list).
+        unfold : list of int, optional
+            List of simulations to unfold eigenvalues (default is empty list).
+
+        Raises
+        ------
+        ValueError
+            If unfold is not a subset of run or if 1 is included in unfold.
+        """
+        # Store runs and unfold arguments
+        self._runs = runs
+        self._unfold = unfold
+
+        # Validate unfold is a subset of runs
+        if not set(unfold).issubset(set(runs)):
+            raise ValueError("Unfold must be a subset of run.")
+
+        # Initialize Monte Carlo simulation
+        super().__init__(ensemble, realizations, workers, memory)
+
+        # If runs is empty, denote all flag and set run to all simulations
+        if not runs:
+            self._all = True
+            self._runs = [1, 2, 3]
+        else:
+            self._all = False
+
+        # Store job arguments in dictionary
+        self._job = {
+            1: {
+                "do": 1 in self._runs,
+                "unfold": 1 in self._unfold,
+                "func": self._spectral_hist,
+                "plot": plot_probabilities,
+                "file": probabilities_config.data_filename,
+            },
+            2: {
+                "do": 2 in self._runs,
+                "unfold": 2 in self._unfold,
+                "func": self._nn_spacing_dist,
+                "plot": plot_purity,
+                "file": purity_config.data_filename,
+            },
+            3: {
+                "do": 3 in self._runs,
+                "unfold": 3 in self._unfold,
+                "func": self._form_factors,
+                "plot": plot_entropy,
+                "file": entropy_config.data_filename,
+            },
+            4: {
+                "do": 4 in self._runs,
+                "unfold": 4 in self._unfold,
+                "func": self._form_factors,
+                "plot": plot_expectation,
+                "file": expectation_config.data_filename,
+            },
+        }
 
 
 # =============================
