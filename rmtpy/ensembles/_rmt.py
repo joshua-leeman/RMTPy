@@ -439,15 +439,15 @@ class SpectralMixin:
         return spacings
 
     def form_factors(
-        self, times: np.ndarray, levels: np.ndarray = None
+        self, time: float, levels: np.ndarray = None
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Calculate the spectral form factors from spectrum sample.
 
         Parameters
         ----------
-        times : np.ndarray
-            Array of time values for the form factors
+        times : float
+            Time value to evaluate the form factors
         levels : np.ndarray, optional
             Spectrum levels (default is None)
 
@@ -461,20 +461,19 @@ class SpectralMixin:
             levels = np.vectorize(self.unfold)(self.eigval_sample())
 
         # Calculate complex exponentials
-        exponentials = np.multiply(times[:, None, None], levels)
-        exponentials = -1j * exponentials
+        exponentials = np.multiply(-1j * time, levels)
         np.exp(exponentials, out=exponentials)
 
         # Calculate partition function and its mean
-        Z = np.sum(exponentials, axis=2)
-        mean_Z = np.mean(Z, axis=1)
+        Z = np.sum(exponentials, axis=1)
+        mean_Z = np.mean(Z)
 
         # Calculate spectral form factor parts
         sff = np.abs(mean_Z) ** 2 / self.dim**2  # disconnected part
-        csff = np.var(Z, axis=1) / self.dim**2  # connected part
+        csff = np.var(Z) / self.dim**2  # connected part
         sff += csff  # total
 
-        # Return spectral form factors
+        # Return spectral form factors evaluated at time
         return sff, csff
 
     def wigner_surmise(self, s: float) -> float:
