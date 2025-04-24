@@ -670,32 +670,11 @@ class SpectralStatistics(MonteCarlo):
         sff = np.empty_like(times, dtype=np.float64)
         csff = np.empty_like(times, dtype=np.float64)
 
-        # Calculate leftover memory for each batch
-        leftover_memory = (
-            self.memory
-            - (times.size + self.realizs * self.ensemble.dim)
-            * np.dtype(np.float64).itemsize
-        )  # in bytes
-
-        # Determine the number of batches based on memory
-        num_chunks = np.ceil(
-            times.size
-            * self.realizs
-            * self.ensemble.dim
-            * np.dtype(np.float64).itemsize
-            / leftover_memory
-        ).astype(int)
-
-        # Create chucks generator
-        def chunks(array, size):
-            for i in range(0, len(array), size):
-                yield i, array[i : i + size]
-
         # Loop over chunks and evaluate form factors
-        for i, chunk in chunks(times, num_chunks):
+        for i, time in enumerate(times):
             # Calculate form factors for the current chunk
-            (sff[i : i + len(chunk)], csff[i : i + len(chunk)]) = (
-                self.ensemble.form_factors(levels=levels, times=chunk)
+            sff[i : i + 1], csff[i : i + 1] = self.ensemble.form_factors(
+                time=time, levels=levels
             )
 
         # Create output directory and store results path
