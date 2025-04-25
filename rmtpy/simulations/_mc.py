@@ -63,8 +63,6 @@ class MonteCarlo(ABC):
         realizs: int = 1,
         workers: int = 1,
         memory: float = virtual_memory().available // 2**30,
-        runs: List[str] = [],
-        unfold: List[str] = [],
     ) -> None:
         """
         Initialize the Monte Carlo simulation.
@@ -79,10 +77,6 @@ class MonteCarlo(ABC):
             Number of workers (default is 1).
         memory : float, optional
             Memory allocated for simulation in GiB (default is 90% of total memory).
-        runs : list of int, optional
-            List of simulations to run (default is empty list).
-        unfold : list of int, optional
-            List of simulations to unfold eigenvalues (default is empty list).
         """
         # Clean ensemble name in ens_args
         ensemble["name"] = re.sub(r"\W+", "", ensemble["name"]).strip().lower()
@@ -109,10 +103,6 @@ class MonteCarlo(ABC):
         # Store job specifications
         self._workers = workers
         self._memory = memory  # in GiB
-
-        # Store runs and unfold arguments
-        self._runs = runs
-        self._unfold = unfold
 
         # Check if Monte Carlo simulation is valid
         self._check_mc()
@@ -165,7 +155,7 @@ class MonteCarlo(ABC):
         # Add number of realizations argument
         parser.add_argument(
             "-realizs",
-            "--realizations",
+            "--realizs",
             type=int,
             default=1,
             help="number of realizations (default is 1)",
@@ -259,10 +249,6 @@ class MonteCarlo(ABC):
             )
         else:
             self._workers = min(self.workers, self.memory // self.calc_memory)
-
-        # Validate unfold is a subset of runs
-        if not set(self.unfold).issubset(set(self.runs)):
-            raise ValueError("Unfold must be a subset of run.")
 
     def _create_output_dir(self, res_type: str = "") -> str:
         """
