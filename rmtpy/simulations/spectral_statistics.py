@@ -16,14 +16,12 @@ It is grouped into the following sections:
 import os
 from argparse import ArgumentParser
 from multiprocessing import Pool
-from textwrap import dedent
 from time import time
-from typing import Any, List
+from typing import Any
 
 # Third-party imports
 import numpy as np
 from matplotlib.ticker import LogLocator, NullLocator
-from psutil import virtual_memory
 from scipy.special import jn_zeros
 
 # Local application imports
@@ -378,138 +376,10 @@ class SpectralStatistics(MonteCarlo):
         Run all specified simulations.
     """
 
-    def __init__(
-        self,
-        ensemble: dict,
-        realizations: int = 1,
-        workers: int = 1,
-        memory: int = virtual_memory().available // 2**30,
-        runs: List[int] = [],
-        unfold: List[int] = [],
-    ) -> None:
-        """
-        Initialize the SpectralStatistics simulation class.
-
-        Parameters
-        ----------
-        ensemble : dict
-            Ensemble parameters.
-        realizations : int, optional
-            Number of realizations (default is 1).
-        workers : int, optional
-            Number of workers (default is 1).
-        memory : int, optional
-            Memory allocated for simulation in bytes (default is total system memory).
-        runs : list of int, optional
-            List of simulations to run (default is empty list).
-        unfold : list of int, optional
-            List of simulations to unfold eigenvalues (default is empty list).
-
-        Raises
-        ------
-        ValueError
-            If unfold is not a subset of run or if 1 is included in unfold.
-        """
-        # Initialize Monte Carlo simulation
-        super().__init__(
-            ensemble=ensemble,
-            realizs=realizations,
-            workers=workers,
-            memory=memory,
-            runs=runs,
-            unfold=unfold,
-        )
-
-        # If runs is empty, denote all flag and set run to all simulations
-        if not runs:
-            self._all = True
-            self._runs = [1, 2, 3]
-        else:
-            self._all = False
-
-        # Store job arguments in dictionary
-        self._job = {
-            1: {
-                "do": 1 in self._runs,
-                "unfold": 1 in self._unfold,
-                "func": self._spectral_hist,
-                "plot": plot_spectral_hist,
-                "file": spectral_config.data_filename,
-            },
-            2: {
-                "do": 2 in self._runs,
-                "unfold": 2 in self._unfold,
-                "func": self._nn_spacing_hist,
-                "plot": plot_nn_spacing_hist,
-                "file": spacings_config.data_filename,
-            },
-            3: {
-                "do": 3 in self._runs,
-                "unfold": 3 in self._unfold,
-                "func": self._form_factors,
-                "plot": plot_form_factors,
-                "file": sff_config.data_filename,
-            },
-        }
-
-    @staticmethod
-    def _parse_args(parser: ArgumentParser) -> dict:
-        """
-        Parse command line arguments for the SpectralStatistics simulation class.
-
-        Parameters
-        ----------
-        parser : ArgumentParser
-            Argument parser object.
-
-        Returns
-        -------
-        dict
-            Parsed arguments as a dictionary.
-        """
-        # Add arguments for which simulation(s) to run
-        parser.add_argument(
-            "-runs",
-            "--runs",
-            nargs="+",
-            type=int,
-            choices=[1, 2, 3],
-            default=[],
-            help=dedent(
-                """
-                Specify which simulation(s) to run:
-                    (1) Spectral Histogram
-                    (2) NN-Level Spacings
-                    (3) Spectral Form Factors
-                """
-            ),
-        )
-
-        # Add arguments for which simulation(s) to unfold eigenvalues
-        parser.add_argument(
-            "-unfold",
-            "--unfold",
-            nargs="+",
-            type=int,
-            choices=[1, 2, 3],
-            default=[],
-            help=dedent(
-                """
-                Specify which simulation(s) to unfold eigenvalues (must be subset of --run and cannot be 1):
-                    (1) Spectral Histogram
-                    (2) NN-Level Spacings
-                    (3) Spectral Form Factors
-                """
-            ),
-        )
-
-        # Send parser to Monte Carlo simulation class and return arguments
-        return MonteCarlo._parse_args(parser)
-
     @staticmethod
     def _worker_func(args: dict) -> np.ndarray:
         """
-        Worker function to run the simulation on a separate processes.
+        Worker function to run the simulation on separate processes.
 
         Parameters
         ----------
@@ -587,20 +457,26 @@ class SpectralStatistics(MonteCarlo):
             data, bins=dataclass.num_bins, density=True
         )
 
-        # Create output directory and store results path
+        # Create output directory
         output_dir = self._create_output_dir(res_type="data")
-        results_path = os.path.join(
-            output_dir, f"{unfold * 'unfolded_'}{dataclass.data_filename}"
-        )
+
+        # Create results path based on unfolding
+        if unfold:
+            data_path = os.path.join(output_dir, dataclass.unfolded_data_filename)
+        else:
+            data_path = os.path.join(output_dir, dataclass.data_filename)
 
         # Save histogram data
         np.savez_compressed(
-            results_path,
+            data_path,
             hist_counts=hist_counts,
             hist_edges=hist_edges,
         )
 
-    def _spectral_hist(self, levels: np.ndarray, unfold: bool = False) -> None:
+        # Return results path
+        return data_path
+
+    def spectral_hist(self, levels: np.ndarray, unfold: bool = False) -> str:
         """
         Create a histogram of the eigenvalue sample.
 
@@ -610,11 +486,21 @@ class SpectralStatistics(MonteCarlo):
             Eigenvalue sample.
         unfold : bool, optional
             Whether to unfold eigenvalues (default is False).
+
+        Returns
+        -------
+        str
+            Path to the saved eigenvalue histogram data file.
         """
         # Create histogram using levels as data
-        self._create_hist(data=levels, dataclass=spectral_config, unfold=unfold)
+        data_path = self._create_hist(
+            data=levels, dataclass=spectral_config, unfold=unfold
+        )
 
-    def _nn_spacing_hist(self, levels: np.ndarray, unfold: bool = False) -> None:
+        # Return results path
+        return data_path
+
+    def nn_spacing_hist(self, levels: np.ndarray, unfold: bool = False) -> str:
         """
         Create a histogram of the nearest-neighbor level spacing sample.
 
@@ -622,6 +508,11 @@ class SpectralStatistics(MonteCarlo):
         ----------
         levels : np.ndarray
             Eigenvalue sample.
+
+        Returns
+        -------
+        str
+            Path to the saved nearest-neighbor spacing data file.
         """
         # Calculate nearst neighbor spacings
         spacings = self.ensemble.nn_spacings(levels=levels)
@@ -631,9 +522,14 @@ class SpectralStatistics(MonteCarlo):
             spacings /= np.mean(spacings) / self.ensemble.degen
 
         # Create histogram using spacings as data
-        self._create_hist(data=spacings, dataclass=spacings_config, unfold=unfold)
+        data_path = self._create_hist(
+            data=spacings, dataclass=spacings_config, unfold=unfold
+        )
 
-    def _form_factors(self, levels: np.ndarray, unfold: bool = False) -> None:
+        # Return results path
+        return data_path
+
+    def form_factors(self, levels: np.ndarray, unfold: bool = False) -> str:
         """
         Create a plot of the spectral form factors versus time.
 
@@ -643,6 +539,11 @@ class SpectralStatistics(MonteCarlo):
             Eigenvalue sample.
         unfold : bool, optional
             Whether to unfold eigenvalues (default is False).
+
+        Returns
+        -------
+        str
+            Path to the saved form factors data file.
         """
         # Store first positive zero of the Bessel function of the first kind
         j_1_1 = jn_zeros(1, 1)[0]
@@ -680,58 +581,25 @@ class SpectralStatistics(MonteCarlo):
                 time=time, levels=levels
             )
 
-        # Create output directory and store results path
+        # Create output directory
         output_dir = self._create_output_dir(res_type="data")
-        results_path = os.path.join(
-            output_dir, f"{unfold * 'unfolded_'}{sff_config.data_filename}"
-        )
+
+        # Create results path based on unfolding
+        if unfold:
+            data_path = os.path.join(output_dir, sff_config.unfolded_data_filename)
+        else:
+            data_path = os.path.join(output_dir, sff_config.data_filename)
 
         # Save form factors data
         np.savez_compressed(
-            results_path,
+            data_path,
             times=times,
             sff=sff,
             csff=csff,
         )
 
-    def run_simulation(self, sim_num: int, levels: np.ndarray = None) -> None:  # type: ignore[assignment]
-        """
-        Run a simulation and save the results.
-
-        Parameters
-        ----------
-        sim_num : int
-            Simulation number.
-        levels : np.ndarray, optional
-            Eigenvalue sample (default is None).
-
-        Raises
-        ------
-        ValueError
-            If the simulation number is not valid.
-        """
-        # Store simulation information
-        sim_info = self._job[sim_num]
-
-        # Realize eigenvalues if not provided
-        if levels is None:
-            levels = self._realize_eigvals()
-            # Unfold eigenvalues if specified
-            if sim_info["unfold"]:
-                levels = self.ensemble.unfold(levels)
-
-        # Run simulation functionm
-        sim_info["func"](levels, unfold=sim_info["unfold"])  # type: ignore[operator]
-
-        # Determine output directory
-        output_dir = self._create_output_dir(res_type="data")
-
-        # Run plot function
-        sim_info["plot"](
-            os.path.join(
-                output_dir, f"{sim_info['unfold'] * 'unfolded_'}{sim_info['file']}"  # type: ignore[operator]
-            ),
-        )  # type: ignore[operator]
+        # Return results path
+        return data_path
 
     def run(self) -> None:
         """
@@ -743,23 +611,23 @@ class SpectralStatistics(MonteCarlo):
         # Realize eigenvalues
         levels = self._realize_eigvals()
 
-        # Run each specified simulation that does not require unfolding
-        for sim_num in self._job:
-            if self._job[sim_num]["do"] and not self._job[sim_num]["unfold"]:
-                self.run_simulation(sim_num, levels)
+        for unfold in (False, True):
+            # Unfold eigenvalues if requested
+            if unfold:
+                # Unfold eigenvalues
+                levels = self.ensemble.unfold(levels)
 
-        # Unfold eigenvalues if specified
-        if any(self._job[sim_num]["unfold"] for sim_num in self._job):
-            levels = self.ensemble.unfold(levels)
-        elif self._all:
-            levels = self.ensemble.unfold(levels)
-            for sim_num in self._job:
-                self._job[sim_num]["unfold"] = True
+            # Create histogram of eigenvalues
+            data_path = self.spectral_hist(levels=levels, unfold=unfold)
+            plot_spectral_hist(data_path=data_path)
 
-        # Run each specified simulation that requires unfolding
-        for sim_num in self._job:
-            if self._job[sim_num]["do"] and self._job[sim_num]["unfold"]:
-                self.run_simulation(sim_num, levels)
+            # Create histogram of nearest-neighbor spacings
+            data_path = self.nn_spacing_hist(levels=levels, unfold=unfold)
+            plot_nn_spacing_hist(data_path=data_path)
+
+            # Create plot of spectral form factors
+            data_path = self.form_factors(levels=levels, unfold=unfold)
+            plot_form_factors(data_path=data_path)
 
         # Stop timer and store elapsed time
         elapsed_time = time() - start_time
