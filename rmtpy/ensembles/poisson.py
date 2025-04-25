@@ -117,11 +117,11 @@ class Poisson(Ensemble):
             Mean spectral density at the given eigenvalue.
         """
         # Return zero if eigenvalue is outside support
-        if eigval < -0.5 * self.N * self.J or eigval > 0.5 * self.N * self.J:
+        if eigval < -self.N * self.J or eigval > self.N * self.J:
             return 0.0
 
         # Calculate mean spectral density
-        return 1.0 / self.N / self.J
+        return 1.0 / 2 / self.N / self.J
 
     @property
     def sigma(self) -> float:
