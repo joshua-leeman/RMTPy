@@ -24,6 +24,7 @@ from typing import Any, List
 import numpy as np
 from matplotlib.ticker import LogLocator, NullLocator
 from psutil import virtual_memory
+from scipy.special import jn_zeros
 
 # Local application imports
 from rmtpy.utils import get_ensemble, _create_plot, _initialize_plot
@@ -124,7 +125,7 @@ def plot_spectral_hist(data_path: str) -> None:
 
         # Adjust y-axis limits only for Poisson ensemble
         if ensemble.__class__.__name__ == "Poisson":
-            ax.set_ylim(0, 1.5 / ensemble.N / ensemble.J)
+            ax.set_ylim(0, 1.5 / 2 / ensemble.N / ensemble.J)
 
         # Create major ticks for x-axis
         ax.set_xticks((-ensemble.E0, 0, ensemble.E0))
@@ -285,6 +286,9 @@ def plot_form_factors(data_path: str) -> None:
         zorder=sff_config.csff_zorder,
     )
 
+    # Store first positive zero of the Bessel function of the first kind
+    j_1_1 = jn_zeros(1, 1)[0]
+
     # Create tick time values
     tick_times = (
         np.logspace(
@@ -303,15 +307,15 @@ def plot_form_factors(data_path: str) -> None:
             base=ensemble.dim,
             dtype=np.float64,
         )
+        * (2 * j_1_1)
         / (2 * ensemble.N * ensemble.J)
-        * (2 * np.pi)
     )
 
     # Add content to plot based on unfolding
     if not unfold:
         # Create major x-axis grid lines
         ax.vlines(
-            tick_times,
+            tick_times[1:-1],
             ymin=ensemble.dim**-3,
             ymax=ensemble.dim,
             color=sff_config.grid_color,
@@ -640,31 +644,30 @@ class SpectralStatistics(MonteCarlo):
         unfold : bool, optional
             Whether to unfold eigenvalues (default is False).
         """
-        # Create logtime array depending on unfolding
-        if not unfold:
-            # Create logtime array based on ensemble parameters
-            times = np.logspace(
-                start=sff_config.logtime_min,
-                stop=sff_config.logtime_max,
-                num=sff_config.num_logtimes,
-                base=self.ensemble.dim,
-                dtype=np.float64,
-            )
+        # Store first positive zero of the Bessel function of the first kind
+        j_1_1 = jn_zeros(1, 1)[0]
 
-            # Normalize times and tick_times by total spectrum width and 2π
-            times /= 2 * self.ensemble.N * self.ensemble.J / (2 * np.pi)
-        else:
-            # Create logtime array based on ensemble parameters
-            times = np.logspace(
+        # Create logtime array depending on unfolding
+        times = (
+            np.logspace(
                 sff_config.unfolded_logtime_min,
                 sff_config.unfolded_logtime_max,
                 sff_config.num_logtimes,
                 base=self.ensemble.dim,
                 dtype=np.float64,
             )
-
-            # Normalize times and tick_times by 2π
-            times *= 2 * np.pi
+            * (2 * np.pi)
+            if unfold
+            else np.logspace(
+                start=sff_config.logtime_min,
+                stop=sff_config.logtime_max,
+                num=sff_config.num_logtimes,
+                base=self.ensemble.dim,
+                dtype=np.float64,
+            )
+            * (2 * j_1_1)
+            / (2 * self.ensemble.N * self.ensemble.J)
+        )
 
         # Allocate memory for form factors
         sff = np.empty_like(times, dtype=np.float64)
