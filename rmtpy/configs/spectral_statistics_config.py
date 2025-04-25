@@ -112,7 +112,7 @@ class NNLevelSpacings:
     universal_class: str = field(init=False)
 
     # Simulation parameters
-    num_bins: int = 100
+    num_bins: int = 300
     density_num: int = 1000
     x_max: int = 4
 
@@ -246,7 +246,7 @@ class SpectralFormFactors:
     sff_legend: str = r"SFF"
     csff_legend: str = r"cSFF"
     universal_legend: str = "universal"
-    xlabel: str = r"$Jt$"
+    xlabel: str = r"$Jt / j_{1,1}$"
     ylabel: str = r"$K(t)$"
     unfolded_xlabel: str = r"$\tau$"
     unfolded_ylabel: str = r"$K(\tau)$"
@@ -254,9 +254,9 @@ class SpectralFormFactors:
     # Tick settings
     has_xticklabels: bool = True
     xticklabels: Tuple[str, ...] = (
-        r"$\pi / N$",
-        r"$\pi \sqrt{D} / N$",
-        r"$\pi D / N$",
+        r"$1 / N$",
+        r"$\sqrt{D} / N$",
+        r"$D / N$",
     )
     has_unfolded_xticklabels: bool = True
     unfolded_xticklabels: Tuple[str, ...] = (
