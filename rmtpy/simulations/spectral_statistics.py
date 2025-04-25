@@ -147,7 +147,7 @@ def plot_spectral_hist(data_path: str) -> None:
     )
 
 
-def plot_nn_spacing_dist(data_path: str) -> None:
+def plot_nn_spacing_hist(data_path: str) -> None:
     """
     Plots the nearest-neighbor level spacing distribution from the given data path.
 
@@ -439,8 +439,8 @@ class SpectralStatistics(MonteCarlo):
             2: {
                 "do": 2 in self._runs,
                 "unfold": 2 in self._unfold,
-                "func": self._nn_spacing_dist,
-                "plot": plot_nn_spacing_dist,
+                "func": self._nn_spacing_hist,
+                "plot": plot_nn_spacing_hist,
                 "file": spacings_config.data_filename,
             },
             3: {
@@ -614,7 +614,7 @@ class SpectralStatistics(MonteCarlo):
         # Create histogram using levels as data
         self._create_hist(data=levels, dataclass=spectral_config, unfold=unfold)
 
-    def _nn_spacing_dist(self, levels: np.ndarray, unfold: bool = False) -> None:
+    def _nn_spacing_hist(self, levels: np.ndarray, unfold: bool = False) -> None:
         """
         Create a histogram of the nearest-neighbor level spacing sample.
 
