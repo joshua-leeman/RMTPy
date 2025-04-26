@@ -370,8 +370,6 @@ class SpectralStatistics(MonteCarlo):
 
     Methods
     -------
-    run_simulation(sim_num, levels=None)
-        Run a specific simulation and save the results.
     run()
         Run all specified simulations.
     """
