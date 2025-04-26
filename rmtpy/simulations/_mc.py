@@ -76,7 +76,7 @@ class MonteCarlo(ABC):
         workers : int, optional
             Number of workers (default is 1).
         memory : float, optional
-            Memory allocated for simulation in GiB (default is 90% of total memory).
+            Memory allocated for simulation in GiB.
         """
         # Clean ensemble name in ens_args
         ensemble["name"] = re.sub(r"\W+", "", ensemble["name"]).strip().lower()
