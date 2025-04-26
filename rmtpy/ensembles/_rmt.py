@@ -566,9 +566,14 @@ class CDOMixin:
         times: np.ndarray,
         realizs: int = 1,
         unfold: bool = False,
+        out: np.ndarray = None,
     ) -> np.ndarray:
-        # Initialize memory to store evolved states
-        evolved_states = np.empty((realizs, times.size, self.dim), dtype=self.dtype)
+        # If no output array is provided, create one
+        if out is None:
+            out = np.empty((times.size, realizs, self.dim), dtype=self.dtype)
+            return_out = True
+        else:
+            return_out = False
 
         # Loop over realizations
         for r in range(realizs):
@@ -585,19 +590,18 @@ class CDOMixin:
             rotated_state = np.matmul(eigvecs.conj().T, state)
 
             # Outer-multiply eigenvalues and times, exponentiate, then broadcast multiply
-            np.outer(times, eigvals, out=evolved_states[r, :, :])
-            np.exp(-1j * evolved_states[r, :, :], out=evolved_states[r, :, :])
-            np.multiply(
-                evolved_states[r, :, :], rotated_state, out=evolved_states[r, :, :]
-            )
+            np.outer(times, eigvals, out=out[:, r, :])
+            np.exp(-1j * out[:, r, :], out=out[:, r, :])
+            np.multiply(out[:, r, :], rotated_state, out=out[:, r, :])
 
             # Rotate back to original basis
-            np.matmul(evolved_states[r, :, :], eigvecs.T, out=evolved_states[r, :, :])
+            np.matmul(out[:, r, :], eigvecs.T, out=out[:, r, :])
 
-        # Return evolved states
-        return evolved_states.transpose(1, 0, 2)
+        # Return evolved states if no output array was provided
+        if return_out:
+            return out
 
-    def time_cdo(self, evolved_states: np.ndarray) -> np.ndarray:
+    def calculate_cdo(self, evolved_states: np.ndarray) -> np.ndarray:
         # Unpack number of realizations
         realizs = evolved_states.shape[0]
 
@@ -659,7 +663,7 @@ class CDOMixin:
 
     def cdo_probabilities(self, cdo: np.ndarray) -> np.ndarray:
         # Compute and return probabilities from CDO
-        return np.diagonal(cdo).real.T
+        return np.diagonal(cdo).real
 
     def cdo_purity(self, cdo: np.ndarray) -> np.ndarray:
         # Compute and return purity from CDO
@@ -667,10 +671,13 @@ class CDOMixin:
 
     def cdo_entropy(self, cdo: np.ndarray) -> np.ndarray:
         # Compute eigenvalues of CDO
-        eigvals = np.linalg.eigvalsh(cdo)
+        eigvals = eigvalsh(cdo, overwrite_a=True, check_finite=False, driver="evr")
+
+        # Clip eigenvalues to avoid numerical issues
+        eigvals = eigvals[eigvals > 1.0e-10]
 
         # Compute and return von Neumann entropy
-        return -np.sum(eigvals * np.log(eigvals))
+        return -np.sum(eigvals * np.log(eigvals)) / np.log(self.dim)
 
     def expectation_value(self, cdo: np.ndarray, observable: np.ndarray) -> np.ndarray:
         # Right-multiply observable with CDOs
