@@ -1,666 +1,476 @@
 # rmtpy.simulations.spectral_statistics.py
-"""
-This module contains programs for performing Monte Carlo simulations to obtain the spectral statistics of random matrix ensembles.
-It is grouped into the following sections:
-    1. Imports
-    2. Plotting Functions
-    3. Spectral Statistics Class
-    4. Main Function
-"""
 
 
-# =============================
+# =======================================
 # 1. Imports
-# =============================
+# =======================================
 # Standard library imports
-import os
+from __future__ import annotations
 from argparse import ArgumentParser
-from multiprocessing import Pool
+from dataclasses import asdict, dataclass, field
+from multiprocessing import Pool, set_start_method
 from time import time
 from typing import Any
 
 # Third-party imports
 import numpy as np
-from matplotlib.ticker import LogLocator, NullLocator
 from scipy.special import jn_zeros
 
 # Local application imports
-from rmtpy.utils import get_ensemble, _create_plot, _initialize_plot
-from rmtpy.simulations._mc import MonteCarlo
-from rmtpy.configs.spectral_statistics_config import (
-    sff_config,
-    spectral_config,
-    spacings_config,
-)
+from rmtpy.plotting.spectral_statistics.spectral_histogram import SpectralHistogram
+from rmtpy.plotting.spectral_statistics.spacings_histogram import SpacingsHistogram
+from rmtpy.plotting.spectral_statistics.form_factors_plot import FormFactorPlot
+from rmtpy.simulations._mc import MonteCarlo, _parse_mc_args
+from rmtpy.utils import get_ensemble, configure_matplotlib
 
 
-# =============================
-# 2. Plotting Functions
-# =============================
-def plot_spectral_hist(data_path: str) -> None:
-    """
-    Plots the spectral histogram from the given data path.
+# =======================================
+# 2. Functions
+# =======================================
+def spectral_histogram(levels: np.ndarray, bins: np.ndarray) -> np.ndarray:
+    """Calculate the spectral histogram counts of eigenvalue sample."""
+    # Calculate histogram counts
+    counts, _ = np.histogram(levels, bins=bins)
 
-    Parameters
-    ----------
-    data_path : str
-        Path to the data file containing histogram data.
-
-    Raises
-    ------
-    FileNotFoundError
-        If the specified path does not exist.
-    ValueError
-        If the file name does not match the expected name or if the ensemble name is not found in the path.
-    """
-
-    # Initialize plot
-    ensemble, hist_data, unfold, fig, ax = _initialize_plot(spectral_config, data_path)
-
-    # Unpack histogram data
-    hist_counts = hist_data["hist_counts"]
-    hist_edges = hist_data["hist_edges"]
-
-    # Plot histogram
-    ax.hist(
-        hist_edges[:-1],
-        bins=hist_edges,
-        weights=hist_counts,
-        color=spectral_config.hist_color,
-        alpha=spectral_config.hist_alpha,
-    )
-
-    # Create array of levels
-    energies = (
-        np.linspace(
-            -ensemble.dim / 2, ensemble.dim / 2, num=spectral_config.density_num
-        )
-        if unfold
-        else np.linspace(-ensemble.E0, ensemble.E0, num=spectral_config.density_num)
-    )
-
-    # Evaluate theoretical average spectral density
-    density = (
-        np.full_like(energies, 1 / ensemble.dim)
-        if unfold
-        else np.vectorize(ensemble.spectral_density)(energies)
-    )
-
-    # Plot theoretical average spectral density
-    ax.plot(
-        energies,
-        density,
-        color=spectral_config.curve_color,
-        linewidth=spectral_config.curve_width,
-        zorder=spectral_config.curve_zorder,
-    )
-
-    # Set limits and ticks based on unfolding
-    if unfold:
-        # Set x-axis limits
-        ax.set_xlim(
-            -spectral_config.x_range * ensemble.dim / 2,
-            spectral_config.x_range * ensemble.dim / 2,
-        )
-
-        # Set y-axis limits
-        ax.set_ylim(0, 1.5 / ensemble.dim)
-
-        # Create major ticks for x-axis
-        ax.set_xticks((-ensemble.dim / 2, 0, ensemble.dim / 2))
-
-        # Create minor ticks for x-axis
-        ax.set_xticks((-ensemble.dim / 4, ensemble.dim / 4), minor=True)
-
-        # Create major ticks for y-axis
-        ax.set_yticks((0, 0.5 / ensemble.dim, 1 / ensemble.dim))
-    else:
-        # Set x-axis limits
-        ax.set_xlim(
-            -spectral_config.x_range * ensemble.E0,
-            spectral_config.x_range * ensemble.E0,
-        )
-
-        # Adjust y-axis limits only for Poisson ensemble
-        if ensemble.__class__.__name__ == "Poisson":
-            ax.set_ylim(0, 1.5 / 2 / ensemble.N / ensemble.J)
-
-        # Create major ticks for x-axis
-        ax.set_xticks((-ensemble.E0, 0, ensemble.E0))
-
-        # Create minor ticks for x-axis
-        ax.set_xticks((-ensemble.E0 / 2, ensemble.E0 / 2), minor=True)
-
-    # Set legend title
-    legend_title = rf"{ensemble}" + ("\nunfolded" if unfold else "")
-
-    # Finish plot and save it
-    _create_plot(
-        dataclass=spectral_config,
-        data_path=data_path,
-        legend_title=legend_title,
-        fig=fig,
-        ax=ax,
-        unfold=unfold,
-    )
+    # Return counts
+    return counts
 
 
-def plot_nn_spacing_hist(data_path: str) -> None:
-    """
-    Plots the nearest-neighbor level spacing distribution from the given data path.
+def spacings_histogram(levels: np.ndarray, degen: int, bins: np.ndarray) -> np.ndarray:
+    """Calculate the nearest neighbor level spacing histogram counts."""
+    # Calculate nearest neighbor level spacings
+    spacings = np.diff(levels)
 
-    Parameters
-    ----------
-    data_path : str
-        Path to the data file containing histogram data.
+    # If degeneracy greater than one, clean spacings
+    if degen > 1:
+        # Remove near-duplicate spacings
+        spacings = spacings[1::degen]
 
-    Raises
-    ------
-    FileNotFoundError
-        If the specified path does not exist.
-    ValueError
-        If the file name does not match the expected name or if the ensemble name is not found in the path.
-    """
-    # Initialize plot
-    ensemble, hist_data, unfold, fig, ax = _initialize_plot(spacings_config, data_path)
+        # Duplicate spacings with degeneracy
+        spacings = np.repeat(spacings, degen)
 
-    # Update simulation configuration with universal class
-    spacings_config._set_universal_class(ensemble.universal_class)
+    # Calculate histogram counts
+    counts, _ = np.histogram(spacings, bins=bins)
 
-    # Unpack histogram data
-    hist_counts = hist_data["hist_counts"]
-    hist_edges = hist_data["hist_edges"]
-
-    # Plot histogram
-    ax.hist(
-        hist_edges[:-1],
-        bins=hist_edges,
-        weights=hist_counts,
-        color=spacings_config.hist_color,
-        alpha=spacings_config.hist_alpha,
-        zorder=spacings_config.hist_zorder,
-    )
-
-    # Create array of spacings values
-    spacings = np.linspace(0, spacings_config.x_max, num=spacings_config.density_num)
-
-    # Calculate Wigner surmise distribution
-    surmise = ensemble.wigner_surmise(spacings)
-
-    # Plot Wigner surmise distribution
-    ax.plot(
-        spacings,
-        surmise,
-        color=spacings_config.curve_color,
-        linewidth=spacings_config.curve_width,
-        zorder=spacings_config.curve_zorder,
-    )
-
-    # Set x-limits
-    ax.set_xlim(0, spacings_config.x_max)
-
-    # Create major ticks for x-axis
-    ax.set_xticks(spacings_config.major_xticks)
-
-    # Create minor ticks for x-axis
-    ax.set_xticks(spacings_config.minor_xticks, minor=True)
-
-    # Set legend title
-    legend_title = rf"{ensemble}" + ("\nunfolded" if unfold else "")
-
-    # Finish plot and save it
-    _create_plot(
-        dataclass=spacings_config,
-        data_path=data_path,
-        legend_title=legend_title,
-        fig=fig,
-        ax=ax,
-        unfold=unfold,
-    )
+    # Return counts and mean nn-level spacing
+    return counts
 
 
-def plot_form_factors(data_path: str) -> None:
-    """
-    Plots the spectral form factors from the given data path.
+def form_factor_moments(
+    levels: np.ndarray, times: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
+    """Calculate the spectral form factors at given times."""
+    # Determine dimension of Hilbert space from levels
+    dim = len(levels)
 
-    Parameters
-    ----------
-    data_path : str
-        Path to the data file containing form factors data.
+    # Calculate complex exponential terms
+    exp_terms = np.exp(-1j * np.outer(levels, times))
 
-    Raises
-    ------
-    FileNotFoundError
-        If the specified path does not exist.
-    ValueError
-        If the file name does not match the expected name or if the ensemble name is not found in the path.
-    """
-    # Initialize plot
-    ensemble, form_factors_data, unfold, fig, ax = _initialize_plot(
-        sff_config, data_path
-    )
+    # Calculate contribution to first moment
+    mu_1 = np.sum(exp_terms, axis=0) / dim
 
-    # Update simulation configuration with universal class
-    sff_config._set_universal_class(ensemble.universal_class)
+    # Calculate contribution to second moment
+    mu_2 = np.abs(mu_1) ** 2
 
-    # Unpack form factors data
-    times = form_factors_data["times"]
-    sff = form_factors_data["sff"]
-    csff = form_factors_data["csff"]
+    # Return spectral form factors
+    return mu_1, mu_2
 
-    # Set x- and y-scales to logarithmic
-    ax.set_xscale("log", base=ensemble.dim)
-    ax.set_yscale("log", base=ensemble.dim)
 
-    # Turn off x- and y-axis minor ticks
-    ax.xaxis.set_minor_locator(NullLocator())
-    ax.yaxis.set_minor_locator(NullLocator())
+def _worker_func(args: dict[str, Any]) -> dict[np.ndarray]:
+    """Worker function for parallel processing."""
+    # Unpack ensemble arguments
+    ens_args = args["ens_args"]
 
-    # Limit number of major ticks on x- and y-axis
-    ax.xaxis.set_major_locator(
-        LogLocator(base=ensemble.dim, numticks=sff_config.num_ticks)
-    )
-    ax.yaxis.set_major_locator(
-        LogLocator(base=ensemble.dim, numticks=sff_config.num_ticks)
-    )
+    # Find and initialize ensemble
+    ensemble = get_ensemble(ens_args)
 
-    # Plot spectral form factor
-    ax.plot(
-        times,
-        sff,
-        color=sff_config.sff_color,
-        linewidth=sff_config.sff_width,
-        alpha=sff_config.sff_alpha,
-        zorder=sff_config.sff_zorder,
-    )
+    # Unpack number of realizations
+    realizs = args["realizs"]
 
-    # Plot connected spectral form factor
-    ax.plot(
-        times,
-        csff,
-        color=sff_config.csff_color,
-        linewidth=sff_config.csff_width,
-        alpha=sff_config.csff_alpha,
-        zorder=sff_config.csff_zorder,
-    )
+    # Initialize configuration
+    config = Config(**args["config"])
 
-    # Store first positive zero of the Bessel function of the first kind
+    # Spectral histogram bin edges
+    spec_bin_edges = config._create_spec_bins() * ensemble.E0
+
+    # Initialize spectral histogram
+    spec_hist = np.zeros(config.spec_num_bins)
+
+    # Unfolded spectral histogram bin edges
+    unf_spec_bin_edges = config._create_spec_bins() * ensemble.dim / 2
+
+    # Initialize unfolded spectral histogram
+    unf_spec_hist = np.zeros(config.spec_num_bins)
+
+    # Estimate global mean level spacing
+    global_mean_spacing = 2 * ensemble.E0 / ensemble.dim
+
+    # Nearest neighbor level spacing bin edges
+    spac_bin_edges = config._create_spac_bins() * global_mean_spacing
+
+    # Initialize nearest neighbor level spacing histogram
+    spac_hist = np.zeros(config.spac_num_bins)
+
+    # Unfolded nearest neighbor level spacing bin edges
+    unf_spac_bin_edges = config._create_spac_bins()
+
+    # Initialize unfolded nearest neighbor level spacing histogram
+    unf_spac_hist = np.zeros(config.spac_num_bins)
+
+    # Store first positive zero of 1st Bessel function
     j_1_1 = jn_zeros(1, 1)[0]
 
-    # Create tick time values
-    tick_times = (
-        np.logspace(
-            start=sff_config.unfolded_logtime_min,
-            stop=sff_config.unfolded_logtime_max,
-            num=sff_config.num_ticks,
-            base=ensemble.dim,
+    # Create times array
+    times = config._create_times_array(base=ensemble.dim)
+    times *= j_1_1 / ensemble.E0
+
+    # Initialize spectral form factor moments
+    mu_1 = np.zeros(config.num_times, dtype=np.complex128)
+    mu_2 = np.zeros(config.num_times, dtype=np.float64)
+
+    # Create unfolded times array
+    unf_times = config._create_unf_times_array(base=ensemble.dim)
+    unf_times *= 2 * np.pi
+
+    # Initialize unfolded spectral form factors
+    unf_mu_1 = np.zeros(config.num_times, dtype=np.complex128)
+    unf_mu_2 = np.zeros(config.num_times, dtype=np.float64)
+
+    # Loop over spectrum realizations and calculate statistics
+    for eigvals in ensemble.eigvals_stream(realizs):
+        # Calculate and accumulate spectral histogram
+        spec_hist += spectral_histogram(eigvals, spec_bin_edges)
+
+        # Calculate and accumulate nearest neighbor level spacings
+        spac_hist += spacings_histogram(eigvals, ensemble.degen, spac_bin_edges)
+
+        # Calculate and accumulate spectral form factors
+        moments = form_factor_moments(eigvals, times)
+        mu_1 += moments[0]
+        mu_2 += moments[1]
+
+        # Unfold spectrum
+        eigvals = ensemble.unfold(eigvals)
+
+        # Calculate and accumulate unfolded spectral histogram
+        unf_spec_hist += spectral_histogram(eigvals, unf_spec_bin_edges)
+
+        # Calculate and accumulate unfolded nearest neighbor level spacings
+        unf_spac_hist += spacings_histogram(eigvals, ensemble.degen, unf_spac_bin_edges)
+
+        # Calculate and accumulate unfolded spectral form factors
+        unf_moments = form_factor_moments(eigvals, unf_times)
+        unf_mu_1 += unf_moments[0]
+        unf_mu_2 += unf_moments[1]
+
+    # Return results
+    return {
+        "spec_hist": spec_hist,
+        "unf_spec_hist": unf_spec_hist,
+        "spac_hist": spac_hist,
+        "unf_spac_hist": unf_spac_hist,
+        "mu_1": mu_1,
+        "mu_2": mu_2,
+        "unf_mu_1": unf_mu_1,
+        "unf_mu_2": unf_mu_2,
+    }
+
+
+# =======================================
+# 3. Configuration Dataclass
+# =======================================
+@dataclass(repr=False, eq=False, kw_only=True, slots=True)
+class Config:
+    # Spectral histogram simulation parameters
+    spec_num_bins: int = 50
+    spec_i: float = -1.2  # factor of E0 or D/2
+    spec_f: float = 1.2  # factor of E0 or D/2
+    spec_filename: str = "spectrum"
+
+    # NN-level spacing simulation parameters
+    spac_num_bins: int = 50
+    spac_i: float = 0.0  # factor of global mean
+    spac_f: float = 4.0  # factor of global mean
+    spac_filename: str = "spacings"
+
+    # SFF simulation parameters
+    num_times: int = 5000
+    logtime_i: float = -0.5  # base = dim
+    logtime_f: float = 1.5  # base = dim
+    unf_logtime_i: float = -1.5  # base = dim
+    unf_logtime_f: float = 0.5  # base = dim
+    sff_filename: str = "form_factors"
+
+    def _create_spec_bins(self) -> np.ndarray:
+        """Create spectral histogram bin edges."""
+        return np.linspace(self.spec_i, self.spec_f, self.spec_num_bins + 1)
+
+    def _create_spac_bins(self) -> np.ndarray:
+        """Create nearest neighbor level spacing bin edges."""
+        return np.linspace(self.spac_i, self.spac_f, self.spac_num_bins + 1)
+
+    def _create_times_array(self, base: float) -> np.ndarray:
+        """Create times array."""
+        return np.logspace(
+            self.logtime_i, self.logtime_f, self.num_times, base=base, dtype=np.float64
+        )
+
+    def _create_unf_times_array(self, base: float) -> np.ndarray:
+        """Create unfolded times array."""
+        return np.logspace(
+            self.unf_logtime_i,
+            self.unf_logtime_f,
+            self.num_times,
+            base=base,
             dtype=np.float64,
         )
-        * (2 * np.pi)
-        if unfold
-        else np.logspace(
-            start=sff_config.logtime_min,
-            stop=sff_config.logtime_max,
-            num=sff_config.num_ticks,
-            base=ensemble.dim,
-            dtype=np.float64,
-        )
-        * (2 * j_1_1)
-        / (2 * ensemble.N * ensemble.J)
-    )
-
-    # Add content to plot based on unfolding
-    if not unfold:
-        # Create major x-axis grid lines
-        ax.vlines(
-            tick_times[1:-1],
-            ymin=ensemble.dim**-3,
-            ymax=ensemble.dim,
-            color=sff_config.grid_color,
-            linestyle=sff_config.grid_linestyle,
-            linewidth=sff_config.grid_linewidth,
-            zorder=sff_config.grid_zorder,
-        )
-    else:
-        # Calculate universal connected spectral form factor
-        universal_csff = np.vectorize(ensemble.universal_csff)(times)
-
-        # Plot universal connected spectral form factor
-        ax.plot(
-            times,
-            universal_csff,
-            color=sff_config.universal_color,
-            linewidth=sff_config.universal_width,
-            zorder=sff_config.universal_zorder,
-        )
-
-    # Set x-axis limits
-    ax.set_xlim(tick_times[0], tick_times[-1])
-
-    # Create ticks for x-axis
-    ax.set_xticks(tick_times[1:-1])
-
-    # Set y-limits
-    ax.set_ylim(ensemble.dim**sff_config.logy_min, ensemble.dim**sff_config.logy_max)
-
-    # Create ticks for y-axis
-    ax.set_yticks([ensemble.dim**i for i in range(-2, 1)])
-
-    # Set legend title
-    legend_title = rf"{ensemble}" + ("\nunfolded" if unfold else "")
-
-    # Finish plot and save it
-    _create_plot(
-        dataclass=sff_config,
-        data_path=data_path,
-        legend_title=legend_title,
-        fig=fig,
-        ax=ax,
-        unfold=unfold,
-    )
 
 
-# =============================
-# 3. Spectral Statistics Class
-# =============================
+# =======================================
+# 4. Simulation Class
+# =======================================
+@dataclass(repr=False, eq=False, kw_only=True, slots=True)
 class SpectralStatistics(MonteCarlo):
-    """
-    SpectralStatistics class for performing Monte Carlo simulations to obtain spectral statistics of random matrix ensembles.
-    Inherits from the MonteCarlo class.
+    # Configuration
+    config: Config = field(default_factory=Config)
 
-    Methods
-    -------
-    run()
-        Run all specified simulations.
-    """
+    def run(self) -> None:
+        """Run the spectral statistics simulation."""
+        # Start timer
+        start_time = time()
 
-    @staticmethod
-    def _worker_func(args: dict) -> np.ndarray:
-        """
-        Worker function to run the simulation on separate processes.
+        # Create arguments for workers
+        worker_args = self._create_worker_args()
 
-        Parameters
-        ----------
-        args : dict
-            Dictionary containing ensemble and simulation arguments.
+        # Run workers in parallel
+        with Pool(processes=self.workers) as pool:
+            results = pool.map(_worker_func, worker_args)  # type: ignore
 
-        Returns
-        -------
-        np.ndarray
-            Eigenvalue sample from the simulation.
-        """
-        # Unpack the arguments
-        ens_args = args["ens_args"]
-        sim_args = args["sim_args"]
+        # Process spectral histograms
+        self._process_spectral_histograms(results)
 
-        # Copy ensemble arguments and pop name
-        ens_inputs = ens_args.copy()
-        ens_inputs.pop("name")
+        # Process nearest neighbor level spacings
+        self._process_spacing_histograms(results)
 
-        # Initialize ensemble
-        ensemble = get_ensemble(ens_args["name"], **ens_inputs)
+        # Process spectral form factors
+        self._process_form_factors(results)
 
-        # Unpack simulation arguments
-        realizs = sim_args["realizs"]
+        # End timer and print elapsed time
+        elapsed_time = time() - start_time
+        print(f"Elapsed time: {elapsed_time:.2f} seconds")
 
-        # Return eigenvalues
-        return ensemble.eigval_sample(realizs=realizs)
-
-    def _realize_eigvals(self) -> np.ndarray:
-        """
-        Divides the number of realizations among workers and runs the simulation in parallel.
-
-        Returns
-        -------
-        np.ndarray
-            Eigenvalue sample from the simulation.
-        """
+    def _create_worker_args(self) -> list[dict[str, Any]]:
+        """Create arguments for workers."""
         # Calculate realizations per worker and remainder
         realizs_per_worker, remainder = divmod(self.realizs, self.workers)
 
-        # Initialize realization array
-        realizs_array = np.full(self.workers, realizs_per_worker, dtype=int)
+        # Initialize realizations list
+        realizs_array = np.full(self.workers, realizs_per_worker)
 
         # Distribute remainder realizations
         realizs_array[:remainder] += 1
 
-        # Create list of worker arguments
+        # Create dictionary representation of ensemble
+        ens_args = self.ensemble._to_dict_str()
+
+        # Create list of worker arguments as list of dictionaries
         worker_args = [
-            {"ens_args": self._ens_args, "sim_args": {"realizs": realizs_array[i]}}
+            {
+                "ens_args": ens_args,
+                "realizs": realizs_array[i],
+                "config": asdict(self.config),
+            }
             for i in range(self.workers)
         ]
 
-        # Run workers in parallel
-        with Pool(processes=self.workers) as pool:
-            eigenvals = np.vstack(pool.map(self._worker_func, worker_args))  # type: ignore
+        # Return list of worker arguments
+        return worker_args
 
-        # Return eigenvalues
-        return eigenvals
+    def _process_spectral_histograms(self, results: dict) -> None:
+        """Process spectral histograms."""
+        # Spectral histogram bin edges
+        bins = self.config._create_spec_bins() * self.E0
 
-    def _create_hist(
-        self, data: np.ndarray, dataclass: Any, unfold: bool = False
-    ) -> None:
-        """
-        Creates a histogram from the given data and saves it to a file.
+        # Unfolded spectral histogram bin edges
+        unf_bins = self.config._create_spec_bins() * self.dim / 2
 
-        Parameters
-        ----------
-        data : np.ndarray
-            Data to create the histogram from.
-        dataclass : Any
-            Configuration class containing histogram parameters.
-        """
-        # Calculate normalized histogram of data
-        hist_counts, hist_edges = np.histogram(
-            data, bins=dataclass.num_bins, density=True
-        )
+        # Combine spectral histogram
+        spec_hist = np.sum([res["spec_hist"] for res in results], axis=0)
 
-        # Create output directory
-        output_dir = self._create_output_dir(res_type="data")
+        # Combine unfolded spectral histogram
+        unf_spec_hist = np.sum([res["unf_spec_hist"] for res in results], axis=0)
 
-        # Create results path based on unfolding
-        if unfold:
-            data_path = os.path.join(output_dir, dataclass.unfolded_data_filename)
-        else:
-            data_path = os.path.join(output_dir, dataclass.data_filename)
+        # Normalize histograms
+        spec_hist /= np.sum(spec_hist * np.diff(bins))
+        unf_spec_hist /= np.sum(unf_spec_hist * np.diff(unf_bins))
 
-        # Save histogram data
-        np.savez_compressed(
-            data_path,
-            hist_counts=hist_counts,
-            hist_edges=hist_edges,
-        )
+        # Store spectral histogram data file name
+        path = f"{self.output_dir}/{self.config.spec_filename}.npz"
 
-        # Return results path
-        return data_path
+        # Store unfolded spectral histogram data file name
+        unf_path = f"{self.output_dir}/{self.config.spec_filename}_unfolded.npz"
 
-    def spectral_hist(self, levels: np.ndarray, unfold: bool = False) -> str:
-        """
-        Create a histogram of the eigenvalue sample.
+        # Save spectral histogram to compressed file
+        np.savez_compressed(path, bin_edges=bins, counts=spec_hist)
 
-        Parameters
-        ----------
-        levels : np.ndarray
-            Eigenvalue sample.
-        unfold : bool, optional
-            Whether to unfold eigenvalues (default is False).
+        # Save unfolded spectral histogram to compressed file
+        np.savez_compressed(unf_path, bin_edges=unf_bins, counts=unf_spec_hist)
 
-        Returns
-        -------
-        str
-            Path to the saved eigenvalue histogram data file.
-        """
-        # Create histogram using levels as data
-        data_path = self._create_hist(
-            data=levels, dataclass=spectral_config, unfold=unfold
-        )
+        # Initialize spectral histogram
+        plot = SpectralHistogram(data_path=path, unfold=False)
 
-        # Return results path
-        return data_path
+        # Plot spectral histogram
+        plot.plot()
 
-    def nn_spacing_hist(self, levels: np.ndarray, unfold: bool = False) -> str:
-        """
-        Create a histogram of the nearest-neighbor level spacing sample.
+        # Initialize unfolded spectral histogram
+        unf_plot = SpectralHistogram(data_path=unf_path, unfold=True)
 
-        Parameters
-        ----------
-        levels : np.ndarray
-            Eigenvalue sample.
+        # Plot unfolded spectral histogram
+        unf_plot.plot()
 
-        Returns
-        -------
-        str
-            Path to the saved nearest-neighbor spacing data file.
-        """
-        # Calculate nearst neighbor spacings
-        spacings = self.ensemble.nn_spacings(levels=levels)
+    def _process_spacing_histograms(self, results: dict) -> None:
+        """Process nearest neighbor level spacing histograms."""
+        # Estimate global mean level spacing
+        global_mean_spacing = 2 * self.E0 / self.dim
 
-        # If unfolding is not requested, divide spacings by effective mean level spacing
-        if not unfold:
-            spacings /= np.mean(spacings) / self.ensemble.degen
+        # Nearest neighbor level spacing bin edges
+        bins = self.config._create_spac_bins() * global_mean_spacing
 
-        # Create histogram using spacings as data
-        data_path = self._create_hist(
-            data=spacings, dataclass=spacings_config, unfold=unfold
-        )
+        # Unfolded nearest neighbor level spacing bin edges
+        unf_bins = self.config._create_spac_bins()
 
-        # Return results path
-        return data_path
+        # Combine nearest neighbor level spacing histogram
+        spac_hist = np.sum([res["spac_hist"] for res in results], axis=0)
 
-    def form_factors(self, levels: np.ndarray, unfold: bool = False) -> str:
-        """
-        Create a plot of the spectral form factors versus time.
+        # Combine unfolded nearest neighbor level spacing histogram
+        unf_spac_hist = np.sum([res["unf_spac_hist"] for res in results], axis=0)
 
-        Parameters
-        ----------
-        levels : np.ndarray
-            Eigenvalue sample.
-        unfold : bool, optional
-            Whether to unfold eigenvalues (default is False).
+        # Normalize histograms
+        spac_hist /= np.sum(spac_hist * np.diff(bins))
+        unf_spac_hist /= np.sum(unf_spac_hist * np.diff(unf_bins))
 
-        Returns
-        -------
-        str
-            Path to the saved form factors data file.
-        """
-        # Store first positive zero of the Bessel function of the first kind
+        # Store spectral histogram data file name
+        path = f"{self.output_dir}/{self.config.spac_filename}.npz"
+
+        # Store unfolded spectral histogram data file name
+        unf_path = f"{self.output_dir}/{self.config.spac_filename}_unfolded.npz"
+
+        # Save nearest neighbor level spacing histogram to compressed file
+        np.savez_compressed(path, bin_edges=bins, counts=spac_hist)
+
+        # Save unfolded nearest neighbor level spacing histogram to compressed file
+        np.savez_compressed(unf_path, bin_edges=unf_bins, counts=unf_spac_hist)
+
+        # Initialize spectral histogram
+        plot = SpacingsHistogram(data_path=path, unfold=False)
+
+        # Plot spectral histogram
+        plot.plot()
+
+        # Initialize unfolded spectral histogram
+        unf_plot = SpacingsHistogram(data_path=unf_path, unfold=True)
+
+        # Plot unfolded spectral histogram
+        unf_plot.plot()
+
+    def _process_form_factors(self, results: dict) -> None:
+        """Process spectral form factors."""
+        # Store first positive zero of 1st Bessel function
         j_1_1 = jn_zeros(1, 1)[0]
 
-        # Create logtime array depending on unfolding
-        times = (
-            np.logspace(
-                sff_config.unfolded_logtime_min,
-                sff_config.unfolded_logtime_max,
-                sff_config.num_logtimes,
-                base=self.ensemble.dim,
-                dtype=np.float64,
-            )
-            * (2 * np.pi)
-            if unfold
-            else np.logspace(
-                start=sff_config.logtime_min,
-                stop=sff_config.logtime_max,
-                num=sff_config.num_logtimes,
-                base=self.ensemble.dim,
-                dtype=np.float64,
-            )
-            * (2 * j_1_1)
-            / (2 * self.ensemble.N * self.ensemble.J)
-        )
+        # Recreate times array
+        times = self.config._create_times_array(base=self.dim)
+        times *= j_1_1 / self.E0
 
-        # Allocate memory for form factors
-        sff = np.empty_like(times, dtype=np.float64)
-        csff = np.empty_like(times, dtype=np.float64)
+        # Recreate unfolded times array
+        unf_times = self.config._create_unf_times_array(base=self.dim)
+        unf_times *= 2 * np.pi
 
-        # Loop over chunks and evaluate form factors
-        for i, time in enumerate(times):
-            # Calculate form factors for the current chunk
-            sff[i : i + 1], csff[i : i + 1] = self.ensemble.form_factors(
-                time=time, levels=levels
-            )
+        # Combine spectral form factor moments
+        mu_1 = np.sum([res["mu_1"] for res in results], axis=0)
+        mu_2 = np.sum([res["mu_2"] for res in results], axis=0)
 
-        # Create output directory
-        output_dir = self._create_output_dir(res_type="data")
+        # Combine unfolded spectral form factor moments
+        unf_mu_1 = np.sum([res["unf_mu_1"] for res in results], axis=0)
+        unf_mu_2 = np.sum([res["unf_mu_2"] for res in results], axis=0)
 
-        # Create results path based on unfolding
-        if unfold:
-            data_path = os.path.join(output_dir, sff_config.unfolded_data_filename)
-        else:
-            data_path = os.path.join(output_dir, sff_config.data_filename)
+        # Calculate spectral form factors
+        sff = mu_2 / self.realizs
+        csff = sff - np.abs(mu_1) ** 2 / self.realizs**2
 
-        # Save form factors data
-        np.savez_compressed(
-            data_path,
-            times=times,
-            sff=sff,
-            csff=csff,
-        )
+        # Calculate unfolded spectral form factors
+        unf_sff = unf_mu_2 / self.realizs
+        unf_csff = unf_sff - np.abs(unf_mu_1) ** 2 / self.realizs**2
 
-        # Return results path
-        return data_path
+        # Store spectral histogram data file name
+        path = f"{self.output_dir}/{self.config.sff_filename}.npz"
 
-    def run(self) -> None:
-        """
-        Run all specified simulations.
-        """
-        # Start timer
-        start_time = time()
+        # Store unfolded spectral histogram data file name
+        unf_path = f"{self.output_dir}/{self.config.sff_filename}_unfolded.npz"
 
-        # Realize eigenvalues
-        levels = self._realize_eigvals()
+        # Save spectral form factors to compressed file
+        np.savez_compressed(path, times=times, sff=sff, csff=csff)
 
-        for unfold in (False, True):
-            # Unfold eigenvalues if requested
-            if unfold:
-                # Unfold eigenvalues
-                levels = self.ensemble.unfold(levels)
+        # Save unfolded spectral form factors to compressed file
+        np.savez_compressed(unf_path, times=unf_times, sff=unf_sff, csff=unf_csff)
 
-            # Create histogram of eigenvalues
-            data_path = self.spectral_hist(levels=levels, unfold=unfold)
-            plot_spectral_hist(data_path=data_path)
+        # Initialize spectral histogram
+        plot = FormFactorPlot(data_path=path, unfold=False)
 
-            # Create histogram of nearest-neighbor spacings
-            data_path = self.nn_spacing_hist(levels=levels, unfold=unfold)
-            plot_nn_spacing_hist(data_path=data_path)
+        # Plot spectral histogram
+        plot.plot()
 
-            # Create plot of spectral form factors
-            data_path = self.form_factors(levels=levels, unfold=unfold)
-            plot_form_factors(data_path=data_path)
+        # Initialize unfolded spectral histogram
+        unf_plot = FormFactorPlot(data_path=unf_path, unfold=True)
 
-        # Stop timer and store elapsed time
-        elapsed_time = time() - start_time
+        # Plot unfolded spectral histogram
+        unf_plot.plot()
 
-        # Print elapsed time
-        print(f"Spectral statistics completed in {elapsed_time:.2f} seconds.")
+    def _worker_memory(self) -> float:
+        """Calculate the memory required for each worker in GiB."""
+        # Amount of memory required to store a random matrix
+        matrix_memory = self.ensemble.matrix_memory
 
-    @property
-    def calc_memory(self) -> int:
-        """
-        Memory required for the simulation in bytes.
-        """
-        return self.ensemble.matrix_memory + 300 * np.sqrt(self.ensemble.matrix_memory)
+        # Amount of residual memory required to generate matrices
+        resid_memory = self.ensemble.resid_memory
+
+        # Amount of workspace memory required for each calculation
+        work_memory = 36 * self.ensemble.dtype.itemsize * self.ensemble.dim
+
+        # Return the total memory required for each worker in GiB
+        return (matrix_memory + resid_memory + work_memory) / 2**30
+
+    def _workspace_memory(self) -> float:
+        """Calculate the actual workspace memory available in GiB."""
+        # No shared memory, so return memory as is
+        return self.memory
 
 
-# =============================
-# 4. Main Function
-# =============================
+# =======================================
+# 5. Main Function
+# =======================================
 def main() -> None:
-    """
-    Main function to run the Spectral Statistics Monte Carlo simulation from the command line.
-    """
+    """Main function to run the spectral statistics simulation."""
     # Create argument parser
-    parser = ArgumentParser(description="Spectral Statistics Monte Carlo")
+    parser = ArgumentParser(description="Spectral Statistics Monte Carlo Simulation")
 
-    # Retrieve Monte Carlo arguments
-    mc_args = SpectralStatistics._parse_args(parser)
+    # Parse command line arguments
+    mc_args = _parse_mc_args(parser)
 
-    # Initialize spectral statistics simulation class
+    # Create an instance of the SpectralStatistics class
     mc = SpectralStatistics(**mc_args)
 
-    # Run spectral statistics simulation
+    # Run simulation
     mc.run()
 
 
-# Run the main function
+# If this script is run directly, execute main function
 if __name__ == "__main__":
+    # Avoid spawning issues on Windows
+    set_start_method("fork", force=True)
+
+    # Configure matplotlib
+    configure_matplotlib()
+
+    # Run main function
     main()
