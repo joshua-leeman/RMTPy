@@ -1,131 +1,160 @@
 # rmtpy.ensembles.poisson.py
-"""
-This module contains the programs defining the Poisson ensemble.
-It is grouped into the following sections:
-    1. Imports
-    2. Attributes
-    3. Ensemble Class
-"""
 
 
-# =============================
+# =======================================
 # 1. Imports
-# =============================
+# =======================================
+# Standard library imports
+from __future__ import annotations
+from dataclasses import dataclass, field
+from typing import Callable, Iterator, Optional
+
 # Third-party imports
 import numpy as np
+from scipy.linalg import eigh, eigvalsh
+from scipy.linalg.lapack import get_lapack_funcs
 
 # Local application imports
-from ._rmt import Ensemble
+from rmtpy.ensembles._rmt import ManyBodyEnsemble
 
 
-# =============================
-# 2. Attributes
-# =============================
-# Class name for dynamic imports
+# =======================================
+# 2. Ensemble
+# =======================================
+# Store class name for module
 class_name = "Poisson"
 
-# Dyson index
-beta = 0
 
-# Degeneracy of eigenvalues
-degen = 1
+# Define Poisson class
+@dataclass(repr=False, eq=False, frozen=True, kw_only=True, slots=True)
+class Poisson(ManyBodyEnsemble):
+    """The Poisson class."""
 
+    # Dyson index
+    beta: int = field(init=False, default=0)
 
-# =============================
-# 3. Ensemble Class
-# =============================
-class Poisson(Ensemble):
-    """
-    The Poisson ensemble class.
-    Inherits from the Ensemble class.
+    # Complex standard deviation of matrix elements
+    sigma: Optional[float] = field(init=False, default=None)
 
-    Attributes
-    ----------
-    sigma : float
-        Standard deviation of the real eigenvalues.
+    # Low-level QR routines
+    _zgeqrf: Optional[Callable] = None
+    _zungqr: Optional[Callable] = None
 
-    Methods
-    -------
-    generate() -> np.ndarray
-        Generate a random matrix from the Poisson ensemble.
-    """
+    def __post_init__(self) -> None:
+        """Finalize the initialization of the Poisson class."""
+        # Call parent class __post_init__
+        super(Poisson, self).__post_init__()
 
-    def __init__(
-        self,
-        N: int = None,
-        dim: int = None,
-        J: float = 1.0,
-        dtype: type = np.complex128,
-    ) -> None:
-        """
-        Initialize the Poisson Ensemble.
+        # Set low-level QR routines
+        object.__setattr__(self, "_zgeqrf", get_lapack_funcs("geqrf", dtype=self.dtype))
+        object.__setattr__(self, "_zungqr", get_lapack_funcs("ungqr", dtype=self.dtype))
 
-        Parameters
-        ----------
-        N : int, optional
-            Number of Majorana fermions
-        dim : int, optional
-            Dimension of the matrix
-        J : float, optional
-            Energy scale of interactions (default is 1.0)
-        dtype : type, optional
-            Data type of the matrix elements (default is np.complex128)
-        """
-        # Set degeneracy of eigenvalues
-        self._degen = degen
+        # Calculate and set complex standard deviation
+        object.__setattr__(self, "sigma", 2 * self.E0)
 
-        # Set Dyson index
-        self._beta = beta
+    def randm(self, out: Optional[np.ndarray] = None) -> np.ndarray:
+        """Generate a random matrix from the Poisson ensemble."""
+        # If out is None, allocate memory for matrix
+        if out is None:
+            U = np.empty((self.dim, self.dim), dtype=self.dtype, order="F")
+        else:
+            U = out
 
-        # Initialize RMT ensemble
-        super().__init__(N=N, dim=dim, J=J, dtype=dtype)
+        # Allocate memory for eigenvalues
+        eigvals = np.empty(self.dim, dtype=self.real_dtype, order="F")
 
-        # Calculate standard deviation of non-zero diagonal matrix elements
-        self._sigma = 2 * self.N * self.J
+        # Build complex Ginibre matrix
+        U.real = self._rng.standard_normal((self.dim, self.dim), dtype=self.real_dtype)
+        U.imag = self._rng.standard_normal((self.dim, self.dim), dtype=self.real_dtype)
+        U /= np.sqrt(2)
 
-    def generate(self) -> np.ndarray:
-        """
-        Return a random matrix from the Poisson ensemble.
+        # Perform in-place QR decomposition
+        qr_fact, tau, _, _ = self._zgeqrf(U, overwrite_a=True)
+        U, _, _ = self._zungqr(qr_fact, tau, overwrite_a=True)
 
-        Returns
-        -------
-        np.ndarray
-            Random matrix from the Poisson ensemble.
-        """
-        # Generate standard uniformly-distributed random eigenvalues
-        eigvals = self._rng.random(self.dim, dtype=self.real_dtype)
-
-        # Shift and scale eigenvalues by standard deviation in place
+        # Generate iid uniform random eigenvalues
+        eigvals[:] = self._rng.random(self.dim, dtype=self.real_dtype)
         eigvals -= 0.5
-        eigvals *= self._sigma
+        eigvals *= self.sigma
 
-        # Return diagonal matrix with eigenvalues
-        return np.diag(eigvals).astype(self.dtype)
+        # Calculate Poisson ensemble matrix
+        np.dot(U, U.conj().T * eigvals[:, None], out=out)
 
-    def spectral_density(self, eigval: float) -> float:
-        """
-        Calculate the mean spectral density at a given eigenvalue.
+        # Return Poisson ensemble matrix
+        return out
 
-        Parameters
-        ----------
-        eigval : float
-            Eigenvalue at which to calculate the spectral density.
+    def eig_stream(self, realizs: int) -> Iterator[tuple[np.ndarray, np.ndarray]]:
+        """Iterator to stream eigensystem realizations."""
+        # Allocate memory for random eigenvalues and eigenvectors
+        eigvals = np.empty(self.dim, dtype=self.real_dtype, order="F")
+        U = np.empty((self.dim, self.dim), dtype=self.dtype, order="F")
 
-        Returns
-        -------
-        float
-            Mean spectral density at the given eigenvalue.
-        """
-        # Return zero if eigenvalue is outside support
-        if eigval < -self.N * self.J or eigval > self.N * self.J:
-            return 0.0
+        # Loop over realizations
+        for _ in range(realizs):
+            # Generate iid uniform random eigenvalues
+            self._rng.random(self.dim, dtype=self.real_dtype, out=eigvals)
+            eigvals -= 0.5
+            eigvals *= self.sigma
 
-        # Calculate mean spectral density
-        return 1.0 / 2 / self.N / self.J
+            # Build complex Ginibre matrix
+            U.real = self._rng.standard_normal(
+                (self.dim, self.dim), dtype=self.real_dtype
+            )
+            U.imag = self._rng.standard_normal(
+                (self.dim, self.dim), dtype=self.real_dtype
+            )
+            U /= np.sqrt(2)
 
-    @property
-    def sigma(self) -> float:
-        """
-        Standard deviation of the real eigenvalues.
-        """
-        return self._sigma
+            # Perform in-place QR decomposition
+            qr_fact, tau, _, _ = self._zgeqrf(U, overwrite_a=True)
+            U, _, _ = self._zungqr(qr_fact, tau, overwrite_a=True)
+
+            # Sort eigenvalues
+            eigvals.sort()
+
+            # Yield eigenvalues and eigenvectors
+            yield eigvals, U
+
+    def eigvals_stream(self, realizs: int) -> Iterator[np.ndarray]:
+        """Iterator to stream spectrum realizations."""
+        # Allocate memory for random eigenvalues
+        eigvals = np.empty(self.dim, dtype=self.real_dtype, order="F")
+
+        # Loop over realizations
+        for _ in range(realizs):
+            # Generate iid uniform random eigenvalues
+            self._rng.random(self.dim, dtype=self.real_dtype, out=eigvals)
+            eigvals -= 0.5
+            eigvals *= self.sigma
+
+            # Sort eigenvalues
+            eigvals.sort()
+
+            # Yield sorted eigenvalues
+            yield eigvals
+
+    def pdf(self, eigval: np.ndarray) -> np.ndarray:
+        """Probability density function of the Poisson ensemble."""
+        # Initialize distribution with zeros
+        pdf = np.zeros_like(eigval, dtype=self.real_dtype)
+
+        # Calculate non-zero elements
+        pdf[np.abs(eigval) < self.E0] = 1 / 2 / self.E0
+
+        # Return probability density function
+        return pdf
+
+    def cdf(self, eigval: np.ndarray) -> np.ndarray:
+        """Cumulative distribution function of the Poisson ensemble."""
+        # Initialize distribution with zeros
+        cdf = np.zeros_like(eigval, dtype=self.real_dtype)
+
+        # Calculate non-trivial elements
+        mask = np.abs(eigval) < self.E0
+        cdf[mask] = eigval[mask] / (2 * self.E0) + 0.5
+
+        # Calculate remaining elements
+        cdf[eigval > self.E0] = 1.0
+
+        # Return cumulative distribution function
+        return cdf
