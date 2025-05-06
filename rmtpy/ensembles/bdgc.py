@@ -1,90 +1,46 @@
 # rmtpy.ensembles.bdgc.py
-"""
-This module contains the programs defining the Bogoliubov-de Gennes C Ensemble (BdG(C)).
-It is grouped into the following sections:
-    1. Imports
-    2. Attributes
-    3. Ensemble Class
-"""
 
-# =============================
+
+# =======================================
 # 1. Imports
-# =============================
+# =======================================
+# Standard library imports
+from __future__ import annotations
+from dataclasses import dataclass, field
+from typing import Optional
+
 # Third-party imports
 import numpy as np
 
 # Local application imports
-from ._rmt import Tenfold
+from rmtpy.ensembles._rmt import GaussianEnsemble
 
 
-# =============================
-# 2. Attributes
-# =============================
-# Class name for dynamic imports
+# =======================================
+# 2. Ensemble
+# =======================================
+# Store class name for module
 class_name = "BdGC"
 
-# Dyson index
-beta = 2
 
-# Degeneracy of eigenvalues
-degen = 1
+# Define Bogoliubov-de Gennes C Ensemble (BdG(C)) class
+@dataclass(repr=False, eq=False, frozen=True, kw_only=True, slots=True)
+class BdGC(GaussianEnsemble):
+    """Bogoliubov-de Gennes C Ensemble (BdG(C)) class."""
 
+    # Dyson index
+    beta: int = field(init=False, default=2)
 
-# =============================
-# 3. Ensemble Class
-# =============================
-class BdGC(Tenfold):
-    """
-    The Bogoliubov-de Gennes C Ensemble (BdG(C)) class.
-    Inherits from the Tenfold class.
+    def randm(self, out: Optional[np.ndarray] = None) -> np.ndarray:
+        """Generate a random matrix from the BdGC ensemble."""
+        # If out is None, allocate memory for matrix
+        if out is None:
+            H = np.empty((self.dim, self.dim), dtype=self.dtype, order="F")
+        else:
+            H = out
 
-    Methods
-    -------
-    generate() -> np.ndarray
-        Generate a random matrix from the BdG(C).
-    """
-
-    def __init__(
-        self,
-        N: int = None,
-        dim: int = None,
-        J: float = 1.0,
-        dtype: type = np.complex128,
-    ) -> None:
-        """
-        Initialize the Bogoliubov-de Gennes C Ensemble (BdG(C)).
-
-        Parameters
-        ----------
-        N : int, optional
-            Number of Majorana fermions
-        dim : int, optional
-            Dimension of the matrix
-        J : float, optional
-            Energy scale of interactions (default is 1.0)
-        dtype : type, optional
-            Data type of the matrix elements (default is np.complex128)
-        """
-        # Set degeneracy of eigenvalues
-        self._degen = degen
-
-        # Initialize tenfold ensemble
-        super().__init__(beta=beta, N=N, dim=dim, J=J, dtype=dtype)
-
-    def generate(self) -> np.ndarray:
-        """
-        Return a random matrix from the BdG(C).
-
-        Returns
-        -------
-        np.ndarray
-            Random matrix from the BdG(C).
-        """
         # Compute block dimension
         bdim = self.dim // 2
-
-        # Allocate memory for BdG(C) matrix
-        H = np.empty((self.dim, self.dim), dtype=self.dtype)
 
         # Generate GUE in top-left block
         H[:bdim, :bdim].real = self._rng.standard_normal(
