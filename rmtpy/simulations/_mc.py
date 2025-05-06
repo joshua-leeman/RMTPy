@@ -1,24 +1,20 @@
 # rmtpy.simulations._mc.py
-"""
-This module contains the Monte Carlo simulation base class for the RMTpy package.
-It is grouped into the following sections:
-    1. Imports
-    2. Monte Carlo Class
-"""
 
 
-# =============================
+# =======================================
 # 1. Imports
-# =============================
+# =======================================
 # Standard library imports
+from __future__ import annotations
 import os
 import re
 from abc import ABC, abstractmethod
 from argparse import ArgumentParser
 from ast import literal_eval
+from dataclasses import dataclass, field
 from textwrap import dedent
 from time import strftime
-from typing import List
+from typing import Any, Optional, Union
 
 # Third-party imports
 from psutil import cpu_count, virtual_memory
@@ -27,379 +23,183 @@ from psutil import cpu_count, virtual_memory
 from rmtpy.utils import get_ensemble
 
 
-# =============================
-# 2. Monte Carlo Class
-# =============================
+# =======================================
+# 2. Functions
+# =======================================
+def _parse_mc_args(parser: ArgumentParser) -> dict:
+    """Parse default command line arguments."""
+    # Add ensemble argument
+    parser.add_argument(
+        "-ens",
+        "--ensemble",
+        type=str,
+        required=True,
+        help="random matrix ensemble in JSON (required)",
+    )
+
+    # Add number of realizations argument
+    parser.add_argument(
+        "-realizs",
+        "--realizs",
+        type=int,
+        default=1,
+        help="number of realizations (default is 1)",
+    )
+
+    # Add number of workers argument
+    parser.add_argument(
+        "-w",
+        "--workers",
+        type=int,
+        default=1,
+        help=f"number of workers (default is 1, maximum is {cpu_count(logical=False)})",
+    )
+
+    # Store available and total memory in GiB
+    avail_memory = virtual_memory().available / 2**30
+
+    # Add memory argument
+    parser.add_argument(
+        "-m",
+        "--memory",
+        type=int,
+        default=avail_memory,
+        help=f"memory allocated for simulation in GiB (default is {avail_memory})",
+    )
+
+    # Parse arguments into dictionary
+    mc_args = vars(parser.parse_args())
+
+    # Convert ensemble argument to dictionary
+    mc_args["ensemble"] = literal_eval(mc_args["ensemble"])
+
+    # Return dictionary of Monte Carlo arguments
+    return mc_args
+
+
+# =======================================
+# 3. Monte Carlo Simulation Class
+# =======================================
+@dataclass(repr=False, eq=False, kw_only=True, slots=True)
 class MonteCarlo(ABC):
-    """
-    Monte Carlo simulation base class.
+    # Random matrix ensemble
+    ensemble: Union[Any, dict, str]
 
-    Attributes
-    ----------
-    ensemble : object
-        Random matrix ensemble object.
-    realizs : int
-        Number of realizations.
-    max_workers : int
-        Maximum number of workers available.
-    max_memory : int
-        Maximum memory available in bytes.
-    workers : int
-        Number of workers for simulation.
-    memory : int
-        Memory allocated for simulation in bytes.
-    calc_memory : int
-        Memory required for calculations in bytes.
+    # Number of realizations
+    realizs: int = field(default=1)
 
-    Methods
-    -------
-    run()
-        Run the Monte Carlo simulation.
-    """
+    # Amount of memory to allocate for simulation in GiB
+    memory: float = field(default=virtual_memory().available / 2**30)
 
-    def __init__(
-        self,
-        ensemble: dict,
-        realizs: int = 1,
-        workers: int = 1,
-        memory: float = virtual_memory().available // 2**30,
-    ) -> None:
-        """
-        Initialize the Monte Carlo simulation.
+    # Maximum amount of system memory
+    max_memory: float = field(default=virtual_memory().total / 2**30)
 
-        Parameters
-        ----------
-        ensemble : dict
-            Random matrix ensemble parameters.
-        realizs : int, optional
-            Number of realizations (default is 1).
-        workers : int, optional
-            Number of workers (default is 1).
-        memory : float, optional
-            Memory allocated for simulation in GiB.
-        """
-        # Clean ensemble name in ens_args
-        ensemble["name"] = re.sub(r"\W+", "", ensemble["name"]).strip().lower()
+    # Number of workers
+    workers: int = field(default=1)
 
-        # Copy ensemble input and pop name
-        ens_inputs = ensemble.copy()
-        ens_inputs.pop("name")
+    # Output directory
+    output_dir: Optional[str] = field(default=None)
 
-        # Import and initialize ensemble
-        self._ensemble = get_ensemble(ensemble["name"], **ens_inputs)
+    # Date and time of simulation
+    time_str: Optional[str] = field(init=False, default=strftime("%Y-%m-%d %H:%M:%S"))
 
-        # Reorder ensemble input and and store
-        self._ens_args = {
-            key: ensemble[key] for key in self.ensemble._arg_order if key in ensemble
-        }
+    # Maxumum number of workers available
+    max_workers: int = field(init=False, default=cpu_count(logical=False))
 
-        # Store number of realizations
-        self._realizs = realizs
+    # Memory required for each worker in bytes
+    worker_memory: float = field(init=False, default=None)
 
-        # Store system specifications
-        self._max_workers = cpu_count(logical=False)
-        self._max_memory = virtual_memory().total  # in bytes
+    @abstractmethod
+    def run(self) -> None:
+        """Run the Monte Carlo simulation."""
+        raise NotImplementedError("run method must be implemented in subclasses.")
 
-        # Store job specifications
-        self._workers = workers
-        self._memory = memory  # in GiB
+    @abstractmethod
+    def _worker_memory(self) -> float:
+        """Calculate the memory required for each calculation in GiB."""
+        raise NotImplementedError("_worker_memory must be implemented in subclass.")
+
+    @abstractmethod
+    def _workspace_memory(self) -> float:
+        """Calculate the actual workspace memory is available in GiB."""
+        raise NotImplementedError("_workspace_memory must be implemented in subclass.")
+
+    def __post_init__(self) -> None:
+        # If ensemble is a dictionary or string, convert it to an ensemble object
+        if isinstance(self.ensemble, (dict, str)):
+            self.ensemble = get_ensemble(self.ensemble)
+
+        # Store amount of memory required for each calculation
+        self.worker_memory = self._worker_memory()
+
+        # Store amount of actual workspace memory available
+        self.memory = self._workspace_memory()
 
         # Check if Monte Carlo simulation is valid
         self._check_mc()
 
-        # Store date and time of simulation
-        self._time_date = strftime("%Y-%m-%d %H:%M:%S")
-        self._time_path = self._time_date.replace(" ", "_").replace(":", "-")
+        # Reduce number of workers if necessary
+        self.workers = min(self.workers, self.memory // self.worker_memory)
 
-    def __repr__(self) -> str:
-        """
-        Default representation of the Monte Carlo simulation.
-        """
-        return f"{self.__class__.__name__} ({self.ensemble}, realizs={self.realizs})"
+        # Create output directory
+        self.output_dir = self._create_output_dir()
 
-    def __str__(self) -> str:
-        """
-        Path representation of the Monte Carlo simulation.
-        """
-        # Replace underscores with spaces
-        string = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", self.__class__.__name__)
-        string = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", string)
-
-        # Convert to lowercase and return
-        return string.lower()
-
-    @staticmethod
-    def _parse_args(parser: ArgumentParser) -> dict:
-        """
-        Get Monte Carlo arguments from the parser.
-
-        Parameters
-        ----------
-        parser : ArgumentParser
-            Parser for command-line options.
-
-        Returns
-        -------
-        dict
-            Monte Carlo arguments.
-        """
-        # Add ensemble argument
-        parser.add_argument(
-            "-ens",
-            "--ensemble",
-            type=str,
-            required=True,
-            help="random matrix ensemble in JSON (required)",
-        )
-
-        # Add number of realizations argument
-        parser.add_argument(
-            "-realizs",
-            "--realizs",
-            type=int,
-            default=1,
-            help="number of realizations (default is 1)",
-        )
-
-        # Add number of workers argument
-        parser.add_argument(
-            "-w",
-            "--workers",
-            type=int,
-            default=1,
-            help=f"number of workers (default is 1, maximum is {cpu_count(logical=False)})",
-        )
-
-        # Store total memory in GiB
-        max_memory = virtual_memory().available // 2**30
-
-        # Add memory argument
-        parser.add_argument(
-            "-m",
-            "--memory",
-            type=int,
-            default=max_memory,
-            help=f"memory allocated for simulation in GiB (default is {max_memory})",
-        )
-
-        # Parse arguments into dictionary
-        mc_args = vars(parser.parse_args())
-
-        # Convert ensemble argument to dictionary
-        mc_args["ensemble"] = literal_eval(mc_args["ensemble"])
-
-        # Return dictionary of Monte Carlo arguments
-        return mc_args
+    def __getattr__(self, name: str) -> Any:
+        """Forward unknown attribute access to the ensemble."""
+        # Return attribute from ensemble if it exists
+        return getattr(self.ensemble, name)
 
     def _check_mc(self) -> None:
-        """
-        Check if Monte Carlo simulation is valid.
-
-        Raises
-        ------
-        ValueError
-            If the Monte Carlo simulation is not valid and explains why.
-        """
+        """Check if Monte Carlo simulation is valid."""
         # Check if number of realizations is valid
-        if (
-            not isinstance(self._realizs, (int, float))
-            or self._realizs < 1
-            or self._realizs != int(self._realizs)
-        ):
-            raise ValueError(f"Number of realizations must be a positive integer.")
+        if not isinstance(self.realizs, int) or self.realizs < 1:
+            raise ValueError("Number of realizations must be a positive integer.")
 
         # Check if number of workers is valid
-        # If so, set to int
-        if (
-            not isinstance(self._workers, (int, float))
-            or self._workers < 1
-            or self._workers != int(self._workers)
-            or self._workers > self._max_workers  # type: ignore[operator]
-        ):
+        if not isinstance(self.workers, int) or self.max_workers < self.workers < 1:
             raise ValueError(
-                f"Number of workers must be a positive integer less than or equal to {self._max_workers}."
+                f"Number of workers must be a positive integer between 1 and {self.max_workers}."
             )
-        else:
-            self._workers = int(self._workers)
 
         # Check if memory is valid
-        # If so, set to bytes
         if (
-            not isinstance(self._memory, (int, float))
-            or self._memory < 1
-            or self._memory > self._max_memory // 2**30
+            not isinstance(self.memory, (int, float))
+            or self.max_memory < self.memory < 0
         ):
             raise ValueError(
-                f"Memory must be a positive integer less than or equal to {self.max_memory / 2**30:.1f} [in GiB]."
+                f"Memory must be a positive integer or float between 0 and {self.max_memory} GiB."
             )
-        else:
-            self._memory = self.memory * 2**30
 
-        # Check if provided memory is sufficient
-        # If so, determine number of usable workers
-        if self.memory < self.calc_memory:
-            raise ValueError(
+        # Check if provided memory is sufficient for calculations
+        if self.worker_memory > self.memory:
+            raise MemoryError(
                 dedent(
                     f"""
-                    Provided memory is insufficient for calculations:
-                    Memory Required > {self.calc_memory // 2**30} GB
-                    Memory Provided: {self.memory // 2**30} GB
+                    Not enough memory available for calculations:
+                    Required: {self.worker_memory:.2f} GiB
+                    Requested: {self.memory:.2f} GiB
                     """
                 )
             )
-        else:
-            self._workers = min(self.workers, self.memory // self.calc_memory)
 
-    def _create_output_dir(self, res_type: str = "") -> str:
-        """
-        Returns the project's results directory for the Monte Carlo simulation.
+    def _create_output_dir(self) -> str:
+        """Create the output directory for the simulation."""
+        # Replace underscores in class name with spaces
+        mc_path = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", self.__class__.__name__)
+        mc_path = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", mc_path)
+        mc_path = mc_path.lower()
 
-        Parameters
-        ----------
-        res_type : str, optional
-            Type of results directory. (default is "")
+        # Begin output directory with outputs, simulation, and ensemble path
+        output_dir = f"outputs/{mc_path}/{self.ensemble._to_path()}"
 
-        Returns
-        -------
-        str
-            Results directory path.
-        """
-        # Construct results directory path
-        output_dir = f"res/{str(self)}/{self._ens_args['name']}/"
-        output_dir += "/".join(
-            f"{key}={val}" for key, val in self._ens_args.items() if key != "name"
-        )
-        output_dir += f"/realizs={self.realizs}/{self._time_path}/{res_type}"
+        # Translate time string to a valid directory name
+        time_path = self.time_str.replace(" ", "_").replace(":", "-")
 
-        # Create directory if it does not exist
+        # Append simulation attributes, titme, and results type to output directory
+        output_dir += f"/realizs={self.realizs}/{time_path}/data"
+
+        # Create output directory if it does not exist
         os.makedirs(output_dir, exist_ok=True)
 
-        # Return results directory path
+        # Return output directory
         return output_dir
-
-    @abstractmethod
-    def run(self) -> None:
-        """
-        Run the specified Monte Carlo simulation(s).
-        """
-        pass
-
-    @property
-    def ensemble(self):
-        """
-        Ensemble object.
-        """
-        return self._ensemble
-
-    @property
-    def realizs(self):
-        """
-        Number of realizations.
-        """
-        return self._realizs
-
-    @property
-    def max_workers(self):
-        """
-        Maximum number of workers.
-        """
-        return self._max_workers
-
-    @property
-    def max_memory(self):
-        """
-        Maximum memory available. [bytes]
-        """
-        return self._max_memory
-
-    @property
-    def workers(self):
-        """
-        Number of workers for simulation.
-        """
-        return self._workers
-
-    @property
-    def memory(self):
-        """
-        Memory allocated for simulation. [bytes]
-        """
-        return self._memory
-
-    @property
-    def runs(self) -> List[int]:
-        """
-        Get the list of simulations to run.
-
-        Returns
-        -------
-        List[int]
-            List of simulation numbers to run.
-        """
-        return self._runs
-
-    @property
-    def unfold(self) -> List[int]:
-        """
-        Get the list of simulations to unfold.
-
-        Returns
-        -------
-        List[int]
-            List of simulation numbers to unfold.
-        """
-        return self._unfold
-
-    @runs.setter
-    def runs(self, runs: List[int]) -> None:
-        """
-        Set the list of simulations to run.
-
-        Parameters
-        ----------
-        runs : List[int]
-            List of simulation numbers to run.
-        """
-        # Replace current run list with new one
-        self._runs = runs
-
-        # Reinitialize MonteCarlo object
-        self.__init__(
-            ensemble=self.ensemble,
-            realizations=self.realizs,
-            workers=self.workers,
-            memory=self.memory,
-            runs=runs,
-            unfold=self.unfold,
-        )
-
-    @unfold.setter
-    def unfold(self, unfold: List[int]) -> None:
-        """
-        Set the list of simulations to unfold.
-
-        Parameters
-        ----------
-        unfold : List[int]
-            List of simulation numbers to unfold.
-        """
-        # Replace current unfold list with new one
-        self._unfold = unfold
-
-        # Reinitialize MonteCarlo object
-        self.__init__(
-            ensemble=self.ensemble,
-            realizations=self.realizs,
-            workers=self.workers,
-            memory=self.memory,
-            runs=self.runs,
-            unfold=unfold,
-        )
-
-    @property
-    @abstractmethod
-    def calc_memory(self):
-        """
-        Memory required for the simulation in bytes.
-        """
-        pass
