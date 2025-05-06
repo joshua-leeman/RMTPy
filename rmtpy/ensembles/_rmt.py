@@ -1,22 +1,14 @@
 # rmtpy.ensembles._rmt.py
-"""
-This module contains the classes for random matrix theory (RMT) ensembles.
-It is grouped into the following sections:
-    1. Imports
-    2. RMT Class
-    3. Spectral Mixin
-    4. CDO Mixin
-    5. Ensemble Class
-    6. Tenfold Class
-"""
 
 
-# =============================
+# =======================================
 # 1. Imports
-# =============================
-# Standard imports
+# =======================================
+from __future__ import annotations
 from abc import ABC, abstractmethod
-from typing import Tuple
+from dataclasses import dataclass, field
+from functools import lru_cache
+from typing import Any, Iterator, Optional
 
 # Third-party imports
 import numpy as np
@@ -26,783 +18,451 @@ from scipy.linalg import eigh, eigvalsh
 from scipy.special import gamma
 
 
-# =============================
-# 2. RMT Class
-# =============================
+# =======================================
+# 2. Random Matrix Theory Class
+# =======================================
+@dataclass(repr=False, eq=False, frozen=True, kw_only=True, slots=True)
 class RMT(ABC):
-    """
-    Random matrix theory (RMT) ensemble base class.
+    # Size of matrices
+    dim: Optional[int] = field(init=False, default=None)
 
-    Attributes
-    ----------
-    N : int
-        Number of particles
-    dim : int
-        Dimension of the matrix
-    J : float
-        Energy scale of interactions
-    dtype : type
-        Data type of the matrix
-    real_dtype : type
-        Real data type of the matrix
-    beta : int
-        Dyson index (symmetry class)
-    degen : int
-        Degeneracy of the ensemble's eigenvalues
-    E0 : float
-        Ground state energy
+    # Data type of matrix elements
+    dtype: np.dtype = field(default=np.dtype("complex64"))
 
-    Methods
-    -------
-    generate(out=None)
-        Generate a random matrix instance of the ensemble.
-    spectral_density(eigenvalue)
-        Calculate the mean spectral density at a given eigenvalue.
-    cumulative_density(eigenvalue)
-        Calculate the cumulative density function value at a given eigenvalue.
-    unfold(eigenvalue)
-        Unfold an eigenvalue about the spectrum center.
-    """
+    # Data type of real parts of matrix elements
+    real_dtype: Optional[np.dtype] = field(init=False, default=None)
 
-    def __init__(
-        self,
-        N: int = None,
-        dim: int = None,
-        J: float = 1.0,
-        dtype: type = np.complex128,
-    ) -> None:
-        """
-        Initialize the RMT ensemble.
+    # Amount of memory each matrix element takes in bytes
+    matrix_memory: Optional[int] = field(init=False, default=None)
 
-        Parameters
-        ----------
-        N : int, optional
-            Number of Majorana fermions (default is None)
-        dim : int, optional
-            Dimension of the matrix (default is None)
-        J : float, optional
-            Energy scale of the interactions (default is 1.0)
-        dtype : type, optional
-            Data type of the matrix elements (default is np.complex128)
-        """
-        # Store ensemble parameters
-        self._N = N
-        self._dim = dim
-        self._J = J
+    # Amount of residual memory needed for each matrix in bytes
+    resid_memory: int = field(init=False, default=0)
 
-        # Calculate ground state energy
-        self._E0 = self.N * self.J
+    # Random number generator seed
+    seed: Optional[int] = field(default=None)
 
-        # Store data type
-        self._dtype = dtype
+    # Random number generator
+    _rng: Optional[np.random.Generator] = field(init=False, default=None)
 
+    # Default ensemble argument names
+    _ens_args: tuple[str] = field(init=False, default=("dim", "dtype"))
+
+    @abstractmethod
+    def randm(self, out: Optional[np.ndarray] = None) -> np.ndarray:
+        """Generate a random matrix of the ensemble."""
+        raise NotImplementedError("randm method must be implemented in subclasses.")
+
+    def __post_init__(self) -> None:
+        """Finalize the initialization of the RMT class."""
         # Check if ensemble is valid
         self._check_ensemble()
 
-        # Store real data type
-        self._real_dtype = self.dtype().real.dtype
-
-        # Create random number generator
-        self._rng = np.random.default_rng()
-
-        # Store memory size per matrix
-        self._matrix_memory = self.dim**2 * np.dtype(self.dtype).itemsize
-
-        # Set default order of arguments
-        self._arg_order = ["name", "N", "dim", "J"]
-
-        # Create cumulative density function
-        self._create_cumulative_density()
-
-    def __repr__(self) -> str:
-        """
-        String representation of the ensemble.
-        """
-        if self.N is None:
-            return f"{self.__class__.__name__}(dim={self.dim}, J={self.J})"
+        # Set data type for real parts
+        if np.issubdtype(self.dtype, np.complexfloating):
+            object.__setattr__(self, "real_dtype", np.dtype(self.dtype.char.lower()))
         else:
-            return f"{self.__class__.__name__}(N={self.N}, J={self.J})"
+            object.__setattr__(self, "real_dtype", self.dtype)
 
-    def __str__(self) -> str:
-        """
-        LaTeX representation of the ensemble.
-        """
-        if self.N is None:
-            return rf"$\textrm{{{self.__class__.__name__}}}\ D={self.dim}$"
-        else:
-            return rf"$\textrm{{{self.__class__.__name__}}}\ N={self.N}$"
+        # Calculate memory size of matrix elements and store it in bytes
+        object.__setattr__(self, "matrix_memory", self.dtype.itemsize * self.dim**2)
+
+        # Initialize random number generator
+        object.__setattr__(self, "_rng", np.random.default_rng(self.seed))
+
+    @property
+    def rng_state(self) -> dict[str, Any]:
+        """State of the random number generator."""
+        # Return state of random number generator
+        return self._rng.bit_generator.state
 
     def _check_ensemble(self) -> None:
-        """
-        Check if the ensemble parameters are valid.
+        """Check if the ensemble is valid."""
+        # Check if dimension is set and valid
+        if not isinstance(self.dim, int) or self.dim <= 0:
+            raise ValueError("Dimension must set and be an integer.")
 
-        Raises
-        ------
-        ValueError
-            If the given ensemble is not valid and why.
-        """
-        # Check if dimension parameters are valid
-        if self.N is not None:
-            if self.N < 1 or self.N % 2 != 0:
-                raise ValueError("Number of Majoranas must be a positive even integer.")
-            if self.dim is not None and self.dim != 2 ** (self.N // 2 - 1):
-                raise ValueError("N and dim must be consistent.")
-        elif self.dim is not None:
-            if self.dim < 1:
-                raise ValueError("Dimension must be a positive integer.")
-        else:
-            raise ValueError("Either N or dim must be specified.")
-
-        # If valid, clean N and dim inputs
-        # Determine effective N if N is not provided
-        self._N = int(self.N) if self.N is not None else 2 * (np.log2(self.dim) + 1)
-        self._dim = int(self.dim) if self.dim is not None else 2 ** (self.N // 2 - 1)
-
-        # Check if interaction energy scale is valid
-        if not isinstance(self.J, (int, float)) or self.J <= 0:
-            raise ValueError("Interaction energy scale must be a positive number.")
-
-        # Check if data type is valid
+        # Normalize and check data type
         try:
-            np.dtype(self.dtype)
+            object.__setattr__(self, "dtype", np.dtype(self.dtype))
         except TypeError:
-            raise TypeError("Data type must be a valid NumPy data type.")
+            raise TypeError("dtype must be a valid NumPy data type.")
+        if not np.issubdtype(self.dtype, np.number):
+            raise ValueError("dtype must be a number type.")
 
-    def _create_cumulative_density(
-        self, num_pts: int = 2**16, multiplier: int = 3
-    ) -> None:
-        """
-        Create numerical cumulative density function using trapezoidal integration.
+        # Check if seed is valid
+        if self.seed is not None and not isinstance(self.seed, int):
+            raise ValueError("Seed must be an integer if provided.")
 
-        Parameters
-        ----------
-        num_pts : int, optional
-            Number of points for the grid (default is 2**16)
-        multiplier : int, optional
-            Multiplier used to extend limits of interp1d (default is 3)
-        """
-        # Create grid for cumulative trapezoidal integration
-        eigen_grid = np.linspace(
-            -multiplier * self.N * self.J,
-            multiplier * self.N * self.J,
-            num_pts,
-        )
+    def _to_dict_str(self) -> str:
+        """Return a dictionary of ensemble attributes"""
+        # Begin dictionary with class name
+        ens_dict = {"name": self.__class__.__name__}
 
-        # Calculate spectral density values
-        density_values = np.vectorize(self.spectral_density)(eigen_grid)
+        # Append all attributes to dictionary
+        for arg in self._ens_args:
+            # If argument is dtype, convert it to string
+            if arg == "dtype":
+                ens_dict[arg] = str(getattr(self, arg))
+            # Otherwise, append the argument as is
+            else:
+                ens_dict[arg] = getattr(self, arg)
 
-        # Compute numerical cumulative density function values
-        cumulative_density_values = cumulative_trapezoid(
-            density_values,
-            eigen_grid,
-            initial=0,
-        )
+        # Return string representation of dictionary
+        return repr(ens_dict)
 
-        # Store cumulative density function
-        self._cumulative_density = interp1d(eigen_grid, cumulative_density_values)
+    def _to_latex(self) -> str:
+        """LaTeX representation of the ensemble."""
+        # Return formatted LaTeX string
+        return rf"$\textrm{{{self.__class__.__name__}}}\ D={self.dim}$"
 
-    @abstractmethod
-    def generate(self, out: np.ndarray = None) -> np.ndarray:
-        """
-        Return an matrix instance of the ensemble.
-        If `out` is provided, it will be filled with the generated matrix.
+    def _to_path(self) -> str:
+        """Build path for simulation results."""
+        # Begin output path with ensemble name
+        ens_path = f"{self.__class__.__name__}"
 
-        Parameters
-        ----------
-        out : np.ndarray, optional
-            Output matrix (default is None)
+        # Append remaining arguments to output directory
+        for arg in self._ens_args:
+            # If argument is float, convert it to string with 2 decimal places and replace dot with underscore
+            if isinstance(getattr(self, arg), float):
+                ens_path += f"/{arg}={getattr(self, arg):.2f}".replace(".", "_")
+            # If argument is dtype, skip it
+            elif arg == "dtype":
+                continue
+            # Otherwise, proceed with default string representation
+            else:
+                ens_path += f"/{arg}={getattr(self, arg)}"
 
-        Returns
-        -------
-        np.ndarray
-            Random matrix instance of the ensemble
-        """
-        pass
-
-    @abstractmethod
-    def spectral_density(self, eigenvalue: float) -> float:
-        """
-        Return the ensemble's mean spectral density at eigenvalue.
-
-        Parameters
-        ----------
-        eigenvalue : float
-            Eigenvalue at which to evaluate the spectral density
-
-        Returns
-        -------
-        float
-            Spectral density at the given eigenvalue
-        """
-        pass
-
-    def cumulative_density(self, eigenvalue: float) -> float:
-        """
-        Return the cumulative density function value at eigenvalue.
-
-        Parameters
-        ----------
-        eigenvalue : float
-            Eigenvalue at which to evaluate the cumulative density function
-
-        Returns
-        -------
-        float
-            Cumulative density function value at the given eigenvalue
-        """
-        # Return cumulative density function value
-        return self._cumulative_density(eigenvalue)
-
-    def unfold(self, eigenvalue: float) -> float:
-        """
-        Unfold eigenvalue about spectrum's center.
-
-        Parameters
-        ----------
-        eigenvalue : float
-            Eigenvalue to unfold
-
-        Returns
-        -------
-        float
-            Unfolded eigenvalue
-        """
-        # Return unfolded eigenvalue about spectrum's center
-        return self.dim * (self.cumulative_density(eigenvalue) - 1 / 2)
-
-    @property
-    def N(self) -> int:
-        """
-        Number of Majorana fermions.
-        """
-        return self._N
-
-    @property
-    def dim(self) -> int:
-        """
-        Dimension of the matrix.
-        """
-        return self._dim
-
-    @property
-    def J(self) -> float:
-        """
-        Energy scale of the ensemble interactions.
-        """
-        return self._J
-
-    @property
-    def E0(self) -> float:
-        """
-        Ground state energy.
-        """
-        return self._E0
-
-    @property
-    def universal_class(self) -> str:
-        """
-        Universal class of the ensemble.
-        """
-        # Create a dictionary to map Dyson index to universal class
-        universal_classes = {
-            0: "Poisson",
-            1: "GOE",
-            2: "GUE",
-            4: "GSE",
-        }
-        # Return the universal class based on the Dyson index
-        return universal_classes.get(self.beta, "Unknown")
-
-    @property
-    def dtype(self) -> type:
-        """
-        Data type of the matrix.
-        """
-        return self._dtype
-
-    @property
-    def real_dtype(self) -> type:
-        """
-        Real data type of the matrix.
-        """
-        return self._real_dtype
-
-    @property
-    def matrix_memory(self) -> int:
-        """
-        Memory size per matrix.
-        """
-        return self._matrix_memory
-
-    @property
-    def beta(self) -> int:
-        """
-        Dyson index (symmetry class).
-            1: Orthogonal
-            2: Unitary
-            4: Symplectic
-        """
-        return self._beta
-
-    @property
-    def degen(self) -> int:
-        """
-        Degeneracy of the ensemble's eigenvalues.
-        """
-        return self._degen
+        # Return formatted path
+        return ens_path
 
 
-# =============================
+# =======================================
 # 3. Spectral Mixin
-# =============================
+# =======================================
 class SpectralMixin:
-    """
-    Mixin class for spectral properties of RMT ensembles.
+    def __init_subclass__(cls):
+        """Check if subclasses define required attributes."""
+        # Run parent class __init_subclass__ for compatibility
+        super().__init_subclass__()
 
-    Methods
-    -------
-    eigval_sample(realizs=1)
-        Generate a sample of eigenvalues from the ensemble.
-    nn_spacings(unfolded_eigvals=None)
-        Calculate the nearest-neighbor level spacings of an eigenvalue sample.
-    form_factors(times, unfolded_eigvals=None)
-        Calculate the spectral form factors from an eigenvalue sample.
-    wigner_surmise(s)
-        Calculate the Wigner surmise for the given spacing.
-    universal_csff(t)
-        Calculate the universal connected spectral form factor at time t.
-    """
+        # Check if required attributes are defined in class hierarchy
+        for attr in ("E0", "beta", "degen", "dim", "dtype", "randm"):
+            if not any(hasattr(base, attr) for base in cls.__mro__):
+                raise TypeError(f"{cls.__name__} must define '{attr} to use mixin.")
 
-    def eigval_sample(self, realizs: int = 1) -> np.ndarray:
-        """
-        Generate a sample of eigenvalues from the ensemble.
-
-        Parameters
-        ----------
-        realizs : int, optional
-            Number of realizations to sample (default is 1)
-
-        Returns
-        -------
-        np.ndarray
-            Sample of eigenvalues from the ensemble
-        """
-        # Allocate memory for realizations of eigenvalues
-        eigenvals = np.empty((realizs, self.dim), dtype=self.real_dtype)
+    def eig_stream(self, realizs: int) -> Iterator[tuple[np.ndarray, np.ndarray]]:
+        """Iterator to stream eigensystem realizations."""
+        # Allocate memory for random Hermitian matrix
+        H = np.empty((self.dim, self.dim), dtype=self.dtype, order="F")
 
         # Loop over realizations
-        for r in range(realizs):
-            # Compute eigenvalues of random matrix
-            eigenvals[r, :] = eigvalsh(
-                self.generate(), overwrite_a=True, check_finite=False, driver="evr"
-            )
+        for _ in range(realizs):
+            # Generate random matrix
+            self.randm(out=H)
 
-        # Return eigenvalues
-        return eigenvals
+            # Compute and yield eigenvalues and eigenvectors
+            yield eigh(H, overwrite_a=True, check_finite=False)
 
-    def nn_spacings(self, levels: np.ndarray = None) -> np.ndarray:
-        """
-        Calculate the nearest-neighbor level spacings of a spectrum sample.
+    def eigvals_stream(self, realizs: int) -> Iterator[np.ndarray]:
+        """Iterator to stream spectrum realizations."""
+        # Allocate memory for random Hermitian matrix
+        H = np.empty((self.dim, self.dim), dtype=self.dtype, order="F")
 
-        Parameters
-        ----------
-        levels : np.ndarray, optional
-            Spectrum levels (default is None)
+        # Loop over realizations
+        for _ in range(realizs):
+            # Generate random matrix
+            self.randm(out=H)
 
-        Returns
-        -------
-        np.ndarray
-            Nearest-neighbor level spacings
-        """
-        # If ensemble dimension is one, raise error
-        if self.dim == 1:
-            raise ValueError(
-                "Cannot compute nearest-neighbor spacings for 1D ensembles."
-            )
+            # Compute and yield eigenvalues
+            yield eigvalsh(H, overwrite_a=True, check_finite=False)
 
-        # If levels are not provided, generate them
-        if levels is None:
-            levels = np.vectorize(self.unfold)(self.eigval_sample())
+    def pdf(self, eigval: np.ndarray) -> np.ndarray:
+        """Average density of energy eigenstates."""
 
-        # Compute nearest-neighbor level spacings
-        spacings = np.diff(levels, axis=1)
+        # # Define function to compute PDF
+        # @lru_cache(maxsize=1)
+        # def numerical_pdf(realizs: int = 100, factor: float = 1.1) -> interp1d:
+        #     """Create numerical PDF using eigenvalue realizations."""
+        #     pass
 
-        # If degeneracy greater than one, clean spacings
-        if self.degen > 1:
-            # Remove near-duplicate spacings
-            spacings = spacings[:, 1 :: self.degen]
+        # # Return PDF values for given eigenvalues
+        # return numerical_pdf()(eigval)
 
-            # Duplicate spacings with degeneracy
-            spacings = np.repeat(spacings, self.degen, axis=1)
+        # Raise NotImplementedError if not implemented
+        raise NotImplementedError("Subclasses must implement this PDF method.")
 
-        # Return nearest-neighbor level spacings
-        return spacings
+    def cdf(self, eigval: np.ndarray) -> np.ndarray:
+        """Average cumulative density of energy eigenstates."""
 
-    def form_factors(
-        self, time: float, levels: np.ndarray = None
-    ) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Calculate the spectral form factors from spectrum sample.
+        # Define function to compute CDF
+        @lru_cache(maxsize=1)
+        def numerical_cdf(num_pts: int = 2**12, factor: int = 1.1) -> interp1d:
+            """Create numerical CDF using trapezoidal rule."""
+            # Generate grid of energies
+            vals = factor * np.linspace(-self.E0, self.E0, num_pts)
 
-        Parameters
-        ----------
-        times : float
-            Time value to evaluate the form factors
-        levels : np.ndarray, optional
-            Spectrum levels (default is None)
+            # Calculate PDF values
+            pdf_vals = self.pdf(vals)
 
-        Returns
-        -------
-        Tuple[np.ndarray, np.ndarray]
-            Spectral form factors and connected spectral form factors
-        """
-        # If levels are not provided, generate them
-        if levels is None:
-            levels = np.vectorize(self.unfold)(self.eigval_sample())
+            # Compute CDF values using trapezoidal rule
+            cdf_vals = cumulative_trapezoid(pdf_vals, vals, initial=0)
 
-        # Calculate complex exponentials
-        exponentials = np.multiply(-1j * time, levels)
-        np.exp(exponentials, out=exponentials)
+            # Create interpolation function
+            cdf_interp = interp1d(vals, cdf_vals, bounds_error=False, fill_value=(0, 1))
 
-        # Calculate partition function and its mean
-        Z = np.sum(exponentials, axis=1)
-        mean_Z = np.mean(Z)
+            # Return interpolation function
+            return cdf_interp
 
-        # Calculate spectral form factor parts
-        sff = np.abs(mean_Z) ** 2 / self.dim**2  # disconnected part
-        csff = np.var(Z) / self.dim**2  # connected part
-        sff += csff  # total
+        # Return CDF values for given eigenvalues
+        return numerical_cdf()(eigval)
 
-        # Return spectral form factors evaluated at time
-        return sff, csff
+    def unfold(self, eigval: np.ndarray) -> np.ndarray:
+        """Unfold eigenvalues with the cumulative distribution function."""
+        # Return unfolded eigenvalues
+        return self.dim * (self.cdf(eigval) - self.cdf(np.array([0.0])))
 
-    def wigner_surmise(self, s: float) -> float:
-        """
-        Calculate the Wigner surmise for the given spacing.
+    def univ_csff(self, tau: np.ndarray) -> np.ndarray:
+        """Universal connected spectral form factor."""
+        # Denote ensemble attributes
+        dim = self.dim
+        beta = self.beta
+        degen = self.degen
 
-        Parameters
-        ----------
-        s : float
-            Spacing between unfolded eigenvalues
-
-        Returns
-        -------
-        float
-            Wigner surmise value for the given spacing
-        """
-
-        # If Dyson index is zero, return Poisson surmise
-        if self.beta == 0:
-            return np.exp(-s)
-
-        # Scale spacing by degeneracy
-        s = s / self.degen
-
-        # Calculate Wigner surmise
-        a = gamma((self.beta + 2) / 2) ** (self.beta + 1) / gamma(
-            (self.beta + 1) / 2
-        ) ** (self.beta + 2)
-        b = (gamma((self.beta + 2) / 2) / gamma((self.beta + 1) / 2)) ** 2
-
-        # Return Wigner surmise at given spacing
-        return 2 * a * s**self.beta * np.exp(-b * s**2) / self.degen
-
-    def universal_csff(self, tau: float) -> float:
-        """
-        Calculate the universal connected spectral form factor at unfolded time tau.
-
-        Parameters
-        ----------
-        tau : float
-            Unfolded time for the spectral form factor
-
-        Returns
-        -------
-        float
-            Universal connected spectral form factor at time tau
-        """
-        # Normalize tau w.r.t. Heisenberg time 2π
+        # Normalize unfolded times w.r.t. Heisenberg time 2π
         tau = tau / (2 * np.pi)
 
         # Return GOE connected spectral form factor if beta = 1
-        if self.beta == 1:
-            # Calculate connected spectral form factor
-            if tau <= 1:
-                return (2 * tau - tau * np.log(2 * tau + 1)) / self.dim
-            else:
-                return (2 - tau * np.log((2 * tau + 1) / (2 * tau - 1))) / self.dim
+        if beta == 1:
+            # Initialize csff array
+            csff = np.empty_like(tau, dtype=self.real_dtype)
+
+            # Handle case when tau is less than or equal to one
+            m = tau <= 1
+            csff[m] = tau[m] * (2 - np.log(2 * tau[m] + 1)) / dim
+
+            # Handle case when tau is greater than one
+            m = tau > 1
+            csff[m] = (2 - tau[m] * np.log((2 * tau[m] + 1) / (2 * tau[m] - 1))) / dim
+
+            # Return csff
+            return csff
 
         # Return GUE connected spectral form factor if beta = 2
-        elif self.beta == 2:
-            # Calculate connected spectral form factor
-            if tau <= 1:
-                return tau / self.dim
-            else:
-                return 1.0 / self.dim
+        elif beta == 2:
+            return np.where(tau <= 1, tau / dim, 1 / dim)
 
-        # Return GSE connected spectral form factor if beta = 4
-        elif self.beta == 4:
-            # Calculate connected spectral form factor
-            if self.degen * tau == 1:
-                return np.nan
-            if self.degen * tau <= 2:
-                log_term = np.log(abs(self.degen * tau - 1))
-                return self.degen * (tau - tau / 2 * log_term) / self.dim
-            else:
-                return float(self.degen) / self.dim
+        # Build GSE connected spectral form factor if beta = 4
+        elif beta == 4:
+            # Create default array for csff
+            csff = np.full_like(tau, degen / dim)
 
-        # Return unity for other Dyson indices
+            # Handle case when scaled tau is one
+            csff[degen * tau == 1] = np.nan
+
+            # Handle case when scaled tau is less than two
+            m = (degen * tau < 2) & (degen * tau != 1)
+            log_term = np.log(np.abs(degen * tau[m] - 1))
+            csff[m] = degen * (tau[m] - tau[m] / 2 * log_term) / dim
+
+            # Return GSE connected spectral form factor
+            return csff
+
+        # Return trivial csff for other Dyson indices
         else:
-            return 1.0 / self.dim
+            return np.full_like(tau, 1 / dim)
+
+    def wigner_surmise(self, s: np.ndarray) -> np.ndarray:
+        """Wigner surmise for the nn-level spacing distribution."""
+        # Denote ensemble attributes
+        beta = self.beta
+        degen = self.degen
+
+        # If beta is 0, return Poisson distribution
+        if beta == 0:
+            return np.exp(-s)
+
+        # Scale spacings by degeneracy
+        s = s / degen
+
+        # Calculate Wigner surmise
+        a = gamma((beta + 2) / 2) ** (beta + 1) / gamma((beta + 1) / 2) ** (beta + 2)
+        b = (gamma((beta + 2) / 2) / gamma((beta + 1) / 2)) ** 2
+
+        # Return Wigner surmise at given spacings
+        return 2 * a * s**beta * np.exp(-b * s**2) / degen
 
 
-# =============================
-# 4. CDO Mixin
-# =============================
+# =======================================
+# 4. Chaotic Density Operator Mixin
+# =======================================
 class CDOMixin:
-    def evolve_pure_state(
+    def __init_subclass__(cls):
+        """Check if subclasses define required attributes."""
+        # Run parent class __init_subclass__ for compatibility
+        super().__init_subclass__()
+
+        # Check if required attributes are defined in class hierarchy
+        for attr in ("dim", "dtype", "randm", "eig_stream", "unfold"):
+            if not any(hasattr(base, attr) for base in cls.__mro__):
+                raise TypeError(f"{cls.__name__} must define '{attr} to use mixin.")
+
+    def evolve_states(
         self,
         state: np.ndarray,
         times: np.ndarray,
-        realizs: int = 1,
+        realizs: int,
         unfold: bool = False,
-        out: np.ndarray = None,
+        out: Optional[np.ndarray] = None,
     ) -> np.ndarray:
-        # If no output array is provided, create one
+        # If out is None, allocate memory for output
         if out is None:
-            out = np.empty((times.size, realizs, self.dim), dtype=self.dtype)
-            return_out = True
-        else:
-            return_out = False
+            out = np.empty((times.size, realizs, self.dim), dtype=self.dtype, order="F")
 
-        # Loop over realizations
-        for r in range(realizs):
-            # Diagonalize random Hamiltonian
-            eigvals, eigvecs = eigh(
-                self.generate(), overwrite_a=True, check_finite=False, driver="evr"
-            )
-
-            # If unfolding is requested, unfold the eigenvalues
+        # Loop over eigensystem realizations
+        for r, (eigvals, eigvecs) in enumerate(self.eig_stream(realizs)):
+            # Unfold eigenvalues if requested
             if unfold:
-                eigvals = np.vectorize(self.unfold)(eigvals)
+                eigvals = self.unfold(eigvals)
 
             # Rotate initial state into eigenbasis
             rotated_state = np.matmul(eigvecs.conj().T, state)
 
-            # Outer-multiply eigenvalues and times, exponentiate, then broadcast multiply
+            # Construct time evolution operator in place
             np.outer(times, eigvals, out=out[:, r, :])
-            np.exp(-1j * out[:, r, :], out=out[:, r, :])
+            np.multiply(-1j, out[:, r, :], out=out[:, r, :])
+            np.exp(out[:, r, :], out=out[:, r, :])
+
+            # Evolve state in eigenbasis in place
             np.multiply(out[:, r, :], rotated_state, out=out[:, r, :])
 
             # Rotate back to original basis
             np.matmul(out[:, r, :], eigvecs.T, out=out[:, r, :])
 
-        # Return evolved states if no output array was provided
-        if return_out:
-            return out
-
-    def calculate_cdo(self, evolved_states: np.ndarray) -> np.ndarray:
-        # Unpack number of realizations
-        realizs = evolved_states.shape[0]
-
-        # Compute CDOs
-        cdo = np.matmul(evolved_states.conj().transpose(1, 0), evolved_states)
-        cdo /= realizs
-
-        # Return CDOs
-        return cdo
-
-    def thermal_cdo(self, betas: np.ndarray, realizs: int = 1) -> np.ndarray:
-        # Initialize memory to store thermal CDOs
-        cdo = np.zeros((betas.size, self.dim, self.dim), dtype=self.dtype)
-
-        # Initialize memory to store average energy
-        average_energy = np.zeros((betas.size,), dtype=self.real_dtype)
-
-        # Initialize memory to store free energy
-        free_energy = np.zeros((betas.size,), dtype=self.real_dtype)
-
-        # Loop over realizations
-        for r in range(realizs):
-            # Diagonalize random Hamiltonian
-            eigvals, eigvecs = eigh(
-                self.generate(), overwrite_a=True, check_finite=False, driver="evr"
-            )
-
-            # Compute unnormalized thermal weights
-            weights = np.exp(np.outer(-betas, eigvals))
-
-            # Compute partition function
-            Z = np.sum(weights, axis=1, keepdims=True)
-
-            # Normalize weights
-            weights /= Z
-
-            # Compute realization of thermal density operator
-            cdo += np.einsum(
-                "bm,im,jm->bij", weights, eigvecs, eigvecs.conj(), optimize="optimal"
-            )
-
-            # Compute average energy
-            average_energy += np.sum(weights * eigvals, axis=1)
-
-            # Compute average logarithm of partition function
-            free_energy += np.log(Z)
-
-        # Normalize thermal CDO
-        cdo /= realizs
-
-        # Normalize average energy
-        average_energy /= realizs
-
-        # Normalize logarithm of partition function and divide by inverse temperature
-        free_energy /= -betas * realizs
-
-        # Return thermal CDO and thermal potentials
-        return cdo, average_energy, self.cdo_entropy(cdo), free_energy
-
-    def cdo_probabilities(self, cdo: np.ndarray) -> np.ndarray:
-        # Compute and return probabilities from CDO
-        return np.diagonal(cdo).real
-
-    def cdo_purity(self, cdo: np.ndarray) -> np.ndarray:
-        # Compute and return purity from CDO
-        return np.sum(self.cdo_probabilities(cdo) ** 2)
-
-    def cdo_entropy(self, cdo: np.ndarray) -> np.ndarray:
-        # Compute eigenvalues of CDO
-        eigvals = eigvalsh(cdo, overwrite_a=True, check_finite=False, driver="evr")
-
-        # Clip eigenvalues to avoid numerical issues
-        eigvals = eigvals[eigvals > 1.0e-10]
-
-        # Compute and return von Neumann entropy
-        return -np.sum(eigvals * np.log(eigvals)) / np.log(self.dim)
-
-    def expectation_value(self, cdo: np.ndarray, observable: np.ndarray) -> np.ndarray:
-        # Right-multiply observable with CDOs
-        products = cdo @ observable
-
-        # Evaluate trace of each product and return
-        return np.trace(products, axis1=1, axis2=2).real
+        # Return evolved states
+        return out
 
 
-# =============================
-# 5. Ensemble Class
-# =============================
-class Ensemble(RMT, SpectralMixin, CDOMixin):
-    """
-    Random matrix theory (RMT) ensemble class.
-    Inherits from the RMT base class and the following Mixin class:
-        - SpectralMixin: for spectral properties
-        - CDOMixin: for time evolution of states
-    """
+# =======================================
+# 5. Many Body Ensemble Class
+# =======================================
+@dataclass(repr=False, eq=False, frozen=True, kw_only=True, slots=True)
+class ManyBodyEnsemble(RMT, SpectralMixin, CDOMixin):
+    """Base class for quantum-chaotic many-body ensembles."""
 
-    def __init__(
-        self,
-        N: int = None,
-        dim: int = None,
-        J: float = 1.0,
-        dtype: type = np.complex128,
-    ) -> None:
-        """
-        Initialize the RMT ensemble.
+    # Number of Majorana particles
+    N: int
 
-        Parameters
-        ----------
-        N : int, optional
-            Number of Majorana fermions (default is None)
-        dim : int, optional
-            Dimension of the matrix (default is None)
-        J : float, optional
-            Energy scale of interactions (default is 1.0)
-        dtype : type, optional
-            Data type of the matrix (default is np.complex128)
-        """
-        # Initialize RMT ensemble
-        super().__init__(N=N, dim=dim, J=J, dtype=dtype)
+    # Interaction strength
+    J: float = 1.0
+
+    # Ground state energy
+    E0: Optional[float] = field(init=False, default=None)
+
+    # Dyson index
+    beta: Optional[int] = field(init=False, default=None)
+
+    # Universality class
+    univ_class: Optional[str] = field(init=False, default=None)
+
+    # Degeneracy of eigenvalues
+    degen: Optional[int] = field(init=False, default=None)
+
+    # Default ensemble argument names
+    _ens_args: tuple[str, str] = field(init=False, default=("N", "J", "dtype"))
+
+    def __post_init__(self) -> None:
+        """Finalize the initialization of the ManyBodyEnsemble class."""
+        # Check if Dyson index is set
+        if self.beta is None:
+            raise TypeError(f"{self.__class__.__name__} must define Dyson index.")
+
+        # Calculate and set Hilbert space dimension
+        object.__setattr__(self, "dim", 2 ** (self.N // 2 - 1))
+
+        # Deterimine universality class
+        if self.beta is not None:
+            # Map Dyson index to universality class
+            univ_classes = {0: "Poisson", 1: "GOE", 2: "GUE", 4: "GSE"}
+
+            # Try to set universality class based on Dyson index
+            try:
+                object.__setattr__(self, "univ_class", univ_classes[self.beta])
+            except KeyError:
+                raise ValueError(f"Invalid Dyson index (beta): {self.beta}.") from None
+
+        # Calculate and set ground state energy
+        object.__setattr__(self, "E0", self.N * self.J)
+
+        # Determine degeneracy of eigenvalues
+        object.__setattr__(self, "degen", 2 if self.beta == 4 else 1)
+
+        # Finish initialization of RMT instance
+        super(ManyBodyEnsemble, self).__post_init__()
+
+    def _check_ensemble(self) -> None:
+        """Check if the ensemble is valid."""
+        # Check number of Majorana fermions
+        if not isinstance(self.N, int) or self.N <= 0 or self.N % 2 != 0:
+            raise ValueError("N must be a positive even integer.")
+
+        # Check interaction strength
+        if not isinstance(self.J, (int, float)) or self.J <= 0:
+            raise TypeError("J must be a positive integer or float.")
+
+        # Call parent class _check_ensemble
+        super(ManyBodyEnsemble, self)._check_ensemble()
+
+    def _to_latex(self) -> str:
+        """LaTeX representation of the ManyBodyEnsemble."""
+        # Return formatted LaTeX string
+        return rf"$\textrm{{{self.__class__.__name__}}}\ N={self.N}$"
 
 
-# =============================
-# 6. Tenfold Class
-# =============================
-class Tenfold(Ensemble):
-    """
-    Base class for tenfold-way RMT ensembles.
-    Inherits from the Ensemble class.
+# =======================================
+# 6. Gaussian Ensemble Class
+# =======================================
+@dataclass(repr=False, eq=False, frozen=True, kw_only=True, slots=True)
+class GaussianEnsemble(ManyBodyEnsemble):
+    # Complex standard deviation of matrix elements
+    sigma: Optional[float] = field(init=False, default=None)
 
-    Attributes
-    ----------
-    beta : int
-        Dyson index (symmetry class)
-    sigma : float
-        Complex standard deviation of the matrix elements
-    E0 : float
-        Ground state energy
+    def __post_init__(self) -> None:
+        """Finalize the initialization of the GaussianEnsemble class."""
+        # Call parent class __post_init__
+        super(GaussianEnsemble, self).__post_init__()
 
-    Methods
-    -------
-    spectral_density(eigenvalue)
-        Calculate the mean spectral density at a given eigenvalue.
-    """
+        # Calculate and set complex standard deviation
+        object.__setattr__(self, "sigma", self.E0 / np.sqrt(2 * self.dim))
 
-    def __init__(
-        self,
-        beta: int,
-        N: int = None,
-        dim: int = None,
-        J: float = 1.0,
-        dtype: type = np.complex128,
-    ) -> None:
-        """
-        Initialize the tenfold (Gaussian) ensemble.
+    def pdf(self, eigval: np.ndarray) -> np.ndarray:
+        """Wigner semicircle probability density function."""
+        # Normalize eigenvalues
+        x = eigval / self.E0
 
-        Parameters
-        ----------
-        beta : int
-            Dyson index (symmetry class)
-        N : int, optional
-            Number of Majorana fermions (default is None)
-        dim : int, optional
-            Dimension of the matrix (default is None)
-        J : float, optional
-            Energy scale of interactions (default is 1.0)
-        dtype : type, optional
-            Data type of the matrix (default is np.complex128)
-        """
+        # Initialize PDF array
+        pdf = np.zeros_like(x, dtype=self.real_dtype)
 
-        # Set Dyson index
-        self._beta = beta
+        # Create mask for eigenvalues
+        mask = np.abs(x) < 1.0
 
-        # Initialize RMT ensemble
-        super().__init__(N=N, dim=dim, J=J, dtype=dtype)
+        # Calculate PDF for eigenvalue array
+        pdf[mask] = np.sqrt(1 - x[mask] * x[mask])
+        pdf[mask] *= 2 / np.pi / self.E0
 
-        # Calculate complex standard deviation of matrix elements
-        self._sigma = self.N * self.J / np.sqrt(2 * self.dim)
+        # Return PDF array
+        return pdf
 
-    def spectral_density(self, eigval: float) -> float:
-        """
-        Calculate the mean spectral density at a given eigenvalue.
+    def cdf(self, eigval: np.ndarray) -> np.ndarray:
+        """Cumulative distribution function of Wigner semicircle PDF."""
+        # Normalize eigenvalues and clip to range [-1, 1]
+        x = np.clip(eigval / self.E0, -1.0, 1.0)
 
-        Parameters
-        ----------
-        eigval : float
-            Eigenvalue at which to evaluate the mean spectral density
+        # Build CDF array
+        cdf = np.sqrt(1 - x * x)
+        cdf *= x
+        cdf += np.arcsin(x)
+        cdf /= np.pi
+        cdf += 0.5
 
-        Returns
-        -------
-        float
-            Mean spectral density at the given eigenvalue
-        """
-        # Calculate semi-circle spectral density
-        if abs(eigval) < self.E0:
-            return np.sqrt(1 - (eigval / self.E0) ** 2) / (np.pi * self.E0 / 2)
-        else:
-            return 0.0
-
-    @property
-    def sigma(self) -> float:
-        """
-        Complex standard deviation of the matrix elements.
-        """
-        return self._sigma
+        # Return CDF array
+        return cdf
