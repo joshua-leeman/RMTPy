@@ -56,6 +56,9 @@ class FormFactorPlotLegend(PlotLegend):
 # =======================================
 @dataclass(repr=False, eq=False, kw_only=True)
 class FormFactorPlot(Plot):
+    # File name
+    file_name: str = "form_factors.png"
+
     # Unfolded data flag
     unfold: bool = False
 
@@ -181,10 +184,17 @@ class FormFactorPlot(Plot):
         # Create figure and axes
         self.create_figure()
 
-        # Unpack form factor data
-        times = self.data["times"]
-        sff = self.data["sff"]
-        csff = self.data["csff"]
+        # Unpack form factor data based on unfolding
+        if self.unfold:
+            # Unfolded histogram data
+            times = self.data["unf_times"]
+            sff = self.data["unf_sff"]
+            csff = self.data["unf_csff"]
+        else:
+            # Non-unfolded histogram data
+            times = self.data["times"]
+            sff = self.data["sff"]
+            csff = self.data["csff"]
 
         # Create short notations for dimension
         dim = self.ensemble.dim
@@ -253,4 +263,4 @@ class FormFactorPlot(Plot):
             )
 
         # Finish plot and save it to a file
-        self.set_plot()
+        self.set_plot(unfold=self.unfold)
