@@ -1,6 +1,8 @@
 # Project-specific files and directories
 rmtpy.code-workspace
-outputs/
+.filelist
+output/
+scratch/
 
 # DotEnv configuration
 .env
