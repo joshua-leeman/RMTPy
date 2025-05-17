@@ -49,6 +49,9 @@ class SpacingsHistogramLegend(PlotLegend):
 # =======================================
 @dataclass(repr=False, eq=False, kw_only=True)
 class SpacingsHistogram(Plot):
+    # File name
+    file_name: str = "spacings_histogram.png"
+
     # Unfolded data flag
     unfold: bool = False
 
@@ -146,9 +149,14 @@ class SpacingsHistogram(Plot):
         # Create figure and axes
         self.create_figure()
 
-        # Unpack histogram data
-        bin_edges = self.data["bin_edges"]
-        counts = self.data["counts"]
+        # Unpack histogram data based on unfolding
+        if self.unfold:
+            # Unfolded histogram data
+            bin_edges = self.data["unf_spac_bin_edges"]
+            counts = self.data["unf_spac_hist"]
+        else:
+            bin_edges = self.data["spac_bin_edges"]
+            counts = self.data["spac_hist"]
 
         # Plot histogram
         self.ax.hist(
@@ -188,4 +196,4 @@ class SpacingsHistogram(Plot):
         )
 
         # Finishes plot and saves it to a file
-        self.set_plot()
+        self.set_plot(unfold=self.unfold)
