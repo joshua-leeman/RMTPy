@@ -6,6 +6,7 @@
 # =======================================
 # Standard library imports
 from __future__ import annotations
+from argparse import ArgumentParser
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
@@ -16,11 +17,29 @@ import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 
 # Local application imports
-from rmtpy.utils import ensemble_from_path
+from rmtpy.utils import ensemble_from_path, configure_matplotlib
 
 
 # =======================================
-# 2. Axes Dataclass
+# 2. Functions
+# =======================================
+def _parse_plot_args(parser: ArgumentParser) -> dict[str]:
+    """Parse command line arguments for plotting."""
+    # Add argument for data path
+    parser.add_argument(
+        "-f",
+        "--data_path",
+        type=str,
+        required=True,
+        help="Path to the data file to be plotted.",
+    )
+
+    # Return parsed arguments as a dictionary
+    return vars(parser.parse_args())
+
+
+# =======================================
+# 3. Axes Dataclass
 # =======================================
 @dataclass(repr=False, eq=False, kw_only=True)
 class PlotAxes:
@@ -99,7 +118,7 @@ class PlotAxes:
 
 
 # =======================================
-# 3. Legend Dataclass
+# 4. Legend Dataclass
 # =======================================
 @dataclass(repr=False, eq=False, kw_only=True)
 class PlotLegend:
@@ -142,7 +161,7 @@ class PlotLegend:
 
 
 # =======================================
-# 4. Plot Dataclass
+# 5. Plot Dataclass
 # =======================================
 @dataclass(repr=False, eq=False, kw_only=True)
 class Plot:
@@ -153,7 +172,7 @@ class Plot:
     data: Optional[np.ndarray] = None
 
     # Plot file name
-    plot_filename: Optional[str] = None
+    file_name: Optional[str] = None
 
     # Axes limits
     xlim: Optional[tuple[float, float]] = None
@@ -181,6 +200,9 @@ class Plot:
             # Load data from file
             self.data = np.load(data_path)
 
+        # Configure matplotlib
+        configure_matplotlib()
+
     def create_figure(self):
         """Creates a figure and axes for plotting."""
         # Create figure and axes
@@ -189,18 +211,26 @@ class Plot:
         # Close figure to avoid displaying it
         plt.close(self.fig)
 
-    def save_plot(self) -> None:
+    def save_plot(self, unfold: bool) -> None:
         # Create plot path from data path
         data_path = Path(self.data_path)
-        plot_dir = data_path.parent.parent / "plots"
+        plot_dir = data_path.parent / "plots"
+
+        # Create unfold prefix if unfolding is enabled
+        if unfold:
+            prefix = "unf_"
+        else:
+            prefix = ""
 
         # Create plot directory if it doesn't exist
         plot_dir.mkdir(parents=True, exist_ok=True)
-        if self.plot_filename is None:
-            self.plot_filename = data_path.stem + ".png"
+        if self.file_name is None:
+            self.file_name = prefix + data_path.stem + ".png"
+        else:
+            self.file_name = prefix + self.file_name
 
         # Create plot path
-        plot_path = plot_dir / self.plot_filename
+        plot_path = plot_dir / self.file_name
 
         # Save plot to file
         self.fig.savefig(plot_path, bbox_inches="tight", dpi=300)
@@ -223,7 +253,7 @@ class Plot:
         # Set legend properties
         self.legend._set_legend(self.ax)
 
-    def set_plot(self) -> None:
+    def set_plot(self, unfold: bool) -> None:
         """Finishes plot with specified parameters and saves it to a file."""
         # Check if figure and axes are created
         if self.fig is None or self.ax is None:
@@ -244,4 +274,4 @@ class Plot:
         self.set_legend()
 
         # Save plot to file
-        self.save_plot()
+        self.save_plot(unfold=unfold)
