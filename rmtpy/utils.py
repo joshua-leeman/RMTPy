@@ -18,10 +18,10 @@ from matplotlib import rcParams
 
 
 # =======================================
-# 2. Dictionary to Ensemble Object
+# 2. Ensemble Registry
 # =======================================
-def get_ensemble(ens_args: Union[dict, str]) -> object:
-    """Return ensemble object from registry."""
+def ensemble_registry() -> dict:
+    """Create a registry of ensemble classes."""
     # Instantiate ensemble registry
     registry = {}
 
@@ -36,6 +36,18 @@ def get_ensemble(ens_args: Union[dict, str]) -> object:
 
         # Register ensemble class
         registry[file.stem] = getattr(module, module.class_name)
+
+    # Return registry
+    return registry
+
+
+# =======================================
+# 3. Dictionary to Ensemble Object
+# =======================================
+def get_ensemble(ens_args: Union[dict, str]) -> object:
+    """Return ensemble object from registry."""
+    # Create ensemble registry
+    registry = ensemble_registry()
 
     # If ens_args is a string, convert it to a dictionary
     if isinstance(ens_args, str):
@@ -65,7 +77,7 @@ def get_ensemble(ens_args: Union[dict, str]) -> object:
 
 
 # =======================================
-# 3. Ensemble from Path
+# 4. Ensemble from Path
 # =======================================
 def ensemble_from_path(path: str) -> object:
     """Initializes ensemble from the given path of a data file."""
@@ -76,12 +88,23 @@ def ensemble_from_path(path: str) -> object:
     # Initialize metadata dictionary
     metadata = {}
 
+    # Create ensemble registry
+    registry = ensemble_registry()
+
+    # Initialize ensemble name
+    ensemble_name = None
+
     # Grabs ensemble name from path
-    try:
-        ensemble_name = next(datum for datum in path.split("/")[2:])
-    except StopIteration:
+    for datum in path.split("/"):
+        # Store ensemble name if it is found
+        if datum.lower() in registry:
+            ensemble_name = datum
+            break
+
+    # If ensemble name is not found, raise an error
+    if ensemble_name is None:
         raise ValueError(
-            f"Invalid path format. Expected format: outputs/<simulation_name>/<ensemble_name>/..."
+            f"Ensemble name not found in path. Expected one of: {', '.join(registry.keys())}"
         )
 
     # Extract ensemble name and metadata from path
@@ -111,7 +134,7 @@ def ensemble_from_path(path: str) -> object:
 
 
 # =======================================
-# 4. Module Configurations
+# 4. Matplotlib Configurations
 # =======================================
 def configure_matplotlib() -> None:
     # Set matplotlib rcParams for plots
