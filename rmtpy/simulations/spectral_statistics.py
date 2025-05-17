@@ -6,22 +6,18 @@
 # =======================================
 # Standard library imports
 from __future__ import annotations
+import os
+import shutil
 from argparse import ArgumentParser
-from dataclasses import asdict, dataclass, field
-from multiprocessing import Pool, set_start_method
-from time import time
-from typing import Any
+from dataclasses import dataclass, field
+
 
 # Third-party imports
 import numpy as np
 from scipy.special import jn_zeros
 
 # Local application imports
-from rmtpy.plotting.spectral_statistics.spectral_histogram import SpectralHistogram
-from rmtpy.plotting.spectral_statistics.spacings_histogram import SpacingsHistogram
-from rmtpy.plotting.spectral_statistics.form_factors_plot import FormFactorPlot
 from rmtpy.simulations._mc import MonteCarlo, _parse_mc_args
-from rmtpy.utils import get_ensemble, configure_matplotlib
 
 
 # =======================================
@@ -76,122 +72,20 @@ def form_factor_moments(
     return mu_1, mu_2
 
 
-def _worker_func(args: dict[str, Any]) -> dict[np.ndarray]:
-    """Worker function for parallel processing."""
-    # Unpack ensemble arguments
-    ens_args = args["ens_args"]
-
-    # Find and initialize ensemble
-    ensemble = get_ensemble(ens_args)
-
-    # Unpack number of realizations
-    realizs = args["realizs"]
-
-    # Initialize configuration
-    config = Config(**args["config"])
-
-    # Spectral histogram bin edges
-    spec_bin_edges = config._create_spec_bins() * ensemble.E0
-
-    # Initialize spectral histogram
-    spec_hist = np.zeros(config.spec_num_bins)
-
-    # Unfolded spectral histogram bin edges
-    unf_spec_bin_edges = config._create_spec_bins() * ensemble.dim / 2
-
-    # Initialize unfolded spectral histogram
-    unf_spec_hist = np.zeros(config.spec_num_bins)
-
-    # Estimate global mean level spacing
-    global_mean_spacing = 2 * ensemble.E0 / ensemble.dim
-
-    # Nearest neighbor level spacing bin edges
-    spac_bin_edges = config._create_spac_bins() * global_mean_spacing
-
-    # Initialize nearest neighbor level spacing histogram
-    spac_hist = np.zeros(config.spac_num_bins)
-
-    # Unfolded nearest neighbor level spacing bin edges
-    unf_spac_bin_edges = config._create_spac_bins()
-
-    # Initialize unfolded nearest neighbor level spacing histogram
-    unf_spac_hist = np.zeros(config.spac_num_bins)
-
-    # Store first positive zero of 1st Bessel function
-    j_1_1 = jn_zeros(1, 1)[0]
-
-    # Create times array
-    times = config._create_times_array(base=ensemble.dim)
-    times *= j_1_1 / ensemble.E0
-
-    # Initialize spectral form factor moments
-    mu_1 = np.zeros(config.num_times, dtype=np.complex128)
-    mu_2 = np.zeros(config.num_times, dtype=np.float64)
-
-    # Create unfolded times array
-    unf_times = config._create_unf_times_array(base=ensemble.dim)
-    unf_times *= 2 * np.pi
-
-    # Initialize unfolded spectral form factors
-    unf_mu_1 = np.zeros(config.num_times, dtype=np.complex128)
-    unf_mu_2 = np.zeros(config.num_times, dtype=np.float64)
-
-    # Loop over spectrum realizations and calculate statistics
-    for eigvals in ensemble.eigvals_stream(realizs):
-        # Calculate and accumulate spectral histogram
-        spec_hist += spectral_histogram(eigvals, spec_bin_edges)
-
-        # Calculate and accumulate nearest neighbor level spacings
-        spac_hist += spacings_histogram(eigvals, ensemble.degen, spac_bin_edges)
-
-        # Calculate and accumulate spectral form factors
-        moments = form_factor_moments(eigvals, times)
-        mu_1 += moments[0]
-        mu_2 += moments[1]
-
-        # Unfold spectrum
-        eigvals = ensemble.unfold(eigvals)
-
-        # Calculate and accumulate unfolded spectral histogram
-        unf_spec_hist += spectral_histogram(eigvals, unf_spec_bin_edges)
-
-        # Calculate and accumulate unfolded nearest neighbor level spacings
-        unf_spac_hist += spacings_histogram(eigvals, ensemble.degen, unf_spac_bin_edges)
-
-        # Calculate and accumulate unfolded spectral form factors
-        unf_moments = form_factor_moments(eigvals, unf_times)
-        unf_mu_1 += unf_moments[0]
-        unf_mu_2 += unf_moments[1]
-
-    # Return results
-    return {
-        "spec_hist": spec_hist,
-        "unf_spec_hist": unf_spec_hist,
-        "spac_hist": spac_hist,
-        "unf_spac_hist": unf_spac_hist,
-        "mu_1": mu_1,
-        "mu_2": mu_2,
-        "unf_mu_1": unf_mu_1,
-        "unf_mu_2": unf_mu_2,
-    }
-
-
 # =======================================
 # 3. Configuration Dataclass
 # =======================================
-@dataclass(repr=False, eq=False, kw_only=True, slots=True)
+@dataclass(repr=False, eq=False, frozen=True, kw_only=True, slots=True)
 class Config:
     # Spectral histogram simulation parameters
-    spec_num_bins: int = 50
+    spec_num_bins: int = 100
     spec_i: float = -1.2  # factor of E0 or D/2
     spec_f: float = 1.2  # factor of E0 or D/2
-    spec_filename: str = "spectrum"
 
     # NN-level spacing simulation parameters
-    spac_num_bins: int = 50
-    spac_i: float = 0.0  # factor of global mean
-    spac_f: float = 4.0  # factor of global mean
-    spac_filename: str = "spacings"
+    spac_num_bins: int = 100
+    spac_i: float = 0.0  # factor of global mean spacing
+    spac_f: float = 4.0  # factor of global mean spacing
 
     # SFF simulation parameters
     num_times: int = 5000
@@ -199,7 +93,7 @@ class Config:
     logtime_f: float = 1.5  # base = dim
     unf_logtime_i: float = -1.5  # base = dim
     unf_logtime_f: float = 0.5  # base = dim
-    sff_filename: str = "form_factors"
+    resolve_dip: bool = False
 
     def _create_spec_bins(self) -> np.ndarray:
         """Create spectral histogram bin edges."""
@@ -211,13 +105,30 @@ class Config:
 
     def _create_times_array(self, base: float) -> np.ndarray:
         """Create times array."""
-        return np.logspace(
+        # Begin with a equally spaced array
+        times_array = np.logspace(
             self.logtime_i, self.logtime_f, self.num_times, base=base, dtype=np.float64
         )
+        # Resolve form factor dip if time range covers it
+        if self.logtime_i < 0.0 and self.logtime_f > 0.5:
+            # Define array with extra time points
+            extra_times = np.logspace(
+                0.0, 0.5, self.num_times, base=base, dtype=np.float64
+            )
+
+            # Append extra time points to the original array and return it
+            times_array = np.sort(np.concatenate((times_array, extra_times)))
+
+            # Change resolve_dip to True
+            object.__setattr__(self, "resolve_dip", True)
+
+        # Return times array
+        return times_array
 
     def _create_unf_times_array(self, base: float) -> np.ndarray:
         """Create unfolded times array."""
-        return np.logspace(
+        # Begin with a equally spaced array
+        times_array = np.logspace(
             self.unf_logtime_i,
             self.unf_logtime_f,
             self.num_times,
@@ -225,225 +136,152 @@ class Config:
             dtype=np.float64,
         )
 
+        # Resolve form factor dip if time range covers it
+        if self.unf_logtime_i < -1.0 and self.unf_logtime_f > -0.5:
+            # Define array with extra time points
+            extra_times = np.logspace(
+                -1.0, -0.5, self.num_times, base=base, dtype=np.float64
+            )
+
+            # Append extra time points to the original array and return it
+            times_array = np.sort(np.concatenate((times_array, extra_times)))
+
+            # Change resolve_dip to True
+            object.__setattr__(self, "resolve_dip", True)
+
+        # Return times array
+        return times_array
+
 
 # =======================================
 # 4. Simulation Class
 # =======================================
-@dataclass(repr=False, eq=False, kw_only=True, slots=True)
+@dataclass(repr=False, eq=False, frozen=True, kw_only=True, slots=True)
 class SpectralStatistics(MonteCarlo):
-    # Configuration
+    # Simulation configuration
     config: Config = field(default_factory=Config)
 
     def run(self) -> None:
         """Run the spectral statistics simulation."""
-        # Start timer
-        start_time = time()
-
-        # Create arguments for workers
-        worker_args = self._create_worker_args()
-
-        # Run workers in parallel
-        with Pool(processes=self.workers) as pool:
-            results = pool.map(_worker_func, worker_args)  # type: ignore
-
-        # Process spectral histograms
-        self._process_spectral_histograms(results)
-
-        # Process nearest neighbor level spacings
-        self._process_spacing_histograms(results)
-
-        # Process spectral form factors
-        self._process_form_factors(results)
-
-        # End timer and print elapsed time
-        elapsed_time = time() - start_time
-        print(f"Elapsed time: {elapsed_time:.2f} seconds")
-
-    def _create_worker_args(self) -> list[dict[str, Any]]:
-        """Create arguments for workers."""
-        # Calculate realizations per worker and remainder
-        realizs_per_worker, remainder = divmod(self.realizs, self.workers)
-
-        # Initialize realizations list
-        realizs_array = np.full(self.workers, realizs_per_worker)
-
-        # Distribute remainder realizations
-        realizs_array[:remainder] += 1
-
-        # Create dictionary representation of ensemble
-        ens_args = self.ensemble._to_dict_str()
-
-        # Create list of worker arguments as list of dictionaries
-        worker_args = [
-            {
-                "ens_args": ens_args,
-                "realizs": realizs_array[i],
-                "config": asdict(self.config),
-            }
-            for i in range(self.workers)
-        ]
-
-        # Return list of worker arguments
-        return worker_args
-
-    def _process_spectral_histograms(self, results: dict) -> None:
-        """Process spectral histograms."""
-        # Spectral histogram bin edges
-        bins = self.config._create_spec_bins() * self.E0
-
-        # Unfolded spectral histogram bin edges
-        unf_bins = self.config._create_spec_bins() * self.dim / 2
-
-        # Combine spectral histogram
-        spec_hist = np.sum([res["spec_hist"] for res in results], axis=0)
-
-        # Combine unfolded spectral histogram
-        unf_spec_hist = np.sum([res["unf_spec_hist"] for res in results], axis=0)
-
-        # Normalize histograms
-        spec_hist /= np.sum(spec_hist * np.diff(bins))
-        unf_spec_hist /= np.sum(unf_spec_hist * np.diff(unf_bins))
-
-        # Store spectral histogram data file name
-        path = f"{self.output_dir}/{self.config.spec_filename}.npz"
-
-        # Store unfolded spectral histogram data file name
-        unf_path = f"{self.output_dir}/{self.config.spec_filename}_unfolded.npz"
-
-        # Save spectral histogram to compressed file
-        np.savez_compressed(path, bin_edges=bins, counts=spec_hist)
-
-        # Save unfolded spectral histogram to compressed file
-        np.savez_compressed(unf_path, bin_edges=unf_bins, counts=unf_spec_hist)
-
-        # Initialize spectral histogram
-        plot = SpectralHistogram(data_path=path, unfold=False)
-
-        # Plot spectral histogram
-        plot.plot()
-
-        # Initialize unfolded spectral histogram
-        unf_plot = SpectralHistogram(data_path=unf_path, unfold=True)
-
-        # Plot unfolded spectral histogram
-        unf_plot.plot()
-
-    def _process_spacing_histograms(self, results: dict) -> None:
-        """Process nearest neighbor level spacing histograms."""
-        # Estimate global mean level spacing
-        global_mean_spacing = 2 * self.E0 / self.dim
-
-        # Nearest neighbor level spacing bin edges
-        bins = self.config._create_spac_bins() * global_mean_spacing
-
-        # Unfolded nearest neighbor level spacing bin edges
-        unf_bins = self.config._create_spac_bins()
-
-        # Combine nearest neighbor level spacing histogram
-        spac_hist = np.sum([res["spac_hist"] for res in results], axis=0)
-
-        # Combine unfolded nearest neighbor level spacing histogram
-        unf_spac_hist = np.sum([res["unf_spac_hist"] for res in results], axis=0)
-
-        # Normalize histograms
-        spac_hist /= np.sum(spac_hist * np.diff(bins))
-        unf_spac_hist /= np.sum(unf_spac_hist * np.diff(unf_bins))
-
-        # Store spectral histogram data file name
-        path = f"{self.output_dir}/{self.config.spac_filename}.npz"
-
-        # Store unfolded spectral histogram data file name
-        unf_path = f"{self.output_dir}/{self.config.spac_filename}_unfolded.npz"
-
-        # Save nearest neighbor level spacing histogram to compressed file
-        np.savez_compressed(path, bin_edges=bins, counts=spac_hist)
-
-        # Save unfolded nearest neighbor level spacing histogram to compressed file
-        np.savez_compressed(unf_path, bin_edges=unf_bins, counts=unf_spac_hist)
-
-        # Initialize spectral histogram
-        plot = SpacingsHistogram(data_path=path, unfold=False)
-
-        # Plot spectral histogram
-        plot.plot()
-
-        # Initialize unfolded spectral histogram
-        unf_plot = SpacingsHistogram(data_path=unf_path, unfold=True)
-
-        # Plot unfolded spectral histogram
-        unf_plot.plot()
-
-    def _process_form_factors(self, results: dict) -> None:
-        """Process spectral form factors."""
         # Store first positive zero of 1st Bessel function
         j_1_1 = jn_zeros(1, 1)[0]
 
-        # Recreate times array
-        times = self.config._create_times_array(base=self.dim)
-        times *= j_1_1 / self.E0
+        # Estimate global mean level spacing
+        global_mean_spacing = 2 * self.ensemble.E0 / self.ensemble.dim
 
-        # Recreate unfolded times array
-        unf_times = self.config._create_unf_times_array(base=self.dim)
+        # Spectral histogram bin edges
+        spec_bin_edges = self._create_spec_bins() * self.ensemble.E0
+
+        # Unfolded spectral histogram bin edges
+        unf_spec_bin_edges = self._create_spec_bins() * self.ensemble.dim / 2
+
+        # Nearest neighbor level spacing bin edges
+        spac_bin_edges = self._create_spac_bins() * global_mean_spacing
+
+        # Unfolded nearest neighbor level spacing bin edges
+        unf_spac_bin_edges = self._create_spac_bins()
+
+        # Create times array
+        times = self._create_times_array(base=self.ensemble.dim)
+        times *= j_1_1 / self.ensemble.E0
+
+        # Create unfolded times array
+        unf_times = self._create_unf_times_array(base=self.ensemble.dim)
         unf_times *= 2 * np.pi
 
-        # Combine spectral form factor moments
-        mu_1 = np.sum([res["mu_1"] for res in results], axis=0)
-        mu_2 = np.sum([res["mu_2"] for res in results], axis=0)
-
-        # Combine unfolded spectral form factor moments
-        unf_mu_1 = np.sum([res["unf_mu_1"] for res in results], axis=0)
-        unf_mu_2 = np.sum([res["unf_mu_2"] for res in results], axis=0)
-
-        # Calculate spectral form factors
-        sff = mu_2 / self.realizs
-        csff = sff - np.abs(mu_1) ** 2 / self.realizs**2
-
-        # Calculate unfolded spectral form factors
-        unf_sff = unf_mu_2 / self.realizs
-        unf_csff = unf_sff - np.abs(unf_mu_1) ** 2 / self.realizs**2
-
-        # Store spectral histogram data file name
-        path = f"{self.output_dir}/{self.config.sff_filename}.npz"
-
-        # Store unfolded spectral histogram data file name
-        unf_path = f"{self.output_dir}/{self.config.sff_filename}_unfolded.npz"
-
-        # Save spectral form factors to compressed file
-        np.savez_compressed(path, times=times, sff=sff, csff=csff)
-
-        # Save unfolded spectral form factors to compressed file
-        np.savez_compressed(unf_path, times=unf_times, sff=unf_sff, csff=unf_csff)
-
         # Initialize spectral histogram
-        plot = FormFactorPlot(data_path=path, unfold=False)
-
-        # Plot spectral histogram
-        plot.plot()
+        spec_hist = np.zeros(self.spec_num_bins)
 
         # Initialize unfolded spectral histogram
-        unf_plot = FormFactorPlot(data_path=unf_path, unfold=True)
+        unf_spec_hist = np.zeros(self.spec_num_bins)
 
-        # Plot unfolded spectral histogram
-        unf_plot.plot()
+        # Initialize nearest neighbor level spacing histogram
+        spac_hist = np.zeros(self.spac_num_bins)
 
-    def _worker_memory(self) -> float:
-        """Calculate the memory required for each worker in GiB."""
-        # Amount of memory required to store a random matrix
-        matrix_memory = self.ensemble.matrix_memory
+        # Initialize unfolded nearest neighbor level spacing histogram
+        unf_spac_hist = np.zeros(self.spac_num_bins)
 
-        # Amount of residual memory required to generate matrices
-        resid_memory = self.ensemble.resid_memory
+        # Determine number of time points based on resolve_dip flag
+        num_times = 2 * self.num_times if self.resolve_dip else self.num_times
 
-        # Amount of workspace memory required for each calculation
-        work_memory = 36 * self.ensemble.dtype.itemsize * self.ensemble.dim
+        # Initialize spectral form factor moments
+        mu_1 = np.zeros(num_times, dtype=np.complex128)
+        mu_2 = np.zeros(num_times, dtype=np.float64)
 
-        # Return the total memory required for each worker in GiB
-        return (matrix_memory + resid_memory + work_memory) / 2**30
+        # Initialize unfolded spectral form factors
+        unf_mu_1 = np.zeros(num_times, dtype=np.complex128)
+        unf_mu_2 = np.zeros(num_times, dtype=np.float64)
 
-    def _workspace_memory(self) -> float:
-        """Calculate the actual workspace memory available in GiB."""
-        # No shared memory, so return memory as is
-        return self.memory
+        # Loop over spectrum realizations and calculate statistics
+        for eigvals in self.ensemble.eigvals_stream(self.realizs):
+            # Calculate and accumulate spectral histogram
+            spec_hist += spectral_histogram(eigvals, spec_bin_edges)
+
+            # Calculate and accumulate nearest neighbor level spacings
+            spac_hist += spacings_histogram(
+                eigvals, self.ensemble.degen, spac_bin_edges
+            )
+
+            # Calculate and accumulate spectral form factors
+            moments = form_factor_moments(eigvals, times)
+            mu_1 += moments[0]
+            mu_2 += moments[1]
+
+            # Unfold spectrum
+            eigvals = self.ensemble.unfold(eigvals)
+
+            # Calculate and accumulate unfolded spectral histogram
+            unf_spec_hist += spectral_histogram(eigvals, unf_spec_bin_edges)
+
+            # Calculate and accumulate unfolded nearest neighbor level spacings
+            unf_spac_hist += spacings_histogram(
+                eigvals, self.ensemble.degen, unf_spac_bin_edges
+            )
+
+            # Calculate and accumulate unfolded spectral form factors
+            unf_moments = form_factor_moments(eigvals, unf_times)
+            unf_mu_1 += unf_moments[0]
+            unf_mu_2 += unf_moments[1]
+
+        # Create file name for output
+        file_name = os.path.join(self.outdir, f"{self.worker_id}.npz")
+
+        # Create temporary file name for output
+        temp_file_name = os.path.join(self.outdir, f"{self.worker_id}.tmp.npz")
+
+        # Scale realizations by number of SLURM workers
+        realizs = int(os.environ.get("SLURM_NTASKS", 1)) * self.realizs
+
+        # Save results to temporary file first
+        with open(temp_file_name, "wb") as temp_file:
+            # Store compressed data
+            np.savez_compressed(
+                temp_file,
+                realizs=realizs,
+                spec_bin_edges=spec_bin_edges,
+                spec_hist=spec_hist,
+                unf_spec_bin_edges=unf_spec_bin_edges,
+                unf_spec_hist=unf_spec_hist,
+                spac_bin_edges=spac_bin_edges,
+                spac_hist=spac_hist,
+                unf_spac_bin_edges=unf_spac_bin_edges,
+                unf_spac_hist=unf_spac_hist,
+                times=times,
+                mu_1=mu_1,
+                mu_2=mu_2,
+                unf_times=unf_times,
+                unf_mu_1=unf_mu_1,
+                unf_mu_2=unf_mu_2,
+            )
+
+            # Flush file
+            temp_file.flush()
+
+            # Force write to disk
+            os.fsync(temp_file.fileno())
+
+        # Rename temporary file to final file name
+        shutil.move(temp_file_name, file_name)
 
 
 # =======================================
@@ -457,6 +295,10 @@ def main() -> None:
     # Parse command line arguments
     mc_args = _parse_mc_args(parser)
 
+    # Grab process ID from environment variable if it exists
+    if mc_args["worker_id"] is None:
+        mc_args["worker_id"] = int(os.environ.get("SLURM_PROCID", 0))
+
     # Create an instance of the SpectralStatistics class
     mc = SpectralStatistics(**mc_args)
 
@@ -466,11 +308,5 @@ def main() -> None:
 
 # If this script is run directly, execute main function
 if __name__ == "__main__":
-    # Avoid spawning issues on Windows
-    set_start_method("fork", force=True)
-
-    # Configure matplotlib
-    configure_matplotlib()
-
     # Run main function
     main()
