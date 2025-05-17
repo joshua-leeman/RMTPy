@@ -67,6 +67,9 @@ class SpectralHistogramLegend(PlotLegend):
 # =======================================
 @dataclass(repr=False, eq=False, kw_only=True)
 class SpectralHistogram(Plot):
+    # File name
+    file_name: str = "spectral_histogram.png"
+
     # Unfolded data flag
     unfold: bool = False
 
@@ -178,9 +181,14 @@ class SpectralHistogram(Plot):
         # Create figure and axes
         self.create_figure()
 
-        # Unpack histogram data
-        bin_edges = self.data["bin_edges"]
-        counts = self.data["counts"]
+        # Unpack histogram data based on unfolding
+        if self.unfold:
+            # Unfolded histogram data
+            bin_edges = self.data["unf_spec_bin_edges"]
+            counts = self.data["unf_spec_hist"]
+        else:
+            bin_edges = self.data["spec_bin_edges"]
+            counts = self.data["spec_hist"]
 
         # Plot histogram
         self.ax.hist(
@@ -219,4 +227,4 @@ class SpectralHistogram(Plot):
         )
 
         # Finishes plot and saves it to a file
-        self.set_plot()
+        self.set_plot(unfold=self.unfold)
