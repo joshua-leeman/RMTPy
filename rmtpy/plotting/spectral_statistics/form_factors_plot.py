@@ -48,7 +48,8 @@ class FormFactorPlotAxes(PlotAxes):
 class FormFactorPlotLegend(PlotLegend):
     # Legend location
     loc: str = "upper right"
-    bbox: tuple[float, float] = (0.735, 0.95)
+    bbox: tuple[float, float] = (0.735, 0.9)
+    unf_bbox: tuple[float, float] = (0.76, 0.9)
 
 
 # =======================================
@@ -68,14 +69,14 @@ class FormFactorPlot(Plot):
     # SFF curve parameters
     sff_color: str = "Blue"
     sff_alpha: float = 1.0
-    sff_width: float = 1.0
+    sff_width: float = 0.5
     sff_zorder: int = 2
     sff_legend: str = "SFF"
 
     # cSFF curve parameters
     csff_color: str = "Red"
     csff_alpha: float = 1.0
-    csff_width: float = 1.0
+    csff_width: float = 0.5
     csff_zorder: int = 2
     csff_legend: str = "cSFF"
 
@@ -89,7 +90,7 @@ class FormFactorPlot(Plot):
     # Universal curve parameters
     usff_color: str = "Black"
     usff_alpha: float = 1.0
-    usff_width: float = 1.0
+    usff_width: float = 0.5
     usff_zorder: int = 2
     usff_legend: str = "universal"
 
@@ -115,7 +116,7 @@ class FormFactorPlot(Plot):
         # Initialize base class
         super(FormFactorPlot, self).__post_init__()
 
-        # Switch legend handles and labels for unfolded data
+        # Switch plot attributes based on unfolding
         if self.unfold:
             # Insert universal class into usff_label if it exists
             if self.ensemble.univ_class is not None:
@@ -128,6 +129,10 @@ class FormFactorPlot(Plot):
 
         # Set legend properties
         self.legend = FormFactorPlotLegend(handles=self.handles, labels=self.labels)
+
+        # Change legend location if unfolded
+        if self.unfold:
+            self.legend.bbox = self.legend.unf_bbox
 
         # Set derived attributes
         self.set_derived_attributes()
@@ -167,15 +172,15 @@ class FormFactorPlot(Plot):
             self.tick_times = np.logspace(-1.5, 0.5, num=5, base=dim)
             self.tick_times *= 2 * np.pi
         else:
-            # Set x-ticks for unfolded data
+            # Set x-ticks for regular data
             self.tick_times = np.logspace(-0.5, 1.5, num=5, base=dim)
             self.tick_times *= j_1_1 / E0
 
-        # Set x-limits for unfolded data
+        # Set x-limits
         if self.xlim is None:
             self.xlim = (self.tick_times[0], self.tick_times[-1])
 
-        # Set x-ticks for unfolded data
+        # Set x-ticks
         if self.axes.xticks is None:
             self.axes.xticks = self.tick_times[1:-1]
 
@@ -248,19 +253,17 @@ class FormFactorPlot(Plot):
                 zorder=self.usff_zorder,
                 label=self.usff_legend,
             )
-        # If not unfolded, plot grid lines on major x-ticks
-        else:
-            # Create vertical grid lines
-            self.ax.vlines(
-                self.tick_times[1:-1],
-                self.ylim[0],
-                self.ylim[1],
-                color=self.grid_color,
-                linestyle=self.grid_linestyle,
-                linewidth=self.grid_linewidth,
-                alpha=self.grid_alpha,
-                zorder=self.grid_zorder,
-            )
+        # Plot grid lines on major x-ticks
+        self.ax.vlines(
+            self.tick_times[1:-1],
+            self.ylim[0],
+            self.ylim[1],
+            color=self.grid_color,
+            linestyle=self.grid_linestyle,
+            linewidth=self.grid_linewidth,
+            alpha=self.grid_alpha,
+            zorder=self.grid_zorder,
+        )
 
         # Finish plot and save it to a file
         self.set_plot(unfold=self.unfold)
