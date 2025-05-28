@@ -72,7 +72,7 @@ def form_factor_moments(
 
 
 # =======================================
-# 3. Configuration Dataclass
+# 3. Configuration Class
 # =======================================
 @dataclass(repr=False, eq=False, frozen=True, kw_only=True, slots=True)
 class Config:
