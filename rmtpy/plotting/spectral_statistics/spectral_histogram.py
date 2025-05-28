@@ -41,7 +41,7 @@ class SpectralHistogramAxes(PlotAxes):
     # Define Poisson specific tick labels
     poi_yticklabels: tuple[str, ...] = (r"$0$", r"$\frac{1}{4NJ}$", r"$\frac{1}{2NJ}$")
 
-    # Define SYK q=2 specific tick labels
+    # Define SYK q=2 and q=4 specific tick labels
     syk2_yticklabels: tuple[str, ...] = (
         r"$0$",
         r"$\frac{1}{\pi NJ}$",
@@ -49,6 +49,12 @@ class SpectralHistogramAxes(PlotAxes):
         r"$\frac{3}{\pi NJ}$",
         r"$\frac{4}{\pi NJ}$",
         r"$\frac{5}{\pi NJ}$",
+    )
+    syk4_yticklabels: tuple[str, ...] = (
+        r"$0$",
+        r"$\frac{1}{\pi NJ}$",
+        r"$\frac{2}{\pi NJ}$",
+        r"$\frac{3}{\pi NJ}$",
     )
 
 
@@ -170,11 +176,17 @@ class SpectralHistogram(Plot):
                 self.axes.yticklabels = self.axes.poi_yticklabels
 
             # Rewrites attributes for Poisson special case
-            if self.ensemble.__class__.__name__ == "SYK" and self.ensemble.q == 2:
-                self.ylim = (0, 5 / np.pi / E0)
-                self.axes.yticks = np.arange(0, 6, 1) / np.pi / E0
-                self.axes.yticks_minor = np.arange(0.5, 6, 0.5) / np.pi / E0
-                self.axes.yticklabels = self.axes.syk2_yticklabels
+            if self.ensemble.__class__.__name__ == "SYK":
+                if self.ensemble.q == 2:
+                    self.ylim = (0, 5 / np.pi / E0)
+                    self.axes.yticks = np.arange(0, 6, 1) / np.pi / E0
+                    self.axes.yticks_minor = np.arange(0.5, 6, 0.5) / np.pi / E0
+                    self.axes.yticklabels = self.axes.syk2_yticklabels
+                elif self.ensemble.q == 4:
+                    self.ylim = (0, 3 / np.pi / E0)
+                    self.axes.yticks = np.arange(0, 4, 1) / np.pi / E0
+                    self.axes.yticks_minor = np.arange(0.5, 4, 0.5) / np.pi / E0
+                    self.axes.yticklabels = self.axes.syk4_yticklabels
 
     def plot(self):
         """Creates a spectral histogram and saves it to a file."""
