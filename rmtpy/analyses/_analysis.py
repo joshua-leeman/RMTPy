@@ -32,18 +32,15 @@ def _parse_analysis_args(parser: ArgumentParser) -> dict:
 
     # Add output directory argument
     parser.add_argument(
-        "-dir",
+        "-d",
         "--outdir",
         type=str,
         default=os.path.join(os.getcwd(), "output"),
-        help="output directory (default is current working directory)",
+        help="output directory (default is ./output)",
     )
 
-    # Parse arguments into dictionary
-    args = vars(parser.parse_args())
-
-    # Return parsed arguments
-    return args
+    # Parse arguments into dictionary and return it
+    return vars(parser.parse_args())
 
 
 # =======================================
