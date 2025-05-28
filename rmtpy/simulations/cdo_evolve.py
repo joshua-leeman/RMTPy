@@ -19,7 +19,7 @@ from rmtpy.simulations._mc import MonteCarlo, _parse_mc_args
 
 
 # =======================================
-# 2. Configuration Dataclass
+# 2. Configuration Class
 # =======================================
 @dataclass(repr=False, eq=False, frozen=True, kw_only=True, slots=True)
 class Config:
