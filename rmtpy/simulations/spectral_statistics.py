@@ -113,7 +113,7 @@ class Config:
         if self.logtime_i < 0.0 and self.logtime_f > 0.5:
             # Define array with extra time points
             extra_times = np.logspace(
-                0.0, 0.5, self.num_times, base=base, dtype=np.float64
+                0.0, 0.5, 2 * self.num_times, base=base, dtype=np.float64
             )
 
             # Append extra time points to the original array and return it
@@ -137,10 +137,10 @@ class Config:
         )
 
         # Resolve form factor dip if time range covers it
-        if self.unf_logtime_i < -1.0 and self.unf_logtime_f > -0.5:
+        if self.unf_logtime_i < -1.0 and self.unf_logtime_f > -0.25:
             # Define array with extra time points
             extra_times = np.logspace(
-                -1.0, -0.5, self.num_times, base=base, dtype=np.float64
+                -1.0, -0.25, 2 * self.num_times, base=base, dtype=np.float64
             )
 
             # Append extra time points to the original array and return it
@@ -202,7 +202,7 @@ class SpectralStatistics(MonteCarlo):
         unf_spac_hist = np.zeros(self.spac_num_bins)
 
         # Determine number of time points based on resolve_dip flag
-        num_times = 2 * self.num_times if self.resolve_dip else self.num_times
+        num_times = 3 * self.num_times if self.resolve_dip else self.num_times
 
         # Initialize spectral form factor moments
         mu_1 = np.zeros(num_times, dtype=np.complex128)
