@@ -11,7 +11,6 @@ import shutil
 from argparse import ArgumentParser
 from dataclasses import dataclass, field
 
-
 # Third-party imports
 import numpy as np
 from scipy.special import jn_zeros
