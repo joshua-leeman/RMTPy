@@ -108,6 +108,7 @@ class Config:
         times_array = np.logspace(
             self.logtime_i, self.logtime_f, self.num_times, base=base, dtype=np.float64
         )
+
         # Resolve form factor dip if time range covers it
         if self.logtime_i < 0.0 and self.logtime_f > 0.5:
             # Define array with extra time points
