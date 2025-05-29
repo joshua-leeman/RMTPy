@@ -24,7 +24,7 @@ from rmtpy.special import create_majorana_pairs
 
 
 # =======================================
-# 2. Function
+# 2. Parser Function
 # =======================================
 def _parse_cdo_evolve_args(parser: ArgumentParser) -> dict:
     # Add unfolding flag argument
@@ -92,7 +92,9 @@ class CDOEvolve(MonteCarlo):
         majorana_pairs = create_majorana_pairs(self.ensemble.N)
 
         # Initialize observable matrix
-        observable = np.zeros((self.ensemble.dim, self.ensemble.dim), order="F")
+        observable = np.zeros(
+            (self.ensemble.dim, self.ensemble.dim), dtype=self.ensemble.dtype, order="F"
+        )
 
         # Retrieve indices for observable terms
         indices = tuple(itertools.combinations(range(self.ensemble.N), self.obs_q))
@@ -100,7 +102,7 @@ class CDOEvolve(MonteCarlo):
         # Loop over indices and fill observable matrix
         for idx in indices:
             # Divide indices into pairs
-            pairs = tuple((idx[i], idx[i + 1]) for i in range(0, self.ensemble.q, 2))
+            pairs = tuple((idx[i], idx[i + 1]) for i in range(0, self.obs_q, 2))
 
             # Start q-body operator with first pair
             j0, k0 = pairs[0]
@@ -118,8 +120,8 @@ class CDOEvolve(MonteCarlo):
 
         # Scale observable by necessary factors for hermicity and extensivity
         observable *= (
-            1j ** (self.ensemble.q * (self.ensemble.q - 1) / 2)
-            * np.sqrt(self.ensemble.N / comb(self.ensemble.N, self.ensemble.q))
+            1j ** (self.obs_q * (self.obs_q - 1) / 2)
+            * np.sqrt(self.ensemble.N / comb(self.ensemble.N, self.obs_q))
             / np.log(2)
         )
 
@@ -143,15 +145,15 @@ class CDOEvolve(MonteCarlo):
         return eigvecs[:, -1]
 
     def run(self) -> None:
-        # Store first positive zero of 1st Bessel function
-        j_1_1 = jn_zeros(1, 1)[0]
-
         # Create times array based on unfolding flag
         if self.unfold:
             # If unfolding is enabled, use unfolded times
             times = self.config._create_unf_times_array(base=self.ensemble.dim)
             times *= 2 * np.pi
         else:
+            # Store first positive zero of 1st Bessel function
+            j_1_1 = jn_zeros(1, 1)[0]
+
             # If unfolding is disabled, use regular times
             times = self.config._create_times_array(base=self.ensemble.dim)
             times *= j_1_1 / self.ensemble.E0
@@ -159,9 +161,89 @@ class CDOEvolve(MonteCarlo):
         # Construct initial state
         initial_state = self._construct_initial_state()
 
+        # Initialize array to store evolved states
+        evolved_states = np.empty(
+            (self.realizs, times.size, self.ensemble.dim),
+            dtype=self.ensemble.dtype,
+            order="F",
+        )
+
         # Loop over diagonalization realizations and store evolved pure states
-        for eigvals, eigvecs in self.ensemble.eig_stream(self.realizs):
-            pass
+        for r, eigsys in enumerate(self.ensemble.eig_stream(self.realizs)):
+            # Unpack eigenvalues and eigenvectors
+            eigvals, eigvecs = eigsys
+
+            # If unfolding is enabled, unfold eigenvalues
+            if self.unfold:
+                eigvals = self.ensemble.unfold(eigvals)
+
+            # Rotate initial state into eigenbasis
+            rotated_state = np.matmul(eigvecs.T.conj(), initial_state)
+
+            # Outer-multiply eigenvalues and times, exponentiate, then broadcast multiply
+            np.outer(times, eigvals, out=evolved_states[r, :, :])
+            evolved_states[r, :, :] *= -1j * 2 * np.pi
+            np.exp(evolved_states[r, :, :], out=evolved_states[r, :, :])
+            np.multiply(
+                evolved_states[r, :, :], rotated_state, out=evolved_states[r, :, :]
+            )
+
+            # Rotate evolved states back to original basis
+            np.matmul(evolved_states[r, :, :], eigvecs.T, out=evolved_states[r, :, :])
+
+        # Create indices to chunk evolved states over times
+        ntasks = os.environ.get("SLURM_NTASKS", 1)
+        chunk_sizes = [(times.size + i) // ntasks for i in range(int(ntasks))]
+        indices = np.cumsum([0] + chunk_sizes)
+
+        # Store views of times for each task
+        times_chunks = [
+            times[indices[i] : indices[i + 1]] for i in range(len(indices) - 1)
+        ]
+
+        # Store views of evolved states for each task
+        state_chunks = [
+            evolved_states[:, indices[i] : indices[i + 1], :]
+            for i in range(len(indices) - 1)
+        ]
+
+        # Store ID of this task
+        process_id = int(os.environ.get("SLURM_PROCID", 0))
+
+        # Loop over tasks and store results
+        for n in range(len(times_chunks)):
+            # Create output directory for chunk of times
+            outdir = os.path.join(self.outdir, f"times_{n}")
+            os.makedirs(outdir, exist_ok=True)
+
+            # Create file name for output
+            file_name = os.path.join(outdir, f"{process_id}.npz")
+            print(outdir, file_name)
+
+            # Create temporary file name for output
+            temp_file_name = os.path.join(outdir, f"{process_id}.npz.tmp")
+
+            # Scale realizations by number of SLURM tasks
+            realizs = ntasks * self.realizs
+
+            # Save results to temporary file first
+            with open(temp_file_name, "wb") as temp_file:
+                # Store compressed data
+                np.savez_compressed(
+                    temp_file,
+                    realizs=realizs,
+                    times=times_chunks[n],
+                    states=state_chunks[n],
+                )
+
+                # Flush file
+                temp_file.flush()
+
+                # Forece write to disk
+                os.fsync(temp_file.fileno())
+
+            # Rename temporary file to final file name
+            shutil.move(temp_file_name, file_name)
 
 
 # =======================================
