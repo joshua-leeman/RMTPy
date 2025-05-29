@@ -170,39 +170,43 @@ class SpectralStatistics(MonteCarlo):
         global_mean_spacing = 2 * self.ensemble.E0 / self.ensemble.dim
 
         # Spectral histogram bin edges
-        spec_bin_edges = self._create_spec_bins() * self.ensemble.E0
+        spec_bin_edges = self.config._create_spec_bins() * self.ensemble.E0
 
         # Unfolded spectral histogram bin edges
-        unf_spec_bin_edges = self._create_spec_bins() * self.ensemble.dim / 2
+        unf_spec_bin_edges = self.config._create_spec_bins() * self.ensemble.dim / 2
 
         # Nearest neighbor level spacing bin edges
-        spac_bin_edges = self._create_spac_bins() * global_mean_spacing
+        spac_bin_edges = self.config._create_spac_bins() * global_mean_spacing
 
         # Unfolded nearest neighbor level spacing bin edges
-        unf_spac_bin_edges = self._create_spac_bins()
+        unf_spac_bin_edges = self.config._create_spac_bins()
 
         # Create times array
-        times = self._create_times_array(base=self.ensemble.dim)
+        times = self.config._create_times_array(base=self.ensemble.dim)
         times *= j_1_1 / self.ensemble.E0
 
         # Create unfolded times array
-        unf_times = self._create_unf_times_array(base=self.ensemble.dim)
+        unf_times = self.config._create_unf_times_array(base=self.ensemble.dim)
         unf_times *= 2 * np.pi
 
         # Initialize spectral histogram
-        spec_hist = np.zeros(self.spec_num_bins)
+        spec_hist = np.zeros(self.config.spec_num_bins)
 
         # Initialize unfolded spectral histogram
-        unf_spec_hist = np.zeros(self.spec_num_bins)
+        unf_spec_hist = np.zeros(self.config.spec_num_bins)
 
         # Initialize nearest neighbor level spacing histogram
-        spac_hist = np.zeros(self.spac_num_bins)
+        spac_hist = np.zeros(self.config.spac_num_bins)
 
         # Initialize unfolded nearest neighbor level spacing histogram
-        unf_spac_hist = np.zeros(self.spac_num_bins)
+        unf_spac_hist = np.zeros(self.config.spac_num_bins)
 
         # Determine number of time points based on resolve_dip flag
-        num_times = 3 * self.num_times if self.resolve_dip else self.num_times
+        num_times = (
+            3 * self.config.num_times
+            if self.config.resolve_dip
+            else self.config.num_times
+        )
 
         # Initialize spectral form factor moments
         mu_1 = np.zeros(num_times, dtype=np.complex128)
