@@ -247,13 +247,16 @@ class SpectralStatistics(MonteCarlo):
             unf_mu_1 += unf_moments[0]
             unf_mu_2 += unf_moments[1]
 
+        # Determine ID of worker
+        process_id = os.environ.get("SLURM_PROCID", "0")
+
         # Create file name for output
-        file_name = os.path.join(self.outdir, f"{self.worker_id}.npz")
+        file_name = os.path.join(self.outdir, f"{process_id}.npz")
 
         # Create temporary file name for output
-        temp_file_name = os.path.join(self.outdir, f"{self.worker_id}.tmp.npz")
+        temp_file_name = os.path.join(self.outdir, f"{process_id}.npz.tmp")
 
-        # Scale realizations by number of SLURM workers
+        # Scale realizations by number of SLURM tasks
         realizs = int(os.environ.get("SLURM_NTASKS", 1)) * self.realizs
 
         # Save results to temporary file first
@@ -298,10 +301,6 @@ def main() -> None:
 
     # Parse command line arguments
     mc_args = _parse_mc_args(parser)
-
-    # Grab process ID from environment variable if it exists
-    if mc_args["worker_id"] is None:
-        mc_args["worker_id"] = int(os.environ.get("SLURM_PROCID", 0))
 
     # Create an instance of the SpectralStatistics class
     mc = SpectralStatistics(**mc_args)
