@@ -9,6 +9,7 @@ from __future__ import annotations
 import os
 from argparse import ArgumentParser
 from dataclasses import dataclass
+from pathlib import Path
 
 # Third-party imports
 import numpy as np
@@ -23,9 +24,15 @@ from rmtpy.analyses._analysis import Analysis, _parse_analysis_args
 @dataclass(repr=False, eq=False, frozen=True, kw_only=True, slots=True)
 class SpectralStatistics(Analysis):
     def run(self) -> None:
-        """Run the spectral statistics analysis."""
+        # Put all file names from directory into a list
+        files = [
+            str(file.resolve())
+            for file in Path(self.data_dir).iterdir()
+            if file.is_file() and file.suffix == ".npz"
+        ]
+
         # Initialize final results with first .npz file
-        results = np.load(self.files[0])
+        results = np.load(files[0])
 
         # Store histogram bin edges and time arrays
         spec_bin_edges = results["spec_bin_edges"]
@@ -49,7 +56,7 @@ class SpectralStatistics(Analysis):
         realizs = results["realizs"]
 
         # Loop through remaining .npz files
-        for file in self.files[1:]:
+        for file in files[1:]:
             # Load results
             results = np.load(file)
 
@@ -113,13 +120,13 @@ def main() -> None:
     parser = ArgumentParser(description="Spectral Statistics Monte Carlo Simulation")
 
     # Parse command line arguments
-    mc_args = _parse_analysis_args(parser)
+    analysis_args = _parse_analysis_args(parser)
 
-    # Create an instance of the SpectralStatistics class
-    mc = SpectralStatistics(**mc_args)
+    # Create an instance of SpectralStatistics class
+    analysis = SpectralStatistics(**analysis_args)
 
-    # Run simulation
-    mc.run()
+    # Run analysis
+    analysis.run()
 
 
 # If this script is run directly, execute main function

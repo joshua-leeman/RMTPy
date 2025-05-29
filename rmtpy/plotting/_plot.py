@@ -27,8 +27,8 @@ def _parse_plot_args(parser: ArgumentParser) -> dict[str]:
     """Parse command line arguments for plotting."""
     # Add argument for data path
     parser.add_argument(
-        "-f",
-        "--data_path",
+        "-d",
+        "--data_dir",
         type=str,
         required=True,
         help="Path to the data file to be plotted.",

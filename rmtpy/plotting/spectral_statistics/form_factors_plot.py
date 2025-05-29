@@ -253,6 +253,7 @@ class FormFactorPlot(Plot):
                 zorder=self.usff_zorder,
                 label=self.usff_legend,
             )
+
         # Plot grid lines on major x-ticks
         self.ax.vlines(
             self.tick_times[1:-1],

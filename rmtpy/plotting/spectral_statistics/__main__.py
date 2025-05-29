@@ -24,7 +24,7 @@ def main() -> None:
     parser = ArgumentParser(description="Spectral Statistics Plotter")
 
     # Obtain file path from command line arguments
-    data_path = _parse_plot_args(parser)["data_path"]
+    data_path = _parse_plot_args(parser)["data_dir"]
 
     # Initialize spectral histogram
     spec_plot = SpectralHistogram(data_path=data_path, unfold=False)
