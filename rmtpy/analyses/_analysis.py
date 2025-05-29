@@ -11,6 +11,7 @@ import re
 from abc import ABC, abstractmethod
 from argparse import ArgumentParser
 from dataclasses import dataclass
+from pathlib import Path
 
 # Local application imports
 from rmtpy.utils import ensemble_from_path
@@ -22,17 +23,16 @@ from rmtpy.utils import ensemble_from_path
 def _parse_analysis_args(parser: ArgumentParser) -> dict:
     # Add list of files argument
     parser.add_argument(
-        "-f",
-        "--files",
+        "-d",
+        "--data_dir",
         type=str,
-        nargs="+",
         required=True,
-        help="list of files to analyze (required)",
+        help="directory of data to analyze (required)",
     )
 
     # Add output directory argument
     parser.add_argument(
-        "-d",
+        "-o",
         "--outdir",
         type=str,
         default=os.path.join(os.getcwd(), "output"),
@@ -49,7 +49,7 @@ def _parse_analysis_args(parser: ArgumentParser) -> dict:
 @dataclass(repr=False, eq=False, frozen=True, kw_only=True, slots=True)
 class Analysis(ABC):
     # List of files to analyze
-    files: list[str]
+    data_dir: str
 
     # Output directory
     outdir: str = os.path.join(os.getcwd(), "output")
@@ -66,8 +66,15 @@ class Analysis(ABC):
         mc_path = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", mc_path)
         mc_path = mc_path.lower()
 
+        # Put all file names from directory into a list
+        files = [
+            str(file.resolve())
+            for file in Path(self.data_dir).iterdir()
+            if file.is_file() and file.suffix == ".npz"
+        ]
+
         # Initialize ensemble from first file
-        ensemble = ensemble_from_path(self.files[0])
+        ensemble = ensemble_from_path(files[0])
 
         # Further specify output directory with simulation and ensemble
         outdir = os.path.join(self.outdir, mc_path, ensemble._to_path())
