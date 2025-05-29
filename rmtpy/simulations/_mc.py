@@ -49,15 +49,6 @@ def _parse_mc_args(parser: ArgumentParser) -> dict:
         help="output directory (default is current working directory)",
     )
 
-    # Add worker ID argument
-    parser.add_argument(
-        "-id",
-        "--worker_id",
-        type=Optional[int],
-        default=None,
-        help="worker ID (default is None)",
-    )
-
     # Parse arguments into dictionary
     mc_args = vars(parser.parse_args())
 
@@ -81,9 +72,6 @@ class MonteCarlo(ABC):
 
     # Output directory
     outdir: str
-
-    # Worker ID
-    worker_id: int = 0
 
     # Configuration object
     config: Optional[Any] = None
