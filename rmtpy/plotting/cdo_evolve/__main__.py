@@ -27,10 +27,28 @@ def main() -> None:
     data_path = _parse_plot_args(parser)["data_dir"]
 
     # Initialize observable plot
-    spec_plot = ObservablePlot(data_path=data_path)
+    obs_plot = ObservablePlot(data_path=data_path)
 
-    # Plot spectral histogram
-    spec_plot.plot()
+    # Plot observable plot
+    obs_plot.plot()
+
+    # Initialize observable plot
+    prob_plot = ProbabilitiesPlot(data_path=data_path)
+
+    # Plot observable plot
+    prob_plot.plot()
+
+    # Initialize observable plot
+    purity_plot = PurityPlot(data_path=data_path)
+
+    # Plot observable plot
+    purity_plot.plot()
+
+    # Initialize observable plot
+    entropy_plot = EntropyPlot(data_path=data_path)
+
+    # Plot observable plot
+    entropy_plot.plot()
 
 
 # If this script is run directly, execute main function
