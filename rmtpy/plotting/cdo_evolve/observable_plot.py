@@ -190,6 +190,10 @@ class ObservablePlot(Plot):
         # Create short notations for ensemble attributes
         dim = self.ensemble.dim
 
+        # Calculate theoretical observable expectation and variance
+        theo_expect = np.sum(obs_eigvals) / a_max / dim
+        theo_std = np.sqrt(np.sum(obs_eigvals**2) / a_max**2 / dim - theo_expect**2)
+
         # Set x- and y-scales to logarithmic
         self.ax.set_xscale("log", base=dim)
 
@@ -241,6 +245,18 @@ class ObservablePlot(Plot):
             self.tick_times[1:-1],
             self.ylim[0],
             self.ylim[1],
+            color=self.grid_color,
+            linestyle=self.grid_linestyle,
+            linewidth=self.grid_linewidth,
+            alpha=self.grid_alpha,
+            zorder=self.grid_zorder,
+        )
+
+        # Create horizontal grid lines
+        self.ax.hlines(
+            [theo_expect, theo_expect + theo_std, theo_expect - theo_std],
+            self.xlim[0],
+            self.xlim[1],
             color=self.grid_color,
             linestyle=self.grid_linestyle,
             linewidth=self.grid_linewidth,
