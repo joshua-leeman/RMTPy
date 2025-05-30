@@ -20,6 +20,11 @@ from rmtpy.ensembles._rmt import ManyBodyEnsemble
 # =======================================
 # 2. Many-body Compound Ensemble
 # =======================================
+# Store class name for module
+class_name = "ManyBodyCompound"
+
+
+# Define Many-body Compound Ensemble class
 @dataclass(repr=False, eq=False, frozen=False, kw_only=True, slots=True)
 class ManyBodyCompound:
     # Underlying ensemble
@@ -63,7 +68,7 @@ class ManyBodyCompound:
         # If TRS enabled, select columns from a Hadamard matrix
         if self.time_reversal:
             # Select columns from Hadamard matrix of size ensemble dimension
-            W = hadamard(self.dim, dtype=self.real_dtype)[:, : self.channels]
+            W = hadamard(self.dim, dtype=self.dtype)[:, : self.channels]
 
             # Normalize columns to have norms equal to strength in place
             W *= self.strength / np.sqrt(self.dim)
@@ -73,8 +78,8 @@ class ManyBodyCompound:
         # If TRS disabled, create normalized DFT matrix
         else:
             # Create only first columns from normalized DFT matrix
-            j = np.arange(self.dim, dtype=self.real_dtype)[:, np.newaxis]
-            k = np.arange(self.channels, dtype=self.real_dtype)[np.newaxis, :]
+            j = np.arange(self.dim, dtype=self.dtype)[:, np.newaxis]
+            k = np.arange(self.channels, dtype=self.dtype)[np.newaxis, :]
             W = np.exp(-2j * np.pi * j * k / self.dim)
 
             # Normalize columns to have norms equal to strength in place
