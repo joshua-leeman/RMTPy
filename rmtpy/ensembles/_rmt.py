@@ -343,7 +343,7 @@ class CDOMixin:
 
 
 # =======================================
-# 5. Many Body Ensemble Class
+# 5. Many-body Ensemble Class
 # =======================================
 @dataclass(repr=False, eq=False, frozen=True, kw_only=True, slots=True)
 class ManyBodyEnsemble(RMT, SpectralMixin, CDOMixin):
