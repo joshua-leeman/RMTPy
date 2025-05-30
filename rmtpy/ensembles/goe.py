@@ -31,23 +31,25 @@ class GOE(GaussianEnsemble):
     # Dyson index
     beta: int = field(init=False, default=1)
 
-    def randm(self, out: Optional[np.ndarray] = None) -> np.ndarray:
+    def randm(self, offset: Optional[np.ndarray] = None) -> np.ndarray:
         """Generate a random matrix from the GOE."""
-        # If out is None, allocate memory for matrix
-        if out is None:
-            H = np.empty((self.dim, self.dim), dtype=self.dtype, order="F")
+        # If offset is None, allocate memory for matrix
+        if offset is None:
+            H = np.zeros((self.dim, self.dim), dtype=self.dtype, order="F")
         else:
-            H = out
+            H = offset
 
-        # Set standard normals for real parts and zero for imaginary parts
-        H.real = self._rng.standard_normal(H.shape, dtype=self.real_dtype)
-        H.imag = np.zeros(H.shape, dtype=self.real_dtype)
+        # Loop over diagonal indices
+        for i in range(self.dim):
+            # Generate a random array of standard normal values
+            rands = self._rng.standard_normal(self.dim - i, dtype=self.real_dtype)
 
-        # Symmetrize matrix in place
-        np.add(H, H.T, out=H)
+            # Scale random values by real standard deviation
+            rands *= self.sigma / np.sqrt(2.0)
 
-        # Halve and scale matrix by real standard deviation in place
-        H *= self.sigma / 2
+            # Add to ith row and ith column
+            H[i, i:] += rands
+            H[i:, i] += rands
 
         # Return GOE matrix
         return H
