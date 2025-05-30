@@ -152,13 +152,16 @@ class SpectralMixin:
 
     def eig_stream(self, realizs: int) -> Iterator[tuple[np.ndarray, np.ndarray]]:
         """Iterator to stream eigensystem realizations."""
-        # Allocate memory for random Hermitian matrix
+        # Allocate memory for random Hermitian matrices
         H = np.empty((self.dim, self.dim), dtype=self.dtype, order="F")
 
         # Loop over realizations
         for _ in range(realizs):
+            # Zero out the matrix
+            H.fill(0.0)
+
             # Generate random matrix
-            self.randm(out=H)
+            self.randm(offset=H)
 
             # Compute and yield eigenvalues and eigenvectors
             yield eigh(H, overwrite_a=True, check_finite=False)
@@ -170,8 +173,11 @@ class SpectralMixin:
 
         # Loop over realizations
         for _ in range(realizs):
+            # Zero out the matrix
+            H.fill(0.0)
+
             # Generate random matrix
-            self.randm(out=H)
+            self.randm(offset=H)
 
             # Compute and yield eigenvalues
             yield eigvalsh(H, overwrite_a=True, check_finite=False)
@@ -189,7 +195,7 @@ class SpectralMixin:
         # return numerical_pdf()(eigval)
 
         # Raise NotImplementedError if not implemented
-        raise NotImplementedError("Subclasses must implement this PDF method.")
+        # raise NotImplementedError("Subclasses must implement this PDF method.")
 
     def cdf(self, eigval: np.ndarray) -> np.ndarray:
         """Average cumulative density of energy eigenstates."""
@@ -293,60 +299,10 @@ class SpectralMixin:
 
 
 # =======================================
-# 4. Chaotic Density Operator Mixin
-# =======================================
-class CDOMixin:
-    def __init_subclass__(cls):
-        """Check if subclasses define required attributes."""
-        # Run parent class __init_subclass__ for compatibility
-        super().__init_subclass__()
-
-        # Check if required attributes are defined in class hierarchy
-        for attr in ("dim", "dtype", "randm", "eig_stream", "unfold"):
-            if not any(hasattr(base, attr) for base in cls.__mro__):
-                raise TypeError(f"{cls.__name__} must define '{attr} to use mixin.")
-
-    def evolve_states(
-        self,
-        state: np.ndarray,
-        times: np.ndarray,
-        realizs: int,
-        unfold: bool = False,
-        out: Optional[np.ndarray] = None,
-    ) -> np.ndarray:
-        # If out is None, allocate memory for output
-        if out is None:
-            out = np.empty((times.size, realizs, self.dim), dtype=self.dtype, order="F")
-
-        # Loop over eigensystem realizations
-        for r, (eigvals, eigvecs) in enumerate(self.eig_stream(realizs)):
-            # Unfold eigenvalues if requested
-            if unfold:
-                eigvals = self.unfold(eigvals)
-
-            # Rotate initial state into eigenbasis
-            rotated_state = np.matmul(eigvecs.conj().T, state)
-
-            # Construct time evolution operator in place
-            np.outer(times, eigvals, out=out[:, r, :])
-            np.multiply(-1j, out[:, r, :], out=out[:, r, :])
-            np.exp(out[:, r, :], out=out[:, r, :])
-
-            # Evolve state in eigenbasis in place
-            np.multiply(out[:, r, :], rotated_state, out=out[:, r, :])
-
-            # Rotate back to original basis
-            np.matmul(out[:, r, :], eigvecs.T, out=out[:, r, :])
-
-        # Return evolved states
-        return out
-
-
-# =======================================
-# 5. Many-body Ensemble Class
+# 4. Many-body Ensemble Class
 # =======================================
 @dataclass(repr=False, eq=False, frozen=True, kw_only=True, slots=True)
-class ManyBodyEnsemble(RMT, SpectralMixin, CDOMixin):
+class ManyBodyEnsemble(RMT, SpectralMixin):
     """Base class for quantum-chaotic many-body ensembles."""
 
     # Number of Majorana particles
@@ -419,7 +375,7 @@ class ManyBodyEnsemble(RMT, SpectralMixin, CDOMixin):
 
 
 # =======================================
-# 6. Gaussian Ensemble Class
+# 5. Gaussian Ensemble Class
 # =======================================
 @dataclass(repr=False, eq=False, frozen=True, kw_only=True, slots=True)
 class GaussianEnsemble(ManyBodyEnsemble):
