@@ -60,7 +60,7 @@ class PurityPlot(Plot):
     unfold: bool = False
 
     # Plot file name
-    plot_filename: str = "purity_plot"
+    file_name: str = "purity_plot"
 
     # Quantum purity curve parameters
     qp_color: str = "Blue"
@@ -169,8 +169,8 @@ class PurityPlot(Plot):
 
         # Unpack purity data
         times = self.data["times"]
-        q_purity = self.data["quantum_purity"]
-        c_purity = self.data["classical_purity"]
+        c_purity = self.data["c_purity"]
+        q_purity = self.data["q_purity"]
 
         # Create short notations for dimension
         dim = self.ensemble.dim
@@ -222,4 +222,4 @@ class PurityPlot(Plot):
         )
 
         # Finish plot and save it to a file
-        self.set_plot()
+        self.set_plot(unfold=self.unfold)
