@@ -60,7 +60,7 @@ class ProbabilitiesPlot(Plot):
     unfold: bool = False
 
     # Plot file name
-    plot_filename: str = "probabilities_plot"
+    file_name: str = "probabilities_plot"
 
     # Revival probability curve parameters
     p0_color: str = "Blue"
@@ -169,7 +169,7 @@ class ProbabilitiesPlot(Plot):
 
         # Unpack probabilities data
         times = self.data["times"]
-        probabilities = self.data["probabilities"]
+        probabilities = self.data["probs"]
 
         # Unpack revival and other probabilities
         p0 = probabilities[:, 0]
@@ -225,4 +225,4 @@ class ProbabilitiesPlot(Plot):
         )
 
         # Finish plot and save it to a file
-        self.set_plot()
+        self.set_plot(unfold=self.unfold)
