@@ -110,7 +110,7 @@ def _parse_cdo_evolve_args(parser: ArgumentParser) -> dict:
 @dataclass(repr=False, eq=False, frozen=True, kw_only=True, slots=True)
 class Config:
     # Simulation parameters
-    num_times: int = 500
+    num_times: int = max(int(os.environ.get("SLURM_NTASKS", "1")), 500)
     logtime_i: float = -0.5  # base = dim
     logtime_f: float = 1.5  # base = dim
     unf_logtime_i: float = -1.5  # base = dim
