@@ -60,7 +60,7 @@ class EntropyPlot(Plot):
     unfold: bool = False
 
     # Plot file name
-    plot_filename: str = "entropy_plot"
+    file_name: str = "entropy_plot"
 
     # Entropy curve parameters
     e_color: str = "Red"
@@ -205,4 +205,4 @@ class EntropyPlot(Plot):
         )
 
         # Finish plot and save it to a file
-        self.set_plot()
+        self.set_plot(unfold=self.unfold)
