@@ -48,8 +48,8 @@ class GOE(GaussianEnsemble):
             rands *= self.sigma / np.sqrt(2.0)
 
             # Add to ith row and ith column
-            H[i, i:] += rands
-            H[i:, i] += rands
+            H[i, i:].real += rands
+            H[i:, i].real += rands
 
         # Return GOE matrix
         return H
