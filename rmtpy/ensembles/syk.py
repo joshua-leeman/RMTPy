@@ -77,15 +77,14 @@ class SYK(ManyBodyEnsemble):
         # Residual memory is required to store the Majorana pairs in bytes
         object.__setattr__(self, "resid_memory", comb(self.N, 2) * (24 * self.dim + 6))
 
-    def randm(self, out: Optional[np.ndarray] = None) -> None:
+    def randm(self, offset: Optional[np.ndarray] = None) -> None:
         """Generate a random matrix from the SYK ensemble."""
         # If out is None, create a new zeroed array
-        if out is None:
+        if offset is None:
             H = np.zeros((self.dim, self.dim), dtype=self.dtype, order="F")
         # If out is provided, zero it
         else:
-            H = out
-            H[:, :] = 0.0
+            H = offset
 
         # Create Majorana operators if not already created
         if self.majorana_pairs is None:
