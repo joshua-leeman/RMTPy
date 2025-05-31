@@ -11,7 +11,6 @@ from typing import Callable, Iterator, Optional
 
 # Third-party imports
 import numpy as np
-from scipy.linalg import eigh, eigvalsh
 from scipy.linalg.lapack import get_lapack_funcs
 
 # Local application imports
@@ -52,36 +51,43 @@ class Poisson(ManyBodyEnsemble):
         # Calculate and set complex standard deviation
         object.__setattr__(self, "sigma", 2 * self.E0)
 
-    def randm(self, out: Optional[np.ndarray] = None) -> np.ndarray:
+    def randm(self, offset: Optional[np.ndarray] = None) -> np.ndarray:
         """Generate a random matrix from the Poisson ensemble."""
         # If out is None, allocate memory for matrix
-        if out is None:
-            U = np.empty((self.dim, self.dim), dtype=self.dtype, order="F")
+        if offset is None:
+            H = np.zeros((self.dim, self.dim), dtype=self.dtype, order="F")
         else:
-            U = out
+            H = offset
 
-        # Allocate memory for eigenvalues
-        eigvals = np.empty(self.dim, dtype=self.real_dtype, order="F")
+        # Allocate memory for complex Ginibre matrix
+        M = np.empty((self.dim, self.dim), dtype=self.dtype, order="F")
 
         # Build complex Ginibre matrix
-        U.real = self._rng.standard_normal((self.dim, self.dim), dtype=self.real_dtype)
-        U.imag = self._rng.standard_normal((self.dim, self.dim), dtype=self.real_dtype)
-        U /= np.sqrt(2)
+        M.real = self._rng.standard_normal((self.dim, self.dim), dtype=self.real_dtype)
+        M.imag = self._rng.standard_normal((self.dim, self.dim), dtype=self.real_dtype)
+        M /= np.sqrt(2)
 
-        # Perform in-place QR decomposition
-        qr_fact, tau, _, _ = self._zgeqrf(U, overwrite_a=True)
+        # In-place QR decomposition
+        qr_fact, tau, _, _ = self._zgeqrf(M, overwrite_a=True)
         U, _, _ = self._zungqr(qr_fact, tau, overwrite_a=True)
 
         # Generate iid uniform random eigenvalues
-        eigvals[:] = self._rng.random(self.dim, dtype=self.real_dtype)
+        eigvals = self._rng.random(self.dim, dtype=self.real_dtype)
         eigvals -= 0.5
         eigvals *= self.sigma
 
         # Calculate Poisson ensemble matrix
-        np.dot(U, U.conj().T * eigvals[:, None], out=out)
+        tmp = U * eigvals[None, :]
+        M[:] = tmp @ U.conj().T
+        H += M
+
+        # Clip small real/imag parts to remove floating-point noise
+        threshold = 1e-7
+        H.real[np.abs(H.real) < threshold] = 0.0
+        H.imag[np.abs(H.imag) < threshold] = 0.0
 
         # Return Poisson ensemble matrix
-        return out
+        return H
 
     def eig_stream(self, realizs: int) -> Iterator[tuple[np.ndarray, np.ndarray]]:
         """Iterator to stream eigensystem realizations."""
