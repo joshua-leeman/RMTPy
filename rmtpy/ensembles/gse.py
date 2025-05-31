@@ -31,52 +31,68 @@ class GSE(GaussianEnsemble):
     # Dyson index
     beta: int = field(init=False, default=4)
 
-    def randm(self, out: Optional[np.ndarray] = None) -> np.ndarray:
+    def randm(self, offset: Optional[np.ndarray] = None) -> np.ndarray:
         """Generate a random matrix from the GSE."""
-        # If out is None, allocate memory for matrix
-        if out is None:
-            H = np.empty((self.dim, self.dim), dtype=self.dtype, order="F")
+        # If offset is None, allocate memory for matrix
+        if offset is None:
+            H = np.zeros((self.dim, self.dim), dtype=self.dtype, order="F")
         else:
-            H = out
+            H = offset
 
         # Compute block dimension
         bdim = self.dim // 2
 
-        # Generate GUE in top-left block
-        H[:bdim, :bdim].real = self._rng.standard_normal(
-            (bdim, bdim), dtype=self.real_dtype
-        )
-        H[:bdim, :bdim].imag = self._rng.standard_normal(
-            (bdim, bdim), dtype=self.real_dtype
-        )
-        np.add(
-            H[:bdim, :bdim],
-            H[:bdim, :bdim].T.conj(),
-            out=H[:bdim, :bdim],
-        )
+        # Generate blocks of GSE matrix
+        for i in range(bdim):
+            # Generate a random array of standard normal values for real parts
+            real_rands = self._rng.standard_normal(bdim - i, dtype=self.real_dtype)
 
-        # Generate complex anti-symmetric matrix in top-right block
-        H[:bdim, bdim:].real = self._rng.standard_normal(
-            (bdim, bdim), dtype=self.real_dtype
-        )
-        H[:bdim, bdim:].imag = self._rng.standard_normal(
-            (bdim, bdim), dtype=self.real_dtype
-        )
-        np.subtract(
-            H[:bdim, bdim:],
-            H[:bdim, bdim:].T,
-            out=H[:bdim, bdim:],
-        )
+            # Generate a random array of standard normal values for imaginary parts
+            imag_rands = self._rng.standard_normal(bdim - i, dtype=self.real_dtype)
 
-        # Write bottom-left block as negative complex conjugate of top-right block
-        np.conjugate(H[:bdim, bdim:], out=H[bdim:, :bdim])
-        np.negative(H[bdim:, :bdim], out=H[bdim:, :bdim])
+            # Scale random values by complex standard deviation
+            real_rands *= self.sigma / 2
+            imag_rands *= self.sigma / 2
 
-        # Write bottom-right block as complex conjugate of top-left block
-        np.conjugate(H[:bdim, :bdim], out=H[bdim:, bdim:])
+            # Add real and imaginary parts of GUE in top-left block
+            H[i, i:bdim].real += real_rands
+            H[i, i:bdim].imag += imag_rands
+            H[i:bdim, i].real += real_rands
+            H[i:bdim, i].imag -= imag_rands
 
-        # Halve and scale matrix by complex standard deviation in place
-        H *= self.sigma / np.sqrt(2) / 2
+            # Add conjugate of top-left block to bottom-right block
+            H[bdim + i, bdim + i :].real += real_rands
+            H[bdim + i, bdim + i :].imag -= imag_rands
+            H[bdim + i :, bdim + i].real += real_rands
+            H[bdim + i :, bdim + i].imag += imag_rands
+
+            # Generate random array of standard normal values for real parts
+            real_rands = np.zeros(bdim - i, dtype=self.real_dtype)
+            real_rands[1:] += self._rng.standard_normal(
+                bdim - i - 1, dtype=self.real_dtype
+            )
+
+            # Generate random array of standard normal values for imaginary parts
+            imag_rands = np.zeros(bdim - i, dtype=self.real_dtype)
+            imag_rands[1:] += self._rng.standard_normal(
+                bdim - i - 1, dtype=self.real_dtype
+            )
+
+            # Scale random values by complex standard deviation
+            real_rands *= self.sigma / 2
+            imag_rands *= self.sigma / 2
+
+            # Add real and imaginary parts of complex anti-symmetric in top-right block
+            H[i, bdim + i :].real += real_rands
+            H[i, bdim + i :].imag += imag_rands
+            H[i:bdim, bdim + i].real -= real_rands
+            H[i:bdim, bdim + i].imag -= imag_rands
+
+            # Add negative conjugate of top-right block to bottom-left block
+            H[bdim + i, i:bdim].real -= real_rands
+            H[bdim + i, i:bdim].imag += imag_rands
+            H[bdim + i :, i].real += real_rands
+            H[bdim + i :, i].imag -= imag_rands
 
         # Return GSE matrix
         return H
