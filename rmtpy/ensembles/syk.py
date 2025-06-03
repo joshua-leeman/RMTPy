@@ -79,10 +79,10 @@ class SYK(ManyBodyEnsemble):
 
     def randm(self, offset: Optional[np.ndarray] = None) -> None:
         """Generate a random matrix from the SYK ensemble."""
-        # If out is None, create a new zeroed array
+        # If offset is None, create a new zeroed array
         if offset is None:
             H = np.zeros((self.dim, self.dim), dtype=self.dtype, order="F")
-        # If out is provided, zero it
+        # If offset is provided, point H to it
         else:
             H = offset
 
@@ -94,6 +94,9 @@ class SYK(ManyBodyEnsemble):
         coeffs = self._rng.standard_normal(
             size=comb(self.N, self.q), dtype=self.real_dtype
         )
+
+        # Scale coefficients by standard deviation
+        coeffs *= self.sigma
 
         # Retrieve indices for Hamiltonian terms
         indices = tuple(itertools.combinations(range(self.N), self.q))
@@ -115,10 +118,9 @@ class SYK(ManyBodyEnsemble):
             q_coo = q_body[: self.dim, : self.dim].tocoo()
 
             # Add q-body operator to Hamiltonian
-            H[q_coo.row, q_coo.col] += coeff * q_coo.data
-
-        # Scale Hamiltonian by standard deviation and global phase
-        H *= 1j ** (self.q * (self.q - 1) / 2) * self.sigma
+            H[q_coo.row, q_coo.col] += (
+                1j ** (self.q * (self.q - 1) / 2) * coeff * q_coo.data
+            )
 
         # Return SYK Hamiltonian
         return H

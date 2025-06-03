@@ -7,11 +7,11 @@
 # Standard library imports
 from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any, Iterator, Optional
 
 # Third-party imports
 import numpy as np
-from scipy.linalg import hadamard
+from scipy.linalg import eig, eigvals, hadamard
 
 # Local application imports
 from rmtpy.ensembles._rmt import ManyBodyEnsemble
@@ -21,12 +21,12 @@ from rmtpy.ensembles._rmt import ManyBodyEnsemble
 # 2. Many-body Compound Ensemble
 # =======================================
 # Store class name for module
-class_name = "ManyBodyCompound"
+class_name = "Compound"
 
 
 # Define Many-body Compound Ensemble class
 @dataclass(repr=False, eq=False, frozen=False, kw_only=True, slots=True)
-class ManyBodyCompound:
+class Compound:
     # Underlying ensemble
     ensemble: ManyBodyEnsemble
 
@@ -87,3 +87,35 @@ class ManyBodyCompound:
 
             # Store coupling matrix
             object.__setattr__(self, "coupling", W)
+
+    def eff_H_eig_stream(self, realizs: int) -> Iterator[tuple[np.ndarray, np.ndarray]]:
+        # Allocate memory for random effective Hamiltonian stream
+        H_eff = np.empty((self.dim, self.dim), dtype=self.dtype)
+
+        # Loop over realizations
+        for _ in range(realizs):
+            # Reset effective Hamiltonian with width term
+            np.matmul(self.coupling, self.coupling.conj().T, out=H_eff)
+            H_eff *= -1j * np.pi
+
+            # Add random part from underlying ensemble
+            self.ensemble.randm(offset=H_eff)
+
+            # Compute and yield eigenvalues
+            yield eig(H_eff, overwrite_a=True, check_finite=False)
+
+    def eff_H_eigvals_stream(self, realizs: int) -> Iterator[np.ndarray]:
+        # Allocate memory for random effective Hamiltonian stream
+        H_eff = np.empty((self.dim, self.dim), dtype=self.dtype)
+
+        # Loop over realizations
+        for _ in range(realizs):
+            # Reset effective Hamiltonian with width term
+            np.matmul(self.coupling, self.coupling.conj().T, out=H_eff)
+            H_eff *= -1j * np.pi
+
+            # Add random part from underlying ensemble
+            self.ensemble.randm(offset=H_eff)
+
+            # Compute and yield eigenvalues
+            yield eigvals(H_eff, overwrite_a=True, check_finite=False)
