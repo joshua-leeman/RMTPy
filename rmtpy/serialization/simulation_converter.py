@@ -19,7 +19,7 @@ from ._converter import normalize_dict, converter
 # ---------------------------------
 # Default Structure Hook Dictionary
 # ---------------------------------
-DEFAULT_STRUCTURE_HOOK: dict[str, Callable] = {
+SIM_STRUCTURE_HOOKS: dict[str, Callable] = {
     key: converter.get_structure_hook(val) for key, val in SIMULATION_REGISTRY.items()
 }
 
@@ -27,7 +27,7 @@ DEFAULT_STRUCTURE_HOOK: dict[str, Callable] = {
 # -----------------------------------
 # Default Unstructure Hook Dictionary
 # -----------------------------------
-DEFAULT_UNSTRUCTURE_HOOK: dict[str, Callable] = {
+SIM_UNSTRUCTURE_HOOKS: dict[str, Callable] = {
     key: converter.get_unstructure_hook(val) for key, val in SIMULATION_REGISTRY.items()
 }
 
@@ -86,9 +86,7 @@ def data_structure_hook(src: str | Path | dict[str, Any] | NpzFile | Data, _) ->
 # Register Simulation Structure Hook
 # ----------------------------------
 @converter.register_structure_hook
-def simulation_structure_hook(
-    src: str | Path | dict[str, Any] | Simulation, _
-) -> Simulation:
+def sim_structure_hook(src: str | Path | dict[str, Any] | Simulation, _) -> Simulation:
     """Convert a general dictionary to a Simulation instance."""
     # If src is already a valid instance, return it
     if type(src) in SIMULATION_REGISTRY.values():
@@ -142,7 +140,7 @@ def simulation_structure_hook(
         raise ValueError(f"Invalid simulation args type: {type(sim_args).__name__}")
 
     # Use base structure hook to convert normalized dictionary to instance
-    sim_inst: Simulation = DEFAULT_STRUCTURE_HOOK[sim_key](sim_args, sim_cls)
+    sim_inst: Simulation = SIM_STRUCTURE_HOOKS[sim_key](sim_args, sim_cls)
 
     # Check if data is provided
     if data is not None:
@@ -157,21 +155,19 @@ def simulation_structure_hook(
 # Register Simulation Unstructure Hook
 # ------------------------------------
 @converter.register_unstructure_hook
-def simulation_unstructure_hook(
-    simulation: Simulation,
-) -> dict[str, str | dict[str, Any]]:
+def sim_unstructure_hook(sim: Simulation) -> dict[str, str | dict[str, Any]]:
     """Convert an Simulation instance to a normalized dictionary."""
     # Initialize empty normalized dictionary
     sim_dict = {}
 
     # Store simulation name in normalized dictionary
-    sim_dict["name"] = type(simulation).__name__
+    sim_dict["name"] = type(sim).__name__
 
     # Convert simulation name to registry key format
     sim_key = re.sub(r"_", "", sim_dict["name"]).lower()
 
     # Use default unstructure hook to get arguments
-    sim_args = DEFAULT_UNSTRUCTURE_HOOK[sim_key](simulation)
+    sim_args = SIM_UNSTRUCTURE_HOOKS[sim_key](sim)
 
     # Store simulation arguments in normalized dictionary
     sim_dict["args"] = sim_args
