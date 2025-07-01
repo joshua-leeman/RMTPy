@@ -14,7 +14,7 @@ from ._manybody import GaussianEnsemble
 # ----------------------------------
 # Gaussian Orthogonal Ensemble (GOE)
 # ----------------------------------
-@frozen(kw_only=True, eq=False, unsafe_hash=False)
+@frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
 class GOE(GaussianEnsemble):
     @property
     def beta(self: GOE) -> int:
