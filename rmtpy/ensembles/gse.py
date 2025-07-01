@@ -14,7 +14,7 @@ from ._manybody import GaussianEnsemble
 # ----------------------------------
 # Gaussian Symplectic Ensemble (GSE)
 # ----------------------------------
-@frozen(kw_only=True, eq=False, unsafe_hash=False)
+@frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
 class GSE(GaussianEnsemble):
     @property
     def beta(self: GSE) -> int:
