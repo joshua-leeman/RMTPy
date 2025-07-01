@@ -13,7 +13,7 @@ from ._converter import normalize_dict, converter
 # ---------------------------------
 # Default Structure Hook Dictionary
 # ---------------------------------
-DEFAULT_STRUCTURE_HOOK: dict[str, Callable] = {
+ENS_STRUCTURE_HOOKS: dict[str, Callable] = {
     key: converter.get_structure_hook(val) for key, val in ENSEMBLE_REGISTRY.items()
 }
 
@@ -21,7 +21,7 @@ DEFAULT_STRUCTURE_HOOK: dict[str, Callable] = {
 # -----------------------------------
 # Default Unstructure Hook Dictionary
 # -----------------------------------
-DEFAULT_UNSTRUCTURE_HOOK: dict[str, Callable] = {
+ENS_UNSTRUCTURE_HOOKS: dict[str, Callable] = {
     key: converter.get_unstructure_hook(val) for key, val in ENSEMBLE_REGISTRY.items()
 }
 
@@ -30,7 +30,7 @@ DEFAULT_UNSTRUCTURE_HOOK: dict[str, Callable] = {
 # Register Ensemble Structure Hook
 # --------------------------------
 @converter.register_structure_hook
-def ensemble_structure_hook(src: dict[str, Any] | Ensemble, _) -> Ensemble:
+def ens_structure_hook(src: dict[str, Any] | Ensemble, _) -> Ensemble:
     """Convert a general dictionary to an Ensemble instance."""
     # If src is already an valid instance, return it
     if type(src) in ENSEMBLE_REGISTRY.values():
@@ -56,7 +56,7 @@ def ensemble_structure_hook(src: dict[str, Any] | Ensemble, _) -> Ensemble:
         raise ValueError(f"Invalid ensemble args type: {type(ens_args).__name__}")
 
     # Use base structure hook to convert normalized dictionary
-    ens_inst: Ensemble = DEFAULT_STRUCTURE_HOOK[ens_key](ens_args, ens_cls)
+    ens_inst: Ensemble = ENS_STRUCTURE_HOOKS[ens_key](ens_args, ens_cls)
 
     # Set random number generator state
     ens_inst.set_rng_state(src.get("rng_state", None))
@@ -69,7 +69,7 @@ def ensemble_structure_hook(src: dict[str, Any] | Ensemble, _) -> Ensemble:
 # Register Ensemble Unstructure Hook
 # ----------------------------------
 @converter.register_unstructure_hook
-def ensemble_unstructure_hook(ensemble: Ensemble) -> dict[str, str | dict[str, Any]]:
+def ens_unstructure_hook(ensemble: Ensemble) -> dict[str, str | dict[str, Any]]:
     """Convert an Ensemble instance to a normalized dictionary."""
     # Initialize empty normalized dictionary
     ens_dict = {}
@@ -81,7 +81,7 @@ def ensemble_unstructure_hook(ensemble: Ensemble) -> dict[str, str | dict[str, A
     ens_key = re.sub(r"_", "", ens_dict["name"]).lower()
 
     # Use default unstructure hook to get arguments
-    ens_args = DEFAULT_UNSTRUCTURE_HOOK[ens_key](ensemble)
+    ens_args = ENS_UNSTRUCTURE_HOOKS[ens_key](ensemble)
 
     # Store ensemble arguments in normalized dictionary
     ens_dict["args"] = ens_args
