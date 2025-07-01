@@ -10,9 +10,9 @@ from ..ensembles import Ensemble, ENSEMBLE_REGISTRY
 from ._converter import normalize_dict, converter
 
 
-# -----------------------------------
+# ---------------------------------
 # Default Structure Hook Dictionary
-# -----------------------------------
+# ---------------------------------
 DEFAULT_STRUCTURE_HOOK: dict[str, Callable] = {
     key: converter.get_structure_hook(val) for key, val in ENSEMBLE_REGISTRY.items()
 }
