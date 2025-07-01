@@ -14,7 +14,7 @@ from ._manybody import GaussianEnsemble
 # ----------------------------------------
 # Bogoliubov-de Gennes C Ensemble (BdG(C))
 # ----------------------------------------
-@frozen(kw_only=True, eq=False, unsafe_hash=False)
+@frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
 class BdGC(GaussianEnsemble):
     @property
     def beta(self: BdGC) -> int:
