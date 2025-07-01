@@ -1,37 +1,27 @@
-# rmtpy.ensembles.gue.py
+# rmtpy/ensembles/gue.py
 
-
-# =======================================
-# 1. Imports
-# =======================================
-# Standard library imports
+# Postponed evaluation of annotations
 from __future__ import annotations
-from dataclasses import dataclass, field
-from typing import Optional
 
 # Third-party imports
 import numpy as np
+from attrs import frozen
 
-# Local application imports
-from rmtpy.ensembles._rmt import GaussianEnsemble
-
-
-# =======================================
-# 2. Ensemble
-# =======================================
-# Store class name for module
-class_name = "GUE"
+# Local imports
+from ._manybody import GaussianEnsemble
 
 
-# Define Gaussian Unitary Ensemble (GUE) class
-@dataclass(repr=False, eq=False, frozen=True, kw_only=True, slots=True)
+# -------------------------------
+# Gaussian Unitary Ensemble (GUE)
+# -------------------------------
+@frozen(kw_only=True, eq=False, unsafe_hash=False)
 class GUE(GaussianEnsemble):
-    """Gaussian Unitary Ensemble (GUE) class."""
+    @property
+    def beta(self: GUE) -> int:
+        """Dyson index of the GUE."""
+        return 2
 
-    # Dyson index
-    beta: int = field(init=False, default=2)
-
-    def randm(self, offset: Optional[np.ndarray] = None) -> np.ndarray:
+    def generate(self: GUE, offset: np.ndarray | None = None) -> np.ndarray:
         """Generate a random matrix from the GUE."""
         # If offset is None, allocate memory for matrix
         if offset is None:
@@ -42,10 +32,10 @@ class GUE(GaussianEnsemble):
         # Loop over diagonal indices
         for i in range(self.dim):
             # Generate a random array of standard normal values for real parts
-            real_rands = self._rng.standard_normal(self.dim - i, dtype=self.real_dtype)
+            real_rands = self.rng.standard_normal(self.dim - i, dtype=self.real_dtype)
 
             # Generate a random array of standard normal values for imaginary parts
-            imag_rands = self._rng.standard_normal(self.dim - i, dtype=self.real_dtype)
+            imag_rands = self.rng.standard_normal(self.dim - i, dtype=self.real_dtype)
 
             # Scale random values by complex standard deviation
             real_rands *= self.sigma / 2

@@ -1,43 +1,28 @@
-# rmtpy.ensembles.bdgc.py
+# rmtpy/ensembles/bdgc.py
 
-
-# =======================================
-# 1. Imports
-# =======================================
-# Standard library imports
+# Postponed evaluation of annotations
 from __future__ import annotations
-from dataclasses import dataclass, field
-from typing import Optional
 
 # Third-party imports
 import numpy as np
+from attrs import frozen
 
-# Local application imports
-from rmtpy.ensembles._rmt import GaussianEnsemble
-
-
-# =======================================
-# 2. Ensemble
-# =======================================
-# Store class name for module
-class_name = "BdGC"
+# Local imports
+from ._manybody import GaussianEnsemble
 
 
-# Define Bogoliubov-de Gennes C Ensemble (BdG(C)) class
-@dataclass(repr=False, eq=False, frozen=True, kw_only=True, slots=True)
+# ----------------------------------------
+# Bogoliubov-de Gennes C Ensemble (BdG(C))
+# ----------------------------------------
+@frozen(kw_only=True, eq=False, unsafe_hash=False)
 class BdGC(GaussianEnsemble):
-    """Bogoliubov-de Gennes C Ensemble (BdG(C)) class."""
+    @property
+    def beta(self: BdGC) -> int:
+        """Dyson index of the BdG(C)."""
+        return 2
 
-    # Dyson index
-    beta: int = field(init=False, default=2)
-
-    def _to_latex(self) -> str:
-        """LaTeX representation of the ensemble."""
-        # Return formatted LaTeX string
-        return rf"$\textrm{{BdG(C)}}\ N={self.N}$"
-
-    def randm(self, offset: Optional[np.ndarray] = None) -> np.ndarray:
-        """Generate a random matrix from the BdGC ensemble."""
+    def generate(self: BdGC, offset: np.ndarray | None = None) -> np.ndarray:
+        """Generate a random matrix from the BdG(C) ensemble."""
         # If out is None, allocate memory for matrix
         if offset is None:
             H = np.zeros((self.dim, self.dim), dtype=self.dtype, order="F")
@@ -50,10 +35,10 @@ class BdGC(GaussianEnsemble):
         # Generate blocks of BdG(C) matrix
         for i in range(bdim):
             # Generate a random array of standard normal values for real parts
-            real_rands = self._rng.standard_normal(bdim - i, dtype=self.real_dtype)
+            real_rands = self.rng.standard_normal(bdim - i, dtype=self.real_dtype)
 
             # Generate a random array of standard normal values for imaginary parts
-            imag_rands = self._rng.standard_normal(bdim - i, dtype=self.real_dtype)
+            imag_rands = self.rng.standard_normal(bdim - i, dtype=self.real_dtype)
 
             # Scale random values by complex standard deviation
             real_rands *= self.sigma / 2
@@ -72,10 +57,10 @@ class BdGC(GaussianEnsemble):
             H[bdim + i :, bdim + i].imag -= imag_rands
 
             # Generate random array of standard normal values for real parts
-            real_rands = self._rng.standard_normal(bdim - i, dtype=self.real_dtype)
+            real_rands = self.rng.standard_normal(bdim - i, dtype=self.real_dtype)
 
             # Generate random array of standard normal values for imaginary parts
-            imag_rands = self._rng.standard_normal(bdim - i, dtype=self.real_dtype)
+            imag_rands = self.rng.standard_normal(bdim - i, dtype=self.real_dtype)
 
             # Scale random values by complex standard deviation
             real_rands *= self.sigma / 2

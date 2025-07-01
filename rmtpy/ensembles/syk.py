@@ -1,97 +1,104 @@
-# rmtpy.ensembles.syk.py
+# rmtpy/ensembles/syk.py
 
-
-# =======================================
-# 1. Imports
-# =======================================
-# Standard library imports
+# Postponed evaluation of annotations
 from __future__ import annotations
-import itertools
-from dataclasses import dataclass, field
+
+# Standard library imports
+from itertools import combinations
 from math import comb
-from typing import Optional
 
 # Third-party imports
 import numpy as np
+from attrs import field, frozen
+from attrs.validators import gt
 from scipy.sparse import csr_matrix
 
-# Local application imports
-from rmtpy.ensembles._rmt import ManyBodyEnsemble
-from rmtpy.special import create_majorana_pairs
+# Local imports
+from ._manybody import ManyBodyEnsemble
+from ..utils.spinmat import create_majorana_pairs
 
 
-# =======================================
-# 2. Ensemble
-# =======================================
-# Store class name for module
-class_name = "SYK"
-
-
-# Define Sachdev-Ye-Kitaev ensemble
-@dataclass(repr=False, eq=False, frozen=True, kw_only=True, slots=True)
+# -----------------------------
+# Sachdev-Ye-Kitaev Model (SYK)
+# -----------------------------
+@frozen(kw_only=True, eq=False, unsafe_hash=False)
 class SYK(ManyBodyEnsemble):
-    """The Sachdev-Ye-Kitaev model class."""
-
     # SYK q-parameter
-    q: int
+    q: int = field(converter=int, validator=gt(0))
+
+    # Validator to ensure q is even
+    @q.validator
+    def __q_validator(self: SYK, _, value: int) -> None:
+        """Ensure that q is even."""
+        # If q is not even, raise error
+        if value % 2 != 0:
+            raise ValueError(f"SYK q-parameter must be an even integer, got {value}")
 
     # Suppression factor
-    eta: Optional[float] = field(init=False, default=None)
+    eta: float = field(init=False, repr=False)
 
-    # Standard deviation of couplings
-    sigma: Optional[float] = field(init=False, default=None)
-
-    # Majorana fermion operators
-    majorana_pairs: Optional[tuple[tuple[Optional[csr_matrix], ...], ...]] = field(
-        init=False, default=None
-    )
-
-    # Default ensemble argument names
-    _ens_args: tuple[str, str] = field(init=False, default=("q", "N", "J", "dtype"))
-
-    def __post_init__(self) -> None:
-        # Create map to determine SYK Dyson index
-        index = {(0, 0): 1, (0, 4): 4}.get((self.q % 4, self.N % 8), 2)
-
-        # Set SYK ensemble's Dyson index
-        object.__setattr__(self, "beta", index if self.q > 2 else 0)
-
-        # Calculate suppression factor
-        eta = np.sum(
+    # Set suppression factor based on q and N
+    @eta.default
+    def __eta_default(self: SYK) -> float:
+        # First calculate product factor
+        product = np.sum(
             (-1) ** (self.q - k) * comb(self.q, k) * comb(self.N - self.q, self.q - k)
             for k in range(self.q + 1)
-        ) / comb(self.N, self.q)
+        )
 
-        # Set suppression factor
-        object.__setattr__(self, "eta", eta)
+        # Calculate and return suppression factor
+        return product / comb(self.N, self.q)
 
-        # Calculate standard deviation
-        sigma = self.N * self.J * np.sqrt((1 - eta) / comb(self.N, self.q)) / 2
+    # Standard deviation of couplings
+    sigma: float = field(init=False, repr=False)
 
-        # Set standard deviation
-        object.__setattr__(self, "sigma", sigma)
+    # Set standard deviation based on N, J, eta, and q
+    @sigma.default
+    def __sigma_default(self: SYK) -> float:
+        """Default value for standard deviation of couplings."""
+        # Calculate standard deviation based on N, J, eta, and q
+        return self.N * self.J * np.sqrt((1 - self.eta) / comb(self.N, self.q)) / 2
 
-        # Finish initialization of ManyBodyEnsemble instance
-        super(SYK, self).__post_init__()
+    # Majorana fermion operators
+    majorana_pairs: tuple[tuple[csr_matrix, ...], ...] = field(init=False, repr=False)
 
-        # Residual memory is required to store the Majorana pairs in bytes
-        object.__setattr__(self, "resid_memory", comb(self.N, 2) * (24 * self.dim + 6))
+    # Set majorana_pairs based on N
+    @majorana_pairs.default
+    def __majorana_pairs_default(self: SYK) -> tuple[tuple[csr_matrix, ...], ...]:
+        """Default value for Majorana pairs."""
+        return create_majorana_pairs(N=self.N)
 
-    def randm(self, offset: Optional[np.ndarray] = None) -> None:
+    @property
+    def beta(self: SYK) -> int:
+        """Dyson index of the SYK model."""
+        # Map to determine SYK Dyson index
+        index_map = {(0, 0): 1, (0, 4): 4}  # (N, q) --> beta
+
+        # Return appropriate index based on q and N
+        return index_map.get((self.q % 4, self.N % 8), 2) if self.q > 2 else 0
+
+    @property
+    def _dir_name(self: SYK) -> str:
+        """Write name of ensemble class in directory format."""
+        # Return class name as directory names
+        return super()._dir_name + f"_{self.q}"
+
+    @property
+    def _latex_name(self: SYK) -> str:
+        """Generate LaTeX representation of the ensemble class name."""
+        # Append q to the LaTeX name
+        return super()._latex_name + f"_{self.q}"
+
+    def generate(self: SYK, offset: np.ndarray | None = None) -> np.ndarray:
         """Generate a random matrix from the SYK ensemble."""
         # If offset is None, create a new zeroed array
         if offset is None:
             H = np.zeros((self.dim, self.dim), dtype=self.dtype, order="F")
-        # If offset is provided, point H to it
         else:
             H = offset
 
-        # Create Majorana operators if not already created
-        if self.majorana_pairs is None:
-            object.__setattr__(self, "majorana_pairs", create_majorana_pairs(N=self.N))
-
         # Pre-draw all random coefficients
-        coeffs = self._rng.standard_normal(
+        coeffs = self.rng.standard_normal(
             size=comb(self.N, self.q), dtype=self.real_dtype
         )
 
@@ -99,7 +106,7 @@ class SYK(ManyBodyEnsemble):
         coeffs *= self.sigma
 
         # Retrieve indices for Hamiltonian terms
-        indices = tuple(itertools.combinations(range(self.N), self.q))
+        indices = tuple(combinations(range(self.N), self.q))
 
         # Generate and sum q-body operators
         for coeff, idx_tuple in zip(coeffs, indices):
@@ -125,7 +132,7 @@ class SYK(ManyBodyEnsemble):
         # Return SYK Hamiltonian
         return H
 
-    def pdf(self, eigval: np.ndarray, num_terms: int = 100) -> float:
+    def pdf(self: SYK, eigval: np.ndarray, num_terms: int = 100) -> float:
         """SYK average spectral density."""
         # Initialize probability distribution function (PDF) array
         pdf = np.zeros(eigval.shape, dtype=self.real_dtype)
@@ -157,24 +164,3 @@ class SYK(ManyBodyEnsemble):
 
         # Return PDF values
         return pdf
-
-    def _check_ensemble(self) -> None:
-        """Check if the SYK ensemble is valid."""
-        # Check if instance is valid ManyBodyEnsemble instance
-        super(SYK, self)._check_ensemble()
-
-        # Check if SYK q-parameter is provided
-        if self.q is None:
-            raise ValueError("SYK q-parameter must be provided.")
-
-        # Check if SYK parameters are valid
-        if not isinstance(self.q, int) or self.q < 2 or self.q % 2 != 0:
-            raise ValueError(f"SYK q-parameter must be an even integer.")
-
-        elif self.N <= self.q:
-            raise ValueError("Number of Majoranas must be greater than q-parameter.")
-
-    def _to_latex(self) -> str:
-        """LaTeX representation of the ManyBodyEnsemble."""
-        # Return formatted LaTeX string
-        return rf"$\textrm{{{self.__class__.__name__}}}_{self.q}\ N={self.N}$"

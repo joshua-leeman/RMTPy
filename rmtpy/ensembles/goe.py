@@ -1,37 +1,27 @@
-# rmtpy.ensembles.goe.py
+# rmtpy/ensembles/goe.py
 
-
-# =======================================
-# 1. Imports
-# =======================================
-# Standard library imports
+# Postponed evaluation of annotations
 from __future__ import annotations
-from dataclasses import dataclass, field
-from typing import Optional
 
 # Third-party imports
 import numpy as np
+from attrs import frozen
 
-# Local application imports
-from rmtpy.ensembles._rmt import GaussianEnsemble
-
-
-# =======================================
-# 2. Ensemble
-# =======================================
-# Store class name for module
-class_name = "GOE"
+# Local imports
+from ._manybody import GaussianEnsemble
 
 
-# Define Gaussian Orthogonal Ensemble (GOE) class
-@dataclass(repr=False, eq=False, frozen=True, kw_only=True, slots=True)
+# ----------------------------------
+# Gaussian Orthogonal Ensemble (GOE)
+# ----------------------------------
+@frozen(kw_only=True, eq=False, unsafe_hash=False)
 class GOE(GaussianEnsemble):
-    """Gaussian Orthogonal Ensemble (GOE) class."""
+    @property
+    def beta(self: GOE) -> int:
+        """Dyson index of the GOE."""
+        return 1
 
-    # Dyson index
-    beta: int = field(init=False, default=1)
-
-    def randm(self, offset: Optional[np.ndarray] = None) -> np.ndarray:
+    def generate(self: GOE, offset: np.ndarray | None = None) -> np.ndarray:
         """Generate a random matrix from the GOE."""
         # If offset is None, allocate memory for matrix
         if offset is None:
@@ -42,7 +32,7 @@ class GOE(GaussianEnsemble):
         # Loop over diagonal indices
         for i in range(self.dim):
             # Generate a random array of standard normal values
-            rands = self._rng.standard_normal(self.dim - i, dtype=self.real_dtype)
+            rands = self.rng.standard_normal(self.dim - i, dtype=self.real_dtype)
 
             # Scale random values by real standard deviation
             rands *= self.sigma / np.sqrt(2.0)

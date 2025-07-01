@@ -1,21 +1,13 @@
-# rmtpy.special.py
-
-
-# =======================================
-# 1. Imports
-# =======================================
-# Standard library imports
-from __future__ import annotations
-from typing import Optional
+# rmtpy/utils/spinmat.py
 
 # Third-party imports
 import numpy as np
 from scipy.sparse import csr_matrix, eye_array, kron
 
 
-# =======================================
-# 2. Build Majorana Fermions
-# =======================================
+# ---------------------------
+# Construct Majorana Fermions
+# ---------------------------
 def create_majoranas(N: int) -> tuple[csr_matrix, ...]:
     """Create list of N Majorana fermion operators."""
     # Create Pauli matrices
@@ -52,27 +44,29 @@ def create_majoranas(N: int) -> tuple[csr_matrix, ...]:
             return tuple(majorana)
 
 
-# =======================================
-# 3. Build Majorana Product Pairs
-# =======================================
+# ------------------------------------
+# Build Products of Pairs of Majoranas
+# ------------------------------------
 def create_majorana_pairs(
-    N: Optional[int] = None,
-    majorana: Optional[tuple[csr_matrix, ...]] = None,
-) -> tuple[tuple[Optional[csr_matrix], ...], ...]:
-    """Create all ψ_j*ψ_k (j < k) pairs of Majorana fermion operators."""
+    N: int | None = None,
+    majorana: tuple[csr_matrix, ...] | None = None,
+) -> tuple[tuple[csr_matrix, ...], ...]:
+    """Create all ψ_j * ψ_k (j < k) pairs of Majorana fermion operators."""
     # If majorana is None, create Majorana operators
     if majorana is None:
         # Check if N are provided
-        if N is None:
-            raise ValueError("N must be provided if majorana is None.")
-        else:
+        if N is not None:
             # Create Majorana operators
             majorana = create_majoranas(N)
+        else:
+            # Raise error if N is not provided
+            raise ValueError("N must be provided if majorana is None.")
     else:
         # Check if majorana is a list of Majorana operators
         if not isinstance(majorana, tuple) or not all(
             isinstance(m, csr_matrix) for m in majorana
         ):
+            # Raise error if majorana is not a tuple of Majorana operators
             raise ValueError("majorana must be a tuple of Majorana operators.")
 
         # Store number of Majorana operators

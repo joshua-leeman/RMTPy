@@ -1,37 +1,27 @@
-# rmtpy.ensembles.gse.py
+# rmtpy/ensembles/gse.py
 
-
-# =======================================
-# 1. Imports
-# =======================================
-# Standard library imports
+# Postponed evaluation of annotations
 from __future__ import annotations
-from dataclasses import dataclass, field
-from typing import Optional
 
 # Third-party imports
 import numpy as np
+from attrs import frozen
 
-# Local application imports
-from rmtpy.ensembles._rmt import GaussianEnsemble
-
-
-# =======================================
-# 2. Ensemble
-# =======================================
-# Store class name for module
-class_name = "GSE"
+# Local imports
+from ._manybody import GaussianEnsemble
 
 
-# Define Gaussian Symplectic Ensemble (GSE) class
-@dataclass(repr=False, eq=False, frozen=True, kw_only=True, slots=True)
+# ----------------------------------
+# Gaussian Symplectic Ensemble (GSE)
+# ----------------------------------
+@frozen(kw_only=True, eq=False, unsafe_hash=False)
 class GSE(GaussianEnsemble):
-    """Gaussian Symplectic Ensemble (GSE) class."""
+    @property
+    def beta(self: GSE) -> int:
+        """Dyson index of the GSE."""
+        return 4
 
-    # Dyson index
-    beta: int = field(init=False, default=4)
-
-    def randm(self, offset: Optional[np.ndarray] = None) -> np.ndarray:
+    def generate(self: GSE, offset: np.ndarray | None = None) -> np.ndarray:
         """Generate a random matrix from the GSE."""
         # If offset is None, allocate memory for matrix
         if offset is None:
@@ -45,10 +35,10 @@ class GSE(GaussianEnsemble):
         # Generate blocks of GSE matrix
         for i in range(bdim):
             # Generate a random array of standard normal values for real parts
-            real_rands = self._rng.standard_normal(bdim - i, dtype=self.real_dtype)
+            real_rands = self.rng.standard_normal(bdim - i, dtype=self.real_dtype)
 
             # Generate a random array of standard normal values for imaginary parts
-            imag_rands = self._rng.standard_normal(bdim - i, dtype=self.real_dtype)
+            imag_rands = self.rng.standard_normal(bdim - i, dtype=self.real_dtype)
 
             # Scale random values by complex standard deviation
             real_rands *= self.sigma / 2
@@ -68,13 +58,13 @@ class GSE(GaussianEnsemble):
 
             # Generate random array of standard normal values for real parts
             real_rands = np.zeros(bdim - i, dtype=self.real_dtype)
-            real_rands[1:] += self._rng.standard_normal(
+            real_rands[1:] += self.rng.standard_normal(
                 bdim - i - 1, dtype=self.real_dtype
             )
 
             # Generate random array of standard normal values for imaginary parts
             imag_rands = np.zeros(bdim - i, dtype=self.real_dtype)
-            imag_rands[1:] += self._rng.standard_normal(
+            imag_rands[1:] += self.rng.standard_normal(
                 bdim - i - 1, dtype=self.real_dtype
             )
 

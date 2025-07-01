@@ -3,6 +3,7 @@ rmtpy.code-workspace
 .filelist
 output/
 scratch/
+archive/
 
 # DotEnv configuration
 .env
