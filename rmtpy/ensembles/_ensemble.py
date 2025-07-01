@@ -26,7 +26,7 @@ ENSEMBLE_REGISTRY: dict[str, type[Ensemble]] = {}
 # ---------------------------------
 # Random Matrix Ensemble Base Class
 # ---------------------------------
-@frozen(kw_only=True, eq=False, unsafe_hash=False)
+@frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
 class Ensemble(ABC):
     # Random number generator seed
     seed: Any = field(default=None)
