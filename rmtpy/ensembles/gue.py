@@ -14,7 +14,7 @@ from ._manybody import GaussianEnsemble
 # -------------------------------
 # Gaussian Unitary Ensemble (GUE)
 # -------------------------------
-@frozen(kw_only=True, eq=False, unsafe_hash=False)
+@frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
 class GUE(GaussianEnsemble):
     @property
     def beta(self: GUE) -> int:
