@@ -21,7 +21,7 @@ from ..utils.spinmat import create_majorana_pairs
 # -----------------------------
 # Sachdev-Ye-Kitaev Model (SYK)
 # -----------------------------
-@frozen(kw_only=True, eq=False, unsafe_hash=False)
+@frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
 class SYK(ManyBodyEnsemble):
     # SYK q-parameter
     q: int = field(converter=int, validator=gt(0))

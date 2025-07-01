@@ -34,7 +34,7 @@ DATA_REGISTRY: dict[str, type[Data]] = {}
 # --------------------------
 # Simulation Data Base Class
 # --------------------------
-@frozen(kw_only=True, repr=False, eq=False, unsafe_hash=False)
+@frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
 class Data(ABC):
     # Simulation metadata
     simulation: dict[str, str | dict[str, Any]] = field(init=False)
@@ -59,7 +59,7 @@ class Data(ABC):
 # ---------------------------------
 # Monte Carlo Simulation Base Class
 # ---------------------------------
-@frozen(kw_only=True, eq=False, unsafe_hash=False)
+@frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
 class Simulation(ABC):
     # Random matrix ensemble
     ensemble: Ensemble = field(converter=Ensemble.create_ensemble)
