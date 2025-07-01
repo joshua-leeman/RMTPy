@@ -53,10 +53,10 @@ class Poisson(ManyBodyEnsemble):
     def generate(self: Poisson, offset: np.ndarray | None = None) -> np.ndarray:
         """Generate a random matrix from the Poisson ensemble."""
         # If out is None, allocate memory for matrix
-        if offset is None:
+        if not isinstance(offset, np.ndarray):
             H = np.zeros((self.dim, self.dim), dtype=self.dtype, order="F")
         else:
-            H = offset
+            H: np.ndarray = offset
 
         # Allocate memory for complex Ginibre matrix
         M = np.empty((self.dim, self.dim), dtype=self.dtype, order="F")
