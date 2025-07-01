@@ -24,7 +24,7 @@ from ._ensemble import Ensemble
 # --------------------------------------------
 # Random Many-Body Hamiltonian Generator Class
 # --------------------------------------------
-@frozen(kw_only=True, eq=False, unsafe_hash=False)
+@frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
 class ManyBodyEnsemble(Ensemble):
     # Number of Majorana particles
     N: int = field(
