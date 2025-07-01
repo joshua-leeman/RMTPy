@@ -18,7 +18,7 @@ from ._manybody import ManyBodyEnsemble
 # ----------------
 # Poisson Ensemble
 # ----------------
-@frozen(kw_only=True, eq=False, unsafe_hash=False)
+@frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
 class Poisson(ManyBodyEnsemble):
     # Standard deviation of eigenvalues
     sigma: float = field(init=False, repr=False)
