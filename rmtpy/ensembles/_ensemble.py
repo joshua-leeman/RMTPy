@@ -39,7 +39,7 @@ class Ensemble(ABC):
 
     # Set real data type based on complex data type
     @real_dtype.default
-    def __real_dtype_default(self: Ensemble) -> np.dtype:
+    def __real_dtype_default(self) -> np.dtype:
         """Set the real data type based on the complex data type."""
         # If dtype is complex, return the real part's dtype
         return np.dtype(self.dtype.char.lower())
@@ -54,7 +54,7 @@ class Ensemble(ABC):
 
     # Initialize random number generator with seed
     @rng.default
-    def __rng_default(self: Ensemble) -> np.random.Generator:
+    def __rng_default(self) -> np.random.Generator:
         """Initialize the ensemble's random number generator."""
         # Validate seed and create random number generator, raise error if invalid
         try:
@@ -106,7 +106,7 @@ class Ensemble(ABC):
             ) from e
 
     @classmethod
-    def __attrs_init_subclass__(cls: type[Ensemble]) -> None:
+    def __attrs_init_subclass__(cls) -> None:
         """Register concrete subclasses in the ensemble registry."""
         # Include only concrete classes in registry
         if not inspect.isabstract(cls):
@@ -117,9 +117,7 @@ class Ensemble(ABC):
             ENSEMBLE_REGISTRY[ens_key] = cls
 
     @classmethod
-    def create_ensemble(
-        cls: type[Ensemble], src: dict[str, Any] | Ensemble
-    ) -> Ensemble:
+    def create(cls, src: dict[str, Any] | Ensemble) -> Ensemble:
         """Create an instance of the ensemble with given parameters."""
         # Import module-level converter
         from ..serialization import converter
@@ -128,19 +126,19 @@ class Ensemble(ABC):
         return converter.structure(src, cls)
 
     @property
-    def matrix_memory(self: Ensemble) -> int:
+    def matrix_memory(self) -> int:
         """Calculate memory used to store a generated matrix in bytes."""
         # Calculate memory used to store a generated matrix
         return self.dtype.itemsize * self.dim**2
 
     @property
-    def rng_state(self: Ensemble) -> dict[str, Any]:
+    def rng_state(self) -> dict[str, Any]:
         """Get current state of the random number generator."""
         # Return state of random number generator
         return self.rng.bit_generator.state
 
     @property
-    def to_dir(self: Ensemble) -> Path:
+    def to_dir(self) -> Path:
         """Generate directory Path used for storing data related to the RMT instance."""
         # Begin path with class name
         dir_path = Path(self._dir_name)
@@ -159,7 +157,7 @@ class Ensemble(ABC):
         return dir_path
 
     @property
-    def to_latex(self: Ensemble) -> str:
+    def to_latex(self) -> str:
         """Generate LaTeX representation of the RMT instance."""
         # Begin LaTeX string with ensemble's latex name
         latex_str = f"${self._latex_name}"
@@ -175,19 +173,19 @@ class Ensemble(ABC):
         return latex_str + "$"
 
     @property
-    def _dir_name(self: Ensemble) -> str:
+    def _dir_name(self) -> str:
         """Generate directory name used for storing Ensemble instance data."""
         # Insert underscores between words and acronyms in class name
         name = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", type(self).__name__)
         return re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", name)
 
     @property
-    def _latex_name(self: Ensemble) -> str:
+    def _latex_name(self) -> str:
         """Generate LaTeX representation of the ensemble class name."""
         # Use class name as LaTeX name, replacing underscores with spaces
         return f"\\textrm{{{re.sub(r'_', ' ', type(self).__name__)}}}"
 
-    def set_rng_state(self: Ensemble, state: dict[str, Any] | None) -> None:
+    def set_rng_state(self, state: dict[str, Any] | None) -> None:
         """Set the state of the random number generator."""
         # Check if state is a dictionary
         if isinstance(state, dict):
@@ -208,6 +206,6 @@ class Ensemble(ABC):
             )
 
     @abstractmethod
-    def generate(self: Ensemble, offset: np.ndarray | None = None) -> np.ndarray:
+    def generate(self, offset: np.ndarray | None = None) -> np.ndarray:
         """Generate a random matrix."""
         pass
