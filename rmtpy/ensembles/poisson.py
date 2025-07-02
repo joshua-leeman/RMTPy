@@ -24,7 +24,7 @@ class Poisson(ManyBodyEnsemble):
     sigma: float = field(init=False, repr=False)
 
     @sigma.default
-    def __sigma_default(self: Poisson) -> float:
+    def __sigma_default(self) -> float:
         """Default value for sigma."""
         # Calculate standard deviation based on E0
         return 2 * self.E0
@@ -35,22 +35,22 @@ class Poisson(ManyBodyEnsemble):
 
     # Set LAPACK geqrf routine for QR decomposition
     @__zgeqrf.default
-    def __zgeqrf_default(self: Poisson) -> Callable:
+    def __zgeqrf_default(self) -> Callable:
         """Default low-level LAPACK QR routine for geqrf."""
         return get_lapack_funcs("geqrf", dtype=self.dtype)
 
     # Set LAPACK ungqr routine for generating Q from QR factorization
     @__zungqr.default
-    def __zungqr_default(self: Poisson) -> Callable:
+    def __zungqr_default(self) -> Callable:
         """Default low-level QR routine for ungqr."""
         return get_lapack_funcs("ungqr", dtype=self.dtype)
 
     @property
-    def beta(self: Poisson) -> int:
+    def beta(self) -> int:
         """Dyson index of the Poisson ensemble."""
         return 0
 
-    def generate(self: Poisson, offset: np.ndarray | None = None) -> np.ndarray:
+    def generate(self, offset: np.ndarray | None = None) -> np.ndarray:
         """Generate a random matrix from the Poisson ensemble."""
         # If out is None, allocate memory for matrix
         if not isinstance(offset, np.ndarray):
@@ -88,9 +88,7 @@ class Poisson(ManyBodyEnsemble):
         # Return Poisson ensemble matrix
         return H
 
-    def eig_stream(
-        self: Poisson, realizs: int
-    ) -> Iterator[tuple[np.ndarray, np.ndarray]]:
+    def eig_stream(self, realizs: int) -> Iterator[tuple[np.ndarray, np.ndarray]]:
         """Iterator to stream eigensystem realizations."""
         # Allocate memory for random eigenvalues and eigenvectors
         eigvals = np.empty(self.dim, dtype=self.real_dtype, order="F")
@@ -122,7 +120,7 @@ class Poisson(ManyBodyEnsemble):
             # Yield eigenvalues and eigenvectors
             yield eigvals, U
 
-    def eigvals_stream(self: Poisson, realizs: int) -> Iterator[np.ndarray]:
+    def eigvals_stream(self, realizs: int) -> Iterator[np.ndarray]:
         """Iterator to stream spectrum realizations."""
         # Allocate memory for random eigenvalues
         eigvals = np.empty(self.dim, dtype=self.real_dtype, order="F")
@@ -140,7 +138,7 @@ class Poisson(ManyBodyEnsemble):
             # Yield sorted eigenvalues
             yield eigvals
 
-    def pdf(self: Poisson, eigval: np.ndarray) -> np.ndarray:
+    def pdf(self, eigval: np.ndarray) -> np.ndarray:
         """Probability density function of the Poisson ensemble."""
         # Initialize distribution with zeros
         pdf = np.zeros_like(eigval, dtype=self.real_dtype)
@@ -151,7 +149,7 @@ class Poisson(ManyBodyEnsemble):
         # Return probability density function
         return pdf
 
-    def cdf(self: Poisson, eigval: np.ndarray) -> np.ndarray:
+    def cdf(self, eigval: np.ndarray) -> np.ndarray:
         """Cumulative distribution function of the Poisson ensemble."""
         # Initialize distribution with zeros
         cdf = np.zeros_like(eigval, dtype=self.real_dtype)
