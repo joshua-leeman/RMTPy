@@ -24,7 +24,7 @@ __all__ = [ens_name for ens_name in __ens_dict.keys()] + [
 def create_ensemble(**kwargs: __Any) -> __Ensemble:
     """Get a random matrix ensemble by name."""
     # Call ensemble constructor with provided keyword arguments as dictionary
-    return __Ensemble.create_ensemble(kwargs)
+    return __Ensemble.create(kwargs)
 
 
 # ------------------------------------
@@ -33,4 +33,4 @@ def create_ensemble(**kwargs: __Any) -> __Ensemble:
 def create_simulation(**kwargs: __Any) -> __Simulation:
     """Get a Monte Carlo simulation by name."""
     # Call simulation constructor with provided keyword arguments as dictionary
-    return __Simulation.create_simulation(kwargs)
+    return __Simulation.create(kwargs)
