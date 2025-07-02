@@ -17,11 +17,11 @@ from ._manybody import GaussianEnsemble
 @frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
 class GSE(GaussianEnsemble):
     @property
-    def beta(self: GSE) -> int:
+    def beta(self) -> int:
         """Dyson index of the GSE."""
         return 4
 
-    def generate(self: GSE, offset: np.ndarray | None = None) -> np.ndarray:
+    def generate(self, offset: np.ndarray | None = None) -> np.ndarray:
         """Generate a random matrix from the GSE."""
         # If offset is None, allocate memory for matrix
         if offset is None:
