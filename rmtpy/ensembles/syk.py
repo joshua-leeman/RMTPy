@@ -28,7 +28,7 @@ class SYK(ManyBodyEnsemble):
 
     # Validator to ensure q is even
     @q.validator
-    def __q_validator(self: SYK, _, value: int) -> None:
+    def __q_validator(self, _, value: int) -> None:
         """Ensure that q is even."""
         # If q is not even, raise error
         if value % 2 != 0:
@@ -39,7 +39,7 @@ class SYK(ManyBodyEnsemble):
 
     # Set suppression factor based on q and N
     @eta.default
-    def __eta_default(self: SYK) -> float:
+    def __eta_default(self) -> float:
         # First calculate product factor
         product = np.sum(
             (-1) ** (self.q - k) * comb(self.q, k) * comb(self.N - self.q, self.q - k)
@@ -54,7 +54,7 @@ class SYK(ManyBodyEnsemble):
 
     # Set standard deviation based on N, J, eta, and q
     @sigma.default
-    def __sigma_default(self: SYK) -> float:
+    def __sigma_default(self) -> float:
         """Default value for standard deviation of couplings."""
         # Calculate standard deviation based on N, J, eta, and q
         return self.N * self.J * np.sqrt((1 - self.eta) / comb(self.N, self.q)) / 2
@@ -64,12 +64,12 @@ class SYK(ManyBodyEnsemble):
 
     # Set majorana_pairs based on N
     @majorana_pairs.default
-    def __majorana_pairs_default(self: SYK) -> tuple[tuple[csr_matrix, ...], ...]:
+    def __majorana_pairs_default(self) -> tuple[tuple[csr_matrix, ...], ...]:
         """Default value for Majorana pairs."""
         return create_majorana_pairs(N=self.N)
 
     @property
-    def beta(self: SYK) -> int:
+    def beta(self) -> int:
         """Dyson index of the SYK model."""
         # Map to determine SYK Dyson index
         index_map = {(0, 0): 1, (0, 4): 4}  # (N, q) --> beta
@@ -78,18 +78,18 @@ class SYK(ManyBodyEnsemble):
         return index_map.get((self.q % 4, self.N % 8), 2) if self.q > 2 else 0
 
     @property
-    def _dir_name(self: SYK) -> str:
+    def _dir_name(self) -> str:
         """Write name of ensemble class in directory format."""
         # Return class name as directory names
         return super()._dir_name + f"_{self.q}"
 
     @property
-    def _latex_name(self: SYK) -> str:
+    def _latex_name(self) -> str:
         """Generate LaTeX representation of the ensemble class name."""
         # Append q to the LaTeX name
         return super()._latex_name + f"_{self.q}"
 
-    def generate(self: SYK, offset: np.ndarray | None = None) -> np.ndarray:
+    def generate(self, offset: np.ndarray | None = None) -> np.ndarray:
         """Generate a random matrix from the SYK ensemble."""
         # If offset is None, create a new zeroed array
         if offset is None:
@@ -132,7 +132,7 @@ class SYK(ManyBodyEnsemble):
         # Return SYK Hamiltonian
         return H
 
-    def pdf(self: SYK, eigval: np.ndarray, num_terms: int = 100) -> float:
+    def pdf(self, eigval: np.ndarray, num_terms: int = 100) -> float:
         """SYK average spectral density."""
         # Initialize probability distribution function (PDF) array
         pdf = np.zeros(eigval.shape, dtype=self.real_dtype)
