@@ -17,11 +17,11 @@ from ._manybody import GaussianEnsemble
 @frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
 class BdGD(GaussianEnsemble):
     @property
-    def beta(self: BdGD) -> int:
+    def beta(self) -> int:
         """Dyson index of the BdG(D)."""
         return 2
 
-    def generate(self: BdGD, offset: np.ndarray | None = None) -> np.ndarray:
+    def generate(self, offset: np.ndarray | None = None) -> np.ndarray:
         """Generate a random matrix from the BdG(D) ensemble."""
         # If out is None, allocate memory for matrix
         if offset is None:
