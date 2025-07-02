@@ -33,7 +33,7 @@ class ManyBodyEnsemble(Ensemble):
 
     # Validator to ensure N is an even integer
     @N.validator
-    def __N_validator(self: ManyBodyEnsemble, _, value: int) -> None:
+    def __N_validator(self, _, value: int) -> None:
         """Ensure N is an even integer."""
         if value % 2 != 0:
             raise ValueError(f"N must be an even integer, got {value}.")
@@ -51,19 +51,19 @@ class ManyBodyEnsemble(Ensemble):
 
     # Set dimension of Hilbert space based on number of Majorana particles
     @dim.default
-    def __dim_default(self: ManyBodyEnsemble) -> int:
+    def __dim_default(self) -> int:
         """Calculate the dimension of the Hilbert space."""
         # Dimension of disconnected parity sector
         return 2 ** (self.N // 2 - 1)
 
     @property
-    def E0(self: ManyBodyEnsemble) -> float:
+    def E0(self) -> float:
         """Ground state energy of the ensemble."""
         # Return ground state energy based on N and J
         return self.N * self.J
 
     @property
-    def univ_cls(self: ManyBodyEnsemble) -> str | None:
+    def univ_cls(self) -> str | None:
         """Set the universality class based on the Dyson index."""
         # Map possible beta values to universality classes
         univ_map = {0.0: "Poisson", 1.0: "GOE", 2.0: "GUE", 4.0: "GSE"}
@@ -72,14 +72,12 @@ class ManyBodyEnsemble(Ensemble):
         return univ_map.get(float(self.beta), None)
 
     @property
-    def degeneracy(self: ManyBodyEnsemble) -> int:
+    def degeneracy(self) -> int:
         """Determine the degeneracy of eigenvalues from the Dyson index."""
         # Return 2 if universality class is GSE, else return 1
         return 2 if self.univ_cls == "GSE" else 1
 
-    def eig_stream(
-        self: ManyBodyEnsemble, realizs: int
-    ) -> Iterator[tuple[np.ndarray, np.ndarray]]:
+    def eig_stream(self, realizs: int) -> Iterator[tuple[np.ndarray, np.ndarray]]:
         """Iterator to stream eigensystem realizations."""
         # Allocate memory for random Hermitian matrices
         H = np.empty((self.dim, self.dim), dtype=self.dtype, order="F")
@@ -95,7 +93,7 @@ class ManyBodyEnsemble(Ensemble):
             # Compute and yield eigenvalues and eigenvectors
             yield eigh(H, overwrite_a=True, check_finite=False)
 
-    def eigvals_stream(self: ManyBodyEnsemble, realizs: int) -> Iterator[np.ndarray]:
+    def eigvals_stream(self, realizs: int) -> Iterator[np.ndarray]:
         """Iterator to stream spectrum realizations."""
         # Allocate memory for random Hermitian matrix
         H = np.empty((self.dim, self.dim), dtype=self.dtype, order="F")
@@ -111,7 +109,7 @@ class ManyBodyEnsemble(Ensemble):
             # Compute and yield eigenvalues
             yield eigvalsh(H, overwrite_a=True, check_finite=False)
 
-    def pdf(self: ManyBodyEnsemble, eigval: np.ndarray) -> np.ndarray:
+    def pdf(self, eigval: np.ndarray) -> np.ndarray:
         """Average density of energy eigenstates."""
         # # Define function to compute PDF
         # @lru_cache(maxsize=1)
@@ -125,7 +123,7 @@ class ManyBodyEnsemble(Ensemble):
         # Raise NotImplementedError if not implemented
         # raise NotImplementedError("Subclasses must implement this PDF method.")
 
-    def cdf(self: ManyBodyEnsemble, eigval: np.ndarray) -> np.ndarray:
+    def cdf(self, eigval: np.ndarray) -> np.ndarray:
         """Average cumulative density of energy eigenstates."""
 
         # Define function to compute CDF
@@ -150,12 +148,12 @@ class ManyBodyEnsemble(Ensemble):
         # Return CDF values for given eigenvalues
         return numerical_cdf()(eigval)
 
-    def unfold(self: ManyBodyEnsemble, eigval: np.ndarray) -> np.ndarray:
+    def unfold(self, eigval: np.ndarray) -> np.ndarray:
         """Unfold eigenvalues with the cumulative distribution function."""
         # Return unfolded eigenvalues
         return self.dim * (self.cdf(eigval) - self.cdf(np.array([0.0])))
 
-    def wigner_surmise(self: ManyBodyEnsemble, s: np.ndarray) -> np.ndarray:
+    def wigner_surmise(self, s: np.ndarray) -> np.ndarray:
         """Wigner surmise for the nn-level spacing distribution."""
         # Denote ensemble attributes
         beta = self.beta
@@ -175,7 +173,7 @@ class ManyBodyEnsemble(Ensemble):
         # Return Wigner surmise at given spacings
         return 2 * a * s**beta * np.exp(-b * s**2) / degen
 
-    def univ_csff(self: ManyBodyEnsemble, tau: np.ndarray) -> np.ndarray:
+    def univ_csff(self, tau: np.ndarray) -> np.ndarray:
         """Universal connected spectral form factor."""
         # Denote ensemble attributes for convenience
         dim = self.dim
@@ -227,7 +225,7 @@ class ManyBodyEnsemble(Ensemble):
 
     @property
     @abstractmethod
-    def beta(self: ManyBodyEnsemble) -> int | float:
+    def beta(self) -> int | float:
         """Dyson index of the many-body ensemble."""
         pass
 
@@ -242,11 +240,11 @@ class GaussianEnsemble(ManyBodyEnsemble):
 
     # Derive sigma from dimension and ground state energy
     @sigma.default
-    def __sigma_default(self: GaussianEnsemble) -> float:
+    def __sigma_default(self) -> float:
         """Calculate the complex standard deviation of matrix entries."""
         return self.E0 / np.sqrt(2 * self.dim)
 
-    def pdf(self: GaussianEnsemble, eigval: np.ndarray) -> np.ndarray:
+    def pdf(self, eigval: np.ndarray) -> np.ndarray:
         """Wigner semicircle probability density function."""
         # Normalize eigenvalues
         x = eigval / self.E0
@@ -264,7 +262,7 @@ class GaussianEnsemble(ManyBodyEnsemble):
         # Return PDF array
         return pdf
 
-    def cdf(self: GaussianEnsemble, eigval: np.ndarray) -> np.ndarray:
+    def cdf(self, eigval: np.ndarray) -> np.ndarray:
         """Cumulative distribution function of Wigner semicircle PDF."""
         # Normalize eigenvalues and clip to range [-1, 1]
         x = np.clip(eigval / self.E0, -1.0, 1.0)
