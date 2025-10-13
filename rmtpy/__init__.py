@@ -1,7 +1,7 @@
 # rmtpy/__init__.py
 
 # Local application imports
-from .ensembles import ens_dict as __ens_dict, ensemble
+from .ensembles import ensemble, ens_dict as __ens_dict
 from .simulations import sim_dict as __sim_dict, sim_exe_dict as __sim_exe_dict
 
 # Redefine __all__ to include all registered ensembles
