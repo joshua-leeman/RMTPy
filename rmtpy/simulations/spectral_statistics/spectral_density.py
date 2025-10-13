@@ -62,10 +62,3 @@ class SpectralData(Data):
         """Initialize unfolded spectral histogram."""
         # Calculate and return zero-initialized histogram
         return np.zeros(self.num_bins)
-
-    def plot(self, path: str | Path = "output") -> None:
-        """Plot the spectral density."""
-        # Create spectral density plot instance
-        plot_inst = SpectralDensityPlot(data=self)
-
-        #
