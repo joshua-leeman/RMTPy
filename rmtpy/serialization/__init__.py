@@ -32,6 +32,7 @@ def normalize_dict(
     src: dict[str, Any], registry: dict[str, type]
 ) -> dict[str, str | dict[str, Any]]:
     """Normalize form of class dictionary."""
+
     # If src is not a dictionary, raise TypeError
     if not isinstance(src, dict):
         raise TypeError(f"Expected a dictionary, got {type(src).__name__}")

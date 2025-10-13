@@ -16,6 +16,7 @@ from matplotlib.axes import Axes
 # ----------------------
 @dataclass(repr=False, eq=False, kw_only=True)
 class PlotLegend(ABC):
+
     # Legend handles
     handles: tuple | None = None
 
@@ -39,6 +40,7 @@ class PlotLegend(ABC):
 
     def configure(self, ax: Axes) -> None:
         """Configure legend with specified settings."""
+
         # Set legend if handles and labels are provided
         if self.handles is not None and self.labels is not None:
             ax.legend(

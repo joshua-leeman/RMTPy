@@ -6,13 +6,13 @@ from pathlib import Path
 from types import FunctionType
 
 # Local imports
-from ..ensembles import ensemble
-from .base.simulation import (
+from .base import (
+    Data,
+    Simulation,
+    DATA_REGISTRY,
     SIMULATION_REGISTRY,
     SIMULATION_EXECUTABLE_REGISTRY,
-    Simulation,
 )
-from .base.data import DATA_REGISTRY, Data
 
 # Get directory that contains this file
 path: Path = Path(__file__).parent
@@ -31,12 +31,6 @@ sim_dict: dict[str, type[Simulation]] = {
 sim_exe_dict: dict[str, type[FunctionType]] = {
     exe.__name__: exe for exe in SIMULATION_EXECUTABLE_REGISTRY.values()
 }
-
-# Update global namespace with registered simulations
-globals().update(sim_dict)
-
-# Update global namespace with registered simulation executables
-globals().update(sim_exe_dict)
 
 # Redefine __all__ to include all registered simulations
 __all__ = [sim_name for sim_name in sim_dict.keys()] + [

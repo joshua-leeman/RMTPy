@@ -28,6 +28,7 @@ DATA_REGISTRY: dict[str, type[Data]] = {}
 # ---------------
 @frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
 class Data(ABC):
+
     # Metadata
     metadata: dict[str, Any] = field(init=False, factory=dict, repr=False)
 
@@ -37,6 +38,7 @@ class Data(ABC):
     @file_name.default
     def __file_name_default(self) -> str:
         """Generate default filename based on class name."""
+
         # Convert class name from CamelCase to snake_case
         file_name = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", type(self).__name__)
         file_name = file_name.lower()
@@ -50,6 +52,7 @@ class Data(ABC):
     @classmethod
     def __attrs_init_subclass__(cls) -> None:
         """Register concrete subclasses in the data registry."""
+
         # Include only concrete classes in registry
         if not inspect.isabstract(cls):
             # Convert data class name from CamelCase to snake_case
@@ -62,6 +65,7 @@ class Data(ABC):
     @classmethod
     def load(cls, path: str | Path) -> Data:
         """Load simulation data from a serialized file."""
+
         # Ensure path is a Path object
         path = Path(path)
 
@@ -73,11 +77,13 @@ class Data(ABC):
 
     def __attrs_post_init__(self) -> None:
         """Initialize metadata after object creation."""
+
         # Add name of data class to metadata
         self.metadata["name"] = type(self).__name__
 
     def save(self, path: str | Path) -> None:
         """Save the simulation data to a serialized file."""
+
         # Ensure path is a Path object
         path = Path(path)
 

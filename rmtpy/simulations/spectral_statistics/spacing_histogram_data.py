@@ -9,8 +9,8 @@ from attrs import frozen, field
 # Third-party imports
 import numpy as np
 
-# Local imports
-from ..base.data import Data
+# Local application imports
+from ..base import Data
 
 
 # ----------------------------
@@ -45,23 +45,27 @@ class SpacingHistogramData(Data):
     @bins.default
     def __default_bins(self) -> np.ndarray:
         """Generate bins for spacings histogram."""
+
         # Calculate and return bin edges
         return np.linspace(self.si, self.sf, self.num_bins + 1)
 
     @hist.default
     def __default_hist(self) -> np.ndarray:
         """Initialize nearest-neighbor spacings histogram."""
+
         # Calculate and return zero-initialized histogram
         return np.zeros(self.num_bins)
 
     @unf_bins.default
     def __default_unf_bins(self) -> np.ndarray:
         """Generate bins for unfolded spacings histogram."""
+
         # Calculate and return bin edges
         return np.linspace(self.si, self.sf, self.num_bins + 1)
 
     @unf_hist.default
     def __default_unf_hist(self) -> np.ndarray:
         """Initialize unfolded nearest-neighbor spacings histogram."""
+
         # Calculate and return zero-initialized histogram
         return np.zeros(self.num_bins)

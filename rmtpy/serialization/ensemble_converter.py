@@ -5,9 +5,9 @@ import re
 from collections.abc import Callable
 from typing import Any
 
-# Local imports
-from ..ensembles import Ensemble, ENSEMBLE_REGISTRY
+# Local application imports
 from . import normalize_dict, converter
+from ..ensembles import Ensemble, ENSEMBLE_REGISTRY
 
 
 # ---------------------------------
@@ -32,6 +32,7 @@ ENS_UNSTRUCTURE_HOOKS: dict[str, Callable] = {
 @converter.register_structure_hook
 def ens_structure_hook(src: dict[str, Any] | Ensemble, _) -> Ensemble:
     """Convert a general dictionary to an Ensemble instance."""
+
     # If src is already a valid instance, return it
     if type(src) in ENSEMBLE_REGISTRY.values():
         return src
@@ -71,6 +72,7 @@ def ens_structure_hook(src: dict[str, Any] | Ensemble, _) -> Ensemble:
 @converter.register_unstructure_hook
 def ens_unstructure_hook(ensemble: Ensemble) -> dict[str, str | dict[str, Any]]:
     """Convert an Ensemble instance to a normalized dictionary."""
+
     # Initialize empty normalized dictionary
     ens_dict = {}
 

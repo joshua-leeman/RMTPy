@@ -13,14 +13,14 @@ from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 
 # Local application imports
-from ....serialization import converter
-from ....ensembles import Ensemble, ManyBodyEnsemble
-from ....simulations.spectral_statistics.spectral_density_data import (
-    SpectralDensityData,
-)
-from ...base import Plot
 from .spectral_density_axes import SpectralDensityAxes
 from .spectral_density_legend import SpectralDensityLegend
+from ...base import Plot
+from ....ensembles import Ensemble, ManyBodyEnsemble
+from ....ensembles.poisson import Poisson
+from ....ensembles.syk import SYK
+from ....serialization import converter
+from ....simulations.spectral_statistics import SpectralDensityData
 
 
 # -------------------------------
@@ -28,6 +28,7 @@ from .spectral_density_legend import SpectralDensityLegend
 # -------------------------------
 @dataclass(repr=False, eq=False, kw_only=True)
 class SpectralDensityPlot(Plot):
+
     # Plot data
     data: SpectralDensityData
 
@@ -86,6 +87,7 @@ class SpectralDensityPlot(Plot):
     syk4_ylim: tuple[float, float] = (0.0, 2.5)  # factor of 1/pi/(E0)
 
     def __post_init__(self) -> None:
+        """Initialize plot derived attributes after object creation."""
         # Initialize base class
         super(SpectralDensityPlot, self).__post_init__()
 
@@ -97,6 +99,7 @@ class SpectralDensityPlot(Plot):
 
     def set_derived_attributes(self) -> None:
         """Set attributes that depend on simulation metadata."""
+
         # Try to extract ensemble metadata
         try:
             ens_meta = self.data.metadata["simulation"]["args"]["ensemble"]
@@ -160,12 +163,12 @@ class SpectralDensityPlot(Plot):
 
         else:
             # Rewrite y-axis attributes for specific ensembles
-            if self.ensemble.__class__.__name__ == "Poisson":
+            if type(self.ensemble) == Poisson:
                 self.axes.ytick_labels = self.axes.poi_ytick_labels
                 self.ylim = self.poi_ylim
                 self.axes.yticks = self.axes.poi_yticks
                 self.axes.yticks_minor = self.axes.poi_yticks_minor
-            elif self.ensemble.__class__.__name__ == "SYK":
+            elif type(self.ensemble) == SYK:
                 if self.ensemble.q == 2:
                     self.axes.ytick_labels = self.axes.syk2_ytick_labels
                     self.ylim = self.syk2_ylim
@@ -195,6 +198,7 @@ class SpectralDensityPlot(Plot):
 
     def plot(self, path: str | Path) -> None:
         """Generate spectral density plot."""
+
         # Alias ensemble dimension
         dim = self.ensemble.dim
 

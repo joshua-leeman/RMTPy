@@ -16,7 +16,7 @@ from types import FunctionType
 from attrs import asdict, field, fields, fields_dict, frozen
 from attrs.validators import gt
 
-# Local imports
+# Local application imports
 from .data import Data
 from ...ensembles import Ensemble
 from ...plotting.base.plot import Plot
@@ -52,6 +52,7 @@ def simulation_executable(func: FunctionType) -> FunctionType:
 # ---------------------------------
 @frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
 class Simulation(ABC):
+
     # Random matrix ensemble
     ensemble: Ensemble = field(converter=Ensemble.create)
 
@@ -71,6 +72,7 @@ class Simulation(ABC):
     @dir_name.default
     def __dir_name_default(self) -> str:
         """Generate default directory name based on class name."""
+
         # Insert underscores between words and acronyms in class name
         name = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", type(self).__name__)
         return re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", name).lower()
@@ -78,6 +80,7 @@ class Simulation(ABC):
     @ensemble.validator
     def __ensemble_is_concrete(self, _, value: Ensemble) -> None:
         """Ensure ensemble is a concrete subclass of Ensemble."""
+
         if inspect.isabstract(value):
             raise ValueError(
                 f"Ensemble must be a concrete subclass of Ensemble, got {type(value).__name__} instead."
@@ -86,6 +89,7 @@ class Simulation(ABC):
     @classmethod
     def __attrs_init_subclass__(cls) -> None:
         """Register concrete subclasses in the simulation registry."""
+
         # Include only concrete classes in registry
         if not inspect.isabstract(cls):
             # Convert simulation class to registry key format
@@ -96,6 +100,7 @@ class Simulation(ABC):
 
     def __attrs_post_init__(self) -> None:
         """Initialize metadata after object creation."""
+
         # Import module-level converter
         from ...serialization import converter
 
@@ -125,6 +130,7 @@ class Simulation(ABC):
 
     def save_data(self, out_dir: str | Path) -> None:
         """Save simulation results to disk."""
+
         # Save metadata to .json file
         with open(out_dir / "metadata.json", "w") as file:
             json.dump(self.metadata, file, indent=4)
@@ -149,6 +155,7 @@ class Simulation(ABC):
 
     def save_plots(self, out_dir: str | Path) -> None:
         """Save simulation plots to disk."""
+
         # Create generator of plot attributes
         plot_attrs = (
             getattr(self, f.name)
@@ -170,6 +177,7 @@ class Simulation(ABC):
     @property
     def to_dir(self) -> Path:
         """Generate directory Path used for storing simulation data."""
+
         # Begin path with class name
         dir_path = Path(self._dir_name)
 
@@ -192,6 +200,7 @@ class Simulation(ABC):
     @property
     def _dir_name(self) -> str:
         """Generate directory name used for storing simulation data."""
+
         # Insert underscores between words and acronyms in class name
         name = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", type(self).__name__)
         return re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", name).lower()

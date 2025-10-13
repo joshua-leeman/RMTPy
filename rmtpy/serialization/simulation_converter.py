@@ -7,10 +7,9 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-# Local imports
-from ..simulations import DATA_REGISTRY
-from ..simulations import Simulation, SIMULATION_REGISTRY
+# Local application imports
 from . import normalize_dict, converter
+from ..simulations import Simulation, DATA_REGISTRY, SIMULATION_REGISTRY
 
 
 # ---------------------------------
@@ -35,6 +34,7 @@ SIM_UNSTRUCTURE_HOOKS: dict[str, Callable] = {
 @converter.register_structure_hook
 def sim_structure_hook(src: str | Path | dict[str, Any] | Simulation, _) -> Simulation:
     """Convert serialized data from a directory to a Simulation instance."""
+
     # If src is already a valid instance, return it
     if type(src) in SIMULATION_REGISTRY.values():
         return src

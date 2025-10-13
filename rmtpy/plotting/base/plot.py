@@ -13,15 +13,17 @@ import matplotlib.pyplot as plt
 from matplotlib import rcParams
 
 # Local application imports
-from ...simulations.base.data import Data
 from .axes import PlotAxes
 from .legend import PlotLegend
+from ...simulations.base.data import Data
 
 
 # ------------------------
 # Matplotlib configuration
 # ------------------------
 def configure_matplotlib() -> None:
+    """Configure matplotlib settings for plots."""
+
     # Set matplotlib rcParams for plots
     rcParams["axes.axisbelow"] = False
     rcParams["font.family"] = "serif"
@@ -45,6 +47,7 @@ def configure_matplotlib() -> None:
 # ---------------
 @dataclass(repr=False, eq=False, kw_only=True)
 class Plot(ABC):
+
     # Plot data
     data: Data
 
@@ -65,6 +68,7 @@ class Plot(ABC):
 
     def __post_init__(self) -> None:
         """Post-initialization processing."""
+
         # Configure matplotlib settings
         configure_matplotlib()
 
@@ -74,10 +78,12 @@ class Plot(ABC):
     @abstractmethod
     def plot(self, path: str | Path) -> None:
         """Create and save the plot to the specified path."""
+
         pass
 
     def create_figure(self) -> None:
         """Create a figure and axes for the plot."""
+
         # Create figure and axis
         self.fig, self.ax = plt.subplots()
 
@@ -86,6 +92,7 @@ class Plot(ABC):
 
     def set_plot(self, path: str | Path) -> None:
         """Finish and save the plot to path."""
+
         # Check if figure and axis exist
         if not hasattr(self, "fig") or not hasattr(self, "ax"):
             raise AttributeError(

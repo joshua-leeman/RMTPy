@@ -9,7 +9,7 @@ from typing import Any
 import numpy as np
 from numpy.lib.npyio import NpzFile
 
-# Local imports
+# Local application imports
 from ..simulations import Data, DATA_REGISTRY
 from . import converter
 
@@ -19,6 +19,8 @@ from . import converter
 # ----------------------------
 @converter.register_structure_hook
 def data_structure_hook(src: str | Path | dict[str, Any] | NpzFile | Data, _) -> Data:
+    """Structure hook to convert unstructured data to Data instance."""
+
     # If src is already a valid instance, return it
     if isinstance(src, Data):
         return src

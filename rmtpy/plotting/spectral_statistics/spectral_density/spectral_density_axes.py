@@ -18,6 +18,7 @@ from ...base import PlotAxes
 # -------------------------------
 @dataclass(repr=False, eq=False, kw_only=True)
 class SpectralDensityAxes(PlotAxes):
+
     # x-axis ticks
     xticks: tuple[float, ...] = (-1.0, 0.0, 1.0)  # factor of E0
     unf_xticks: tuple[float, ...] = (-1.0, 0.0, 1.0)  # factor of D/2

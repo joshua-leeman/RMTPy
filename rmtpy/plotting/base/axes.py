@@ -16,6 +16,7 @@ from matplotlib.axes import Axes
 # --------------------
 @dataclass(repr=False, eq=False, kw_only=True)
 class PlotAxes(ABC):
+
     # Axes width
     axes_width: float = 1.0
 
@@ -45,6 +46,7 @@ class PlotAxes(ABC):
 
     def configure(self, ax: Axes) -> None:
         """Configure axes with specified settings."""
+
         # Set axes line width
         for spine in ax.spines.values():
             spine.set_linewidth(self.axes_width)

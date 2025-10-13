@@ -15,6 +15,7 @@ from ...base import PlotLegend
 # ---------------------------------
 @dataclass(repr=False, eq=False, kw_only=True)
 class SpectralDensityLegend(PlotLegend):
+
     # Legend location
     loc: str = "upper right"
 

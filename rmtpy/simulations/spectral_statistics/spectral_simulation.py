@@ -11,17 +11,13 @@ from pathlib import Path
 import numpy as np
 from scipy.special import jn_zeros
 
-# Local imports
-from ...ensembles import ManyBodyEnsemble
-from ...plotting.spectral_statistics import SpectralDensityPlot
-from ..base.simulation import (
-    SIMULATION_EXECUTABLE_REGISTRY,
-    simulation_executable,
-    Simulation,
-)
+# Local application imports
 from .spectral_density_data import SpectralDensityData
 from .spacing_histogram_data import SpacingHistogramData
 from .form_factors_data import FormFactorsData
+from ..base import Simulation, simulation_executable
+from ...ensembles import ManyBodyEnsemble
+from ...plotting.spectral_statistics import SpectralDensityPlot
 
 
 # --------------------
@@ -116,6 +112,7 @@ class SpectralStatistics(Simulation):
 
     def __attrs_post_init__(self) -> None:
         """Initialize metadata after object creation."""
+
         # Call parent post-init method
         super().__attrs_post_init__()
 
@@ -126,12 +123,9 @@ class SpectralStatistics(Simulation):
 
     def realize_monte_carlo(self) -> None:
         """Realize Monte Carlo sample of spectral statistics."""
+
         # Alias ensemble
         ensemble: ManyBodyEnsemble = self.ensemble
-
-        # Check if ensemble is ManyBodyEnsemble
-        if not isinstance(ensemble, ManyBodyEnsemble):
-            raise TypeError("Ensemble must be an instance of ManyBodyEnsemble.")
 
         # Alias ensemble parameters
         dim: int = ensemble.dim
@@ -145,6 +139,10 @@ class SpectralStatistics(Simulation):
         spectral: SpectralDensityData = self.spectral_data
         spacings: SpacingHistogramData = self.spacings_data
         factors: FormFactorsData = self.factors_data
+
+        # Check if ensemble is ManyBodyEnsemble
+        if not isinstance(ensemble, ManyBodyEnsemble):
+            raise TypeError("Ensemble must be an instance of ManyBodyEnsemble.")
 
         # Store first positive zero of 1st Bessel function
         j_1_1 = jn_zeros(1, 1)[0]
@@ -200,6 +198,7 @@ class SpectralStatistics(Simulation):
 
     def calculate_statistics(self) -> None:
         """Calculate final spectral statistics from Monte Carlo data."""
+
         # Alias number of realizations
         realizs = self.realizs
 
@@ -236,6 +235,7 @@ class SpectralStatistics(Simulation):
 
     def run(self, out_dir: str | Path = "output") -> None:
         """Run the spectral statistics simulation."""
+
         # Realize Monte Carlo sample of spectral statistics
         self.realize_monte_carlo()
 
