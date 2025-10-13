@@ -8,10 +8,13 @@ from pathlib import Path
 from .base.simulation import Simulation, SIMULATION_REGISTRY
 from .base.data import Data, DATA_REGISTRY
 
-# Dynamically import all simulation modules
+# Get directory that contains this file
 path: Path = Path(__file__).parent
-for file in path.glob("[!_]*.py"):
-    import_module(f".{file.stem}", package=__name__)
+
+# Dynamically import all Python modules in this directory
+for subdir in path.iterdir():
+    if subdir.is_dir() and (subdir / "__init__.py").exists():
+        import_module(f".{subdir.name}", package=__name__)
 
 # Create dictionary of registered simulations
 sim_dict: dict[str, type[Simulation]] = {

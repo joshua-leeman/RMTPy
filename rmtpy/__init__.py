@@ -14,7 +14,6 @@ globals().update(__sim_dict)
 # Redefine __all__ to include all registered ensembles
 __all__ = [ens_name for ens_name in __ens_dict.keys()] + [
     "create_ensemble",
-    "create_simulation",
 ]
 
 
@@ -30,7 +29,7 @@ def create_ensemble(**kwargs: __Any) -> __Ensemble:
 # ------------------------------------
 # Monte Carlo Simulation Class Factory
 # ------------------------------------
-def create_simulation(**kwargs: __Any) -> __Simulation:
-    """Get a Monte Carlo simulation by name."""
-    # Call simulation constructor with provided keyword arguments as dictionary
-    return __Simulation.create(kwargs)
+# def create_simulation(**kwargs: __Any) -> __Simulation:
+#     """Get a Monte Carlo simulation by name."""
+#     # Call simulation constructor with provided keyword arguments as dictionary
+#     return __Simulation.create(kwargs)
