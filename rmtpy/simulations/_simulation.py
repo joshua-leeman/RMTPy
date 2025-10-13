@@ -82,6 +82,7 @@ class Simulation(ABC):
     def __ensemble_is_concrete(self, _, value: Ensemble) -> None:
         """Ensure ensemble is a concrete subclass of Ensemble."""
 
+        # If ensemble is abstract, raise error
         if inspect.isabstract(value):
             raise ValueError(
                 f"Ensemble must be a concrete subclass of Ensemble, got {type(value).__name__} instead."
