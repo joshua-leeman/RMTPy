@@ -12,16 +12,18 @@ globals().update(__ens_dict)
 globals().update(__sim_dict)
 
 # Redefine __all__ to include all registered ensembles
-__all__ = [ens_name for ens_name in __ens_dict.keys()] + [
-    "create_ensemble",
-]
+__all__ = (
+    [ens_name for ens_name in __ens_dict.keys()]
+    + [sim_name for sim_name in __sim_dict.keys()]
+    + ["ensemble"]
+)
 
 
 # ------------------------------------
 # Random Matrix Ensemble Class Factory
 # ------------------------------------
-def create_ensemble(**kwargs: __Any) -> __Ensemble:
-    """Get a random matrix ensemble by name."""
+def ensemble(**kwargs: __Any) -> __Ensemble:
+    """Create a random matrix ensemble instance by name."""
     # Call ensemble constructor with provided keyword arguments as dictionary
     return __Ensemble.create(kwargs)
 
