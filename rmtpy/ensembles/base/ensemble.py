@@ -23,6 +23,15 @@ from attrs.validators import gt
 ENSEMBLE_REGISTRY: dict[str, type[Ensemble]] = {}
 
 
+# ------------------------------------
+# Random Matrix Ensemble Class Factory
+# ------------------------------------
+def ensemble(**kwargs: Any) -> Ensemble:
+    """Create a random matrix ensemble instance by name."""
+    # Call ensemble constructor with provided keyword arguments as dictionary
+    return Ensemble.create(kwargs)
+
+
 # ---------------------------------
 # Random Matrix Ensemble Base Class
 # ---------------------------------

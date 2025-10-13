@@ -1,4 +1,4 @@
-# rmtpy/simulations/spectral_statistics/spectral_statistics_simulation.py
+# rmtpy/simulations/spectral_statistics/spectral_simulation.py
 
 # Postponed evaluation of annotations
 from __future__ import annotations
@@ -14,7 +14,11 @@ from scipy.special import jn_zeros
 # Local imports
 from ...ensembles import ManyBodyEnsemble
 from ...plotting.spectral_statistics import SpectralDensityPlot
-from ..base.simulation import Simulation
+from ..base.simulation import (
+    SIMULATION_EXECUTABLE_REGISTRY,
+    simulation_executable,
+    Simulation,
+)
 from .spectral_density_data import SpectralDensityData
 from .spacing_histogram_data import SpacingHistogramData
 from .form_factors_data import FormFactorsData
@@ -25,6 +29,7 @@ from .form_factors_data import FormFactorsData
 # --------------------
 def spectral_histogram(levels: np.ndarray, bins: np.ndarray) -> np.ndarray:
     """Compute the spectral histogram of an eigenvalue sample."""
+
     # Calculate histogram counts
     counts, _ = np.histogram(levels, bins=bins)
 
@@ -34,6 +39,7 @@ def spectral_histogram(levels: np.ndarray, bins: np.ndarray) -> np.ndarray:
 
 def spacings_histogram(levels: np.ndarray, bins: np.ndarray, degen: int) -> np.ndarray:
     """Compute the nearest-neighbor spacings histogram from an eigenvalue sample."""
+
     # Compute the nearest-neighbor spacings
     spacings = np.diff(np.sort(levels))
 
@@ -50,6 +56,7 @@ def spacings_histogram(levels: np.ndarray, bins: np.ndarray, degen: int) -> np.n
 
 def sff_moments(levels: np.ndarray, times: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """Compute the spectral form factor moments from an eigenvalue sample."""
+
     # Determine dimension of Hilbert space from levels
     dim = len(levels)
 
@@ -66,8 +73,10 @@ def sff_moments(levels: np.ndarray, times: np.ndarray) -> tuple[np.ndarray, np.n
     return mu_1, mu_2
 
 
+@simulation_executable
 def spectral_statistics(ensemble: ManyBodyEnsemble, realizs: int) -> None:
     """Perform a spectral statistics simulation for a given ensemble."""
+
     # Checks if ensemble is ManyBodyEnsemble
     if not isinstance(ensemble, ManyBodyEnsemble):
         raise TypeError("Ensemble must be an instance of ManyBodyEnsemble.")
@@ -88,6 +97,7 @@ def spectral_statistics(ensemble: ManyBodyEnsemble, realizs: int) -> None:
 # ------------------------------------
 @frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
 class SpectralStatistics(Simulation):
+
     # Spectral density data
     spectral_data: SpectralDensityData = field(factory=SpectralDensityData, repr=False)
 

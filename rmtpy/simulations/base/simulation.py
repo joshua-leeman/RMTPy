@@ -10,6 +10,7 @@ import re
 from abc import ABC
 from pathlib import Path
 from typing import Any
+from types import FunctionType
 
 # Third-party imports
 from attrs import asdict, field, fields, fields_dict, frozen
@@ -25,6 +26,25 @@ from ...plotting.base.plot import Plot
 # Monte Carlo Simulation Registry
 # -------------------------------
 SIMULATION_REGISTRY: dict[str, type[Simulation]] = {}
+
+
+# ------------------------------
+# Simulation Executable Registry
+# ------------------------------
+SIMULATION_EXECUTABLE_REGISTRY: dict[str, type[FunctionType]] = {}
+
+
+# -------------------------------
+# Simulation Executable Decorator
+# -------------------------------
+def simulation_executable(func: FunctionType) -> FunctionType:
+    """Decorator to register a simulation executable function."""
+
+    # Register function in executable registry
+    SIMULATION_EXECUTABLE_REGISTRY[func.__name__] = func
+
+    # Return original function
+    return func
 
 
 # ---------------------------------
