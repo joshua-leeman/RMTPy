@@ -66,6 +66,23 @@ def sff_moments(levels: np.ndarray, times: np.ndarray) -> tuple[np.ndarray, np.n
     return mu_1, mu_2
 
 
+def spectral_statistics(ensemble: ManyBodyEnsemble, realizs: int) -> None:
+    """Perform a spectral statistics simulation for a given ensemble."""
+    # Checks if ensemble is ManyBodyEnsemble
+    if not isinstance(ensemble, ManyBodyEnsemble):
+        raise TypeError("Ensemble must be an instance of ManyBodyEnsemble.")
+
+    # Checks if realizs is a positive integer
+    if not isinstance(realizs, int) or realizs <= 0:
+        raise ValueError("Number of realizations must be a positive integer.")
+
+    # Create simulation instance
+    sim = SpectralStatistics(ensemble=ensemble, realizs=realizs)
+
+    # Run simulation
+    sim.run()
+
+
 # ------------------------------------
 # Spectral Statistics Simulation Class
 # ------------------------------------
@@ -101,6 +118,10 @@ class SpectralStatistics(Simulation):
         """Realize Monte Carlo sample of spectral statistics."""
         # Alias ensemble
         ensemble: ManyBodyEnsemble = self.ensemble
+
+        # Check if ensemble is ManyBodyEnsemble
+        if not isinstance(ensemble, ManyBodyEnsemble):
+            raise TypeError("Ensemble must be an instance of ManyBodyEnsemble.")
 
         # Alias ensemble parameters
         dim: int = ensemble.dim
