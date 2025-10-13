@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 # Standard library imports
+from abc import ABC
 from dataclasses import dataclass
 
 # Third-party imports
@@ -14,7 +15,7 @@ from matplotlib.axes import Axes
 # Plot Legend Base Class
 # ----------------------
 @dataclass(repr=False, eq=False, kw_only=True)
-class PlotLegend:
+class PlotLegend(ABC):
     # Legend handles
     handles: tuple | None = None
 

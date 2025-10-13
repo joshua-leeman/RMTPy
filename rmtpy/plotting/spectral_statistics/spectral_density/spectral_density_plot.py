@@ -30,7 +30,7 @@ class SpectralDensityPlot(Plot):
     data: SpectralData
 
     # File name
-    file_name: str = "spectral_density.png"
+    file_name: str = "spectral_density"
 
     # Unfolded data flag
     unfold: bool = False

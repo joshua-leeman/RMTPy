@@ -13,6 +13,7 @@ from scipy.special import jn_zeros
 
 # Local imports
 from ...ensembles import ManyBodyEnsemble
+from ...plotting.spectral_statistics import SpectralDensityPlot
 from ..base.simulation import Simulation
 from .spectral_density import SpectralData
 from .spacing_histogram import SpacingsData
@@ -71,29 +72,22 @@ def sff_moments(levels: np.ndarray, times: np.ndarray) -> tuple[np.ndarray, np.n
 @frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
 class SpectralStatistics(Simulation):
     # Spectral density data
-    spectral_data: SpectralData = field(factory=SpectralData)
+    spectral_data: SpectralData = field(factory=SpectralData, repr=False)
 
     # Spacings histogram data
-    spacings_data: SpacingsData = field(factory=SpacingsData)
+    spacings_data: SpacingsData = field(factory=SpacingsData, repr=False)
 
     # Spectral form factor data
-    factors_data: FactorsData = field(factory=FactorsData)
+    factors_data: FactorsData = field(factory=FactorsData, repr=False)
 
-    #
+    # Spectral density plot instance
+    spectral_plot: SpectralDensityPlot = field(init=False, repr=False)
 
-    def __attrs_post_init__(self) -> None:
-        """Initialize metadata after object creation."""
-        # Call parent post-init method
-        super().__attrs_post_init__()
-
-        # Add simulation metadata to spectral histogram data
-        self.spectral_data.metadata.update({"simulation": self.metadata.copy()})
-
-        # Add simulation metadata to spacings histogram data
-        self.spacings_data.metadata.update({"simulation": self.metadata.copy()})
-
-        # Add simulation metadata to spectral form factor data
-        self.factors_data.metadata.update({"simulation": self.metadata.copy()})
+    @spectral_plot.default
+    def __default_spectral_plot(self) -> SpectralDensityPlot:
+        """Create default spectral density plot instance."""
+        # Return spectral density plot instance with current spectral data
+        return SpectralDensityPlot(data=self.spectral_data)
 
     def realize_monte_carlo(self) -> None:
         """Realize Monte Carlo sample of spectral statistics."""
@@ -201,7 +195,7 @@ class SpectralStatistics(Simulation):
         # Calculate unfolded connected spectral form factor
         factors.unf_csff[:] = factors.unf_sff - np.abs(factors.unf_mu_1) ** 2
 
-    def run(self, path: str | Path = "output") -> None:
+    def run(self, out_dir: str | Path = "output") -> None:
         """Run the spectral statistics simulation."""
         # Realize Monte Carlo sample of spectral statistics
         self.realize_monte_carlo()
@@ -209,4 +203,17 @@ class SpectralStatistics(Simulation):
         # Calculate final spectral statistics from Monte Carlo data
         self.calculate_statistics()
 
-        print()
+        # Ensure path is a Path object
+        out_dir = Path(out_dir)
+
+        # Alias base directory path
+        base_dir = out_dir / self.to_dir
+
+        # Create base directory if it does not exist
+        base_dir.mkdir(parents=True, exist_ok=True)
+
+        # Save simulation data to output directory
+        self.save_data(out_dir=base_dir)
+
+        # Generate and save plots to output directory
+        self.save_plots(out_dir=base_dir)

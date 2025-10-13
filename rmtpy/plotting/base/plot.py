@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 # Standard library imports
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -45,9 +46,12 @@ def configure_matplotlib() -> None:
 # Plot Base Class
 # ---------------
 @dataclass(repr=False, eq=False, kw_only=True)
-class Plot:
+class Plot(ABC):
     # Plot data
     data: Data
+
+    # File name
+    file_name: str = "plot.png"
 
     # x-axis limits
     xlim: tuple[float, float] | None = None
@@ -68,6 +72,11 @@ class Plot:
         """Post-initialization processing."""
         # Configure matplotlib settings
         configure_matplotlib()
+
+    @abstractmethod
+    def plot(self, path: str | Path) -> None:
+        """Create and save the plot to the specified path."""
+        pass
 
     def create_figure(self) -> None:
         """Create a figure and axes for the plot."""

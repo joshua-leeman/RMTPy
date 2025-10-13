@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 # Standard library imports
+from abc import ABC
 from dataclasses import dataclass
 
 # Third-party imports
@@ -14,7 +15,7 @@ from matplotlib.axes import Axes
 # Plot Axes Base Class
 # --------------------
 @dataclass(repr=False, eq=False, kw_only=True)
-class PlotAxes:
+class PlotAxes(ABC):
     # Axes width
     axes_width: float = 1.0
 

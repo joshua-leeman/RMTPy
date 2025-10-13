@@ -50,7 +50,7 @@ class Data(ABC):
         # Include only concrete classes in registry
         if not inspect.isabstract(cls):
             # Convert data class name from CamelCase to snake_case
-            data_key = re.sub(r"(?<=[a-z][0-9])([A-Z])", r"_\1", cls.__name__)
+            data_key = re.sub(r"([a-z0-9])([A-Z])([A-Z])", r"\1_\2", cls.__name__)
             data_key = data_key.lower()
 
             # Normalize class name to registry key format
