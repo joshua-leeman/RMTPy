@@ -26,8 +26,9 @@ ENSEMBLE_REGISTRY: dict[str, type[Ensemble]] = {}
 # ------------------------------------
 # Random Matrix Ensemble Class Factory
 # ------------------------------------
-def ensemble(**kwargs: Any) -> Ensemble:
+def rmt_ensemble(**kwargs: Any) -> Ensemble:
     """Create a random matrix ensemble instance by name."""
+
     # Call ensemble constructor with provided keyword arguments as dictionary
     return Ensemble.create(kwargs)
 
@@ -37,6 +38,7 @@ def ensemble(**kwargs: Any) -> Ensemble:
 # ---------------------------------
 @frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
 class Ensemble(ABC):
+
     # Random number generator seed
     seed: Any = field(default=None)
 
@@ -58,6 +60,7 @@ class Ensemble(ABC):
     @real_dtype.default
     def __real_dtype_default(self) -> np.dtype:
         """Set the real data type based on the complex data type."""
+
         # If dtype is complex, return the real part's dtype
         return np.dtype(self.dtype.char.lower())
 
@@ -65,6 +68,7 @@ class Ensemble(ABC):
     @rng.default
     def __rng_default(self) -> np.random.Generator:
         """Initialize the ensemble's random number generator."""
+
         # Validate seed and create random number generator, raise error if invalid
         try:
             # If seed is a string, attempt literal evaluation
@@ -117,6 +121,7 @@ class Ensemble(ABC):
     @classmethod
     def __attrs_init_subclass__(cls) -> None:
         """Register concrete subclasses in the ensemble registry."""
+
         # Include only concrete classes in registry
         if not inspect.isabstract(cls):
             # Convert ensemble class to registry key format
@@ -128,6 +133,7 @@ class Ensemble(ABC):
     @classmethod
     def create(cls, src: dict[str, Any] | Ensemble) -> Ensemble:
         """Create an instance of the ensemble with given parameters."""
+
         # Import module-level converter
         from ...serialization import converter
 
@@ -137,18 +143,21 @@ class Ensemble(ABC):
     @property
     def matrix_memory(self) -> int:
         """Calculate memory used to store a generated matrix in bytes."""
+
         # Calculate memory used to store a generated matrix
         return self.dtype.itemsize * self.dim**2
 
     @property
     def rng_state(self) -> dict[str, Any]:
         """Get current state of the random number generator."""
+
         # Return state of random number generator
         return self.rng.bit_generator.state
 
     @property
     def to_dir(self) -> Path:
         """Generate directory Path used for storing data related to the RMT instance."""
+
         # Begin path with class name
         dir_path = Path(self._dir_name)
 
@@ -168,6 +177,7 @@ class Ensemble(ABC):
     @property
     def to_latex(self) -> str:
         """Generate LaTeX representation of the RMT instance."""
+
         # Begin LaTeX string with ensemble's latex name
         latex_str = f"${self._latex_name}"
 
@@ -184,6 +194,7 @@ class Ensemble(ABC):
     @property
     def _dir_name(self) -> str:
         """Generate directory name used for storing Ensemble instance data."""
+
         # Insert underscores between words and acronyms in class name
         name = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", type(self).__name__)
         return re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", name)
@@ -191,11 +202,13 @@ class Ensemble(ABC):
     @property
     def _latex_name(self) -> str:
         """Generate LaTeX representation of the ensemble class name."""
+
         # Use class name as LaTeX name, replacing underscores with spaces
         return f"\\textrm{{{re.sub(r'_', ' ', type(self).__name__)}}}"
 
     def set_rng_state(self, state: dict[str, Any] | None) -> None:
         """Set the state of the random number generator."""
+
         # Check if state is a dictionary
         if isinstance(state, dict):
             # Try to set state of random number generator
@@ -217,4 +230,6 @@ class Ensemble(ABC):
     @abstractmethod
     def generate(self, offset: np.ndarray | None = None) -> np.ndarray:
         """Generate a random matrix."""
+
+        # This method should be implemented by subclasses
         pass

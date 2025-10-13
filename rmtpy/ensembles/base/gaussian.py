@@ -7,7 +7,7 @@ from __future__ import annotations
 import numpy as np
 from attrs import field, frozen
 
-# Local imports
+# Local application imports
 from .manybody import ManyBodyEnsemble
 
 
@@ -16,6 +16,7 @@ from .manybody import ManyBodyEnsemble
 # ----------------------------
 @frozen(kw_only=True)
 class GaussianEnsemble(ManyBodyEnsemble):
+
     # Complex standard deviation of matrix entries
     sigma: float = field(init=False, repr=False)
 
@@ -23,10 +24,12 @@ class GaussianEnsemble(ManyBodyEnsemble):
     @sigma.default
     def __sigma_default(self) -> float:
         """Calculate the complex standard deviation of matrix entries."""
+
         return self.E0 / np.sqrt(2 * self.dim)
 
     def pdf(self, eigval: np.ndarray) -> np.ndarray:
         """Wigner semicircle probability density function."""
+
         # Normalize eigenvalues
         x = eigval / self.E0
 
@@ -45,6 +48,7 @@ class GaussianEnsemble(ManyBodyEnsemble):
 
     def cdf(self, eigval: np.ndarray) -> np.ndarray:
         """Cumulative distribution function of Wigner semicircle PDF."""
+
         # Normalize eigenvalues and clip to range [-1, 1]
         x = np.clip(eigval / self.E0, -1.0, 1.0)
 

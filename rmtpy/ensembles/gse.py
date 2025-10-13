@@ -7,8 +7,8 @@ from __future__ import annotations
 import numpy as np
 from attrs import frozen
 
-# Local imports
-from .base.gaussian import GaussianEnsemble
+# Local application imports
+from .base import GaussianEnsemble
 
 
 # ----------------------------------
@@ -16,6 +16,7 @@ from .base.gaussian import GaussianEnsemble
 # ----------------------------------
 @frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
 class GSE(GaussianEnsemble):
+
     @property
     def beta(self) -> int:
         """Dyson index of the GSE."""
@@ -23,6 +24,7 @@ class GSE(GaussianEnsemble):
 
     def generate(self, offset: np.ndarray | None = None) -> np.ndarray:
         """Generate a random matrix from the GSE."""
+
         # If offset is None, allocate memory for matrix
         if offset is None:
             H = np.zeros((self.dim, self.dim), dtype=self.dtype, order="F")

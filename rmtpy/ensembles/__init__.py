@@ -4,9 +4,8 @@
 from importlib import import_module
 from pathlib import Path
 
-# Local imports
-from .base.ensemble import ENSEMBLE_REGISTRY, ensemble, Ensemble
-from .base.manybody import ManyBodyEnsemble
+# Local application imports
+from .base import Ensemble, ManyBodyEnsemble, rmt_ensemble, ENSEMBLE_REGISTRY
 
 # Dynamically import all ensemble modules
 path: Path = Path(__file__).parent

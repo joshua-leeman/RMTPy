@@ -5,7 +5,7 @@ from importlib import import_module
 from pathlib import Path
 from types import FunctionType
 
-# Local imports
+# Local application imports
 from .base import (
     Data,
     Simulation,

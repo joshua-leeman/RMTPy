@@ -11,8 +11,8 @@ import numpy as np
 from attrs import field, frozen
 from scipy.linalg.lapack import get_lapack_funcs
 
-# Local imports
-from .base.manybody import ManyBodyEnsemble
+# Local application imports
+from .base import ManyBodyEnsemble
 
 
 # ----------------
@@ -20,6 +20,7 @@ from .base.manybody import ManyBodyEnsemble
 # ----------------
 @frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
 class Poisson(ManyBodyEnsemble):
+
     # Standard deviation of eigenvalues
     sigma: float = field(init=False, repr=False)
 
@@ -30,6 +31,7 @@ class Poisson(ManyBodyEnsemble):
     @sigma.default
     def __sigma_default(self) -> float:
         """Default value for sigma."""
+
         # Calculate standard deviation based on E0
         return 2 * self.E0
 
@@ -37,21 +39,28 @@ class Poisson(ManyBodyEnsemble):
     @__zgeqrf.default
     def __zgeqrf_default(self) -> Callable:
         """Default low-level LAPACK QR routine for geqrf."""
+
+        # Get LAPACK functions for geqrf
         return get_lapack_funcs("geqrf", dtype=self.dtype)
 
     # Set LAPACK ungqr routine for generating Q from QR factorization
     @__zungqr.default
     def __zungqr_default(self) -> Callable:
         """Default low-level QR routine for ungqr."""
+
+        # Get LAPACK functions for ungqr
         return get_lapack_funcs("ungqr", dtype=self.dtype)
 
     @property
     def beta(self) -> int:
         """Dyson index of the Poisson ensemble."""
+
+        # Poisson ensemble has no level repulsion
         return 0
 
     def generate(self, offset: np.ndarray | None = None) -> np.ndarray:
         """Generate a random matrix from the Poisson ensemble."""
+
         # If out is None, allocate memory for matrix
         if not isinstance(offset, np.ndarray):
             H = np.zeros((self.dim, self.dim), dtype=self.dtype, order="F")
@@ -90,6 +99,7 @@ class Poisson(ManyBodyEnsemble):
 
     def eig_stream(self, realizs: int) -> Iterator[tuple[np.ndarray, np.ndarray]]:
         """Iterator to stream eigensystem realizations."""
+
         # Allocate memory for random eigenvalues and eigenvectors
         eigvals = np.empty(self.dim, dtype=self.real_dtype, order="F")
         U = np.empty((self.dim, self.dim), dtype=self.dtype, order="F")
@@ -122,6 +132,7 @@ class Poisson(ManyBodyEnsemble):
 
     def eigvals_stream(self, realizs: int) -> Iterator[np.ndarray]:
         """Iterator to stream spectrum realizations."""
+
         # Allocate memory for random eigenvalues
         eigvals = np.empty(self.dim, dtype=self.real_dtype, order="F")
 
@@ -140,6 +151,7 @@ class Poisson(ManyBodyEnsemble):
 
     def pdf(self, eigval: np.ndarray) -> np.ndarray:
         """Probability density function of the Poisson ensemble."""
+
         # Initialize distribution with zeros
         pdf = np.zeros_like(eigval, dtype=self.real_dtype)
 
@@ -151,6 +163,7 @@ class Poisson(ManyBodyEnsemble):
 
     def cdf(self, eigval: np.ndarray) -> np.ndarray:
         """Cumulative distribution function of the Poisson ensemble."""
+
         # Initialize distribution with zeros
         cdf = np.zeros_like(eigval, dtype=self.real_dtype)
 
