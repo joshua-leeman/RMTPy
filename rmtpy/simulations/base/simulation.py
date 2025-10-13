@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 # Third-party imports
-from attrs import asdict, field, fields_dict, frozen
+from attrs import asdict, field, fields, fields_dict, frozen
 from attrs.validators import gt
 
 # Local imports
@@ -92,7 +92,11 @@ class Simulation(ABC):
         self.metadata["args"]["realizs"] = self.realizs
 
         # Create generator of data attributes
-        data_attrs = (attr for attr in asdict(self).values() if isinstance(attr, Data))
+        data_attrs = tuple(
+            getattr(self, f.name)
+            for f in fields(type(self))
+            if isinstance(getattr(self, f.name), Data)
+        )
 
         # Loop through data objects
         for data in data_attrs:
@@ -106,7 +110,11 @@ class Simulation(ABC):
             json.dump(self.metadata, file, indent=4)
 
         # Create generator of data attributes
-        data_attrs = (attr for attr in asdict(self).values() if isinstance(attr, Data))
+        data_attrs = (
+            getattr(self, f.name)
+            for f in fields(type(self))
+            if isinstance(getattr(self, f.name), Data)
+        )
 
         # Loop through data objects
         for data in data_attrs:
@@ -122,12 +130,16 @@ class Simulation(ABC):
     def save_plots(self, out_dir: str | Path) -> None:
         """Save simulation plots to disk."""
         # Create generator of plot attributes
-        plot_attrs = (attr for attr in asdict(self).values() if isinstance(attr, Plot))
+        plot_attrs = (
+            getattr(self, f.name)
+            for f in fields(type(self))
+            if isinstance(getattr(self, f.name), Plot)
+        )
 
         # Loop through plot objects
         for plot in plot_attrs:
             # Generate output path for plot object
-            out_path = out_dir / plot.file_name / f"{plot.file_name}.png"
+            out_path = out_dir / plot.file_name
 
             # Make sure directories exist
             out_path.parent.mkdir(parents=True, exist_ok=True)

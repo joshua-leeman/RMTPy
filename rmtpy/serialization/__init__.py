@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 # Third-party imports
+import numpy as np
 from attrs import fields_dict
 from cattrs import Converter
 
@@ -14,7 +15,14 @@ from cattrs import Converter
 # ----------------------
 # Module-level Converter
 # ----------------------
+# Initialize converter instance
 converter = Converter()
+
+# Unstructure hook: from np.dtype to JSON-serializable type
+converter.register_unstructure_hook(np.dtype, lambda dt: dt.name)
+
+# Structure hook: from string to np.dtype
+converter.register_structure_hook(np.dtype, lambda s, _: np.dtype(s))
 
 
 # ---------------------------------

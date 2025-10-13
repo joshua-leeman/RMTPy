@@ -7,10 +7,8 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
 
 # Third-party imports
-import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import rcParams
 
@@ -50,9 +48,6 @@ class Plot(ABC):
     # Plot data
     data: Data
 
-    # File name
-    file_name: str = "plot.png"
-
     # x-axis limits
     xlim: tuple[float, float] | None = None
 
@@ -72,6 +67,9 @@ class Plot(ABC):
         """Post-initialization processing."""
         # Configure matplotlib settings
         configure_matplotlib()
+
+        # Set file name to data file name
+        self.file_name = self.data.file_name
 
     @abstractmethod
     def plot(self, path: str | Path) -> None:

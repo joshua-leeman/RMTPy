@@ -41,6 +41,9 @@ class Data(ABC):
         file_name = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", type(self).__name__)
         file_name = file_name.lower()
 
+        # Remove '_data' suffix
+        file_name = file_name.replace("_data", "")
+
         # Return file name
         return file_name
 

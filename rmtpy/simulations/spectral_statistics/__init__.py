@@ -15,9 +15,9 @@ from scipy.special import jn_zeros
 from ...ensembles import ManyBodyEnsemble
 from ...plotting.spectral_statistics import SpectralDensityPlot
 from ..base.simulation import Simulation
-from .spectral_density import SpectralData
-from .spacing_histogram import SpacingsData
-from .form_factors import FactorsData
+from .spectral_density_data import SpectralDensityData
+from .spacing_histogram_data import SpacingHistogramData
+from .form_factors_data import FormFactorsData
 
 
 # --------------------
@@ -72,22 +72,30 @@ def sff_moments(levels: np.ndarray, times: np.ndarray) -> tuple[np.ndarray, np.n
 @frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
 class SpectralStatistics(Simulation):
     # Spectral density data
-    spectral_data: SpectralData = field(factory=SpectralData, repr=False)
+    spectral_data: SpectralDensityData = field(factory=SpectralDensityData, repr=False)
 
     # Spacings histogram data
-    spacings_data: SpacingsData = field(factory=SpacingsData, repr=False)
+    spacings_data: SpacingHistogramData = field(
+        factory=SpacingHistogramData, repr=False
+    )
 
     # Spectral form factor data
-    factors_data: FactorsData = field(factory=FactorsData, repr=False)
+    factors_data: FormFactorsData = field(factory=FormFactorsData, repr=False)
 
     # Spectral density plot instance
-    spectral_plot: SpectralDensityPlot = field(init=False, repr=False)
+    spectral_plot: SpectralDensityPlot | None = field(
+        init=False, repr=False, default=None
+    )
 
-    @spectral_plot.default
-    def __default_spectral_plot(self) -> SpectralDensityPlot:
-        """Create default spectral density plot instance."""
-        # Return spectral density plot instance with current spectral data
-        return SpectralDensityPlot(data=self.spectral_data)
+    def __attrs_post_init__(self) -> None:
+        """Initialize metadata after object creation."""
+        # Call parent post-init method
+        super().__attrs_post_init__()
+
+        # Initialize spectral plot
+        object.__setattr__(
+            self, "spectral_plot", SpectralDensityPlot(data=self.spectral_data)
+        )
 
     def realize_monte_carlo(self) -> None:
         """Realize Monte Carlo sample of spectral statistics."""
@@ -103,9 +111,9 @@ class SpectralStatistics(Simulation):
         realizs = self.realizs
 
         # Alias simulation data
-        spectral: SpectralData = self.spectral_data
-        spacings: SpacingsData = self.spacings_data
-        factors: FactorsData = self.factors_data
+        spectral: SpectralDensityData = self.spectral_data
+        spacings: SpacingHistogramData = self.spacings_data
+        factors: FormFactorsData = self.factors_data
 
         # Store first positive zero of 1st Bessel function
         j_1_1 = jn_zeros(1, 1)[0]
@@ -165,9 +173,9 @@ class SpectralStatistics(Simulation):
         realizs = self.realizs
 
         # Alias simulation data
-        spectral: SpectralData = self.spectral_data
-        spacings: SpacingsData = self.spacings_data
-        factors: FactorsData = self.factors_data
+        spectral: SpectralDensityData = self.spectral_data
+        spacings: SpacingHistogramData = self.spacings_data
+        factors: FormFactorsData = self.factors_data
 
         # Normalize spectral histogram
         spectral.hist[:] /= np.sum(spectral.hist * np.diff(spectral.bins))

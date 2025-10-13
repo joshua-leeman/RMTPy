@@ -15,7 +15,9 @@ from matplotlib.patches import Patch
 # Local application imports
 from ....serialization import converter
 from ....ensembles import Ensemble, ManyBodyEnsemble
-from ....simulations.spectral_statistics.spectral_density import SpectralData
+from ....simulations.spectral_statistics.spectral_density_data import (
+    SpectralDensityData,
+)
 from ...base import Plot
 from .spectral_density_axes import SpectralDensityAxes
 from .spectral_density_legend import SpectralDensityLegend
@@ -27,10 +29,7 @@ from .spectral_density_legend import SpectralDensityLegend
 @dataclass(repr=False, eq=False, kw_only=True)
 class SpectralDensityPlot(Plot):
     # Plot data
-    data: SpectralData
-
-    # File name
-    file_name: str = "spectral_density"
+    data: SpectralDensityData
 
     # Unfolded data flag
     unfold: bool = False
