@@ -51,13 +51,6 @@ class Poisson(ManyBodyEnsemble):
         # Get LAPACK functions for ungqr
         return get_lapack_funcs("ungqr", dtype=self.dtype)
 
-    @property
-    def beta(self) -> int:
-        """Dyson index of the Poisson ensemble."""
-
-        # Poisson ensemble has no level repulsion
-        return 0
-
     def generate(self, offset: np.ndarray | None = None) -> np.ndarray:
         """Generate a random matrix from the Poisson ensemble."""
 

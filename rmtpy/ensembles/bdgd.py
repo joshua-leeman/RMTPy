@@ -5,7 +5,7 @@ from __future__ import annotations
 
 # Third-party imports
 import numpy as np
-from attrs import frozen
+from attrs import field, frozen
 
 # Local application imports
 from ._base import GaussianEnsemble
@@ -17,12 +17,22 @@ from ._base import GaussianEnsemble
 @frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
 class BdGD(GaussianEnsemble):
 
-    @property
-    def beta(self) -> int:
-        """Dyson index of the BdG(D)."""
+    # Dyson index (for BdG(D) is 2)
+    beta: int = field(init=False, default=2, repr=False)
 
-        # Ensemble BdG(D) has Dyson index 2
-        return 2
+    @property
+    def _dir_name(self) -> str:
+        """Generate directory name used for storing BdG(D) instance data."""
+
+        # Return formatted class name
+        return "BdG_D"
+
+    @property
+    def _latex_name(self) -> str:
+        """Generate LaTeX representation of BdG(D) class name."""
+
+        # Return formatted LaTeX name
+        return "\\textrm{{BdG(D)}}"
 
     def generate(self, offset: np.ndarray | None = None) -> np.ndarray:
         """Generate a random matrix from the BdG(D) ensemble."""

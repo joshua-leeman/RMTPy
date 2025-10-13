@@ -201,7 +201,7 @@ class Ensemble(ABC):
 
     @property
     def _latex_name(self) -> str:
-        """Generate LaTeX representation of the ensemble class name."""
+        """Generate LaTeX representation of Ensemble class name."""
 
         # Use class name as LaTeX name, replacing underscores with spaces
         return f"\\textrm{{{re.sub(r'_', ' ', type(self).__name__)}}}"

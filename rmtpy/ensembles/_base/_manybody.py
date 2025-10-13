@@ -27,6 +27,9 @@ from ._ensemble import Ensemble
 @frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
 class ManyBodyEnsemble(Ensemble):
 
+    # Dyson index (default is 0)
+    beta: int | float = field(init=False, default=0, repr=False)
+
     # Number of Majorana particles
     N: int = field(
         converter=int, validator=gt(2), metadata={"dir_name": "N", "latex_name": "N"}
@@ -234,11 +237,3 @@ class ManyBodyEnsemble(Ensemble):
         # Return trivial csff for other Dyson indices
         else:
             return np.full_like(tau, 1 / dim)
-
-    @property
-    @abstractmethod
-    def beta(self) -> int | float:
-        """Dyson index of the many-body ensemble."""
-
-        # This property should be implemented by subclasses
-        pass

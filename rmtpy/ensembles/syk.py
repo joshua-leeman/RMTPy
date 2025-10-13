@@ -27,6 +27,9 @@ class SYK(ManyBodyEnsemble):
     # SYK q-parameter
     q: int = field(converter=int, validator=gt(0))
 
+    # Dyson index
+    beta: int = field(init=False, repr=False)
+
     # Suppression factor
     eta: float = field(init=False, repr=False)
 
@@ -46,6 +49,17 @@ class SYK(ManyBodyEnsemble):
         # If q is not even, raise error
         if value % 2 != 0:
             raise ValueError(f"SYK q-parameter must be an even integer, got {value}")
+
+    # Set Dyson index based on q and N
+    @beta.default
+    def __beta_default(self) -> int:
+        """Default value for Dyson index."""
+
+        # Map to determine SYK Dyson index
+        index_map = {(0, 0): 1, (0, 4): 4}  # (N, q) --> beta
+
+        # Return appropriate index based on q and N
+        return index_map.get((self.q % 4, self.N % 8), 2) if self.q > 2 else 0
 
     # Set suppression factor based on q and N
     @eta.default
@@ -70,25 +84,15 @@ class SYK(ManyBodyEnsemble):
         return self.N * self.J * np.sqrt((1 - self.eta) / comb(self.N, self.q)) / 2
 
     @property
-    def beta(self) -> int:
-        """Dyson index of the SYK model."""
-
-        # Map to determine SYK Dyson index
-        index_map = {(0, 0): 1, (0, 4): 4}  # (N, q) --> beta
-
-        # Return appropriate index based on q and N
-        return index_map.get((self.q % 4, self.N % 8), 2) if self.q > 2 else 0
-
-    @property
     def _dir_name(self) -> str:
-        """Write name of ensemble class in directory format."""
+        """Write name of SYK class with q parameter in directory format."""
 
         # Return class name as directory names
         return super()._dir_name + f"_{self.q}"
 
     @property
     def _latex_name(self) -> str:
-        """Generate LaTeX representation of the ensemble class name."""
+        """Generate LaTeX representation of the SYK_q class name."""
 
         # Append q to the LaTeX name
         return super()._latex_name + f"_{self.q}"

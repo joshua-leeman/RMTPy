@@ -5,7 +5,7 @@ from __future__ import annotations
 
 # Third-party imports
 import numpy as np
-from attrs import frozen
+from attrs import field, frozen
 
 # Local application imports
 from ._base import GaussianEnsemble
@@ -17,12 +17,8 @@ from ._base import GaussianEnsemble
 @frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
 class GOE(GaussianEnsemble):
 
-    @property
-    def beta(self) -> int:
-        """Dyson index of the GOE."""
-
-        # Ensemble GOE has Dyson index 1
-        return 1
+    # Dyson index (for GOE is 1)
+    beta: int = field(init=False, default=1, repr=False)
 
     def generate(self, offset: np.ndarray | None = None) -> np.ndarray:
         """Generate a random matrix from the GOE."""
