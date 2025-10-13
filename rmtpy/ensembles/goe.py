@@ -20,6 +20,8 @@ class GOE(GaussianEnsemble):
     @property
     def beta(self) -> int:
         """Dyson index of the GOE."""
+
+        # Ensemble GOE has Dyson index 1
         return 1
 
     def generate(self, offset: np.ndarray | None = None) -> np.ndarray:

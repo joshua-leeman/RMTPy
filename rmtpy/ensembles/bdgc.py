@@ -20,6 +20,8 @@ class BdGC(GaussianEnsemble):
     @property
     def beta(self) -> int:
         """Dyson index of the BdG(C)."""
+
+        # Ensemble BdG(C) has Dyson index 2
         return 2
 
     def generate(self, offset: np.ndarray | None = None) -> np.ndarray:
