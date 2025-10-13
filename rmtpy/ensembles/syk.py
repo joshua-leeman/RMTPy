@@ -15,7 +15,7 @@ from scipy.sparse import csr_matrix
 
 # Local imports
 from .base.manybody import ManyBodyEnsemble
-from ..utils.spinmat import create_majorana_pairs
+from ..utils.spin_matrices import create_majorana_pairs
 
 
 # -----------------------------

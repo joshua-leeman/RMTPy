@@ -1,4 +1,4 @@
-# rmtpy/utils/spinmat.py
+# rmtpy/utils/spin_matrices.py
 
 # Third-party imports
 import numpy as np
@@ -10,6 +10,7 @@ from scipy.sparse import csr_matrix, eye_array, kron
 # ---------------------------
 def create_majoranas(N: int) -> tuple[csr_matrix, ...]:
     """Create list of N Majorana fermion operators."""
+
     # Create Pauli matrices
     pauli = (
         csr_matrix([[0, 1], [1, 0]], dtype=np.complex64),  # sigma_x
@@ -52,6 +53,7 @@ def create_majorana_pairs(
     majorana: tuple[csr_matrix, ...] | None = None,
 ) -> tuple[tuple[csr_matrix, ...], ...]:
     """Create all ψ_j * ψ_k (j < k) pairs of Majorana fermion operators."""
+
     # If majorana is None, create Majorana operators
     if majorana is None:
         # Check if N are provided
