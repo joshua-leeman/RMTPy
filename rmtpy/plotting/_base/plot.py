@@ -15,7 +15,7 @@ from matplotlib import rcParams
 # Local application imports
 from .axes import PlotAxes
 from .legend import PlotLegend
-from ...simulations.base.data import Data
+from ...data import Data
 
 
 # ------------------------

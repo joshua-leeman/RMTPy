@@ -5,7 +5,7 @@ from importlib import import_module
 from pathlib import Path
 
 # Local application imports
-from .base import Ensemble, ManyBodyEnsemble, rmt_ensemble, ENSEMBLE_REGISTRY
+from ._base import Ensemble, ManyBodyEnsemble, rmt_ensemble, ENSEMBLE_REGISTRY
 
 # Dynamically import all ensemble modules
 path: Path = Path(__file__).parent

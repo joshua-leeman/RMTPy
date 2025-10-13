@@ -14,8 +14,8 @@ from attrs.validators import gt
 from scipy.sparse import csr_matrix
 
 # Local application imports
-from .base import ManyBodyEnsemble
-from ..utils.spin_matrices import create_majorana_pairs
+from ._base import ManyBodyEnsemble
+from .utils.spin_matrices import create_majorana_pairs
 
 
 # -----------------------------

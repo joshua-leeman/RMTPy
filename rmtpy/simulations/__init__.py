@@ -6,13 +6,12 @@ from pathlib import Path
 from types import FunctionType
 
 # Local application imports
-from .base import (
-    Data,
+from ._simulation import (
     Simulation,
-    DATA_REGISTRY,
     SIMULATION_REGISTRY,
     SIMULATION_EXECUTABLE_REGISTRY,
 )
+from .spectral_simulation import spectral_statistics
 
 # Get directory that contains this file
 path: Path = Path(__file__).parent

@@ -12,7 +12,7 @@ from attrs import field, frozen
 from scipy.linalg.lapack import get_lapack_funcs
 
 # Local application imports
-from .base import ManyBodyEnsemble
+from ._base import ManyBodyEnsemble
 
 
 # ----------------

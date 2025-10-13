@@ -1,4 +1,4 @@
-# rmtpy/simulations/spectral_statistics/spectral_density_data.py
+# rmtpy/simulations/spectral_statistics_data/spectral_density_data.py
 
 # Postponed evaluation of annotations
 from __future__ import annotations
@@ -10,7 +10,7 @@ from attrs import frozen, field
 import numpy as np
 
 # Local application imports
-from ..base import Data
+from .._data import Data
 
 
 # ---------------------------

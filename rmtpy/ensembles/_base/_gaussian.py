@@ -8,7 +8,7 @@ import numpy as np
 from attrs import field, frozen
 
 # Local application imports
-from .manybody import ManyBodyEnsemble
+from ._manybody import ManyBodyEnsemble
 
 
 # ----------------------------

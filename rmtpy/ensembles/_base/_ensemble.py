@@ -16,6 +16,9 @@ import numpy as np
 from attrs import asdict, field, fields_dict, frozen
 from attrs.validators import gt
 
+# Local application imports
+from ._converter import converter
+
 
 # -------------------------------
 # Random Matrix Ensemble Registry
@@ -133,9 +136,6 @@ class Ensemble(ABC):
     @classmethod
     def create(cls, src: dict[str, Any] | Ensemble) -> Ensemble:
         """Create an instance of the ensemble with given parameters."""
-
-        # Import module-level converter
-        from ...serialization import converter
 
         # Convert dictionary to ensemble instance
         return converter.structure(src, cls)

@@ -16,6 +16,9 @@ from typing import Any
 import numpy as np
 from attrs import asdict, field, frozen
 
+# Local application imports
+from ..ensembles._base import converter
+
 
 # -------------------------
 # Monte Carlo Data Registry
@@ -68,9 +71,6 @@ class Data(ABC):
 
         # Ensure path is a Path object
         path = Path(path)
-
-        # Import module-level converter
-        from ...serialization import converter
 
         # Return Data instance from .npz file
         return converter.structure(path, cls)

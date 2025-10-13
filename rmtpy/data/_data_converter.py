@@ -1,4 +1,4 @@
-# rmtpy/serialization/data_converter.py
+# rmtpy/data/_data_converter.py
 
 # Standard library imports
 import re
@@ -10,8 +10,8 @@ import numpy as np
 from numpy.lib.npyio import NpzFile
 
 # Local application imports
-from ..simulations import Data, DATA_REGISTRY
-from . import converter
+from ._data import Data, DATA_REGISTRY
+from ..ensembles._base import converter
 
 
 # ----------------------------

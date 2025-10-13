@@ -7,7 +7,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 # Local application imports
-from ...base import PlotLegend
+from ..._base import PlotLegend
 
 
 # ---------------------------------

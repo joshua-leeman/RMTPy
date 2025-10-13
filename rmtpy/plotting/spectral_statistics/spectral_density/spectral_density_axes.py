@@ -10,7 +10,7 @@ from dataclasses import dataclass
 import numpy as np
 
 # Local application imports
-from ...base import PlotAxes
+from ..._base import PlotAxes
 
 
 # -------------------------------

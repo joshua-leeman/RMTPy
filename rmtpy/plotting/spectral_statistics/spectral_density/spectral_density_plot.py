@@ -15,12 +15,12 @@ from matplotlib.patches import Patch
 # Local application imports
 from .spectral_density_axes import SpectralDensityAxes
 from .spectral_density_legend import SpectralDensityLegend
-from ...base import Plot
+from ..._base import Plot
+from ....data.spectral_statistics_data import SpectralDensityData
 from ....ensembles import Ensemble, ManyBodyEnsemble
+from ....ensembles._base import converter
 from ....ensembles.poisson import Poisson
 from ....ensembles.syk import SYK
-from ....serialization import converter
-from ....simulations.spectral_statistics import SpectralDensityData
 
 
 # -------------------------------
@@ -29,7 +29,7 @@ from ....simulations.spectral_statistics import SpectralDensityData
 @dataclass(repr=False, eq=False, kw_only=True)
 class SpectralDensityPlot(Plot):
 
-    # Plot data
+    # Data to plot
     data: SpectralDensityData
 
     # Unfolded data flag
@@ -88,6 +88,7 @@ class SpectralDensityPlot(Plot):
 
     def __post_init__(self) -> None:
         """Initialize plot derived attributes after object creation."""
+
         # Initialize base class
         super(SpectralDensityPlot, self).__post_init__()
 

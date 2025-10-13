@@ -18,7 +18,7 @@ from scipy.linalg import eigh, eigvalsh
 from scipy.special import gamma
 
 # Local application imports
-from .ensemble import Ensemble
+from ._ensemble import Ensemble
 
 
 # --------------------------------------------

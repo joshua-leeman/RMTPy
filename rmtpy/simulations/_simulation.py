@@ -17,9 +17,10 @@ from attrs import asdict, field, fields, fields_dict, frozen
 from attrs.validators import gt
 
 # Local application imports
-from .data import Data
-from ...ensembles import Ensemble
-from ...plotting.base.plot import Plot
+from ..data import Data
+from ..ensembles import Ensemble
+from ..ensembles._base import converter
+from ..plotting import Plot
 
 
 # -------------------------------
@@ -100,9 +101,6 @@ class Simulation(ABC):
 
     def __attrs_post_init__(self) -> None:
         """Initialize metadata after object creation."""
-
-        # Import module-level converter
-        from ...serialization import converter
 
         # Add simulation name to metadata
         self.metadata["name"] = type(self).__name__

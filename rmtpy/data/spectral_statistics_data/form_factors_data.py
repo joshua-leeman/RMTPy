@@ -1,4 +1,4 @@
-# rmtpy/simulations/spectral_statistics/form_factors_data.py
+# rmtpy/simulations/spectral_statistics_data/form_factors_data.py
 
 # Postponed evaluation of annotations
 from __future__ import annotations
@@ -10,7 +10,7 @@ from attrs import frozen, field
 import numpy as np
 
 # Local application imports
-from ..base import Data
+from .._data import Data
 
 
 # ----------------------
@@ -18,7 +18,6 @@ from ..base import Data
 # ----------------------
 @frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
 class FormFactorsData(Data):
-    """Data class for spectral form factor."""
 
     # Number of times for spectral form factors
     num_times: int = 5000

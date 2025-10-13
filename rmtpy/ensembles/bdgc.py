@@ -8,7 +8,7 @@ import numpy as np
 from attrs import frozen
 
 # Local application imports
-from .base import GaussianEnsemble
+from ._base import GaussianEnsemble
 
 
 # ----------------------------------------

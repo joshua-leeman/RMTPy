@@ -1,9 +1,7 @@
-# rmtpy/serialization/__init__.py
+# rmtpy/ensembles/_base/_converter.py
 
 # Standard library imports
 import re
-from importlib import import_module
-from pathlib import Path
 from typing import Any
 
 # Third-party imports
@@ -90,12 +88,3 @@ def normalize_dict(
 
     # Return normalized dictionary
     return norm_dict
-
-
-# --------------------------
-# Register Custom Converters
-# --------------------------
-# Dynamically import all converter modules
-path: Path = Path(__file__).parent
-for file in path.glob("[!_]*.py"):
-    import_module(f".{file.stem}", package=__name__)

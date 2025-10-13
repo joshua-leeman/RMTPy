@@ -1,4 +1,4 @@
-# rmtpy/simulations/spectral_statistics/spacing_histogram_data.py
+# rmtpy/simulations/spectral_statistics_data/spacing_histogram_data.py
 
 # Postponed evaluation of annotations
 from __future__ import annotations
@@ -10,7 +10,7 @@ from attrs import frozen, field
 import numpy as np
 
 # Local application imports
-from ..base import Data
+from .._data import Data
 
 
 # ----------------------------
@@ -18,7 +18,6 @@ from ..base import Data
 # ----------------------------
 @frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
 class SpacingHistogramData(Data):
-    """Data class for spacing histogram."""
 
     # Number of histogram bins
     num_bins: int = 100

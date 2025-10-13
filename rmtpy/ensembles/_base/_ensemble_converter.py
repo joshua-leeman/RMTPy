@@ -1,4 +1,4 @@
-# rmtpy/serialization/ensemble_converter.py
+# rmtpy/ensembles/_base/_ensemble_converter.py
 
 # Standard library imports
 import re
@@ -6,8 +6,8 @@ from collections.abc import Callable
 from typing import Any
 
 # Local application imports
-from . import normalize_dict, converter
-from ..ensembles import Ensemble, ENSEMBLE_REGISTRY
+from ._converter import normalize_dict, converter
+from ._ensemble import Ensemble, ENSEMBLE_REGISTRY
 
 
 # ---------------------------------
