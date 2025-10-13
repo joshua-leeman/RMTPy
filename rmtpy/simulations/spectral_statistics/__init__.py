@@ -70,7 +70,7 @@ def sff_moments(levels: np.ndarray, times: np.ndarray) -> tuple[np.ndarray, np.n
 # ------------------------------------
 @frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
 class SpectralStatistics(Simulation):
-    # Spectral histogram data
+    # Spectral density data
     spectral_data: SpectralData = field(factory=SpectralData)
 
     # Spacings histogram data
@@ -78,6 +78,8 @@ class SpectralStatistics(Simulation):
 
     # Spectral form factor data
     factors_data: FactorsData = field(factory=FactorsData)
+
+    #
 
     def __attrs_post_init__(self) -> None:
         """Initialize metadata after object creation."""
