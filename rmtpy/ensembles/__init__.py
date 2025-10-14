@@ -63,7 +63,7 @@ def ens_structure_hook(src: dict[str, Any] | Ensemble, _) -> Ensemble:
     # Convert ensemble name to registry key format
     ens_key = re.sub(r"_", "", ens_name).lower()
 
-    # Retrieve ensemble class from registry
+    # Retrieve Ensemble class from registry
     ens_cls = ENSEMBLE_REGISTRY[ens_key]
 
     # Extract ensemble arguments from normalized dictionary, raise error if invalid

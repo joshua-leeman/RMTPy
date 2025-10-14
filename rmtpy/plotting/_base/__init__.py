@@ -3,4 +3,4 @@
 # Local application imports
 from .axes import PlotAxes
 from .legend import PlotLegend
-from .plot import Plot
+from .plot import Plot, plot_data, PLOT_REGISTRY

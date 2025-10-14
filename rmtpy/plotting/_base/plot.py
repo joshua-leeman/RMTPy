@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 # Standard library imports
+import inspect
+import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -16,6 +18,7 @@ from matplotlib import rcParams
 from .axes import PlotAxes
 from .legend import PlotLegend
 from ...data import Data
+from ...ensembles import converter
 
 
 # -------------------------
@@ -48,6 +51,25 @@ def configure_matplotlib() -> None:
         pass
 
 
+# ----------------------------
+# Plot From Data File Function
+# ----------------------------
+def plot_data(data_path: str | Path) -> None:
+    """Plot data from a specified data file."""
+
+    # Ensure data_path is a Path object
+    data_path = Path(data_path)
+
+    # Create Plot instance from data file
+    plot = converter.structure(data_path, Plot)
+
+    # Alias parent directory of data file
+    out_dir = data_path.parent
+
+    # Plot data and save to parent directory
+    plot.plot(path=out_dir)
+
+
 # ---------------
 # Plot Base Class
 # ---------------
@@ -71,6 +93,22 @@ class Plot(ABC):
 
     # Plot dots per inch
     dpi: int = 300
+
+    @classmethod
+    def __init_subclass__(cls) -> None:
+        """Register concrete subclasses in the plot registry."""
+
+        # Include only concrete classes in registry
+        if not inspect.isabstract(cls):
+            # Convert data class name from CamelCase to snake_case
+            plot_key = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", cls.__name__)
+            plot_key = plot_key.lower()
+
+            # Replace '_plot' suffix with '_data'
+            plot_key = plot_key.replace("_plot", "_data")
+
+            # Normalize class name to registry key format
+            PLOT_REGISTRY[plot_key] = cls
 
     def __post_init__(self) -> None:
         """Post-initialization processing."""

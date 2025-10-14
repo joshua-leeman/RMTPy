@@ -73,7 +73,7 @@ def sim_structure_hook(src: str | Path | dict[str, Any] | Simulation, _) -> Simu
     # Convert simulation name to registry key format
     sim_key = re.sub(r"_", "", sim_name).lower()
 
-    # Retrieve simulation class from registry
+    # Retrieve Simulation class from registry
     sim_cls = SIMULATION_REGISTRY[sim_key]
 
     # Extract simulation arguments from normalized dictionary, raise error if invalid
@@ -97,10 +97,10 @@ def sim_structure_hook(src: str | Path | dict[str, Any] | Simulation, _) -> Simu
                 continue
 
             # Load data from .npz file
-            data = converter.structure(folder / f"{folder.name}.npz")
+            data = data_cls.load(folder / f"{folder.name}.npz")
 
-            # Set data attribute on simulation instance
+            # Set data attribute on Simulation instance
             object.__setattr__(sim_inst, folder.name + "_data", data)
 
-    # Return loaded simulation instance
+    # Return loaded Simulation instance
     return sim_inst
