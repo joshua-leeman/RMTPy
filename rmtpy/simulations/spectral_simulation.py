@@ -12,7 +12,7 @@ import numpy as np
 from scipy.special import jn_zeros
 
 # Local application imports
-from ._simulation import Simulation, simulation_executable
+from ._simulation import Simulation
 from ..data.spectral_statistics_data import SpectralDensityData
 from ..data.spectral_statistics_data import SpacingHistogramData
 from ..data.spectral_statistics_data import FormFactorsData
@@ -72,7 +72,6 @@ def sff_moments(levels: np.ndarray, times: np.ndarray) -> tuple[np.ndarray, np.n
 # ---------------------------------
 # Random Matrix Simulation Function
 # ---------------------------------
-@simulation_executable
 def spectral_statistics(ensemble: ManyBodyEnsemble, realizs: int) -> None:
     """Perform a spectral statistics simulation for a given ensemble."""
 

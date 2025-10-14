@@ -18,6 +18,12 @@ from .legend import PlotLegend
 from ...data import Data
 
 
+# -------------------------
+# Monte Carlo Plot Registry
+# -------------------------
+PLOT_REGISTRY: dict[str, type[Plot]] = {}
+
+
 # ------------------------
 # Matplotlib configuration
 # ------------------------
@@ -75,12 +81,6 @@ class Plot(ABC):
         # Set file name to data file name
         self.file_name = self.data.file_name
 
-    @abstractmethod
-    def plot(self, path: str | Path) -> None:
-        """Create and save the plot to the specified path."""
-
-        pass
-
     def create_figure(self) -> None:
         """Create a figure and axes for the plot."""
 
@@ -121,3 +121,10 @@ class Plot(ABC):
 
         # Save plot to file
         self.fig.savefig(path / self.data.file_name, dpi=self.dpi, bbox_inches="tight")
+
+    @abstractmethod
+    def plot(self, path: str | Path) -> None:
+        """Create and save the plot to the specified path."""
+
+        # Abstract method to be implemented by subclasses
+        pass

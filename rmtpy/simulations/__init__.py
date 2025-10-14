@@ -4,43 +4,16 @@
 import json
 import re
 from collections.abc import Callable
-from importlib import import_module
 from pathlib import Path
 from typing import Any
-from types import FunctionType
 
 # Local application imports
-from ._simulation import (
-    Simulation,
-    SIMULATION_REGISTRY,
-    SIMULATION_EXECUTABLE_REGISTRY,
-)
-from .spectral_simulation import spectral_statistics
+from ._simulation import Simulation, SIMULATION_REGISTRY
 from ..data import DATA_REGISTRY
 from ..ensembles import normalize_dict, converter
 
-# Get directory that contains this file
-path: Path = Path(__file__).parent
-
-# Dynamically import all simulation modules
-path: Path = Path(__file__).parent
-for file in path.glob("[!_]*.py"):
-    import_module(f".{file.stem}", package=__name__)
-
-# Create dictionary of registered simulations
-sim_dict: dict[str, type[Simulation]] = {
-    sim.__name__: sim for sim in SIMULATION_REGISTRY.values()
-}
-
-# Create dictionary of registered simulation executables
-sim_exe_dict: dict[str, type[FunctionType]] = {
-    exe.__name__: exe for exe in SIMULATION_EXECUTABLE_REGISTRY.values()
-}
-
-# Redefine __all__ to include all registered simulations
-__all__ = [sim_name for sim_name in sim_dict.keys()] + [
-    exe_name for exe_name in sim_exe_dict.keys()
-]
+# Simulation functions
+from .spectral_simulation import spectral_statistics
 
 
 # ---------------------------------
@@ -124,7 +97,7 @@ def sim_structure_hook(src: str | Path | dict[str, Any] | Simulation, _) -> Simu
                 continue
 
             # Load data from .npz file
-            data = data_cls.load(folder / f"{folder.name}.npz")
+            data = converter.structure(folder / f"{folder.name}.npz")
 
             # Set data attribute on simulation instance
             object.__setattr__(sim_inst, folder.name + "_data", data)

@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 # Standard library imports
-from abc import abstractmethod
 from functools import lru_cache
 from collections.abc import Iterator
 

@@ -1,8 +1,6 @@
 # rmtpy/data/__init__.py
 
 # Standard library imports
-import re
-from importlib import import_module
 from pathlib import Path
 from typing import Any
 
@@ -13,20 +11,6 @@ from numpy.lib.npyio import NpzFile
 # Local application imports
 from ._data import Data, DATA_REGISTRY
 from ..ensembles import converter
-
-# Dynamically import all ensemble modules
-path: Path = Path(__file__).parent
-for file in path.glob("[!_]*.py"):
-    import_module(f".{file.stem}", package=__name__)
-
-# Create dictionary of registered ensembles
-ens_dict: dict[str, type[Data]] = {ens.__name__: ens for ens in DATA_REGISTRY.values()}
-
-# Update global namespace with registered ensembles
-globals().update(ens_dict)
-
-# Redefine __all__ to include all registered ensembles
-__all__ = [ens_name for ens_name in ens_dict.keys()]
 
 
 # ----------------------------
@@ -65,8 +49,6 @@ def data_structure_hook(src: str | Path | dict[str, Any] | NpzFile | Data, _) ->
     data_key = metadata.get("name", None)
     if data_key is None:
         raise ValueError(f"Missing or invalid 'name' in 'metadata' dict in {src}")
-
-    print("data_key:", data_key)  # Debugging line
 
     # Get corresponding data class from registry
     if data_key in DATA_REGISTRY:

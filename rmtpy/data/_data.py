@@ -62,8 +62,6 @@ class Data(ABC):
             data_key = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", cls.__name__)
             data_key = data_key.lower()
 
-            print("Registering data class with key:", data_key)  # Debugging line
-
             # Normalize class name to registry key format
             DATA_REGISTRY[data_key] = cls
 
@@ -83,8 +81,6 @@ class Data(ABC):
         # Convert data class name from CamelCase to snake_case
         data_key = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", type(self).__name__)
         data_key = data_key.lower()
-
-        print("data_key in post init:", data_key)  # Debugging line
 
         # Add name of data class to metadata
         self.metadata["name"] = data_key

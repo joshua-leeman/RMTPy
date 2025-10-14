@@ -29,7 +29,7 @@ ENSEMBLE_REGISTRY: dict[str, type[Ensemble]] = {}
 # ------------------------------------
 # Random Matrix Ensemble Class Factory
 # ------------------------------------
-def rmt_ensemble(**kwargs: Any) -> Ensemble:
+def create_ensemble(**kwargs: Any) -> Ensemble:
     """Create a random matrix ensemble instance by name."""
 
     # Call ensemble constructor with provided keyword arguments as dictionary
