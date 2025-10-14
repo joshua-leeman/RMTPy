@@ -17,8 +17,7 @@ from .spectral_density_axes import SpectralDensityAxes
 from .spectral_density_legend import SpectralDensityLegend
 from ..._base import Plot
 from ....data.spectral_statistics_data import SpectralDensityData
-from ....ensembles import Ensemble, ManyBodyEnsemble
-from ....ensembles._base import converter
+from ....ensembles import Ensemble, ManyBodyEnsemble, converter
 from ....ensembles.poisson import Poisson
 from ....ensembles.syk import SYK
 

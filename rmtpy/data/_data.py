@@ -17,7 +17,7 @@ import numpy as np
 from attrs import asdict, field, frozen
 
 # Local application imports
-from ..ensembles._base import converter
+from ..ensembles import converter
 
 
 # -------------------------
@@ -59,8 +59,10 @@ class Data(ABC):
         # Include only concrete classes in registry
         if not inspect.isabstract(cls):
             # Convert data class name from CamelCase to snake_case
-            data_key = re.sub(r"([a-z0-9])([A-Z])([A-Z])", r"\1_\2", cls.__name__)
+            data_key = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", cls.__name__)
             data_key = data_key.lower()
+
+            print("Registering data class with key:", data_key)  # Debugging line
 
             # Normalize class name to registry key format
             DATA_REGISTRY[data_key] = cls
@@ -78,8 +80,14 @@ class Data(ABC):
     def __attrs_post_init__(self) -> None:
         """Initialize metadata after object creation."""
 
+        # Convert data class name from CamelCase to snake_case
+        data_key = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", type(self).__name__)
+        data_key = data_key.lower()
+
+        print("data_key in post init:", data_key)  # Debugging line
+
         # Add name of data class to metadata
-        self.metadata["name"] = type(self).__name__
+        self.metadata["name"] = data_key
 
     def save(self, path: str | Path) -> None:
         """Save the simulation data to a serialized file."""

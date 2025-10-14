@@ -18,8 +18,7 @@ from attrs.validators import gt
 
 # Local application imports
 from ..data import Data
-from ..ensembles import Ensemble
-from ..ensembles._base import converter
+from ..ensembles import Ensemble, converter
 from ..plotting import Plot
 
 

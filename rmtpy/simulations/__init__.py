@@ -17,15 +17,15 @@ from ._simulation import (
 )
 from .spectral_simulation import spectral_statistics
 from ..data import DATA_REGISTRY
-from ..ensembles._base import normalize_dict, converter
+from ..ensembles import normalize_dict, converter
 
 # Get directory that contains this file
 path: Path = Path(__file__).parent
 
-# Dynamically import all Python modules in this directory
-for subdir in path.iterdir():
-    if subdir.is_dir() and (subdir / "__init__.py").exists():
-        import_module(f".{subdir.name}", package=__name__)
+# Dynamically import all simulation modules
+path: Path = Path(__file__).parent
+for file in path.glob("[!_]*.py"):
+    import_module(f".{file.stem}", package=__name__)
 
 # Create dictionary of registered simulations
 sim_dict: dict[str, type[Simulation]] = {
