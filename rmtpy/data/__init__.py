@@ -13,6 +13,46 @@ from ._data import Data, DATA_REGISTRY
 from ..ensembles import converter
 
 
+# ---------------------------
+# Normalize Metadata Function
+# ---------------------------
+def normalize_metadata(metadata: Any) -> dict[str, Any]:
+    """Normalize metadata input to a dictionary for Data initialization."""
+
+    # Unwrap metadata if it is a 0-dim numpy array
+    if isinstance(metadata, np.ndarray) and metadata.dtype == object:
+        metadata = metadata.item()
+
+    # If metadata is a dictionary, return it
+    if isinstance(metadata, dict):
+        return metadata
+    else:
+        raise TypeError(f"Expected dict, got {type(metadata).__name__}")
+
+
+# -------------------------
+# Normalize Source Function
+# -------------------------
+def normalize_source(src: str | Path | dict[str, Any]) -> dict[str, Any]:
+    """Normalize source input to a dictionary for Data initialization."""
+
+    # If src is a Path-like, load data from npz file into dictionary
+    if isinstance(src, (str, Path)):
+        with np.load(src, allow_pickle=True) as data:
+            src_dict = {key: data[key] for key in data.files}
+
+    # If src is already a dictionary, use it directly
+    elif isinstance(src, dict):
+        src_dict = src
+
+    # If src is of invalid type, raise TypeError
+    else:
+        raise TypeError(f"Expected path, dict, npz file, got {type(src).__name__}")
+
+    # Return normalized dictionary
+    return src_dict
+
+
 # ----------------------------
 # Register Data Structure Hook
 # ----------------------------
@@ -20,33 +60,14 @@ from ..ensembles import converter
 def data_structure_hook(src: str | Path | dict[str, Any] | NpzFile | Data, _) -> Data:
     """Structure hook to convert unstructured data to Data instance."""
 
-    # If src is already a valid instance, return it
-    if isinstance(src, Data):
-        return src
+    # Convert source to normalized dictionary
+    src_dict = normalize_source(src)
 
-    # If src is a string or Path, load data from npz file
-    elif isinstance(src, (str, Path)):
-        # Load data from .npz file into dictionary
-        with np.load(src, allow_pickle=True) as data:
-            src_dict = {key: data[key] for key in data.files}
+    # Normalize metadata dictionary
+    metadata = normalize_metadata(src_dict["metadata"])
 
-    # If src is not a dictionary or npz file, raise TypeError
-    elif not isinstance(src, dict):
-        raise TypeError(
-            f"Expected path, dict, npz file, or Data, got {type(src).__name__}"
-        )
-
-    # Retrieve data metadata from source
-    metadata = src_dict.get("metadata", None)
-    if metadata is None:
-        raise ValueError(f"Missing 'metadata' in {src}")
-    else:
-        metadata = metadata.item()
-        src_dict["metadata"] = metadata
-
-    # Ensure metadata item is a dictionary
-    if not isinstance(metadata, dict):
-        raise ValueError(f"Invalid 'metadata' value in {src}")
+    # Replace metadata in source dictionary with normalized version
+    src_dict["metadata"] = metadata
 
     # Retrieve data name from source
     data_key = metadata.get("name", None)
@@ -61,8 +82,6 @@ def data_structure_hook(src: str | Path | dict[str, Any] | NpzFile | Data, _) ->
 
     # Initialize default Data instance
     data_inst = data_cls()
-
-    print("data_inst.metadata before:", data_inst.metadata)
 
     # Update data instance with source attributes
     for key in src_dict:

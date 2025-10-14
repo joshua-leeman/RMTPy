@@ -10,7 +10,7 @@ from numpy.lib.npyio import NpzFile
 
 # Local application imports
 from ._base import Plot, PLOT_REGISTRY
-from ..data import DATA_REGISTRY
+from ..data import normalize_metadata, normalize_source, DATA_REGISTRY
 from ..ensembles import converter
 
 # Plot from data function
@@ -24,38 +24,14 @@ from ._base import plot_data
 def plot_structure_hook(src: str | Path | dict[str, Any] | NpzFile | Plot, _) -> Plot:
     """Structure hook to convert unstructured data to Plot instance."""
 
-    # If src is already a valid instance, return it
-    if isinstance(src, Plot):
-        return src
+    # Convert source to normalized dictionary
+    src_dict = normalize_source(src)
 
-    # If src is a string or Path, load data from npz file
-    elif isinstance(src, (str, Path)):
-        # Store path for later
-        path = Path(src)
+    # Normalize metadata dictionary
+    metadata = normalize_metadata(src_dict["metadata"])
 
-        # Load data from .npz file into dictionary
-        with np.load(src, allow_pickle=True) as data:
-            src_dict = {key: data[key] for key in data.files}
-
-    # If src is not a dictionary, raise TypeError
-    elif not isinstance(src, dict):
-        raise TypeError(
-            f"Expected path, dict, npz file, or Data, got {type(src).__name__}"
-        )
-
-    # Retrieve data metadata from source
-    metadata = src_dict.get("metadata", None)
-    if metadata is None:
-        raise ValueError(f"Missing 'metadata' in {src}")
-    else:
-        metadata = metadata.item()
-
-    print("metadata:", metadata)
-    print("type(metadata):", type(metadata))
-
-    # Ensure metadata item is a dictionary
-    if not isinstance(metadata, dict):
-        raise ValueError(f"Invalid 'metadata' value in {src}")
+    # Replace metadata in source dictionary with normalized version
+    src_dict["metadata"] = metadata
 
     # Retrieve plot name from source
     plot_key = metadata.get("name", None)
@@ -75,7 +51,7 @@ def plot_structure_hook(src: str | Path | dict[str, Any] | NpzFile | Plot, _) ->
         raise ValueError(f"No registered Data class found for Plot in {src}")
 
     # Initialize Data instance from source
-    data_inst = data_cls.load(path=path)
+    data_inst = converter.structure(src_dict, data_cls)
 
     # Return constructed Plot instance
     return plot_cls(data=data_inst)
