@@ -162,12 +162,15 @@ class Simulation(ABC):
         # Append ensemble directory representation
         dir_path /= self.ensemble.to_dir
 
+        # Construct instance as dictionary
+        self_asdict = asdict(self)
+
         # Loop through remaining attributes
         for name, attr in fields_dict(type(self)).items():
             # Use only fields labeled for path inclusion
             if attr.metadata.get("dir_name", None) is not None:
                 # Sanitize field value for directory representation
-                val = re.sub(r"[^\w\-.]", "_", str(asdict(self)[name]))
+                val = re.sub(r"[^\w\-.]", "_", str(self_asdict[name]))
 
                 # Append string representation of field value to path
                 dir_path /= f"{attr.metadata['dir_name']}_{val.replace('.', 'p')}"

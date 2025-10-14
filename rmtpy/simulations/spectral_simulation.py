@@ -4,11 +4,11 @@
 from __future__ import annotations
 
 # Standard library imports
-from attrs import frozen, field
 from pathlib import Path
 
 # Third-party imports
 import numpy as np
+from attrs import frozen, field
 from scipy.special import jn_zeros
 
 # Local application imports

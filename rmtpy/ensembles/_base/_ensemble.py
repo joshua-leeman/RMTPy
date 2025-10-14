@@ -161,12 +161,15 @@ class Ensemble(ABC):
         # Begin path with class name
         dir_path = Path(self._dir_name)
 
+        # Construct instance as dictionary
+        self_asdict = asdict(self)
+
         # Loop through fields of class instance
         for name, attr in fields_dict(type(self)).items():
             # Use only fields labeled for path inclusion
             if attr.metadata.get("dir_name", None) is not None:
                 # Sanitize field value for directory representation
-                val = re.sub(r"[^\w\-.]", "_", str(asdict(self)[name]))
+                val = re.sub(r"[^\w\-.]", "_", str(self_asdict[name]))
 
                 # Append string representation of field value to path
                 dir_path /= f"{attr.metadata['dir_name']}_{val.replace('.', 'p')}"
@@ -181,12 +184,15 @@ class Ensemble(ABC):
         # Begin LaTeX string with ensemble's latex name
         latex_str = f"${self._latex_name}"
 
+        # Construct instance as dictionary
+        self_asdict = asdict(self)
+
         # Loop through fields of class instance
         for name, attr in fields_dict(type(self)).items():
             # Use only fields labeled for LaTeX inclusion
             if attr.metadata.get("latex_name", None) is not None:
                 # Append LaTeX formatted field value to string
-                latex_str += rf"\ {attr.metadata['latex_name']}={asdict(self)[name]}"
+                latex_str += rf"\ {attr.metadata['latex_name']}={self_asdict[name]}"
 
         # Close LaTeX string and return it
         return latex_str + "$"

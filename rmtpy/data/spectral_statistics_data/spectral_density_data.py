@@ -3,11 +3,9 @@
 # Postponed evaluation of annotations
 from __future__ import annotations
 
-# Standard library imports
-from attrs import frozen, field
-
 # Third-party imports
 import numpy as np
+from attrs import frozen, field
 
 # Local application imports
 from .._data import Data
