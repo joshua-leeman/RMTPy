@@ -58,9 +58,7 @@ def sim_structure_hook(src: str | Path | dict[str, Any] | Simulation, _) -> Simu
 
     # If src is of invalid type, raise TypeError
     else:
-        raise TypeError(
-            f"Expected str, Path, dict, or Simulation, got {type(src).__name__}"
-        )
+        raise TypeError(f"Expected str, Path, dict, got {type(src).__name__}")
 
     # Normalize metadata dictionary
     sim_dict = normalize_dict(metadata, SIMULATION_REGISTRY)
