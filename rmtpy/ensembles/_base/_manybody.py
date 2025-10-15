@@ -69,7 +69,7 @@ class ManyBodyEnsemble(Ensemble):
         return self.N * self.J
 
     @property
-    def univ_cls(self) -> str | None:
+    def univ_class(self) -> str | None:
         """Set the universality class based on the Dyson index."""
 
         # Map possible beta values to universality classes
@@ -83,7 +83,7 @@ class ManyBodyEnsemble(Ensemble):
         """Determine the degeneracy of eigenvalues from the Dyson index."""
 
         # Return 2 if universality class is GSE, else return 1
-        return 2 if self.univ_cls == "GSE" else 1
+        return 2 if self.univ_class == "GSE" else 1
 
     def eig_stream(self, realizs: int) -> Iterator[tuple[np.ndarray, np.ndarray]]:
         """Iterator to stream eigensystem realizations."""
