@@ -144,7 +144,7 @@ class Simulation(ABC):
         # Loop through plot objects
         for plot in plot_attrs:
             # Generate output path for plot object
-            out_path = out_dir / plot.file_name
+            out_path = out_dir / plot.data.file_name
 
             # Make sure directories exist
             out_path.parent.mkdir(parents=True, exist_ok=True)
