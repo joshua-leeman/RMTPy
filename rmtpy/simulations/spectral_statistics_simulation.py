@@ -1,4 +1,4 @@
-# rmtpy/simulations/spectral_statistics/spectral_simulation.py
+# rmtpy/simulations/spectral_statistics/spectral_statistics_simulation.py
 
 # Postponed evaluation of annotations
 from __future__ import annotations

@@ -13,7 +13,7 @@ from ..data import DATA_REGISTRY
 from ..ensembles import normalize_dict, converter
 
 # Simulation functions
-from .spectral_simulation import spectral_statistics
+from .spectral_statistics_simulation import spectral_statistics
 
 
 # ---------------------------------
