@@ -121,7 +121,7 @@ class SpectralDensityPlot(Plot):
 
         # Configure plot based on unfolding
         if self.unfold:
-            # Prepend "unf." to file name
+            # Prepend "unf_" to file name
             self.file_name = "unf_" + self.file_name
 
             # Scale unfolded x-axis limits
@@ -244,4 +244,4 @@ class SpectralDensityPlot(Plot):
         )
 
         # Finalize and save figure
-        self.set_plot(path=path)
+        self.finish_plot(path=path)

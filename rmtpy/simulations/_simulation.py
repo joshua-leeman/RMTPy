@@ -94,7 +94,7 @@ class Simulation(ABC):
         # Add number of realizations to metadata
         self.metadata["args"]["realizs"] = self.realizs
 
-        # Create generator of data attributes
+        # Construct tuple of data attributes
         data_attrs = tuple(
             getattr(self, f.name)
             for f in fields(type(self))
@@ -113,7 +113,7 @@ class Simulation(ABC):
         with open(out_dir / "metadata.json", "w") as file:
             json.dump(self.metadata, file, indent=4)
 
-        # Create generator of data attributes
+        # Construct tuple of data attributes
         data_attrs = (
             getattr(self, f.name)
             for f in fields(type(self))
@@ -134,7 +134,7 @@ class Simulation(ABC):
     def save_plots(self, out_dir: str | Path) -> None:
         """Save simulation plots to disk."""
 
-        # Create generator of plot attributes
+        # Construct tuple of plot attributes
         plot_attrs = (
             getattr(self, f.name)
             for f in fields(type(self))

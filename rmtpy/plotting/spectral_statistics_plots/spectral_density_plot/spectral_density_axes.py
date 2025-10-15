@@ -19,6 +19,14 @@ from ..._base import PlotAxes
 @dataclass(repr=False, eq=False, kw_only=True)
 class SpectralDensityAxes(PlotAxes):
 
+    # -----------------
+    # x-axis Properties
+    # -----------------
+
+    # x-axis labels
+    xlabel: str = r"$E$"
+    unf_xlabel: str = r"$\xi$"
+
     # x-axis ticks
     xticks: tuple[float, ...] = (-1.0, 0.0, 1.0)  # factor of E0
     unf_xticks: tuple[float, ...] = (-1.0, 0.0, 1.0)  # factor of D/2
@@ -26,22 +34,6 @@ class SpectralDensityAxes(PlotAxes):
     # x-axis minor ticks
     xticks_minor: tuple[float, ...] = (-0.5, 0.5)  # factor of E0
     unf_xticks_minor: tuple[float, ...] = (-1.5, -0.5, 0.5, 1.5)  # factor of D/2
-
-    # y-axis ticks
-    yticks: tuple[float, ...] = (0.0, 1.0, 2.0)  # factor of 1/pi/(E0)
-    unf_yticks: tuple[float, ...] = (0.0, 0.5, 1.0)  # factor of 1/D
-
-    # y-axis minor ticks
-    yticks_minor: tuple[float, ...] = (0.0, 1.0, 2.0)  # factor of 1/pi/(E0)
-    unf_yticks_minor: tuple[float, ...] = (0.25, 0.75, 1.25)  # factor of 1/D
-
-    # x-axis labels
-    xlabel: str = r"$E$"
-    unf_xlabel: str = r"$\xi$"
-
-    # y-axis labels
-    ylabel: str = r"$\ensavg{\rho(E)}$"
-    unf_ylabel: str = r"$\ensavg{\rho(\xi)}$"
 
     # x-axis tick labels
     xtick_labels: tuple[str, ...] = (
@@ -55,6 +47,22 @@ class SpectralDensityAxes(PlotAxes):
         r"$\frac{1}{2}D$",
     )
 
+    # -----------------
+    # y-axis Properties
+    # -----------------
+
+    # y-axis labels
+    ylabel: str = r"$\ensavg{\rho(E)}$"
+    unf_ylabel: str = r"$\ensavg{\rho(\xi)}$"
+
+    # y-axis ticks
+    yticks: tuple[float, ...] = (0.0, 1.0, 2.0)  # factor of 1/pi/(E0)
+    unf_yticks: tuple[float, ...] = (0.0, 0.5, 1.0)  # factor of 1/D
+
+    # y-axis minor ticks
+    yticks_minor: tuple[float, ...] = (0.0, 1.0, 2.0)  # factor of 1/pi/(E0)
+    unf_yticks_minor: tuple[float, ...] = (0.25, 0.75, 1.25)  # factor of 1/D
+
     # y-axis tick labels
     ytick_labels: tuple[str, ...] = (
         r"$0$",
@@ -66,6 +74,10 @@ class SpectralDensityAxes(PlotAxes):
         r"$\frac{1}{2}D^{-1}$",
         r"$D^{-1}$",
     )
+
+    # -------------
+    # Special Cases
+    # -------------
 
     # Poisson specific y-axis ticks
     poi_yticks: tuple[float, ...] = (
@@ -85,6 +97,8 @@ class SpectralDensityAxes(PlotAxes):
         r"$\frac{1}{4NJ}$",
         r"$\frac{1}{2NJ}$",
     )
+
+    # -------------
 
     # SYK q=2 specific y-axis ticks
     syk2_yticks: tuple[float, ...] = tuple(range(6))  # factor of 1/pi/(E0)
