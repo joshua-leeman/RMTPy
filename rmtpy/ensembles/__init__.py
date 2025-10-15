@@ -15,7 +15,7 @@ from ._base import (
     ENSEMBLE_REGISTRY,
 )
 
-# Ensemble classes
+# Import all ensemble classes to register them
 from .bdgc import BdGC
 from .bdgd import BdGD
 from .goe import GOE
