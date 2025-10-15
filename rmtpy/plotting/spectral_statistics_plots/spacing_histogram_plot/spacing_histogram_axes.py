@@ -1,4 +1,4 @@
-# rmtpy/plotting/spectral_statistics_plots/spacing_histogram_figure/spacing_histogram_axes.py
+# rmtpy/plotting/spectral_statistics_plots/spacing_histogram_plot/spacing_histogram_axes.py
 
 # Postponed evaluation of annotations
 from __future__ import annotations

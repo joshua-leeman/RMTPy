@@ -1,1 +1,0 @@
-# rmtpy/plotting/spectral_statistics_plots/form_factors_figure/form_factors_plot.py

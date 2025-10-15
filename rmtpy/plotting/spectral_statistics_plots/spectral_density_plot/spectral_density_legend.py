@@ -1,4 +1,4 @@
-# rmtpy/plotting/spectral_statistics_plots/spacing_histogram_figure/spacing_histogram_legend.py
+# rmtpy/plotting/spectral_statistics_plots/spectral_density_plot/spectral_density_legend.py
 
 # Postponed evaluation of annotations
 from __future__ import annotations
@@ -11,10 +11,10 @@ from ..._base import PlotLegend
 
 
 # ---------------------------------
-# Spacing Histogram Legend Dataclass
+# Spectral Density Legend Dataclass
 # ---------------------------------
 @dataclass(repr=False, eq=False, kw_only=True)
-class SpacingHistogramLegend(PlotLegend):
+class SpectralDensityLegend(PlotLegend):
 
     # Legend location
     loc: str = "upper right"
