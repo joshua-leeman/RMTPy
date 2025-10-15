@@ -128,7 +128,7 @@ class Plot(ABC):
         # Close figure to avoid displaying it
         plt.close(self.fig)
 
-    def set_plot(self, path: str | Path) -> None:
+    def finish_plot(self, path: str | Path) -> None:
         """Finish and save the plot to path."""
 
         # Check if figure and axis exist
