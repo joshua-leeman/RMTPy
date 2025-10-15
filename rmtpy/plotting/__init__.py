@@ -13,7 +13,12 @@ from ._base import Plot, PLOT_REGISTRY
 from ..data import normalize_metadata, normalize_source, DATA_REGISTRY
 from ..ensembles import converter
 
-# Plot from data function
+# Import all plot classes to register them
+from .spectral_statistics_plots import FormFactorsPlot
+from .spectral_statistics_plots import SpacingHistogramPlot
+from .spectral_statistics_plots import SpectralDensityPlot
+
+# Import plotting-from-data function
 from ._base import plot_data
 
 
