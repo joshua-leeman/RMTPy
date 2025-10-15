@@ -6,9 +6,6 @@ from __future__ import annotations
 # Standard library imports
 from dataclasses import dataclass
 
-# Third-party imports
-import numpy as np
-
 # Local application imports
 from ..._base import PlotAxes
 

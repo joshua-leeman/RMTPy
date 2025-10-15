@@ -74,7 +74,7 @@ class SpectralDensityPlot(Plot):
     unf_ylim: tuple[float, float] = (0.0, 1.5)  # factor of 1/D
 
     # Poisson specific y-axis limits
-    poi_ylim: tuple[float, float] = (0.0, 0.75)  # factor of 1/(E0)
+    poi_ylim: tuple[float, float] = (0.0, 1.25)  # factor of 1/(E0)
 
     # SYK q=2 specific y-axis limits
     syk2_ylim: tuple[float, float] = (0.0, 4.0)  # factor of 1/pi/(E0)

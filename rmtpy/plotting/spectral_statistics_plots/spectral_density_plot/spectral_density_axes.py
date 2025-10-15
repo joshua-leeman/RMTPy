@@ -84,11 +84,13 @@ class SpectralDensityAxes(PlotAxes):
         0.0,
         0.25 * np.pi,
         0.5 * np.pi,
+        0.75 * np.pi,
     )  # factor of 1/pi/(E0)
     poi_yticks_minor: tuple[float, ...] = (
         0.125 * np.pi,
         0.375 * np.pi,
         0.625 * np.pi,
+        0.875 * np.pi,
     )  # factor of 1/pi/(E0)
 
     # Poisson specific y-axis tick labels
@@ -96,6 +98,7 @@ class SpectralDensityAxes(PlotAxes):
         r"$0$",
         r"$\frac{1}{4NJ}$",
         r"$\frac{1}{2NJ}$",
+        r"$\frac{3}{4NJ}$",
     )
 
     # -------------

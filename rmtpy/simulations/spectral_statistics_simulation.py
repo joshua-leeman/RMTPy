@@ -17,8 +17,9 @@ from ..data.spectral_statistics_data import SpectralDensityData
 from ..data.spectral_statistics_data import SpacingHistogramData
 from ..data.spectral_statistics_data import FormFactorsData
 from ..ensembles import ManyBodyEnsemble
-from ..plotting.spectral_statistics_plots import SpacingHistogramPlot
-from ..plotting.spectral_statistics_plots import SpectralDensityPlot
+from ..plotting import FormFactorsPlot
+from ..plotting import SpacingHistogramPlot
+from ..plotting import SpectralDensityPlot
 
 
 # --------------------
@@ -51,7 +52,9 @@ def spacings_histogram(levels: np.ndarray, bins: np.ndarray, degen: int) -> np.n
     return counts
 
 
-def sff_moments(levels: np.ndarray, times: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+def form_factor_moments(
+    levels: np.ndarray, times: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
     """Compute the spectral form factor moments from an eigenvalue sample."""
 
     # Determine dimension of Hilbert space from levels
@@ -128,6 +131,16 @@ class SpectralStatistics(Simulation):
         init=False, repr=False, default=None
     )
 
+    # Spectral form factors plot instance
+    form_factors_plot: FormFactorsPlot | None = field(
+        init=False, repr=False, default=None
+    )
+
+    # Unfolded spectral form factors plot instance
+    unf_form_factors_plot: FormFactorsPlot | None = field(
+        init=False, repr=False, default=None
+    )
+
     def __attrs_post_init__(self) -> None:
         """Initialize metadata after object creation."""
 
@@ -156,6 +169,18 @@ class SpectralStatistics(Simulation):
             self,
             "unf_spacing_hist",
             SpacingHistogramPlot(data=self.spacings_data, unfold=True),
+        )
+
+        # Initialize form factors plot
+        object.__setattr__(
+            self, "form_factors_plot", FormFactorsPlot(data=self.factors_data)
+        )
+
+        # Initialize unfolded form factors plot
+        object.__setattr__(
+            self,
+            "unf_form_factors_plot",
+            FormFactorsPlot(data=self.factors_data, unfold=True),
         )
 
     def realize_monte_carlo(self) -> None:
@@ -213,23 +238,23 @@ class SpectralStatistics(Simulation):
             spacings.hist[:] += spacings_histogram(eigvals, spacings.bins, degen)
 
             # Calculate spectral form factor moments and update data
-            mu_1, mu_2 = sff_moments(eigvals, factors.times)
+            mu_1, mu_2 = form_factor_moments(eigvals, factors.times)
             factors.mu_1[:] += mu_1
             factors.mu_2[:] += mu_2
 
             # Unfold eigenvalues
-            unfvals = ensemble.unfold(eigvals)
+            unf_eigvals = ensemble.unfold(eigvals)
 
             # Calculate unfolded spectral histogram counts
-            spectral.unf_hist[:] += spectral_histogram(unfvals, spectral.unf_bins)
+            spectral.unf_hist[:] += spectral_histogram(unf_eigvals, spectral.unf_bins)
 
             # Calculate unfolded nearest-neighbor spacings histogram counts
             spacings.unf_hist[:] += spacings_histogram(
-                unfvals, spacings.unf_bins, degen
+                unf_eigvals, spacings.unf_bins, degen
             )
 
             # Calculate unfolded spectral form factor moments and update data
-            unf_mu_1, unf_mu_2 = sff_moments(unfvals, factors.unf_times)
+            unf_mu_1, unf_mu_2 = form_factor_moments(unf_eigvals, factors.unf_times)
             factors.unf_mu_1[:] += unf_mu_1
             factors.unf_mu_2[:] += unf_mu_2
 
@@ -260,12 +285,18 @@ class SpectralStatistics(Simulation):
         factors.mu_1[:] /= realizs
         factors.mu_2[:] /= realizs
 
+        # Calculate spectral form factor
+        factors.sff[:] = factors.mu_2
+
         # Calculate connected spectral form factor
         factors.csff[:] = factors.sff - np.abs(factors.mu_1) ** 2
 
         # Calculate unfolded first and second moments of spectral form factor
         factors.unf_mu_1[:] /= realizs
         factors.unf_mu_2[:] /= realizs
+
+        # Calculate unfolded spectral form factor
+        factors.unf_sff[:] = factors.unf_mu_2
 
         # Calculate unfolded connected spectral form factor
         factors.unf_csff[:] = factors.unf_sff - np.abs(factors.unf_mu_1) ** 2

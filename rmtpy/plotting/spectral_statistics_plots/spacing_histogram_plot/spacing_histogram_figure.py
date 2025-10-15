@@ -72,9 +72,6 @@ class SpacingHistogramPlot(Plot):
     def set_derived_attributes(self) -> None:
         """Set attributes that depend on simulation metadata."""
 
-        # Configure legend
-        self.legend = SpacingHistogramLegend(handles=self.handles, labels=self.labels)
-
         # Try to extract ensemble metadata
         try:
             ens_meta = self.data.metadata["simulation"]["args"]["ensemble"]
@@ -85,6 +82,14 @@ class SpacingHistogramPlot(Plot):
 
         # Initialize ensemble
         self.ensemble: ManyBodyEnsemble = converter.structure(ens_meta, Ensemble)
+
+        # Insert universal class into legend if it exists
+        if self.ensemble.univ_class is not None:
+            self.spac_legend = f"{self.ensemble.univ_class} surmise"
+            self.labels = (self.hist_legend, self.spac_legend)
+
+        # Configure legend
+        self.legend = SpacingHistogramLegend(handles=self.handles, labels=self.labels)
 
         # Set default legend title
         if self.legend.title is None:
@@ -129,7 +134,7 @@ class SpacingHistogramPlot(Plot):
         )
 
     def plot(self, path: str | Path) -> None:
-        """Creates a nn-level spacings histogram and saves it to a file."""
+        """Generates and saves NN-level spacings histogram to a file."""
 
         # Set derived attributes
         self.set_derived_attributes()

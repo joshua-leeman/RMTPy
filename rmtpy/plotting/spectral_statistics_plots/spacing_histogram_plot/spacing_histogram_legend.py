@@ -10,9 +10,9 @@ from dataclasses import dataclass
 from ..._base import PlotLegend
 
 
-# ---------------------------------
+# ----------------------------------
 # Spacing Histogram Legend Dataclass
-# ---------------------------------
+# ----------------------------------
 @dataclass(repr=False, eq=False, kw_only=True)
 class SpacingHistogramLegend(PlotLegend):
 
