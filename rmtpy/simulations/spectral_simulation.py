@@ -17,7 +17,7 @@ from ..data.spectral_statistics_data import SpectralDensityData
 from ..data.spectral_statistics_data import SpacingHistogramData
 from ..data.spectral_statistics_data import FormFactorsData
 from ..ensembles import ManyBodyEnsemble
-from ..plotting.spectral_statistics import SpectralDensityPlot
+from ..plotting.spectral_statistics_plots import SpectralDensityPlot
 
 
 # --------------------

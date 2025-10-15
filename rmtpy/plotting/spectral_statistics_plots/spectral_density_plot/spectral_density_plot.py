@@ -1,4 +1,4 @@
-# rmtpy/plotting/spectral_statistics/spectral_density/spectral_density_plot.py
+# rmtpy/plotting/spectral_statistics_plots/spectral_density_plot/spectral_density_plot.py
 
 # Postponed evaluation of annotations
 from __future__ import annotations
