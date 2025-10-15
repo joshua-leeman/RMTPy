@@ -17,6 +17,7 @@ from ..data.spectral_statistics_data import SpectralDensityData
 from ..data.spectral_statistics_data import SpacingHistogramData
 from ..data.spectral_statistics_data import FormFactorsData
 from ..ensembles import ManyBodyEnsemble
+from ..plotting.spectral_statistics_plots import SpacingHistogramPlot
 from ..plotting.spectral_statistics_plots import SpectralDensityPlot
 
 
@@ -112,6 +113,21 @@ class SpectralStatistics(Simulation):
         init=False, repr=False, default=None
     )
 
+    # Unfolded spectral density plot instance
+    unf_spectral_plot: SpectralDensityPlot | None = field(
+        init=False, repr=False, default=None
+    )
+
+    # Spacings histogram plot instance
+    spacing_hist: SpacingHistogramPlot | None = field(
+        init=False, repr=False, default=None
+    )
+
+    # Unfolded spacings histogram plot instance
+    unf_spacing_hist: SpacingHistogramPlot | None = field(
+        init=False, repr=False, default=None
+    )
+
     def __attrs_post_init__(self) -> None:
         """Initialize metadata after object creation."""
 
@@ -121,6 +137,25 @@ class SpectralStatistics(Simulation):
         # Initialize spectral plot
         object.__setattr__(
             self, "spectral_plot", SpectralDensityPlot(data=self.spectral_data)
+        )
+
+        # Initialize unfolded spectral plot
+        object.__setattr__(
+            self,
+            "unf_spectral_plot",
+            SpectralDensityPlot(data=self.spectral_data, unfold=True),
+        )
+
+        # Initialize spacing histogram plot
+        object.__setattr__(
+            self, "spacing_hist", SpacingHistogramPlot(data=self.spacings_data)
+        )
+
+        # Initialize unfolded spacing histogram plot
+        object.__setattr__(
+            self,
+            "unf_spacing_hist",
+            SpacingHistogramPlot(data=self.spacings_data, unfold=True),
         )
 
     def realize_monte_carlo(self) -> None:
