@@ -54,7 +54,7 @@ def configure_matplotlib() -> None:
 # ----------------------------
 # Plot From Data File Function
 # ----------------------------
-def plot_data(data_path: str | Path) -> None:
+def plot_data(data_path: str | Path, unfold: bool = False) -> None:
     """Plot data from a specified data file."""
 
     # Ensure data_path is a Path object
@@ -62,6 +62,9 @@ def plot_data(data_path: str | Path) -> None:
 
     # Create Plot instance from data file
     plot = converter.structure(data_path, Plot)
+
+    # Set unfold flag
+    plot.unfold = unfold
 
     # Alias parent directory of data file
     out_dir = data_path.parent
@@ -78,6 +81,9 @@ class Plot(ABC):
 
     # Plot data
     data: Data
+
+    # Unfold flag
+    unfold: bool = False
 
     # x-axis limits
     xlim: tuple[float, float] | None = None
@@ -158,7 +164,7 @@ class Plot(ABC):
         path.mkdir(parents=True, exist_ok=True)
 
         # Save plot to file
-        self.fig.savefig(path / self.data.file_name, dpi=self.dpi, bbox_inches="tight")
+        self.fig.savefig(path / self.file_name, dpi=self.dpi, bbox_inches="tight")
 
     @abstractmethod
     def plot(self, path: str | Path) -> None:
