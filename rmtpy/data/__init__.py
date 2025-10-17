@@ -12,6 +12,16 @@ from numpy.lib.npyio import NpzFile
 from ._data import Data, DATA_REGISTRY
 from ..ensembles import converter
 
+# Load Data Function
+from ._data import load_data
+
+# Import concrete Data classes to register them
+from .spectral_statistics_data import (
+    FormFactorsData,
+    SpectralDensityData,
+    SpacingHistogramData,
+)
+
 
 # ---------------------------
 # Normalize Metadata Function
