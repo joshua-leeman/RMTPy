@@ -20,6 +20,19 @@ from attrs import asdict, field, frozen
 from ..ensembles import converter
 
 
+# ------------------
+# Load Data Function
+# ------------------
+def load_data(path: str | Path) -> dict[str, Any]:
+    """Load data from a .npz file into a dictionary."""
+
+    # Ensure path is a Path object
+    path = Path(path)
+
+    # Load and return Data instance
+    return Data.load(path=path)
+
+
 # -------------------------
 # Monte Carlo Data Registry
 # -------------------------
