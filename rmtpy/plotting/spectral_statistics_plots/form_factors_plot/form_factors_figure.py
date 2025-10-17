@@ -35,6 +35,14 @@ class FormFactorsPlot(Plot):
     # Number of universal form factor points
     num_points: int = 1000
 
+    # Thouless time marker
+    thou_marker: str = "*"
+    thou_size: int = 12
+    thou_color: str = "Black"
+    thou_alpha: float = 1.0
+    thou_zorder: int = 3
+    thou_style: str = "None"
+
     # Graphic colors
     grid_color: str = rcParams["grid.color"]
     sff_color: str = "Blue"
@@ -65,14 +73,16 @@ class FormFactorsPlot(Plot):
     # Legend labels
     sff_legend: str = "SFF"
     csff_legend: str = "cSFF"
+    thou_legend: str = r"$t_\textrm{\tiny Th}$"
     usff_legend: str = "universal"
 
     # Legend handles and labels
     handles: tuple[Patch, Line2D] = (
         Line2D([0], [0], color=sff_color, alpha=sff_alpha, linewidth=sff_width),
         Line2D([0], [0], color=csff_color, alpha=csff_alpha, linewidth=csff_width),
+        Line2D([0], [0], marker=thou_marker, color=thou_color, linestyle=thou_style),
     )
-    labels: tuple[str, str] = (sff_legend, csff_legend)
+    labels: tuple[str, str] = (sff_legend, csff_legend, thou_legend)
 
     # Unfolded legend handles and labels
     unf_handles: tuple[Patch, Line2D, Line2D] = (
@@ -113,10 +123,6 @@ class FormFactorsPlot(Plot):
         # Store first positive zero of 1st Bessel function
         j_1_1 = jn_zeros(1, 1)[0]
 
-        # Set default legend title
-        if self.legend.title is None:
-            self.legend.title = self.ensemble.to_latex
-
         # Set y-limits
         self.ylim = tuple(dim**y for y in self.ylim)
 
@@ -128,9 +134,6 @@ class FormFactorsPlot(Plot):
             # Prepend "unf_" to file name
             self.file_name = "unf_" + self.file_name
 
-            # Append legend title with "unfolded"
-            self.legend.title += "\nunfolded"
-
             # Insert universal class into usff_label if it exists
             if self.ensemble.univ_class is not None:
                 self.usff_legend = f"{self.ensemble.univ_class} limit"
@@ -140,6 +143,10 @@ class FormFactorsPlot(Plot):
             self.legend = FormFactorsLegend(
                 handles=self.unf_handles, labels=self.unf_labels
             )
+
+            # Set default legend title
+            if self.legend.title is None:
+                self.legend.title = self.ensemble.to_latex + "\nunfolded"
 
             # Change legend location
             self.legend.bbox = self.legend.unf_bbox
@@ -158,6 +165,10 @@ class FormFactorsPlot(Plot):
             # Configure legend data
             self.legend = FormFactorsLegend(handles=self.handles, labels=self.labels)
 
+            # Set default legend title
+            if self.legend.title is None:
+                self.legend.title = self.ensemble.to_latex
+
             # Scale x-limits
             self.xlim = tuple(dim**x * j_1_1 / E0 for x in self.xlim)
 
@@ -166,6 +177,9 @@ class FormFactorsPlot(Plot):
 
     def plot(self, path: str | Path) -> None:
         """Generates and saves form factors plot to file."""
+
+        # Ensure path is a Path object
+        path = Path(path)
 
         # Set derived attributes
         self.set_derived_attributes()
@@ -184,6 +198,18 @@ class FormFactorsPlot(Plot):
             times = self.data.times
             sff = self.data.sff
             csff = self.data.csff
+
+            # Calculate Thouless time only if ensemble is chaotic
+            if self.ensemble.beta > 0:
+                # Alias Thouless time from data
+                thou_time = self.data.thouless_time
+
+                # Save Thouless time to text file
+                with open(path / "thouless_time.txt", "w") as f:
+                    f.write(f"Thouless time: {thou_time:.6f}")
+            else:
+                # Set dummy Thouless time for integrable ensembles
+                thou_time = np.nan
 
         # Alias ensemble dimension
         dim = self.ensemble.dim
@@ -236,6 +262,23 @@ class FormFactorsPlot(Plot):
                 linewidth=self.usff_width,
                 zorder=self.usff_zorder,
                 label=self.usff_legend,
+            )
+
+        # Else, plot the Thouless time instead
+        else:
+            # Find closest time to Thouless time
+            thou_time_idx = np.argmin(np.abs(times - thou_time))
+
+            # Plot Thouless time marker
+            self.ax.plot(
+                thou_time,
+                sff[thou_time_idx],
+                marker=self.thou_marker,
+                markersize=self.thou_size,
+                color=self.thou_color,
+                alpha=self.thou_alpha,
+                zorder=self.thou_zorder,
+                label=self.thou_legend,
             )
 
         # Add grid lines on major x-ticks

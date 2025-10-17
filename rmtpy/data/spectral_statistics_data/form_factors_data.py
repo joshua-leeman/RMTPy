@@ -3,12 +3,41 @@
 # Postponed evaluation of annotations
 from __future__ import annotations
 
+# Standard library imports
+import os
+from pathlib import Path
+
 # Third-party imports
 import numpy as np
 from attrs import frozen, field
+from scipy.interpolate import PchipInterpolator
+from scipy.signal import find_peaks
 
 # Local application imports
 from .._data import Data
+
+
+# --------------------------------
+# Thouless Time Estimator Function
+# --------------------------------
+def thouless_time(times: np.ndarray, sff: np.ndarray) -> float:
+    """Estimate the Thouless time from the spectral form factor data."""
+
+    # Find local maxima of spectral form factor
+    max_idx, _ = find_peaks(sff)
+
+    # Interpolate envelope of local maxima using PCHIP
+    pchip = PchipInterpolator(times[max_idx], sff[max_idx])
+
+    # Determine index of absolute minimum of interpolated maxima
+    start = max_idx[0]
+    stop = max_idx[-1] + 1
+    env = pchip(times[start:stop])
+    rel_idx = np.argmin(env)
+    idx = np.searchsorted(times, times[start:stop][rel_idx])
+
+    # Return the Thouless time
+    return float(times[idx])
 
 
 # ----------------------
@@ -127,3 +156,10 @@ class FormFactorsData(Data):
 
         # Return zero-initialized unfolded connected spectral form factor
         return np.zeros(self.num_times, dtype=np.float64)
+
+    @property
+    def thouless_time(self) -> float:
+        """Estimate the Thouless time from the spectral form factor data."""
+
+        # Estimate and return the Thouless time
+        return thouless_time(self.times, self.sff)

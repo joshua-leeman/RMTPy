@@ -261,6 +261,9 @@ class SpectralStatistics(Simulation):
     def calculate_statistics(self) -> None:
         """Calculate final spectral statistics from Monte Carlo data."""
 
+        # Alias ensemble dimension
+        dim = self.ensemble.dim
+
         # Alias number of realizations
         realizs = self.realizs
 
