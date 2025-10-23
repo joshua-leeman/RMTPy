@@ -42,7 +42,7 @@ class ManyBodyEnsemble(Ensemble):
         default=1.0,
         converter=float,
         validator=gt(0),
-        metadata={"dir_name": "J", "latex_name": "J"},
+        metadata={"dir_name": "J"},
     )
 
     # Validator to ensure N is an even integer
