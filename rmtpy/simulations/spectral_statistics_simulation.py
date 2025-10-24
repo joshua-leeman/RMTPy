@@ -1,4 +1,4 @@
-# rmtpy/simulations/spectral_statistics/spectral_statistics_simulation.py
+# rmtpy/simulations/spectral_statistics_simulation.py
 
 # Postponed evaluation of annotations
 from __future__ import annotations
@@ -73,9 +73,9 @@ def form_factor_moments(
     return mu_1, mu_2
 
 
-# ---------------------------------
-# Random Matrix Simulation Function
-# ---------------------------------
+# ---------------------------------------
+# Spectral Statistics Simulation Function
+# ---------------------------------------
 def spectral_statistics(ensemble: ManyBodyEnsemble, realizs: int) -> None:
     """Perform a spectral statistics simulation for a given ensemble."""
 
@@ -260,9 +260,6 @@ class SpectralStatistics(Simulation):
 
     def calculate_statistics(self) -> None:
         """Calculate final spectral statistics from Monte Carlo data."""
-
-        # Alias ensemble dimension
-        dim = self.ensemble.dim
 
         # Alias number of realizations
         realizs = self.realizs

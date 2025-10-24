@@ -1,4 +1,4 @@
-# rmtpy/simulations/base/simulation.py
+# rmtpy/simulations/_simulation.py
 
 # Postponed evaluation of annotations
 from __future__ import annotations
