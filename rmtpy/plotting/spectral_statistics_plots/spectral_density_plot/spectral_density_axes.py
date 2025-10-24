@@ -37,9 +37,9 @@ class SpectralDensityAxes(PlotAxes):
 
     # x-axis tick labels
     xtick_labels: tuple[str, ...] = (
-        r"$-NJ$",
+        r"$-E_0$",
         r"$0$",
-        r"$NJ$",
+        r"$E_0$",
     )
     unf_xtick_labels: tuple[str, ...] = (
         r"$-\frac{1}{2}D$",
@@ -66,8 +66,8 @@ class SpectralDensityAxes(PlotAxes):
     # y-axis tick labels
     ytick_labels: tuple[str, ...] = (
         r"$0$",
-        r"$\frac{1}{\pi NJ}$",
-        r"$\frac{2}{\pi NJ}$",
+        r"$\frac{1}{\pi E_0}$",
+        r"$\frac{2}{\pi E_0}$",
     )
     unf_ytick_labels: tuple[str, ...] = (
         r"$0$",
@@ -96,9 +96,9 @@ class SpectralDensityAxes(PlotAxes):
     # Poisson specific y-axis tick labels
     poi_ytick_labels: tuple[str, ...] = (
         r"$0$",
-        r"$\frac{1}{4NJ}$",
-        r"$\frac{1}{2NJ}$",
-        r"$\frac{3}{4NJ}$",
+        r"$\frac{1}{4E_0}$",
+        r"$\frac{1}{2E_0}$",
+        r"$\frac{3}{4E_0}$",
     )
 
     # -------------
@@ -112,11 +112,11 @@ class SpectralDensityAxes(PlotAxes):
     # SYK q=2 specific y-axis tick labels
     syk2_ytick_labels: tuple[str, ...] = (
         r"$0$",
-        r"$\frac{1}{\pi NJ}$",
-        r"$\frac{2}{\pi NJ}$",
-        r"$\frac{3}{\pi NJ}$",
-        r"$\frac{4}{\pi NJ}$",
-        r"$\frac{5}{\pi NJ}$",
+        r"$\frac{1}{\pi E_0}$",
+        r"$\frac{2}{\pi E_0}$",
+        r"$\frac{3}{\pi E_0}$",
+        r"$\frac{4}{\pi E_0}$",
+        r"$\frac{5}{\pi E_0}$",
     )
 
     # SYK q=4 specific y-axis ticks
@@ -128,6 +128,6 @@ class SpectralDensityAxes(PlotAxes):
     # SYK q=4 specific y-axis tick labels
     syk4_ytick_labels: tuple[str, ...] = (
         r"$0$",
-        r"$\frac{1}{\pi NJ}$",
-        r"$\frac{2}{\pi NJ}$",
+        r"$\frac{1}{\pi E_0}$",
+        r"$\frac{2}{\pi E_0}$",
     )

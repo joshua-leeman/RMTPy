@@ -22,7 +22,7 @@ class FormFactorsAxes(PlotAxes):
 
     # x-axis labels
     xlabel: str = r"$Jt / j_{1,1}$"
-    unf_xlabel: str = r"$\tau$"
+    unf_xlabel: str = r"$\tau / \tau_\textrm{\tiny H}$"
 
     # x-axis ticks (base dim log scale)
     xticks: tuple[float, ...] = (0.0, 0.5, 1.0)  # factor of j_1_1/(E0)
@@ -31,8 +31,8 @@ class FormFactorsAxes(PlotAxes):
     unf_xticks: tuple[float, ...] = (-1.0, -0.5, 0.0)  # factor of 2 pi
 
     # x-axis tick labels
-    xtick_labels: tuple[str, ...] = (r"$1/N$", r"$\sqrt{D}/N$", r"$D/N$")
-    unf_xtick_labels: tuple[str, ...] = (r"$2\pi / D$", r"$2\pi / \sqrt{D}$", r"$2\pi$")
+    xtick_labels: tuple[str, ...] = (r"$1/N$", r"$D^{1/2}/N$", r"$D/N$")
+    unf_xtick_labels: tuple[str, ...] = (r"$D^{-1}$", r"$D^{-1/2}$", r"$D^0$")
 
     # -----------------
     # y-axis Properties
@@ -46,4 +46,4 @@ class FormFactorsAxes(PlotAxes):
     yticks: tuple[float, ...] = (-2, -1, 0)  # base dim log scale
 
     # y-axis tick labels
-    ytick_labels: tuple[str, ...] = (r"$D^{-2}$", r"$D^{-1}$", r"$1$")
+    ytick_labels: tuple[str, ...] = (r"$D^{-2}$", r"$D^{-1}$", r"$D^0$")
