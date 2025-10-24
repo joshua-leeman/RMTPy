@@ -5,7 +5,7 @@ from __future__ import annotations
 
 # Standard library imports
 from itertools import combinations
-from math import comb
+from math import comb, factorial
 
 # Third-party imports
 import numpy as np
@@ -81,7 +81,14 @@ class SYK(ManyBodyEnsemble):
         """Default value for standard deviation of couplings."""
 
         # Calculate standard deviation based on N, J, eta, and q
-        return self.N * self.J * np.sqrt((1 - self.eta) / comb(self.N, self.q)) / 2
+        return self.J * np.sqrt(factorial(self.q - 1) / self.N ** (self.q - 1))
+
+    @property
+    def E0(self) -> float:
+        """Ground state energy of the ensemble."""
+
+        # Return ground state energy based on N and J
+        return 2 * self.sigma * np.sqrt(comb(self.N, self.q) / (1 - self.eta))
 
     @property
     def _dir_name(self) -> str:
