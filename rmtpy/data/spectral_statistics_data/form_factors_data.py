@@ -3,13 +3,10 @@
 # Postponed evaluation of annotations
 from __future__ import annotations
 
-# Standard library imports
-import os
-from pathlib import Path
-
 # Third-party imports
 import numpy as np
 from attrs import frozen, field
+from attrs.validators import gt
 from scipy.interpolate import PchipInterpolator
 from scipy.signal import find_peaks
 
@@ -47,7 +44,7 @@ def thouless_time(times: np.ndarray, sff: np.ndarray) -> float:
 class FormFactorsData(Data):
 
     # Number of times for spectral form factors
-    num_times: int = 5000
+    num_times: int = field(converter=int, validator=gt(0), default=1000)
 
     # Logarithmic range for times
     logt_i: float = -0.5  # base = dim
@@ -92,70 +89,70 @@ class FormFactorsData(Data):
         """Generate times for spectral form factors."""
 
         # Calculate and return logarithmic time range
-        return np.logspace(self.logt_i, self.logt_f, self.num_times)
+        return np.logspace(self.logt_i, self.logt_f, self.num_times, order="F")
 
     @mu_1.default
     def __default_mu_1(self) -> np.ndarray:
         """Initialize first moment of spectral form factor."""
 
         # Calculate and return zero-initialized first moment
-        return np.zeros(self.num_times, dtype=np.complex128)
+        return np.zeros(self.num_times, dtype=np.complex128, order="F")
 
     @mu_2.default
     def __default_mu_2(self) -> np.ndarray:
         """Initialize second moment of spectral form factor."""
 
         # Calculate and return zero-initialized second moment
-        return np.zeros(self.num_times, dtype=np.float64)
+        return np.zeros(self.num_times, dtype=np.float64, order="F")
 
     @sff.default
     def __default_sff(self) -> np.ndarray:
         """Initialize spectral form factor with zeros."""
 
         # Return zero-initialized spectral form factor
-        return np.zeros(self.num_times, dtype=np.float64)
+        return np.zeros(self.num_times, dtype=np.float64, order="F")
 
     @csff.default
     def __default_csff(self) -> np.ndarray:
         """Initialize connected spectral form factor with zeros."""
 
         # Return zero-initialized connected spectral form factor
-        return np.zeros(self.num_times, dtype=np.float64)
+        return np.zeros(self.num_times, dtype=np.float64, order="F")
 
     @unf_times.default
     def __default_unf_times(self) -> np.ndarray:
         """Generate times for unfolded spectral form factors."""
 
         # Calculate and return logarithmic time range
-        return np.logspace(self.unf_logt_i, self.unf_logt_f, self.num_times)
+        return np.logspace(self.unf_logt_i, self.unf_logt_f, self.num_times, order="F")
 
     @unf_mu_1.default
     def __default_unf_mu_1(self) -> np.ndarray:
         """Initialize first moment of unfolded spectral form factor."""
 
         # Calculate and return zero-initialized first moment
-        return np.zeros(self.num_times, dtype=np.complex128)
+        return np.zeros(self.num_times, dtype=np.complex128, order="F")
 
     @unf_mu_2.default
     def __default_unf_mu_2(self) -> np.ndarray:
         """Initialize second moment of unfolded spectral form factor."""
 
         # Calculate and return zero-initialized second moment
-        return np.zeros(self.num_times, dtype=np.float64)
+        return np.zeros(self.num_times, dtype=np.float64, order="F")
 
     @unf_sff.default
     def __default_unf_sff(self) -> np.ndarray:
         """Initialize unfolded spectral form factor with zeros."""
 
         # Return zero-initialized unfolded spectral form factor
-        return np.zeros(self.num_times, dtype=np.float64)
+        return np.zeros(self.num_times, dtype=np.float64, order="F")
 
     @unf_csff.default
     def __default_unf_csff(self) -> np.ndarray:
         """Initialize unfolded connected spectral form factor with zeros."""
 
         # Return zero-initialized unfolded connected spectral form factor
-        return np.zeros(self.num_times, dtype=np.float64)
+        return np.zeros(self.num_times, dtype=np.float64, order="F")
 
     @property
     def thouless_time(self) -> float:

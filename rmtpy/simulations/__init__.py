@@ -14,7 +14,6 @@ from ..ensembles import normalize_dict, converter
 
 # Simulation functions
 from .spectral_statistics_simulation import spectral_statistics
-from .evolve_cdo_simulation import evolve_cdo
 
 
 # ---------------------------------

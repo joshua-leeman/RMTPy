@@ -13,13 +13,13 @@ from scipy.special import jn_zeros
 
 # Local application imports
 from ._simulation import Simulation
-from ..data.spectral_statistics_data import SpectralDensityData
-from ..data.spectral_statistics_data import SpacingHistogramData
-from ..data.spectral_statistics_data import FormFactorsData
+from ..data.spectral_statistics_data import (
+    SpectralDensityData,
+    SpacingHistogramData,
+    FormFactorsData,
+)
 from ..ensembles import ManyBodyEnsemble
-from ..plotting import FormFactorsPlot
-from ..plotting import SpacingHistogramPlot
-from ..plotting import SpectralDensityPlot
+from ..plotting import FormFactorsPlot, SpacingHistogramPlot, SpectralDensityPlot
 
 
 # --------------------
@@ -221,12 +221,16 @@ class SpectralStatistics(Simulation):
         # Scale spacings histogram bins by global mean spacing
         spacings.bins[:] *= spacings.mean
 
-        # Change base of factors.times to dimension and divide by inverse energy scale
+        # Change base of factors.times to dimension
         factors.times[:] **= np.log(dim) / np.log(10.0)
+
+        # Scale times by j_1_1 / E0
         factors.times[:] *= j_1_1 / E0
 
-        # Change base of unf_times to dimension and multiply by 2π
+        # Change base of unf_times to dimension
         factors.unf_times[:] **= np.log(dim) / np.log(10.0)
+
+        # Scale unfolded times by 2 * pi
         factors.unf_times[:] *= 2 * np.pi
 
         # Loop over spectrum realizations and calculate spectral statistics
