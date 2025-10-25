@@ -90,7 +90,7 @@ class Poisson(ManyBodyEnsemble):
         # Return Poisson ensemble matrix
         return H
 
-    def eig_stream(self, realizs: int) -> Iterator[tuple[np.ndarray, np.ndarray]]:
+    def eigsys_stream(self, realizs: int) -> Iterator[tuple[np.ndarray, np.ndarray]]:
         """Iterator to stream eigensystem realizations."""
 
         # Allocate memory for random eigenvalues and eigenvectors

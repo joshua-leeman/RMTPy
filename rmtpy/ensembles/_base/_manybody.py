@@ -85,7 +85,7 @@ class ManyBodyEnsemble(Ensemble):
         # Return 2 if universality class is GSE, else return 1
         return 2 if self.univ_class == "GSE" else 1
 
-    def eig_stream(self, realizs: int) -> Iterator[tuple[np.ndarray, np.ndarray]]:
+    def eigsys_stream(self, realizs: int) -> Iterator[tuple[np.ndarray, np.ndarray]]:
         """Iterator to stream eigensystem realizations."""
 
         # Allocate memory for random Hermitian matrices

@@ -103,7 +103,7 @@ class CDOEvolution(Simulation):
         times *= j_1_1 / E0
 
         # Loop over diagonalization realizations
-        for r, eigsys in enumerate(ensemble.eig_stream(realizs)):
+        for r, eigsys in enumerate(ensemble.eigsys_stream(realizs)):
 
             # Unpack eigenvalues and eigenvectors
             eigvals, eigvecs = eigsys
