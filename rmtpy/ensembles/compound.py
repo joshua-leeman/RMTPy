@@ -83,7 +83,7 @@ class Compound:
         return H_eff
 
     def resonance_stream(self, realizs: int) -> Iterator[np.ndarray]:
-        """Iterator to stream resonance eigenvalues."""
+        """Iterator to stream resonances."""
 
         # Alias ensemble dimension and data type
         dim = self.ensemble.dim
@@ -99,3 +99,23 @@ class Compound:
 
             # Compute and yield resonance eigenvalues
             yield eigvals(H_eff)
+
+    def eff_H_eigsys_stream(
+        self, realizs: int
+    ) -> Iterator[tuple[np.ndarray, np.ndarray]]:
+        """Iterator to stream effective Hamiltonian eigensystem realizations."""
+
+        # Alias ensemble dimension and data type
+        dim = self.ensemble.dim
+        dtype = self.ensemble.dtype
+
+        # Allocate memory for random effective Hamiltonian
+        H_eff = np.empty((dim, dim), dtype=dtype)
+
+        # Loop over realizations
+        for _ in range(realizs):
+            # Generate effective Hamiltonian
+            self.H_eff(out=H_eff)
+
+            # Compute and yield eigenvalues and eigenvectors
+            yield eig(H_eff, overwrite_a=True, check_finite=False)
