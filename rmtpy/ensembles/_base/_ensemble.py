@@ -46,7 +46,7 @@ class Ensemble(ABC):
     seed: Any = field(default=None)
 
     # Complex data type of matrix entries
-    dtype: np.dtype = field(default=np.dtype("complex64"), converter=np.dtype)
+    dtype: np.dtype = field(default=np.dtype("complex128"), converter=np.dtype)
 
     # Data type for real and imaginary parts of matrix entries
     real_dtype: np.dtype = field(init=False, repr=False)

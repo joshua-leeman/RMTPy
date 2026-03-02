@@ -77,13 +77,13 @@ class Compound:
         H_eff *= -1j * np.pi
 
         # Add random Hamiltonian from underlying ensemble
-        ensemble.generate(H_eff, offset=H_eff)
+        ensemble.generate(offset=H_eff)
 
         # Return effective Hamiltonian
         return H_eff
 
-    def resonance_stream(self, realizs: int) -> Iterator[np.ndarray]:
-        """Iterator to stream resonances."""
+    def eff_H_eigvals_stream(self, realizs: int) -> Iterator[np.ndarray]:
+        """Iterator to stream effective Hamiltonian eigenvalue realizations."""
 
         # Alias ensemble dimension and data type
         dim = self.ensemble.dim
@@ -97,7 +97,7 @@ class Compound:
             # Generate effective Hamiltonian
             self.H_eff(out=H_eff)
 
-            # Compute and yield resonance eigenvalues
+            # Compute and yield effective Hamiltonian eigenvalues
             yield eigvals(H_eff)
 
     def eff_H_eigsys_stream(
@@ -119,3 +119,71 @@ class Compound:
 
             # Compute and yield eigenvalues and eigenvectors
             yield eig(H_eff, overwrite_a=True, check_finite=False)
+
+    def S_stream(self, energy: float, realizs: int) -> Iterator[np.ndarray]:
+        """Iterator to stream scattering matrix realizations."""
+
+        # Alias ensemble dimension and data type
+        dim = self.ensemble.dim
+        dtype = self.ensemble.dtype
+
+        # Alias number of channels
+        M = self.channels
+
+        # Alias couplings and energy
+        W = self.couplings
+        E = energy
+
+        # Allocate memory for random effective Hamiltonian and scattering matrix
+        H_eff = np.empty((dim, dim), dtype=dtype)
+        S = np.empty((M, M), dtype=dtype)
+
+        # Loop over realizations
+        for _ in range(realizs):
+            # Generate effective Hamiltonian
+            self.H_eff(out=H_eff)
+
+            # Shift effective Hamiltonian by energy
+            H_eff -= E * np.eye(dim, dtype=dtype)
+
+            # Compute scattering matrix using the Heidelberg formula
+            np.matmul(W.conj().T, np.linalg.solve(H_eff, W), out=S)
+            S *= 2j * np.pi
+            S += np.eye(M, dtype=dtype)
+
+            # Yield scattering matrix realization
+            yield S
+
+    def Q_stream(self, energy: float, realizs: int) -> Iterator[np.ndarray]:
+        """Iterator to stream Wigner-Smith time-delay matrix realizations."""
+
+        # Alias ensemble dimension and data type
+        dim = self.ensemble.dim
+        dtype = self.ensemble.dtype
+
+        # Alias number of channels
+        M = self.channels
+
+        # Alias couplings and energy
+        W = self.couplings
+        E = energy
+
+        # Allocate memory for random effective Hamiltonian and time-delay matrix
+        H_eff = np.empty((dim, dim), dtype=dtype)
+        Q = np.empty((M, M), dtype=dtype)
+
+        # Loop over realizations
+        for _ in range(realizs):
+            # Generate effective Hamiltonian
+            self.H_eff(out=H_eff)
+
+            # Shift effective Hamiltonian by energy
+            H_eff -= E * np.eye(dim, dtype=dtype)
+
+            # Compute time-delay matrix
+            Y = np.linalg.solve(H_eff, W)
+            np.matmul(Y.conj().T, Y, out=Q)
+            Q *= 2 * np.pi
+
+            # Yield time-delay matrix realization
+            yield Q

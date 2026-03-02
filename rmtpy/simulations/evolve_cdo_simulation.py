@@ -105,8 +105,6 @@ class CDOEvolution(Simulation):
         # Loop over diagonalization realizations
         for r, eigsys in enumerate(ensemble.eigsys_stream(realizs)):
 
-            print("Realization", r + 1, "of", realizs)
-
             # Unpack eigenvalues and eigenvectors
             eigvals, eigvecs = eigsys
 

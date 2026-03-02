@@ -21,7 +21,7 @@ class FormFactorsAxes(PlotAxes):
     # -----------------
 
     # x-axis labels
-    xlabel: str = r"$Jt / j_{1,1}$"
+    xlabel: str = r"$Jt / j_\textrm{\tiny 1,1}$"
     unf_xlabel: str = r"$\tau / \tau_\textrm{\tiny H}$"
 
     # x-axis ticks (base dim log scale)
