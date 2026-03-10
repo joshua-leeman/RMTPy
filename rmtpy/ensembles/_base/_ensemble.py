@@ -234,7 +234,7 @@ class Ensemble(ABC):
             )
 
     @abstractmethod
-    def generate(self, offset: np.ndarray | None = None) -> np.ndarray:
+    def generate_matrix(self, offset: np.ndarray | None = None) -> np.ndarray:
         """Generate a random matrix."""
 
         # This method should be implemented by subclasses

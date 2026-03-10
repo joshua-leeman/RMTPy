@@ -51,10 +51,10 @@ class Poisson(ManyBodyEnsemble):
         # Get LAPACK functions for ungqr
         return get_lapack_funcs("ungqr", dtype=self.dtype)
 
-    def generate(self, offset: np.ndarray | None = None) -> np.ndarray:
+    def generate_matrix(self, offset: np.ndarray | None = None) -> np.ndarray:
         """Generate a random matrix from the Poisson ensemble."""
 
-        # If out is None, allocate memory for matrix
+        # If offset is None, allocate memory for matrix
         if not isinstance(offset, np.ndarray):
             H = np.zeros((self.dim, self.dim), dtype=self.dtype, order="F")
         else:

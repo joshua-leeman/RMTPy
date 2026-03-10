@@ -97,7 +97,7 @@ class ManyBodyEnsemble(Ensemble):
             H.fill(0.0)
 
             # Generate random matrix
-            self.generate(offset=H)
+            self.generate_matrix(offset=H)
 
             # Compute and yield eigenvalues and eigenvectors
             yield eigh(H, overwrite_a=True, check_finite=False)
@@ -114,7 +114,7 @@ class ManyBodyEnsemble(Ensemble):
             H.fill(0.0)
 
             # Generate random matrix
-            self.generate(offset=H)
+            self.generate_matrix(offset=H)
 
             # Compute and yield eigenvalues
             yield eigvalsh(H, overwrite_a=True, check_finite=False)

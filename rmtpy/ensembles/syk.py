@@ -104,7 +104,7 @@ class SYK(ManyBodyEnsemble):
         # Append q to the LaTeX name
         return super()._latex_name + f"_{self.q}"
 
-    def generate(self, offset: np.ndarray | None = None) -> np.ndarray:
+    def generate_matrix(self, offset: np.ndarray | None = None) -> np.ndarray:
         """Generate a random matrix from the SYK ensemble."""
 
         # If offset is None, create a new zeroed array

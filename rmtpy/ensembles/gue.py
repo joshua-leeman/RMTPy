@@ -20,7 +20,7 @@ class GUE(GaussianEnsemble):
     # Dyson index (for GUE is 2)
     beta: int = field(init=False, default=2, repr=False)
 
-    def generate(self, offset: np.ndarray | None = None) -> np.ndarray:
+    def generate_matrix(self, offset: np.ndarray | None = None) -> np.ndarray:
         """Generate a random matrix from the GUE."""
 
         # If offset is None, allocate memory for matrix

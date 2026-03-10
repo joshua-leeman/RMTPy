@@ -34,10 +34,10 @@ class BdGD(GaussianEnsemble):
         # Return formatted LaTeX name
         return "\\textrm{{BdG(D)}}"
 
-    def generate(self, offset: np.ndarray | None = None) -> np.ndarray:
+    def generate_matrix(self, offset: np.ndarray | None = None) -> np.ndarray:
         """Generate a random matrix from the BdG(D) ensemble."""
 
-        # If out is None, allocate memory for matrix
+        # If offset is None, allocate memory for matrix
         if offset is None:
             H = np.zeros((self.dim, self.dim), dtype=self.dtype, order="F")
         else:

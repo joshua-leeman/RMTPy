@@ -77,7 +77,7 @@ class Compound:
         H_eff *= -1j * np.pi
 
         # Add random Hamiltonian from underlying ensemble
-        ensemble.generate(offset=H_eff)
+        ensemble.generate_matrix(offset=H_eff)
 
         # Return effective Hamiltonian
         return H_eff
