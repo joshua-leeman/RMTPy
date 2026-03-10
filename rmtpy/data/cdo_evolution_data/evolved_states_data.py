@@ -1,4 +1,4 @@
-# rmtpy/data/evolve_cdo_data/evolved_states_data.py
+# rmtpy/data/cdo_evolution_data/evolved_states_data.py
 
 # Postponed evaluation of annotations
 from __future__ import annotations

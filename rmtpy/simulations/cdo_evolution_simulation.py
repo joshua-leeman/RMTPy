@@ -1,4 +1,4 @@
-# rmtpy/simulations/evolve_cdo_simulation.py
+# rmtpy/simulations/cdo_evolution_simulation.py
 
 # Postponed evaluation of annotations
 from __future__ import annotations
@@ -14,7 +14,7 @@ from scipy.special import jn_zeros
 
 # Local application imports
 from ._simulation import Simulation
-from ..data.evolve_cdo_data import CDODynamicsData, EvolvedStatesData
+from ..data.cdo_evolution_data import CDODynamicsData, EvolvedStatesData
 from ..ensembles import ManyBodyEnsemble
 
 
