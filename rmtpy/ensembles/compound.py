@@ -11,7 +11,7 @@ from collections.abc import Iterator
 import numpy as np
 from attrs import field, frozen
 from attrs.validators import instance_of, gt
-from scipy.linalg import eig, eigvals, hadamard
+from scipy.linalg import eig, eigvals, hadamard, solve
 
 
 # ---------------------------
@@ -63,17 +63,27 @@ class Compound:
         # Return couplings matrix
         return W
 
-    def H_eff(self, out: np.ndarray | None = None) -> np.ndarray:
+    def generate_H_eff(self, out: np.ndarray | None = None) -> np.ndarray:
         """Generate a random effective Hamiltonian."""
 
         # Alias ensemble
         ensemble = self.ensemble
 
+        # Alias ensemble dimension and data type
+        dim = ensemble.dim
+        dtype = ensemble.dtype
+
         # Alias couplings
         W = self.couplings
 
+        # If out is None, allocate memory for effective Hamiltonian
+        if out is None:
+            H_eff = np.empty((dim, dim), dtype=dtype, order="F")
+        else:
+            H_eff = out
+
         # Construct width term of effective Hamiltonian
-        H_eff = np.matmul(W, W.conj().T, out=out)
+        H_eff = np.matmul(W, W.conj().T, out=H_eff)
         H_eff *= -1j * np.pi
 
         # Add random Hamiltonian from underlying ensemble
@@ -82,7 +92,51 @@ class Compound:
         # Return effective Hamiltonian
         return H_eff
 
-    def eff_H_eigvals_stream(self, realizs: int) -> Iterator[np.ndarray]:
+    def generate_S(
+        self,
+        energy: float,
+        out: np.ndarray | None = None,
+        H_eff: np.ndarray | None = None,
+    ) -> np.ndarray:
+        """Generate a random scattering matrix at given energy."""
+
+        # Alias ensemble dimension and data type
+        dim = self.ensemble.dim
+        dtype = self.ensemble.dtype
+
+        # Alias number of channels
+        M = self.channels
+
+        # Alias couplings and energy
+        W = self.couplings
+        E = energy
+
+        # If out is None, allocate memory for scattering matrix
+        if out is None:
+            S = np.empty((M, M), dtype=dtype, order="F")
+        else:
+            S = out
+
+        # If H_eff is None, generate effective Hamiltonian on the fly
+        if H_eff is None:
+            H_eff = self.generate_H_eff()
+
+        # Shift effective Hamiltonian by energy
+        H_eff -= E * np.eye(dim, dtype=dtype)
+
+        # Compute scattering matrix using the Heidelberg formula
+        np.matmul(
+            W.conj().T,
+            solve(H_eff, W, overwrite_a=True, check_finite=False, assume_a="gen"),
+            out=S,
+        )
+        S *= 2j * np.pi
+        S += np.eye(M, dtype=dtype)
+
+        # Return scattering matrix
+        return S
+
+    def H_eff_eigvals_stream(self, realizs: int) -> Iterator[np.ndarray]:
         """Iterator to stream effective Hamiltonian eigenvalue realizations."""
 
         # Alias ensemble dimension and data type
@@ -95,12 +149,12 @@ class Compound:
         # Loop over realizations
         for _ in range(realizs):
             # Generate effective Hamiltonian
-            self.H_eff(out=H_eff)
+            self.generate_H_eff(out=H_eff)
 
             # Compute and yield effective Hamiltonian eigenvalues
             yield eigvals(H_eff)
 
-    def eff_H_eigsys_stream(
+    def H_eff_eigsys_stream(
         self, realizs: int
     ) -> Iterator[tuple[np.ndarray, np.ndarray]]:
         """Iterator to stream effective Hamiltonian eigensystem realizations."""
@@ -115,7 +169,7 @@ class Compound:
         # Loop over realizations
         for _ in range(realizs):
             # Generate effective Hamiltonian
-            self.H_eff(out=H_eff)
+            self.generate_H_eff(offset=H_eff)
 
             # Compute and yield eigenvalues and eigenvectors
             yield eig(H_eff, overwrite_a=True, check_finite=False)
@@ -141,7 +195,7 @@ class Compound:
         # Loop over realizations
         for _ in range(realizs):
             # Generate effective Hamiltonian
-            self.H_eff(out=H_eff)
+            self.generate_H_eff(offset=H_eff)
 
             # Shift effective Hamiltonian by energy
             H_eff -= E * np.eye(dim, dtype=dtype)
@@ -175,7 +229,7 @@ class Compound:
         # Loop over realizations
         for _ in range(realizs):
             # Generate effective Hamiltonian
-            self.H_eff(out=H_eff)
+            self.generate_H_eff(out=H_eff)
 
             # Shift effective Hamiltonian by energy
             H_eff -= E * np.eye(dim, dtype=dtype)
