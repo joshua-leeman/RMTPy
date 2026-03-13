@@ -64,7 +64,7 @@ class Simulation(ABC):
         # If ensemble is abstract, raise error
         if inspect.isabstract(value):
             raise ValueError(
-                f"Ensemble must be a concrete subclass of Ensemble, got {type(value).__name__} instead."
+                f"Class must be a concrete subclass of Ensemble, got {type(value).__name__} instead."
             )
 
     @classmethod
@@ -131,8 +131,15 @@ class Simulation(ABC):
             # Save data to disk
             data.save(out_path)
 
+    def initialize_plots(self) -> None:
+        """Initialize plot instances for simulation."""
+        pass
+
     def save_plots(self, out_dir: str | Path) -> None:
         """Save simulation plots to disk."""
+
+        # Initialize plot instances if they have not been initialized
+        self.initialize_plots()
 
         # Construct tuple of plot attributes
         plot_attrs = (
