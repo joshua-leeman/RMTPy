@@ -30,18 +30,26 @@ class GaussianEnsemble(ManyBodyEnsemble):
     def pdf(self, eigval: np.ndarray) -> np.ndarray:
         """Wigner semicircle probability density function."""
 
+        # Alias ground state energy
+        E0 = self.E0
+
+        # Alias real data type of eigenvalues
+        rdtype = self.real_dtype
+
+        # =============================================================
+
         # Normalize eigenvalues
-        x = eigval / self.E0
+        x = eigval / E0
 
         # Initialize PDF array
-        pdf = np.zeros_like(x, dtype=self.real_dtype)
+        pdf = np.zeros_like(x, dtype=rdtype)
 
         # Create mask for eigenvalues
         mask = np.abs(x) < 1.0
 
         # Calculate PDF for eigenvalue array
         pdf[mask] = np.sqrt(1 - x[mask] * x[mask])
-        pdf[mask] *= 2 / np.pi / self.E0
+        pdf[mask] *= 2 / np.pi / E0
 
         # Return PDF array
         return pdf
@@ -49,8 +57,13 @@ class GaussianEnsemble(ManyBodyEnsemble):
     def cdf(self, eigval: np.ndarray) -> np.ndarray:
         """Cumulative distribution function of Wigner semicircle PDF."""
 
+        # Alias ground state energy
+        E0 = self.E0
+
+        # =============================================================
+
         # Normalize eigenvalues and clip to range [-1, 1]
-        x = np.clip(eigval / self.E0, -1.0, 1.0)
+        x = np.clip(eigval / E0, -1.0, 1.0)
 
         # Build CDF array
         cdf = np.sqrt(1 - x * x)

@@ -23,28 +23,45 @@ class GUE(GaussianEnsemble):
     def generate_matrix(self, offset: np.ndarray | None = None) -> np.ndarray:
         """Generate a random matrix from the GUE."""
 
-        # If offset is None, allocate memory for matrix
-        if offset is None:
-            H = np.zeros((self.dim, self.dim), dtype=self.dtype, order="F")
-        else:
+        # Alias random number generator
+        rng = self.rng
+
+        # Alias dimension of matrix
+        d = self.dim
+
+        # Alias data types of matrix elements
+        cdtype = self.dtype
+        rdtype = self.real_dtype
+
+        # Alias standard deviation of matrix elements
+        sigma = self.sigma
+
+        # =============================================================
+
+        # If offset is not None, add to provided matrix
+        if offset is not None:
             H = offset
 
+        # Otherwise, create new matrix
+        else:
+            H = np.zeros((d, d), cdtype, "F")
+
         # Loop over diagonal indices
-        for i in range(self.dim):
+        for i in range(d):
             # Generate a random array of standard normal values for real parts
-            real_rands = self.rng.standard_normal(self.dim - i, dtype=self.real_dtype)
+            real_rands = rng.standard_normal(d - i, rdtype)
 
             # Generate a random array of standard normal values for imaginary parts
-            imag_rands = self.rng.standard_normal(self.dim - i, dtype=self.real_dtype)
+            imag_rands = rng.standard_normal(d - i, rdtype)
 
-            # Scale random values by complex standard deviation
-            real_rands *= self.sigma / 2
-            imag_rands *= self.sigma / 2
+            # Scale by complex standard deviation
+            real_rands *= sigma / 2
+            imag_rands *= sigma / 2
 
-            # Add real and imaginary parts to the ith row and column
+            # Add to ith row and ith column of matrix
             H[i, i:].real += real_rands
-            H[i, i:].imag += imag_rands
             H[i:, i].real += real_rands
+            H[i, i:].imag += imag_rands
             H[i:, i].imag -= imag_rands
 
         # Return GUE matrix

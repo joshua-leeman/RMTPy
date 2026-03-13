@@ -23,21 +23,38 @@ class GOE(GaussianEnsemble):
     def generate_matrix(self, offset: np.ndarray | None = None) -> np.ndarray:
         """Generate a random matrix from the GOE."""
 
-        # If offset is None, allocate memory for matrix
-        if offset is None:
-            H = np.zeros((self.dim, self.dim), dtype=self.dtype, order="F")
-        else:
+        # Alias random number generator
+        rng = self.rng
+
+        # Alias dimension of matrix
+        d = self.dim
+
+        # Alias data types of matrix elements
+        cdtype = self.dtype
+        rdtype = self.real_dtype
+
+        # Alias standard deviation of matrix elements
+        sigma = self.sigma
+
+        # =============================================================
+
+        # If offset is not None, add to provided matrix
+        if offset is not None:
             H = offset
 
+        # Otherwise, create new matrix
+        else:
+            H = np.zeros((d, d), cdtype, "F")
+
         # Loop over diagonal indices
-        for i in range(self.dim):
+        for i in range(d):
             # Generate a random array of standard normal values
-            rands = self.rng.standard_normal(self.dim - i, dtype=self.real_dtype)
+            rands = rng.standard_normal(d - i, rdtype)
 
-            # Scale random values by real standard deviation
-            rands *= self.sigma / np.sqrt(2.0)
+            # Scale by standard deviation
+            rands *= sigma / np.sqrt(2)
 
-            # Add to ith row and ith column
+            # Add to ith row and ith column of matrix
             H[i, i:].real += rands
             H[i:, i].real += rands
 
