@@ -14,9 +14,9 @@ from scipy.signal import find_peaks
 from .._data import Data
 
 
-# --------------------------------
-# Thouless Time Estimator Function
-# --------------------------------
+# -----------------------
+# Thouless Time Estimator
+# -----------------------
 def thouless_time(times: np.ndarray, sff: np.ndarray) -> float:
     """Estimate the Thouless time from the spectral form factor data."""
 
@@ -57,6 +57,9 @@ class FormFactorsData(Data):
     # Times for spectral form factors
     times: np.ndarray = field(init=False, repr=False)
 
+    # Count of realizations performed
+    realizs_count: int = field(init=False, repr=False)
+
     # First moment of spectral form factor
     mu_1: np.ndarray = field(init=False, repr=False)
 
@@ -71,6 +74,9 @@ class FormFactorsData(Data):
 
     # Times for unfolded spectral form factors
     unf_times: np.ndarray = field(init=False, repr=False)
+
+    # Count of unfolded realizations performed
+    unf_realizs_count: int = field(init=False, repr=False)
 
     # First moment of unfolded spectral form factor
     unf_mu_1: np.ndarray = field(init=False, repr=False)
@@ -91,6 +97,13 @@ class FormFactorsData(Data):
         # Calculate and return logarithmic time range
         return np.logspace(self.logt_i, self.logt_f, self.num_times)
 
+    @realizs_count.default
+    def __default_realizs_count(self) -> int:
+        """Initialize count of realizations."""
+
+        # Return zero-initialized count of realizations
+        return np.zeros((1,), dtype=int)
+
     @mu_1.default
     def __default_mu_1(self) -> np.ndarray:
         """Initialize first moment of spectral form factor."""
@@ -110,14 +123,14 @@ class FormFactorsData(Data):
         """Initialize spectral form factor with zeros."""
 
         # Return zero-initialized spectral form factor
-        return np.zeros(self.num_times, dtype=np.float64)
+        return np.empty(self.num_times, dtype=np.float64)
 
     @csff.default
     def __default_csff(self) -> np.ndarray:
         """Initialize connected spectral form factor with zeros."""
 
         # Return zero-initialized connected spectral form factor
-        return np.zeros(self.num_times, dtype=np.float64)
+        return np.empty(self.num_times, dtype=np.float64)
 
     @unf_times.default
     def __default_unf_times(self) -> np.ndarray:
@@ -125,6 +138,13 @@ class FormFactorsData(Data):
 
         # Calculate and return logarithmic time range
         return np.logspace(self.unf_logt_i, self.unf_logt_f, self.num_times)
+
+    @unf_realizs_count.default
+    def __default_unf_realizs_count(self) -> int:
+        """Initialize count of unfolded realizations."""
+
+        # Return zero-initialized count of unfolded realizations
+        return np.zeros((1,), dtype=int)
 
     @unf_mu_1.default
     def __default_unf_mu_1(self) -> np.ndarray:
@@ -145,14 +165,28 @@ class FormFactorsData(Data):
         """Initialize unfolded spectral form factor with zeros."""
 
         # Return zero-initialized unfolded spectral form factor
-        return np.zeros(self.num_times, dtype=np.float64)
+        return np.empty(self.num_times, dtype=np.float64)
 
     @unf_csff.default
     def __default_unf_csff(self) -> np.ndarray:
         """Initialize unfolded connected spectral form factor with zeros."""
 
         # Return zero-initialized unfolded connected spectral form factor
-        return np.zeros(self.num_times, dtype=np.float64)
+        return np.empty(self.num_times, dtype=np.float64)
+
+    @property
+    def realizs(self) -> int:
+        """Get the count of realizations performed."""
+
+        # Return realizations from realizs_count array
+        return self.realizs_count[0]
+
+    @property
+    def unf_realizs(self) -> int:
+        """Get the count of unfolded realizations performed."""
+
+        # Return realizations from unf_realizs_count array
+        return self.unf_realizs_count[0]
 
     @property
     def thouless_time(self) -> float:
@@ -160,3 +194,48 @@ class FormFactorsData(Data):
 
         # Estimate and return the Thouless time
         return thouless_time(self.times, self.sff)
+
+    def compute_moment_contributions(self, levels: np.ndarray, unfolded: bool) -> None:
+        """Compute the first and second moments of the spectral form factor from an eigenvalue sample."""
+
+        # Select appropriate times, realizations, and moment arrays
+        if unfolded:
+            times = self.unf_times
+            realizs = self.unf_realizs_count
+            mu_1 = self.unf_mu_1
+            mu_2 = self.unf_mu_2
+        else:
+            times = self.times
+            realizs = self.realizs_count
+            mu_1 = self.mu_1
+            mu_2 = self.mu_2
+
+        # Determine dimension of Hilbert space from levels
+        dim = len(levels)
+
+        # Calculate contribution to first moment
+        mu_1_contrib = np.sum(np.exp(-1j * np.outer(levels, times)), axis=0) / dim
+
+        # Add contribution to first moment
+        mu_1[:] += mu_1_contrib
+
+        # Add contribution to second moment
+        mu_2[:] += np.abs(mu_1_contrib) ** 2
+
+        # Add realization to count of realizations
+        realizs[0] += 1
+
+    def compute_form_factors(self) -> None:
+        """Compute the spectral form factor and connected spectral form factor from the moments."""
+
+        # Calculate spectral form factor
+        self.sff[:] = self.mu_2 / self.realizs
+
+        # Calculate connected spectral form factor
+        self.csff[:] = self.sff - np.abs(self.mu_1 / self.realizs) ** 2
+
+        # Calculate unfolded spectral form factor
+        self.unf_sff[:] = self.unf_mu_2 / self.unf_realizs
+
+        # Calculate unfolded connected spectral form factor
+        self.unf_csff[:] = self.unf_sff - np.abs(self.unf_mu_1 / self.unf_realizs) ** 2
