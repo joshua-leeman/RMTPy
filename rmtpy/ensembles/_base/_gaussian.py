@@ -34,7 +34,7 @@ class GaussianEnsemble(ManyBodyEnsemble):
         E0 = self.E0
 
         # Alias real data type of eigenvalues
-        rdtype = self.real_dtype
+        rdtype = self.real_dtype.type
 
         # =============================================================
 
@@ -42,7 +42,7 @@ class GaussianEnsemble(ManyBodyEnsemble):
         x = eigval / E0
 
         # Initialize PDF array
-        pdf = np.zeros_like(x, dtype=rdtype)
+        pdf = np.zeros_like(x, rdtype)
 
         # Create mask for eigenvalues
         mask = np.abs(x) < 1.0

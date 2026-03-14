@@ -88,16 +88,21 @@ class ManyBodyEnsemble(Ensemble):
     def eigsys_stream(self, realizs: int) -> Iterator[tuple[np.ndarray, np.ndarray]]:
         """Iterator to stream eigensystem realizations."""
 
+        # Alias data types of matrix elements
+        cdtype = self.dtype.type
+
+        # Alias dimension of matrix
+        d = self.dim
+
+        # =============================================================
+
         # Allocate memory for random Hermitian matrices
-        H = np.empty((self.dim, self.dim), dtype=self.dtype, order="F")
+        H = np.empty((d, d), cdtype, "F")
 
         # Loop over realizations
         for _ in range(realizs):
-            # Zero out the matrix
-            H.fill(0.0)
-
             # Generate random matrix
-            self.generate_matrix(offset=H)
+            self.generate_matrix(out=H)
 
             # Compute and yield eigenvalues and eigenvectors
             yield eigh(H, overwrite_a=True, check_finite=False)
@@ -105,16 +110,21 @@ class ManyBodyEnsemble(Ensemble):
     def eigvals_stream(self, realizs: int) -> Iterator[np.ndarray]:
         """Iterator to stream spectrum realizations."""
 
+        # Alias data types of matrix elements
+        cdtype = self.dtype.type
+
+        # Alias dimension of matrix
+        d = self.dim
+
+        # =============================================================
+
         # Allocate memory for random Hermitian matrix
-        H = np.empty((self.dim, self.dim), dtype=self.dtype, order="F")
+        H = np.empty((d, d), cdtype, "F")
 
         # Loop over realizations
         for _ in range(realizs):
-            # Zero out the matrix
-            H.fill(0.0)
-
             # Generate random matrix
-            self.generate_matrix(offset=H)
+            self.generate_matrix(out=H)
 
             # Compute and yield eigenvalues
             yield eigvalsh(H, overwrite_a=True, check_finite=False)
@@ -141,8 +151,14 @@ class ManyBodyEnsemble(Ensemble):
         @lru_cache(maxsize=1)
         def numerical_cdf(num_pts: int = 2**12, factor: int = 1.1) -> interp1d:
             """Create numerical CDF using trapezoidal rule."""
+
+            # Alias ground state energy
+            E0 = self.E0
+
+            # =============================================================
+
             # Generate grid of energies
-            vals = factor * np.linspace(-self.E0, self.E0, num_pts)
+            vals = factor * np.linspace(-E0, E0, num_pts)
 
             # Calculate PDF values
             pdf_vals = self.pdf(vals)
@@ -168,7 +184,7 @@ class ManyBodyEnsemble(Ensemble):
     def wigner_surmise(self, s: np.ndarray) -> np.ndarray:
         """Wigner surmise for the nn-level spacing distribution."""
 
-        # Denote ensemble attributes
+        # Alias ensemble attributes
         beta = self.beta
         degen = self.degeneracy
 
@@ -189,7 +205,10 @@ class ManyBodyEnsemble(Ensemble):
     def univ_csff(self, tau: np.ndarray) -> np.ndarray:
         """Universal connected spectral form factor."""
 
-        # Denote ensemble attributes for convenience
+        # Alias real data type of eigenvalues
+        rdtype = self.real_dtype.type
+
+        # Alias ensemble attributes
         dim = self.dim
         beta = self.beta
         degen = self.degeneracy
@@ -200,7 +219,7 @@ class ManyBodyEnsemble(Ensemble):
         # Return GOE connected spectral form factor if beta = 1
         if beta == 1:
             # Initialize csff array
-            csff = np.empty_like(tau, dtype=self.real_dtype)
+            csff = np.empty_like(tau, rdtype)
 
             # Handle case when tau is less than or equal to one
             m = tau <= 1
@@ -220,7 +239,7 @@ class ManyBodyEnsemble(Ensemble):
         # Build GSE connected spectral form factor if beta = 4
         elif beta == 4:
             # Create default array for csff
-            csff = np.full_like(tau, degen / dim)
+            csff = np.full_like(tau, degen / dim, rdtype)
 
             # Handle case when scaled tau is one
             csff[degen * tau == 1] = np.nan
@@ -235,4 +254,4 @@ class ManyBodyEnsemble(Ensemble):
 
         # Return trivial csff for other Dyson indices
         else:
-            return np.full_like(tau, 1 / dim)
+            return np.full_like(tau, 1 / dim, rdtype)
