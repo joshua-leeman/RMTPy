@@ -198,7 +198,7 @@ class FormFactorsData(Data):
     def compute_moment_contributions(self, levels: np.ndarray, unfolded: bool) -> None:
         """Compute the first and second moments of the spectral form factor from an eigenvalue sample."""
 
-        # Select appropriate times, realizations, and moment arrays
+        # Select and alias appropriate times, realizations, and moment arrays
         if unfolded:
             times = self.unf_times
             realizs = self.unf_realizs_count
@@ -209,6 +209,8 @@ class FormFactorsData(Data):
             realizs = self.realizs_count
             mu_1 = self.mu_1
             mu_2 = self.mu_2
+
+        # =============================================================
 
         # Determine dimension of Hilbert space from levels
         dim = len(levels)
@@ -228,14 +230,30 @@ class FormFactorsData(Data):
     def compute_form_factors(self) -> None:
         """Compute the spectral form factor and connected spectral form factor from the moments."""
 
+        # Alias realizations, moments, and form factor arrays
+        realizs = self.realizs
+        mu_1 = self.mu_1
+        mu_2 = self.mu_2
+        sff = self.sff
+        csff = self.csff
+
+        # Alias unfolded realizations, moments, and form factor arrays
+        unf_realizs = self.unf_realizs
+        unf_mu_1 = self.unf_mu_1
+        unf_mu_2 = self.unf_mu_2
+        unf_sff = self.unf_sff
+        unf_csff = self.unf_csff
+
+        # =============================================================
+
         # Calculate spectral form factor
-        self.sff[:] = self.mu_2 / self.realizs
+        sff[:] = mu_2 / realizs
 
         # Calculate connected spectral form factor
-        self.csff[:] = self.sff - np.abs(self.mu_1 / self.realizs) ** 2
+        csff[:] = sff - np.abs(mu_1 / realizs) ** 2
 
         # Calculate unfolded spectral form factor
-        self.unf_sff[:] = self.unf_mu_2 / self.unf_realizs
+        unf_sff[:] = unf_mu_2 / unf_realizs
 
         # Calculate unfolded connected spectral form factor
-        self.unf_csff[:] = self.unf_sff - np.abs(self.unf_mu_1 / self.unf_realizs) ** 2
+        unf_csff[:] = unf_sff - np.abs(unf_mu_1 / unf_realizs) ** 2

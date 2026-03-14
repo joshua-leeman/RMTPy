@@ -104,9 +104,11 @@ class SpectralDensityData(Data):
     def add_histogram_contribution(self, levels: np.ndarray, unfolded: bool) -> None:
         """Compute the contribution of a spectrum to the spectral histogram."""
 
-        # Select appropriate bins and histogram counts
+        # Select and aliasappropriate bins and histogram counts
         bins = self.unf_bins if unfolded else self.bins
         counts = self.unf_counts if unfolded else self.counts
+
+        # =============================================================
 
         # Calculate and update histogram counts
         counts[:] += np.histogram(levels, bins=bins)[0]
@@ -117,10 +119,20 @@ class SpectralDensityData(Data):
     def compute_histograms(self) -> None:
         """Calculate the spectral histograms."""
 
+        # Alias bins, counts, and histogram
+        bins = self.bins
+        counts = self.counts
+        hist = self.hist
+
+        # Alias unfolded bins, counts, and histogram
+        unf_bins = self.unf_bins
+        unf_counts = self.unf_counts
+        unf_hist = self.unf_hist
+
+        # =============================================================
+
         # Normalize spectral histogram counts to obtain histogram
-        self.hist[:] = self.counts / np.sum(self.counts * np.diff(self.bins))
+        hist[:] = counts / np.sum(counts * np.diff(bins))
 
         # Normalize unfolded spectral histogram counts to obtain histogram
-        self.unf_hist[:] = self.unf_counts / np.sum(
-            self.unf_counts * np.diff(self.unf_bins)
-        )
+        unf_hist[:] = unf_counts / np.sum(unf_counts * np.diff(unf_bins))

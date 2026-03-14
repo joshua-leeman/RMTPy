@@ -109,9 +109,11 @@ class SpacingHistogramData(Data):
     ) -> None:
         """Compute the contribution of a spectrum to the spacings histogram."""
 
-        # Select appropriate bins and histogram counts
+        # Select and alias appropriate bins and histogram counts
         bins = self.unf_bins if unfolded else self.bins
         counts = self.unf_counts if unfolded else self.counts
+
+        # =============================================================
 
         # Compute nearest-neighbor spacings
         spacings = np.diff(np.sort(levels))
@@ -129,10 +131,20 @@ class SpacingHistogramData(Data):
     def compute_histograms(self) -> None:
         """Calculate the spacings histograms."""
 
+        # Alias counts, bins, and histogram
+        counts = self.counts
+        bins = self.bins
+        hist = self.hist
+
+        # Alias unfolded counts, bins, and histogram
+        unf_counts = self.unf_counts
+        unf_bins = self.unf_bins
+        unf_hist = self.unf_hist
+
+        # =============================================================
+
         # Normalize spacings histogram counts to obtain histogram
-        self.hist[:] = self.counts / np.sum(self.counts * np.diff(self.bins))
+        hist[:] = counts / np.sum(counts * np.diff(bins))
 
         # Normalize unfolded spacings histogram counts to obtain histogram
-        self.unf_hist[:] = self.unf_counts / np.sum(
-            self.unf_counts * np.diff(self.unf_bins)
-        )
+        unf_hist[:] = unf_counts / np.sum(unf_counts * np.diff(unf_bins))
