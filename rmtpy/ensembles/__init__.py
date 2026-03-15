@@ -45,7 +45,7 @@ ENS_UNSTRUCTURE_HOOKS: dict[str, Callable] = {
 # Register Ensemble Structure Hook
 # --------------------------------
 @converter.register_structure_hook
-def ens_structure_hook(src: dict[str, Any] | Ensemble, _) -> Ensemble:
+def _ens_structure_hook(src: dict[str, Any] | Ensemble, _) -> Ensemble:
     """Convert a general dictionary to an Ensemble instance."""
 
     # If src is already a valid instance, return it
@@ -85,7 +85,7 @@ def ens_structure_hook(src: dict[str, Any] | Ensemble, _) -> Ensemble:
 # Register Ensemble Unstructure Hook
 # ----------------------------------
 @converter.register_unstructure_hook
-def ens_unstructure_hook(ensemble: Ensemble) -> dict[str, str | dict[str, Any]]:
+def _ens_unstructure_hook(ensemble: Ensemble) -> dict[str, str | dict[str, Any]]:
     """Convert an Ensemble instance to a normalized dictionary."""
 
     # Initialize empty normalized dictionary
