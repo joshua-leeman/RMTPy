@@ -33,7 +33,7 @@ class SpectralDensityAxes(PlotAxes):
 
     # x-axis minor ticks
     xticks_minor: tuple[float, ...] = (-0.5, 0.5)  # factor of E0
-    unf_xticks_minor: tuple[float, ...] = (-1.5, -0.5, 0.5, 1.5)  # factor of D/2
+    unf_xticks_minor: tuple[float, ...] = (-0.5, 0.5)  # factor of D/2
 
     # x-axis tick labels
     xtick_labels: tuple[str, ...] = (
@@ -42,9 +42,9 @@ class SpectralDensityAxes(PlotAxes):
         r"$E_0$",
     )
     unf_xtick_labels: tuple[str, ...] = (
-        r"$-\frac{1}{2}D$",
+        r"$-\frac{D}{2}$",
         r"$0$",
-        r"$\frac{1}{2}D$",
+        r"$\frac{D}{2}$",
     )
 
     # -----------------
@@ -57,11 +57,11 @@ class SpectralDensityAxes(PlotAxes):
 
     # y-axis ticks
     yticks: tuple[float, ...] = (0.0, 1.0, 2.0)  # factor of 1/pi/(E0)
-    unf_yticks: tuple[float, ...] = (0.0, 0.5, 1.0)  # factor of 1/D
+    unf_yticks: tuple[float, ...] = (0.0, 0.5, 1.0, 1.5)  # factor of 1/D
 
     # y-axis minor ticks
     yticks_minor: tuple[float, ...] = (0.0, 1.0, 2.0)  # factor of 1/pi/(E0)
-    unf_yticks_minor: tuple[float, ...] = (0.25, 0.75, 1.25)  # factor of 1/D
+    unf_yticks_minor: tuple[float, ...] = (0.25, 0.75, 1.25, 1.75)  # factor of 1/D
 
     # y-axis tick labels
     ytick_labels: tuple[str, ...] = (
@@ -71,8 +71,9 @@ class SpectralDensityAxes(PlotAxes):
     )
     unf_ytick_labels: tuple[str, ...] = (
         r"$0$",
-        r"$\frac{1}{2}D^{-1}$",
-        r"$D^{-1}$",
+        r"$\frac{1}{2 D}$",
+        r"$\frac{1}{D}$",
+        r"$\frac{3}{2 D}$",
     )
 
     # -------------
@@ -101,7 +102,7 @@ class SpectralDensityAxes(PlotAxes):
         r"$\frac{3}{4E_0}$",
     )
 
-    # -------------
+    # =================================================
 
     # SYK q=2 specific y-axis ticks
     syk2_yticks: tuple[float, ...] = tuple(range(6))  # factor of 1/pi/(E0)
