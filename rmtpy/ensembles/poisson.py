@@ -9,10 +9,11 @@ from collections.abc import Callable, Iterator
 # Third-party imports
 import numpy as np
 from attrs import field, frozen
+from scipy.linalg import eigh
 from scipy.linalg.lapack import get_lapack_funcs
 
 # Local application imports
-from ._base import ManyBodyEnsemble
+from ._base import ManyBodyEnsemble, converter
 
 
 # ----------------
@@ -24,9 +25,11 @@ class Poisson(ManyBodyEnsemble):
     # Standard deviation of eigenvalues
     sigma: float = field(init=False, repr=False)
 
-    # Low-level LAPACK QR routines (for complex dtypes)
-    __zgeqrf: Callable = field(init=False, repr=False)
-    __zungqr: Callable = field(init=False, repr=False)
+    # Flag of ensemble from which to draw eigenvectors
+    eigvecs_flag: str = field(default="GUE")
+
+    # Ensemble from which to draw eigenvectors
+    eigvecs_ensemble: ManyBodyEnsemble = field(init=False, repr=False)
 
     @sigma.default
     def __sigma_default(self) -> float:
@@ -35,90 +38,76 @@ class Poisson(ManyBodyEnsemble):
         # Calculate standard deviation based on E0
         return 2 * self.E0
 
-    # Set LAPACK geqrf routine for QR decomposition
-    @__zgeqrf.default
-    def __zgeqrf_default(self) -> Callable:
-        """Default low-level LAPACK QR routine for geqrf."""
+    def __attrs_post_init__(self) -> None:
+        """Post-initialization method to initialize eigenvector ensemble."""
 
-        # Get LAPACK functions for geqrf
-        return get_lapack_funcs("geqrf", dtype=self.dtype)
+        # Unstructure Poisson class instance to dictionary
+        dic = converter.unstructure(self)
 
-    # Set LAPACK ungqr routine for generating Q from QR factorization
-    @__zungqr.default
-    def __zungqr_default(self) -> Callable:
-        """Default low-level QR routine for ungqr."""
+        # Change name in dictionary to eigvecs_flag
+        dic["name"] = self.eigvecs_flag
 
-        # Get LAPACK functions for ungqr
-        return get_lapack_funcs("ungqr", dtype=self.dtype)
+        # Remove eigvecs_flag from dictionary
+        dic["args"].pop("eigvecs_flag")
 
-    def generate_matrix(self, offset: np.ndarray | None = None) -> np.ndarray:
+        # Create ensemble instance from modified dictionary
+        ens = converter.structure(dic, ManyBodyEnsemble)
+
+        # Store ensemble instance in eigvecs_ensemble attribute
+        object.__setattr__(self, "eigvecs_ensemble", ens)
+
+    def generate_matrix(
+        self, out: np.ndarray | None = None, offset: np.ndarray | None = None
+    ) -> np.ndarray:
         """Generate a random matrix from the Poisson ensemble."""
 
-        # If offset is None, allocate memory for matrix
-        if not isinstance(offset, np.ndarray):
-            H = np.zeros((self.dim, self.dim), dtype=self.dtype, order="F")
-        else:
-            H: np.ndarray = offset
-
-        # Allocate memory for complex Ginibre matrix
-        M = np.empty((self.dim, self.dim), dtype=self.dtype, order="F")
-
-        # Build complex Ginibre matrix
-        M.real = self.rng.standard_normal((self.dim, self.dim), dtype=self.real_dtype)
-        M.imag = self.rng.standard_normal((self.dim, self.dim), dtype=self.real_dtype)
-        M /= np.sqrt(2)
-
-        # In-place QR decomposition
-        qr_fact, tau, _, _ = self.__zgeqrf(M, overwrite_a=True)
-        U, _, _ = self.__zungqr(qr_fact, tau, overwrite_a=True)
-
-        # Generate iid uniform random eigenvalues
-        eigvals = self.rng.random(self.dim, dtype=self.real_dtype)
-        eigvals -= 0.5
-        eigvals *= self.sigma
-
-        # Calculate Poisson ensemble matrix
-        tmp = U * eigvals[None, :]
-        M[:] = tmp @ U.conj().T
-        H += M
-
-        # Clip small real/imag parts to remove floating-point noise
-        threshold = 1e-7
-        H.real[np.abs(H.real) < threshold] = 0.0
-        H.imag[np.abs(H.imag) < threshold] = 0.0
-
-        # Return Poisson ensemble matrix
-        return H
+        # Pass since matrix generation is not implemented
+        raise NotImplementedError(
+            "Matrix generation is not implemented for the Poisson ensemble."
+        )
 
     def eigsys_stream(self, realizs: int) -> Iterator[tuple[np.ndarray, np.ndarray]]:
         """Iterator to stream eigensystem realizations."""
 
-        # Allocate memory for random eigenvalues and eigenvectors
-        eigvals = np.empty(self.dim, dtype=self.real_dtype, order="F")
-        U = np.empty((self.dim, self.dim), dtype=self.dtype, order="F")
+        # Alias random number generator
+        rng = self.rng
+
+        # Alias data types of eigenvalues and eigenvectors
+        rdtype = self.real_dtype.type
+        cdtype = self.dtype.type
+
+        # Alias dimension of matrix
+        d = self.dim
+
+        # Alias standard deviation of eigenvalues
+        std = self.sigma
+
+        # Alias ensemble for generating eigenvectors
+        eigvecs_ens = self.eigvecs_ensemble
+
+        # =================================================
+
+        # Allocate memory for random eigenvalues
+        eigvals = np.empty(d, rdtype, "F")
+
+        # Allocate memory for unitary matrix of eigenvectors
+        U = np.empty((d, d), cdtype, "F")
 
         # Loop over realizations
         for _ in range(realizs):
             # Generate iid uniform random eigenvalues
-            self.rng.random(self.dim, dtype=self.real_dtype, out=eigvals)
+            rng.random(d, rdtype, out=eigvals)
             eigvals -= 0.5
-            eigvals *= self.sigma
-
-            # Build complex Ginibre matrix
-            U.real = self.rng.standard_normal(
-                (self.dim, self.dim), dtype=self.real_dtype
-            )
-            U.imag = self.rng.standard_normal(
-                (self.dim, self.dim), dtype=self.real_dtype
-            )
-            U /= np.sqrt(2)
-
-            # Perform in-place QR decomposition
-            qr_fact, tau, _, _ = self.__zgeqrf(U, overwrite_a=True)
-            U, _, _ = self.__zungqr(qr_fact, tau, overwrite_a=True)
+            eigvals *= std
 
             # Sort eigenvalues
             eigvals.sort()
+
+            # Generate matrix from eigvecs_ensemble in place of U
+            eigvecs_ens.generate_matrix(out=U)
+
+            # Diagonalize matrix for eigenvectors
+            _, U = eigh(U, overwrite_a=True, check_finite=False)
 
             # Yield eigenvalues and eigenvectors
             yield eigvals, U
@@ -126,15 +115,29 @@ class Poisson(ManyBodyEnsemble):
     def eigvals_stream(self, realizs: int) -> Iterator[np.ndarray]:
         """Iterator to stream spectrum realizations."""
 
+        # Alias random number generator
+        rng = self.rng
+
+        # Alias data type of eigenvalues
+        rdtype = self.real_dtype.type
+
+        # Alias dimension of matrix
+        d = self.dim
+
+        # Alias standard deviation of eigenvalues
+        std = self.sigma
+
+        # =================================================
+
         # Allocate memory for random eigenvalues
-        eigvals = np.empty(self.dim, dtype=self.real_dtype, order="F")
+        eigvals = np.empty(d, rdtype, "F")
 
         # Loop over realizations
         for _ in range(realizs):
             # Generate iid uniform random eigenvalues
-            self.rng.random(self.dim, dtype=self.real_dtype, out=eigvals)
+            rng.random(d, rdtype, out=eigvals)
             eigvals -= 0.5
-            eigvals *= self.sigma
+            eigvals *= std
 
             # Sort eigenvalues
             eigvals.sort()
@@ -145,11 +148,19 @@ class Poisson(ManyBodyEnsemble):
     def pdf(self, eigval: np.ndarray) -> np.ndarray:
         """Probability density function of the Poisson ensemble."""
 
+        # Alias data type of eigenvalues
+        rdtype = self.real_dtype.type
+
+        # Alias ground state energy
+        E0 = self.E0
+
+        # =================================================
+
         # Initialize distribution with zeros
-        pdf = np.zeros_like(eigval, dtype=self.real_dtype)
+        pdf = np.zeros_like(eigval, rdtype)
 
         # Calculate non-zero elements
-        pdf[np.abs(eigval) < self.E0] = 1 / 2 / self.E0
+        pdf[np.abs(eigval) < E0] = 1 / 2 / E0
 
         # Return probability density function
         return pdf
@@ -157,15 +168,23 @@ class Poisson(ManyBodyEnsemble):
     def cdf(self, eigval: np.ndarray) -> np.ndarray:
         """Cumulative distribution function of the Poisson ensemble."""
 
+        # Alias data type of eigenvalues
+        rdtype = self.real_dtype.type
+
+        # Alias ground state energy
+        E0 = self.E0
+
+        # =================================================
+
         # Initialize distribution with zeros
-        cdf = np.zeros_like(eigval, dtype=self.real_dtype)
+        cdf = np.zeros_like(eigval, rdtype)
 
         # Calculate non-trivial elements
-        mask = np.abs(eigval) < self.E0
-        cdf[mask] = eigval[mask] / (2 * self.E0) + 0.5
+        mask = np.abs(eigval) < E0
+        cdf[mask] = eigval[mask] / (2 * E0) + 0.5
 
         # Calculate remaining elements
-        cdf[eigval > self.E0] = 1.0
+        cdf[eigval > E0] = 1.0
 
         # Return cumulative distribution function
         return cdf
