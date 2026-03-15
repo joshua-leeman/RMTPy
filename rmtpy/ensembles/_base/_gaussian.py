@@ -36,7 +36,7 @@ class GaussianEnsemble(ManyBodyEnsemble):
         # Alias real data type of eigenvalues
         rdtype = self.real_dtype.type
 
-        # =============================================================
+        # =================================================
 
         # Normalize eigenvalues
         x = eigval / E0
@@ -60,7 +60,7 @@ class GaussianEnsemble(ManyBodyEnsemble):
         # Alias ground state energy
         E0 = self.E0
 
-        # =============================================================
+        # =================================================
 
         # Normalize eigenvalues and clip to range [-1, 1]
         x = np.clip(eigval / E0, -1.0, 1.0)

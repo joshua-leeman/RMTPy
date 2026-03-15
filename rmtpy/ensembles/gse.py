@@ -138,7 +138,7 @@ class GSE(GaussianEnsemble):
         # Alias standard deviation of matrix elements
         std = self.sigma / 2
 
-        # =============================================================
+        # =================================================
 
         # If offset is not None, add to provided matrix
         if offset is not None:

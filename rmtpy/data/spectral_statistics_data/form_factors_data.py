@@ -210,7 +210,7 @@ class FormFactorsData(Data):
             mu_1 = self.mu_1
             mu_2 = self.mu_2
 
-        # =============================================================
+        # =================================================
 
         # Determine dimension of Hilbert space from levels
         dim = len(levels)
@@ -244,7 +244,7 @@ class FormFactorsData(Data):
         unf_sff = self.unf_sff
         unf_csff = self.unf_csff
 
-        # =============================================================
+        # =================================================
 
         # Calculate spectral form factor
         sff[:] = mu_2 / realizs

@@ -108,7 +108,7 @@ class SpectralDensityData(Data):
         bins = self.unf_bins if unfolded else self.bins
         counts = self.unf_counts if unfolded else self.counts
 
-        # =============================================================
+        # =================================================
 
         # Calculate and update histogram counts
         counts[:] += np.histogram(levels, bins=bins)[0]
@@ -129,7 +129,7 @@ class SpectralDensityData(Data):
         unf_counts = self.unf_counts
         unf_hist = self.unf_hist
 
-        # =============================================================
+        # =================================================
 
         # Normalize spectral histogram counts to obtain histogram
         hist[:] = counts / np.sum(counts * np.diff(bins))

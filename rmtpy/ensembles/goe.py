@@ -78,7 +78,7 @@ class GOE(GaussianEnsemble):
         # Alias standard deviation of matrix elements
         std = self.sigma / np.sqrt(2)
 
-        # =============================================================
+        # =================================================
 
         # If offset is not None, add to provided matrix
         if offset is not None:

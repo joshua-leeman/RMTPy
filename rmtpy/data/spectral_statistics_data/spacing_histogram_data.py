@@ -113,7 +113,7 @@ class SpacingHistogramData(Data):
         bins = self.unf_bins if unfolded else self.bins
         counts = self.unf_counts if unfolded else self.counts
 
-        # =============================================================
+        # =================================================
 
         # Compute nearest-neighbor spacings
         spacings = np.diff(np.sort(levels))
@@ -141,7 +141,7 @@ class SpacingHistogramData(Data):
         unf_bins = self.unf_bins
         unf_hist = self.unf_hist
 
-        # =============================================================
+        # =================================================
 
         # Normalize spacings histogram counts to obtain histogram
         hist[:] = counts / np.sum(counts * np.diff(bins))

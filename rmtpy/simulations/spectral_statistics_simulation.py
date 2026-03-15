@@ -148,7 +148,7 @@ class SpectralStatistics(Simulation):
         spacings: SpacingHistogramData = self.spacings_data
         factors: FormFactorsData = self.factors_data
 
-        # =============================================================
+        # =================================================
 
         # Check if ensemble is ManyBodyEnsemble
         if not isinstance(ensemble, ManyBodyEnsemble):
@@ -212,7 +212,7 @@ class SpectralStatistics(Simulation):
         spacings: SpacingHistogramData = self.spacings_data
         factors: FormFactorsData = self.factors_data
 
-        # =============================================================
+        # =================================================
 
         # Calculate spectral histograms from counts
         spectral.compute_histograms()

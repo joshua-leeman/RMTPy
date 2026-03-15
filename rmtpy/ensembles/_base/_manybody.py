@@ -94,7 +94,7 @@ class ManyBodyEnsemble(Ensemble):
         # Alias dimension of matrix
         d = self.dim
 
-        # =============================================================
+        # =================================================
 
         # Allocate memory for random Hermitian matrices
         H = np.empty((d, d), cdtype, "F")
@@ -116,7 +116,7 @@ class ManyBodyEnsemble(Ensemble):
         # Alias dimension of matrix
         d = self.dim
 
-        # =============================================================
+        # =================================================
 
         # Allocate memory for random Hermitian matrix
         H = np.empty((d, d), cdtype, "F")
@@ -155,7 +155,7 @@ class ManyBodyEnsemble(Ensemble):
             # Alias ground state energy
             E0 = self.E0
 
-            # =============================================================
+            # =================================================
 
             # Generate grid of energies
             vals = factor * np.linspace(-E0, E0, num_pts)
@@ -212,6 +212,8 @@ class ManyBodyEnsemble(Ensemble):
         dim = self.dim
         beta = self.beta
         degen = self.degeneracy
+
+        # =================================================
 
         # Normalize unfolded times w.r.t. Heisenberg time 2π
         tau = tau / (2 * np.pi)
