@@ -67,11 +67,11 @@ class SpectralDensityPlot(Plot):
 
     # x-axis limits
     xlim: tuple[float, float] = (-1.2, 1.2)  # factor of E0
-    unf_xlim: tuple[float, float] = (-1.6, 1.6)  # factor of D/2
+    unf_xlim: tuple[float, float] = (-1.2, 1.2)  # factor of D/2
 
     # y-axis limits
     ylim: tuple[float, float] = (0.0, 2.6)  # factor of 1/pi/(E0)
-    unf_ylim: tuple[float, float] = (0.0, 1.5)  # factor of 1/D
+    unf_ylim: tuple[float, float] = (0.0, 1.625)  # factor of 1/D
 
     # Poisson specific y-axis limits
     poi_ylim: tuple[float, float] = (0.0, 1.25)  # factor of 1/(E0)
@@ -85,8 +85,14 @@ class SpectralDensityPlot(Plot):
     def set_derived_attributes(self) -> None:
         """Set attributes that depend on simulation metadata."""
 
-        # Legend configuration
+        # Configure legend
         self.legend = SpectralDensityLegend(handles=self.handles, labels=self.labels)
+
+        # Alias legend object
+        legend = self.legend
+
+        # Alias axes object
+        axes = self.axes
 
         # Try to extract ensemble metadata
         try:
@@ -99,13 +105,16 @@ class SpectralDensityPlot(Plot):
         # Initialize ensemble
         self.ensemble: ManyBodyEnsemble = converter.structure(ens_meta, Ensemble)
 
-        # Alias ensemble attributes
-        dim = self.ensemble.dim
-        E0 = self.ensemble.E0
+        # Alias ensemble and ensemble attributes
+        ensemble = self.ensemble
+        dim = ensemble.dim
+        E0 = ensemble.E0
 
         # Set default legend title
-        if self.legend.title is None:
-            self.legend.title = self.ensemble.to_latex
+        if legend.title is None:
+            legend.title = ensemble.to_latex
+
+        # =================================================
 
         # Configure plot based on unfolding
         if self.unfold:
@@ -119,54 +128,63 @@ class SpectralDensityPlot(Plot):
             self.unf_ylim = tuple(y / dim for y in self.unf_ylim)
 
             # Scale unfolded x-axis ticks and minor ticks
-            self.axes.unf_xticks = tuple(x * dim / 2 for x in self.axes.unf_xticks)
-            self.axes.unf_xticks_minor = tuple(
-                x * dim / 2 for x in self.axes.unf_xticks_minor
-            )
+            axes.unf_xticks = tuple(x * dim / 2 for x in axes.unf_xticks)
+            axes.unf_xticks_minor = tuple(x * dim / 2 for x in axes.unf_xticks_minor)
 
             # Scale unfolded y-axis ticks and minor ticks
-            self.axes.unf_yticks = tuple(y / dim for y in self.axes.unf_yticks)
-            self.axes.unf_yticks_minor = tuple(
-                y / dim for y in self.axes.unf_yticks_minor
-            )
+            axes.unf_yticks = tuple(y / dim for y in axes.unf_yticks)
+            axes.unf_yticks_minor = tuple(y / dim for y in axes.unf_yticks_minor)
 
             # Append legend title with "unfolded"
-            self.legend.title += "\nunfolded"
+            legend.title += "\nunfolded"
 
             # Replace x-axis limits for unfolded data
             self.xlim = self.unf_xlim
             self.ylim = self.unf_ylim
 
             # Replace axes labels for unfolded data
-            self.axes.xlabel = self.axes.unf_xlabel
-            self.axes.ylabel = self.axes.unf_ylabel
-            self.axes.xtick_labels = self.axes.unf_xtick_labels
-            self.axes.ytick_labels = self.axes.unf_ytick_labels
+            axes.xlabel = axes.unf_xlabel
+            axes.ylabel = axes.unf_ylabel
+            axes.xtick_labels = axes.unf_xtick_labels
+            axes.ytick_labels = axes.unf_ytick_labels
 
             # Replace axes ticks for unfolded data
-            self.axes.xticks = self.axes.unf_xticks
-            self.axes.xticks_minor = self.axes.unf_xticks_minor
-            self.axes.yticks = self.axes.unf_yticks
-            self.axes.yticks_minor = self.axes.unf_yticks_minor
+            axes.xticks = axes.unf_xticks
+            axes.xticks_minor = axes.unf_xticks_minor
+            axes.yticks = axes.unf_yticks
+            axes.yticks_minor = axes.unf_yticks_minor
 
+        # Else, configure for regular data
         else:
-            # Rewrite y-axis attributes for specific ensembles
+            # Rewrite y-axis attributes for Poisson ensemble
             if type(self.ensemble) == Poisson:
-                self.axes.ytick_labels = self.axes.poi_ytick_labels
+                # Set y-axis limits for Poisson ensemble
                 self.ylim = self.poi_ylim
-                self.axes.yticks = self.axes.poi_yticks
-                self.axes.yticks_minor = self.axes.poi_yticks_minor
+
+                # Set y-axis ticks and labels for Poisson ensemble
+                axes.ytick_labels = axes.poi_ytick_labels
+                axes.yticks = axes.poi_yticks
+                axes.yticks_minor = axes.poi_yticks_minor
+
+            # Rewrite y-axis attributes for SYK ensembles
             elif type(self.ensemble) == SYK:
                 if self.ensemble.q == 2:
-                    self.axes.ytick_labels = self.axes.syk2_ytick_labels
+                    # Set y-axis limits for SYK q=2 ensemble
                     self.ylim = self.syk2_ylim
-                    self.axes.yticks = self.axes.syk2_yticks
-                    self.axes.yticks_minor = self.axes.syk2_yticks_minor
+
+                    # Set y-axis ticks and labels for SYK q=2 ensemble
+                    axes.ytick_labels = axes.syk2_ytick_labels
+                    axes.yticks = axes.syk2_yticks
+                    axes.yticks_minor = axes.syk2_yticks_minor
+
                 elif self.ensemble.q == 4:
-                    self.axes.ytick_labels = self.axes.syk4_ytick_labels
+                    # Set y-axis limits for SYK q=4 ensemble
                     self.ylim = self.syk4_ylim
-                    self.axes.yticks = self.axes.syk4_yticks
-                    self.axes.yticks_minor = self.axes.syk4_yticks_minor
+
+                    # Set y-axis ticks and labels for SYK q=4 ensemble
+                    axes.ytick_labels = axes.syk4_ytick_labels
+                    axes.yticks = axes.syk4_yticks
+                    axes.yticks_minor = axes.syk4_yticks_minor
 
             # Scale x-axis limits
             self.xlim = tuple(x * E0 for x in self.xlim)
@@ -175,14 +193,12 @@ class SpectralDensityPlot(Plot):
             self.ylim = tuple(y / np.pi / E0 for y in self.ylim)
 
             # Scale x-axis ticks and minor ticks
-            self.axes.xticks = tuple(x * E0 for x in self.axes.xticks)
-            self.axes.xticks_minor = tuple(x * E0 for x in self.axes.xticks_minor)
+            axes.xticks = tuple(x * E0 for x in axes.xticks)
+            axes.xticks_minor = tuple(x * E0 for x in axes.xticks_minor)
 
             # Scale y-axis ticks and minor ticks
-            self.axes.yticks = tuple(y / np.pi / E0 for y in self.axes.yticks)
-            self.axes.yticks_minor = tuple(
-                y / np.pi / E0 for y in self.axes.yticks_minor
-            )
+            axes.yticks = tuple(y / np.pi / E0 for y in axes.yticks)
+            axes.yticks_minor = tuple(y / np.pi / E0 for y in axes.yticks_minor)
 
     def plot(self, path: str | Path) -> None:
         """Generate spectral density plot."""
@@ -190,19 +206,22 @@ class SpectralDensityPlot(Plot):
         # Set derived attributes
         self.set_derived_attributes()
 
-        # Alias ensemble dimension
-        dim = self.ensemble.dim
-
-        # Create figure and axes
-        self.create_figure()
-
-        # Unpack histogram data based on unfolding
+        # Unpack and alias histogram data based on unfolding
         if self.unfold:
             bins = self.data.unf_bins
             hist = self.data.unf_hist
         else:
             bins = self.data.bins
             hist = self.data.hist
+
+        # Alias ensemble and ensemble dimension
+        ensemble = self.ensemble
+        dim = ensemble.dim
+
+        # =================================================
+
+        # Create figure and axes
+        self.create_figure()
 
         # Plot histogram
         self.ax.hist(
@@ -222,7 +241,7 @@ class SpectralDensityPlot(Plot):
             spec_pdf = np.zeros(self.num_points)
             spec_pdf[np.abs(energies) < dim / 2] = 1 / dim
         else:
-            spec_pdf = self.ensemble.pdf(energies)
+            spec_pdf = ensemble.pdf(energies)
 
         # Plot theoretical spectral density
         self.ax.plot(

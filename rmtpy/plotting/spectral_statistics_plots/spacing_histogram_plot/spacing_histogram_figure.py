@@ -72,6 +72,15 @@ class SpacingHistogramPlot(Plot):
     def set_derived_attributes(self) -> None:
         """Set attributes that depend on simulation metadata."""
 
+        # Configure legend
+        self.legend = SpacingHistogramLegend(handles=self.handles, labels=self.labels)
+
+        # Alias legend object
+        legend = self.legend
+
+        # Alias axes object
+        axes = self.axes
+
         # Try to extract ensemble metadata
         try:
             ens_meta = self.data.metadata["simulation"]["args"]["ensemble"]
@@ -83,17 +92,21 @@ class SpacingHistogramPlot(Plot):
         # Initialize ensemble
         self.ensemble: ManyBodyEnsemble = converter.structure(ens_meta, Ensemble)
 
+        # Alias ensemble and ensemble attributes
+        ensemble = self.ensemble
+        dim = ensemble.dim
+        E0 = ensemble.E0
+
         # Insert universal class into legend if it exists
-        if self.ensemble.univ_class is not None:
-            self.spac_legend = f"{self.ensemble.univ_class} surmise"
+        if ensemble.univ_class is not None:
+            self.spac_legend = f"{ensemble.univ_class} surmise"
             self.labels = (self.hist_legend, self.spac_legend)
 
-        # Configure legend
-        self.legend = SpacingHistogramLegend(handles=self.handles, labels=self.labels)
-
         # Set default legend title
-        if self.legend.title is None:
-            self.legend.title = self.ensemble.to_latex
+        if legend.title is None:
+            legend.title = ensemble.to_latex
+
+        # =================================================
 
         # Perform unfolding adjustments
         if self.unfold:
@@ -101,37 +114,33 @@ class SpacingHistogramPlot(Plot):
             self.file_name = "unf_" + self.file_name
 
             # Append legend title with "unfolded"
-            self.legend.title += "\nunfolded"
+            legend.title += "\nunfolded"
 
             # Replace axes labels with unfolded versions
-            self.axes.xlabel = self.axes.unf_xlabel
-            self.axes.ylabel = self.axes.unf_ylabel
-            self.axes.xtick_labels = self.axes.unf_xtick_labels
-            self.axes.ytick_labels = self.axes.unf_ytick_labels
+            axes.xlabel = axes.unf_xlabel
+            axes.ylabel = axes.unf_ylabel
+            axes.xtick_labels = axes.unf_xtick_labels
+            axes.ytick_labels = axes.unf_ytick_labels
 
             # Estimate global mean level spacing
             self.mean_spacing = 1.0
         else:
             # Estimate global mean level spacing
-            self.mean_spacing = 2 * self.ensemble.E0 / self.ensemble.dim
+            self.mean_spacing = 2 * ensemble.E0 / ensemble.dim
 
         # Scale x-axis limits
         self.xlim = tuple(x * self.mean_spacing for x in self.xlim)
 
         # Scale x-axis ticks
-        self.axes.xticks = tuple(x * self.mean_spacing for x in self.axes.xticks)
-        self.axes.xticks_minor = tuple(
-            x * self.mean_spacing for x in self.axes.xticks_minor
-        )
+        axes.xticks = tuple(x * self.mean_spacing for x in axes.xticks)
+        axes.xticks_minor = tuple(x * self.mean_spacing for x in axes.xticks_minor)
 
         # Scale y-axis limits
         self.ylim = tuple(y / self.mean_spacing for y in self.ylim)
 
         # Scale y-axis ticks
-        self.axes.yticks = tuple(y / self.mean_spacing for y in self.axes.yticks)
-        self.axes.yticks_minor = tuple(
-            y / self.mean_spacing for y in self.axes.yticks_minor
-        )
+        axes.yticks = tuple(y / self.mean_spacing for y in axes.yticks)
+        axes.yticks_minor = tuple(y / self.mean_spacing for y in axes.yticks_minor)
 
     def plot(self, path: str | Path) -> None:
         """Generates and saves NN-level spacings histogram to a file."""
@@ -139,16 +148,21 @@ class SpacingHistogramPlot(Plot):
         # Set derived attributes
         self.set_derived_attributes()
 
-        # Create figure and axes
-        self.create_figure()
-
-        # Unpack histogram data based on unfolding
+        # Unpack and alias histogram data based on unfolding
         if self.unfold:
             bin_edges = self.data.unf_bins
             counts = self.data.unf_hist
         else:
             bin_edges = self.data.bins
             counts = self.data.hist
+
+        # Alias ensemble
+        ensemble = self.ensemble
+
+        # =================================================
+
+        # Create figure and axes
+        self.create_figure()
 
         # Plot histogram
         self.ax.hist(
@@ -164,7 +178,7 @@ class SpacingHistogramPlot(Plot):
         spacings = np.linspace(0, self.xlim[1], self.num_points)
 
         # Calculate Wigner surmise
-        surmise = self.ensemble.wigner_surmise(spacings / self.mean_spacing)
+        surmise = ensemble.wigner_surmise(spacings / self.mean_spacing)
         surmise /= self.mean_spacing  # Scale by mean spacing
 
         # Plot Wigner surmise

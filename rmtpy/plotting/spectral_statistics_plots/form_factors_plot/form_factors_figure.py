@@ -105,6 +105,9 @@ class FormFactorsPlot(Plot):
     def set_derived_attributes(self) -> None:
         """Set attributes that depend on simulation metadata."""
 
+        # Alias axes object
+        axes = self.axes
+
         # Try to extract ensemble metadata
         try:
             ens_meta = self.data.metadata["simulation"]["args"]["ensemble"]
@@ -116,9 +119,12 @@ class FormFactorsPlot(Plot):
         # Initialize ensemble
         self.ensemble: ManyBodyEnsemble = converter.structure(ens_meta, Ensemble)
 
-        # Alias ensemble attributes
-        dim = self.ensemble.dim
-        E0 = self.ensemble.E0
+        # Alias ensemble and ensemble attributes
+        ensemble = self.ensemble
+        dim = ensemble.dim
+        E0 = ensemble.E0
+
+        # =================================================
 
         # Store first positive zero of 1st Bessel function
         j_1_1 = jn_zeros(1, 1)[0]
@@ -127,7 +133,7 @@ class FormFactorsPlot(Plot):
         self.ylim = tuple(dim**y for y in self.ylim)
 
         # Set y-axis ticks
-        self.axes.yticks = tuple(dim**y for y in self.axes.yticks)
+        axes.yticks = tuple(dim**y for y in axes.yticks)
 
         # Perform unfolding adjustments
         if self.unfold:
@@ -139,41 +145,45 @@ class FormFactorsPlot(Plot):
                 self.usff_legend = f"{self.ensemble.univ_class} limit"
                 self.unf_labels = (self.sff_legend, self.csff_legend, self.usff_legend)
 
-            # Configure legend for unfolded data
+            # Configure and alias legend for unfolded data
             self.legend = FormFactorsLegend(
                 handles=self.unf_handles, labels=self.unf_labels
             )
+            legend = self.legend
 
             # Set default legend title
-            if self.legend.title is None:
-                self.legend.title = self.ensemble.to_latex + "\nunfolded"
+            if legend.title is None:
+                legend.title = ensemble.to_latex + "\nunfolded"
 
             # Change legend location
-            self.legend.bbox = self.legend.unf_bbox
+            legend.bbox = legend.unf_bbox
 
             # Replace axes labels with unfolded versions
-            self.axes.xlabel = self.axes.unf_xlabel
-            self.axes.ylabel = self.axes.unf_ylabel
-            self.axes.xtick_labels = self.axes.unf_xtick_labels
+            axes.xlabel = axes.unf_xlabel
+            axes.ylabel = axes.unf_ylabel
+            axes.xtick_labels = axes.unf_xtick_labels
 
             # Replace and scale x-limits
             self.xlim = tuple(dim**x * 2 * np.pi for x in self.unf_xlim)
 
             # Replace and scale x-ticks
-            self.axes.xticks = tuple(dim**x * 2 * np.pi for x in self.axes.unf_xticks)
+            axes.xticks = tuple(dim**x * 2 * np.pi for x in axes.unf_xticks)
+
+        # Else, configure for regular data
         else:
-            # Configure legend data
+            # Configure and alias legend for regular data
             self.legend = FormFactorsLegend(handles=self.handles, labels=self.labels)
+            legend = self.legend
 
             # Set default legend title
-            if self.legend.title is None:
-                self.legend.title = self.ensemble.to_latex
+            if legend.title is None:
+                legend.title = ensemble.to_latex
 
             # Scale x-limits
             self.xlim = tuple(dim**x * j_1_1 / E0 for x in self.xlim)
 
             # Scale x-ticks
-            self.axes.xticks = tuple(dim**x * j_1_1 / E0 for x in self.axes.xticks)
+            axes.xticks = tuple(dim**x * j_1_1 / E0 for x in axes.xticks)
 
     def plot(self, path: str | Path) -> None:
         """Generates and saves form factors plot to file."""
@@ -184,25 +194,29 @@ class FormFactorsPlot(Plot):
         # Set derived attributes
         self.set_derived_attributes()
 
-        # Create figure and axes
-        self.create_figure()
+        # Alias figure data
+        data = self.data
+
+        # Alias ensemble and ensemble attributes
+        ensemble = self.ensemble
+        dim = ensemble.dim
 
         # Unpack form factor data based on unfolding
         if self.unfold:
             # Unfolded data
-            times = self.data.unf_times
-            sff = self.data.unf_sff
-            csff = self.data.unf_csff
+            times = data.unf_times
+            sff = data.unf_sff
+            csff = data.unf_csff
         else:
             # Regular data
-            times = self.data.times
-            sff = self.data.sff
-            csff = self.data.csff
+            times = data.times
+            sff = data.sff
+            csff = data.csff
 
             # Calculate Thouless time only if ensemble is chaotic
-            if self.ensemble.beta > 0:
+            if ensemble.beta > 0:
                 # Alias Thouless time from data
-                thou_time = self.data.thouless_time
+                thou_time = data.thouless_time
 
                 # Save Thouless time to text file
                 with open(path / "thouless_time.txt", "w") as f:
@@ -211,8 +225,10 @@ class FormFactorsPlot(Plot):
                 # Set dummy Thouless time for integrable ensembles
                 thou_time = np.nan
 
-        # Alias ensemble dimension
-        dim = self.ensemble.dim
+        # =================================================
+
+        # Create figure and axes
+        self.create_figure()
 
         # Set x- and y-scales to logarithmic
         self.ax.set_xscale("log", base=dim)
@@ -251,7 +267,7 @@ class FormFactorsPlot(Plot):
         # If unfolded, plot universal curve
         if self.unfold:
             # Generate universal curve
-            usff = self.ensemble.univ_csff(times)
+            usff = ensemble.univ_csff(times)
 
             # Plot universal connected spectral form factor
             self.ax.plot(
