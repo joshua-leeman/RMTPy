@@ -189,7 +189,7 @@ class SYK(ManyBodyEnsemble):
 
         # Otherwise, create new zero matrix
         else:
-            H = np.zeros((d, d), cdtype, "F")
+            H = np.zeros((d, d), cdtype, order="F")
 
         # Pre-draw all random coefficients
         coeffs = rng.standard_normal(comb(N, q), rdtype)

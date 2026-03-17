@@ -102,7 +102,7 @@ class GUE(GaussianEnsemble):
                 H = out
             else:
                 # Create empty matrix
-                H = np.empty((d, d), cdtype)
+                H = np.empty((d, d), cdtype, order="F")
 
             # Create GUE matrix
             _create_gue_matrix(H, d, rdtype, rng, std)

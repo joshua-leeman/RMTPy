@@ -156,7 +156,7 @@ class GSE(GaussianEnsemble):
                 H = out
             else:
                 # Create empty matrix
-                H = np.empty((d, d), cdtype)
+                H = np.empty((d, d), cdtype, order="F")
 
             # Create GSE matrix
             _create_gse_matrix(H, d, rdtype, rng, std)

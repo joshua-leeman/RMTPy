@@ -177,7 +177,7 @@ class BdGC(GaussianEnsemble):
                 H = out
             else:
                 # Create empty matrix
-                H = np.empty((d, d), cdtype)
+                H = np.empty((d, d), cdtype, order="F")
 
             # Create BdG(C) matrix
             _create_bdgc_matrix(H, d, rdtype, rng, std)

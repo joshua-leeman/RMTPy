@@ -61,7 +61,7 @@ class Compound:
         W *= v / np.sqrt(dim)
 
         # Return couplings matrix
-        return W
+        return np.asfortranarray(W)
 
     def generate_H_eff(self, out: np.ndarray | None = None) -> np.ndarray:
         """Generate a random effective Hamiltonian."""
@@ -136,15 +136,18 @@ class Compound:
         # Return scattering matrix
         return S
 
-    def H_eff_eigvals_stream(self, realizs: int) -> Iterator[np.ndarray]:
-        """Iterator to stream effective Hamiltonian eigenvalue realizations."""
+    def generate_Q(self, energy: float, out: np.ndarray | None = None) -> np.ndarray:
+        pass
+
+    def resonance_stream(self, realizs: int) -> Iterator[np.ndarray]:
+        """Iterator to stream effective Hamiltonian eigenvalue realizations (i.e. resonances)."""
 
         # Alias ensemble dimension and data type
         dim = self.ensemble.dim
         dtype = self.ensemble.dtype
 
         # Allocate memory for random effective Hamiltonian
-        H_eff = np.empty((dim, dim), dtype=dtype)
+        H_eff = np.empty((dim, dim), dtype=dtype, order="F")
 
         # Loop over realizations
         for _ in range(realizs):
@@ -153,26 +156,6 @@ class Compound:
 
             # Compute and yield effective Hamiltonian eigenvalues
             yield eigvals(H_eff)
-
-    def H_eff_eigsys_stream(
-        self, realizs: int
-    ) -> Iterator[tuple[np.ndarray, np.ndarray]]:
-        """Iterator to stream effective Hamiltonian eigensystem realizations."""
-
-        # Alias ensemble dimension and data type
-        dim = self.ensemble.dim
-        dtype = self.ensemble.dtype
-
-        # Allocate memory for random effective Hamiltonian
-        H_eff = np.empty((dim, dim), dtype=dtype)
-
-        # Loop over realizations
-        for _ in range(realizs):
-            # Generate effective Hamiltonian
-            self.generate_H_eff(offset=H_eff)
-
-            # Compute and yield eigenvalues and eigenvectors
-            yield eig(H_eff, overwrite_a=True, check_finite=False)
 
     def S_stream(self, energy: float, realizs: int) -> Iterator[np.ndarray]:
         """Iterator to stream scattering matrix realizations."""
@@ -189,8 +172,8 @@ class Compound:
         E = energy
 
         # Allocate memory for random effective Hamiltonian and scattering matrix
-        H_eff = np.empty((dim, dim), dtype=dtype)
-        S = np.empty((M, M), dtype=dtype)
+        H_eff = np.empty((dim, dim), dtype=dtype, order="F")
+        S = np.empty((M, M), dtype=dtype, order="F")
 
         # Loop over realizations
         for _ in range(realizs):
@@ -198,7 +181,7 @@ class Compound:
             self.generate_H_eff(offset=H_eff)
 
             # Shift effective Hamiltonian by energy
-            H_eff -= E * np.eye(dim, dtype=dtype)
+            H_eff -= E * np.eye(dim, dtype=dtype, order="F")
 
             # Compute scattering matrix using the Heidelberg formula
             np.matmul(W.conj().T, np.linalg.solve(H_eff, W), out=S)
@@ -223,8 +206,8 @@ class Compound:
         E = energy
 
         # Allocate memory for random effective Hamiltonian and time-delay matrix
-        H_eff = np.empty((dim, dim), dtype=dtype)
-        Q = np.empty((M, M), dtype=dtype)
+        H_eff = np.empty((dim, dim), dtype=dtype, order="F")
+        Q = np.empty((M, M), dtype=dtype, order="F")
 
         # Loop over realizations
         for _ in range(realizs):

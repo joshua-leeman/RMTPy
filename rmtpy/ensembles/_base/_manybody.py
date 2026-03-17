@@ -97,7 +97,7 @@ class ManyBodyEnsemble(Ensemble):
         # =================================================
 
         # Allocate memory for random Hermitian matrices
-        H = np.empty((d, d), cdtype, "F")
+        H = np.empty((d, d), cdtype, order="F")
 
         # Loop over realizations
         for _ in range(realizs):
@@ -119,7 +119,7 @@ class ManyBodyEnsemble(Ensemble):
         # =================================================
 
         # Allocate memory for random Hermitian matrix
-        H = np.empty((d, d), cdtype, "F")
+        H = np.empty((d, d), cdtype, order="F")
 
         # Loop over realizations
         for _ in range(realizs):

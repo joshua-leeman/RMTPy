@@ -4,13 +4,12 @@
 from __future__ import annotations
 
 # Standard library imports
-from collections.abc import Callable, Iterator
+from collections.abc import Iterator
 
 # Third-party imports
 import numpy as np
 from attrs import field, frozen
 from scipy.linalg import eigh
-from scipy.linalg.lapack import get_lapack_funcs
 
 # Local application imports
 from ._base import ManyBodyEnsemble, converter
@@ -88,10 +87,10 @@ class Poisson(ManyBodyEnsemble):
         # =================================================
 
         # Allocate memory for random eigenvalues
-        eigvals = np.empty(d, rdtype, "F")
+        eigvals = np.empty(d, rdtype, order="F")
 
         # Allocate memory for unitary matrix of eigenvectors
-        U = np.empty((d, d), cdtype, "F")
+        U = np.empty((d, d), cdtype, order="F")
 
         # Loop over realizations
         for _ in range(realizs):
@@ -130,7 +129,7 @@ class Poisson(ManyBodyEnsemble):
         # =================================================
 
         # Allocate memory for random eigenvalues
-        eigvals = np.empty(d, rdtype, "F")
+        eigvals = np.empty(d, rdtype, order="F")
 
         # Loop over realizations
         for _ in range(realizs):

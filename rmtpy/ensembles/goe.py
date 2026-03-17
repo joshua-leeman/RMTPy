@@ -96,7 +96,7 @@ class GOE(GaussianEnsemble):
                 H = out
             else:
                 # Create empty matrix
-                H = np.empty((d, d), cdtype)
+                H = np.empty((d, d), cdtype, order="F")
 
             # Create GOE matrix
             _create_goe_matrix(H, d, rdtype, rng, std)
