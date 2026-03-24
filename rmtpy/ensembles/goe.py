@@ -68,8 +68,7 @@ class GOE(GaussianEnsemble):
         # Alias random number generator
         rng = self.rng
 
-        # Alias data types of matrix elements
-        cdtype = self.dtype.type
+        # Alias data type of real matrix elements
         rdtype = self.real_dtype.type
 
         # Alias dimension of matrix
@@ -86,7 +85,7 @@ class GOE(GaussianEnsemble):
             H = offset
 
             # Add GOE matrix to H
-            _add_goe_matrix(H, d, rdtype, rng, std)
+            _add_goe_matrix(H.real, d, rdtype, rng, std)
 
         # Otherwise, write to provided memory
         else:
@@ -96,7 +95,7 @@ class GOE(GaussianEnsemble):
                 H = out
             else:
                 # Create empty matrix
-                H = np.empty((d, d), cdtype, order="F")
+                H = np.empty((d, d), rdtype, order="F")
 
             # Create GOE matrix
             _create_goe_matrix(H, d, rdtype, rng, std)
