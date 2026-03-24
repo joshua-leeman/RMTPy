@@ -92,13 +92,16 @@ class ManyBodyEnsemble(Ensemble):
         cdtype = self.dtype.type
         rdtype = self.real_dtype.type
 
+        # Alias Dyson index
+        beta = self.beta
+
         # Alias dimension of matrix
         d = self.dim
 
         # =================================================
 
         # If Dyson index is 1, allocate memory for real symmetric matrices
-        if self.beta == 1:
+        if beta == 1:
             H = np.empty((d, d), rdtype, order="F")
 
         # Else, allocate memory for complex Hermitian matrices
@@ -125,8 +128,11 @@ class ManyBodyEnsemble(Ensemble):
 
         # =================================================
 
+        # Alias Dyson index
+        beta = self.beta
+
         # If Dyson index is 1, allocate memory for real symmetric matrices
-        if self.beta == 1:
+        if beta == 1:
             H = np.empty((d, d), rdtype, order="F")
 
         # Else, allocate memory for complex Hermitian matrices
