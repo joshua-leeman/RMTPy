@@ -89,8 +89,13 @@ class Poisson(ManyBodyEnsemble):
         # Allocate memory for random eigenvalues
         eigvals = np.empty(d, rdtype, order="F")
 
-        # Allocate memory for unitary matrix of eigenvectors
-        U = np.empty((d, d), cdtype, order="F")
+        # If ensemble flag is GOE, allocate memory for real eigenvectors
+        if self.eigvecs_flag == "GOE":
+            U = np.empty((d, d), rdtype, order="F")
+
+        # Else, allocate memory for complex eigenvectors
+        else:
+            U = np.empty((d, d), cdtype, order="F")
 
         # Loop over realizations
         for _ in range(realizs):
