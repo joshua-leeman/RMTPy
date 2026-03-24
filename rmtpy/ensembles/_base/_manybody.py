@@ -90,14 +90,20 @@ class ManyBodyEnsemble(Ensemble):
 
         # Alias data types of matrix elements
         cdtype = self.dtype.type
+        rdtype = self.real_dtype.type
 
         # Alias dimension of matrix
         d = self.dim
 
         # =================================================
 
-        # Allocate memory for random Hermitian matrices
-        H = np.empty((d, d), cdtype, order="F")
+        # If Dyson index is 1, allocate memory for real symmetric matrices
+        if self.beta == 1:
+            H = np.empty((d, d), rdtype, order="F")
+
+        # Else, allocate memory for complex Hermitian matrices
+        else:
+            H = np.empty((d, d), cdtype, order="F")
 
         # Loop over realizations
         for _ in range(realizs):
@@ -112,14 +118,20 @@ class ManyBodyEnsemble(Ensemble):
 
         # Alias data types of matrix elements
         cdtype = self.dtype.type
+        rdtype = self.real_dtype.type
 
         # Alias dimension of matrix
         d = self.dim
 
         # =================================================
 
-        # Allocate memory for random Hermitian matrix
-        H = np.empty((d, d), cdtype, order="F")
+        # If Dyson index is 1, allocate memory for real symmetric matrices
+        if self.beta == 1:
+            H = np.empty((d, d), rdtype, order="F")
+
+        # Else, allocate memory for complex Hermitian matrices
+        else:
+            H = np.empty((d, d), cdtype, order="F")
 
         # Loop over realizations
         for _ in range(realizs):

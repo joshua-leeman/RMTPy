@@ -25,6 +25,7 @@ class GaussianEnsemble(ManyBodyEnsemble):
     def __sigma_default(self) -> float:
         """Calculate the complex standard deviation of matrix entries."""
 
+        # Return sigma based on dimension and ground state energy
         return self.E0 / np.sqrt(2 * self.dim)
 
     def pdf(self, eigval: np.ndarray) -> np.ndarray:
