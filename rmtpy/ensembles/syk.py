@@ -162,6 +162,9 @@ class SYK(ManyBodyEnsemble):
         # Alias q-parameter
         q = self.q
 
+        # Alias Dyson index
+        beta = self.beta
+
         # Alias dimension of matrix
         d = self.dim
 
@@ -175,7 +178,11 @@ class SYK(ManyBodyEnsemble):
 
         # If Majorana pairs not set, create and alias them
         if majorana_pairs is None:
-            object.__setattr__(self, "majorana_pairs", create_majorana_pairs(N))
+            object.__setattr__(
+                self,
+                "majorana_pairs",
+                create_majorana_pairs(N=N, real_basis=(beta == 1)),
+            )
             majorana_pairs = self.majorana_pairs
 
         # If offset is not None, add to provided matrix
@@ -189,13 +196,19 @@ class SYK(ManyBodyEnsemble):
 
         # Otherwise, create new zero matrix
         else:
-            H = np.zeros((d, d), cdtype, order="F")
+            # If Dyson index is 1, allocate memory for real symmetric matrices
+            if beta == 1:
+                H = np.zeros((d, d), rdtype, order="F")
+
+            # Else, allocate memory for complex Hermitian matrices
+            else:
+                H = np.zeros((d, d), cdtype, order="F")
 
         # Pre-draw all random coefficients
         coeffs = rng.standard_normal(comb(N, q), rdtype)
 
-        # Scale coefficients by standard deviation
-        coeffs *= sigma
+        # Scale coefficients by standard deviation and phase factor
+        coeffs *= sigma if (q // 2) % 2 == 0 else 1j * sigma
 
         # Retrieve indices for Hamiltonian terms
         indices = tuple(combinations(range(N), q))
@@ -214,13 +227,19 @@ class SYK(ManyBodyEnsemble):
                 q_body = q_body.dot(majorana_pairs[j][k])
 
             # Store q-body operator as COO matrix
-            q_coo = q_body[:d, :d].tocoo()
+            if beta == 1:
+                q_body_coo = q_body[:d, :d].real.tocoo()
+            else:
+                q_body_coo = q_body[:d, :d].tocoo()
 
-            # Scale q-body operator by coefficient and phase factor in place
-            q_coo.data *= 1j ** (q * (q - 1) / 2) * coeff
+            # Free memory of full q-body operator
+            del q_body
+
+            # Scale q-body operator by coefficient
+            q_body_coo.data *= coeff
 
             # Add q-body operator to Hamiltonian
-            H[q_coo.row, q_coo.col] += q_coo.data
+            H[q_body_coo.row, q_body_coo.col] += q_body_coo.data
 
         # Return SYK Hamiltonian
         return H

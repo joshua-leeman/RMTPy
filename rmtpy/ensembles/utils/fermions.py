@@ -2,12 +2,13 @@
 
 # Third-party imports
 import numpy as np
+from scipy.linalg import eig
 from scipy.sparse import csr_matrix, eye_array, kron
 
 
-# ---------------------------
-# Construct Majorana Fermions
-# ---------------------------
+# ------------------------
+# Create Majorana Fermions
+# ------------------------
 def create_majoranas(N: int) -> tuple[csr_matrix, ...]:
     """Create list of N Majorana fermion operators."""
 
@@ -45,11 +46,44 @@ def create_majoranas(N: int) -> tuple[csr_matrix, ...]:
             return tuple(majorana)
 
 
+# ------------------------------
+# Rotate Majoranas to Real Basis
+# ------------------------------
+def to_real_basis(majorana: tuple[csr_matrix, ...]) -> tuple[csr_matrix, ...]:
+    """Rotate Majorana operators to real basis."""
+
+    # Alias number of Majorana operators
+    N = len(majorana)
+
+    # Alias dimension of Hilbert space
+    d = 2 ** (N // 2)
+
+    # =================================================
+
+    # Construct particle-hole operator unitary part
+    P = eye_array(d, format="csr", dtype=np.complex64)
+    for k in range(N // 2):
+        P = majorana[2 * k].dot(P)
+
+    # Initialize list of Majorana operators in real basis
+    real_majorana = [None for _ in range(N)]
+
+    # Rotate Majorana operators to real basis
+    for k in range(N):
+        PmajP = P.dot(majorana[k].dot(P))
+        commutator = majorana[k].dot(P) - P.dot(majorana[k])
+        real_majorana[k] = (majorana[k] + PmajP + 1j * commutator) / 2
+
+    # Return Majorana operators in real basis
+    return tuple(real_majorana)
+
+
 # ----------------------------------------
 # Construct Products of Pairs of Majoranas
 # ----------------------------------------
 def create_majorana_pairs(
     N: int | None = None,
+    real_basis: bool = False,
     majorana: tuple[csr_matrix, ...] | None = None,
 ) -> tuple[tuple[csr_matrix, ...], ...]:
     """Create all ψ_j * ψ_k (j < k) pairs of Majorana fermion operators."""
@@ -60,6 +94,10 @@ def create_majorana_pairs(
         if N is not None:
             # Create Majorana operators
             majorana = create_majoranas(N)
+
+            # If real_basis is True, convert Majorana operators to real basis
+            if real_basis:
+                majorana = to_real_basis(majorana)
         else:
             # Raise error if N is not provided
             raise ValueError("N must be provided if majorana is None.")
