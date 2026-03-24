@@ -1,4 +1,4 @@
-# rmtpy/utils/spin_matrices.py
+# rmtpy/utils/fermions.py
 
 # Third-party imports
 import numpy as np
