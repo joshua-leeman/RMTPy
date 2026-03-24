@@ -207,8 +207,8 @@ class SYK(ManyBodyEnsemble):
         # Pre-draw all random coefficients
         coeffs = rng.standard_normal(comb(N, q), rdtype)
 
-        # Scale coefficients by standard deviation and phase factor
-        coeffs *= sigma if (q // 2) % 2 == 0 else 1j * sigma
+        # Scale coefficients by standard deviation
+        coeffs *= sigma
 
         # Retrieve indices for Hamiltonian terms
         indices = tuple(combinations(range(N), q))
@@ -235,8 +235,11 @@ class SYK(ManyBodyEnsemble):
             # Free memory of full q-body operator
             del q_body
 
-            # Scale q-body operator by coefficient
-            q_body_coo.data *= coeff
+            # Scale q-body operator by coefficient and phase factor
+            if (q // 2) % 2 == 0:
+                q_body_coo.data *= coeff
+            else:
+                q_body_coo.data *= 1j * coeff
 
             # Add q-body operator to Hamiltonian
             H[q_body_coo.row, q_body_coo.col] += q_body_coo.data
