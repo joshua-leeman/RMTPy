@@ -19,7 +19,7 @@ from scipy.special import jn_zeros
 from .form_factors_axes import FormFactorsAxes
 from .form_factors_legend import FormFactorsLegend
 from ..._base import Plot
-from ....data.spectral_statistics_data import FormFactorsData
+from ....dataclasses.spectral_statistics_data import FormFactorsData
 from ....ensembles import Ensemble, ManyBodyEnsemble, converter
 
 

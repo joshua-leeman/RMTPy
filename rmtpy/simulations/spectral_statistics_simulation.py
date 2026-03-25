@@ -13,7 +13,7 @@ from scipy.special import jn_zeros
 
 # Local application imports
 from ._simulation import Simulation
-from ..data.spectral_statistics_data import (
+from ..dataclasses.spectral_statistics_data import (
     SpectralDensityData,
     SpacingHistogramData,
     FormFactorsData,

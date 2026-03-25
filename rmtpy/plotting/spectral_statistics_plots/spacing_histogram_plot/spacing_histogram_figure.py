@@ -16,7 +16,7 @@ from matplotlib.patches import Patch
 from .spacing_histogram_axes import SpacingHistogramAxes
 from .spacing_histogram_legend import SpacingHistogramLegend
 from ..._base import Plot
-from ....data.spectral_statistics_data import SpacingHistogramData
+from ....dataclasses.spectral_statistics_data import SpacingHistogramData
 from ....ensembles import Ensemble, ManyBodyEnsemble, converter
 
 

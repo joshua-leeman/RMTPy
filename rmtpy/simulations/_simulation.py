@@ -16,7 +16,7 @@ from attrs import asdict, field, fields, fields_dict, frozen
 from attrs.validators import gt
 
 # Local application imports
-from ..data import Data
+from ..dataclasses import Data
 from ..ensembles import Ensemble, converter
 from ..plotting import Plot
 

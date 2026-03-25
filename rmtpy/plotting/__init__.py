@@ -10,7 +10,7 @@ from numpy.lib.npyio import NpzFile
 
 # Local application imports
 from ._base import Plot, PLOT_REGISTRY
-from ..data import normalize_metadata, normalize_source, DATA_REGISTRY
+from ..dataclasses import normalize_metadata, normalize_source, DATA_REGISTRY
 from ..ensembles import converter
 
 # Import all plot classes to register them

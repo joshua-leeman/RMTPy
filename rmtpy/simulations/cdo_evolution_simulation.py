@@ -14,7 +14,7 @@ from scipy.special import jn_zeros
 
 # Local application imports
 from ._simulation import Simulation
-from ..data.cdo_evolution_data import CDODynamicsData, EvolvedStatesData
+from ..dataclasses.cdo_evolution_data import CDODynamicsData, EvolvedStatesData
 from ..ensembles import ManyBodyEnsemble
 
 

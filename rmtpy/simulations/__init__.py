@@ -9,7 +9,7 @@ from typing import Any
 
 # Local application imports
 from ._simulation import Simulation, SIMULATION_REGISTRY
-from ..data import DATA_REGISTRY
+from ..dataclasses import DATA_REGISTRY
 from ..ensembles import normalize_dict, converter
 
 # Simulation functions
