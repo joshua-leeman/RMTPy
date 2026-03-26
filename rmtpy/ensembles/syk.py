@@ -36,10 +36,11 @@ class SYK(ManyBodyEnsemble):
     # Standard deviation of couplings
     sigma: float = field(init=False, repr=False)
 
+    # Ground state energy
+    E0: float = field(init=False, repr=False)
+
     # Majorana fermion operators
-    majorana_pairs: tuple[tuple[csr_matrix, ...], ...] | None = field(
-        init=False, repr=False, default=None
-    )
+    majorana_pairs: tuple[tuple[csr_matrix, ...], ...] = field(init=False, repr=False)
 
     # Validator to ensure q is even
     @q.validator
@@ -109,9 +110,25 @@ class SYK(ManyBodyEnsemble):
         # Calculate standard deviation based on N, J, eta, and q
         return J * np.sqrt(factorial(q - 1) / N ** (q - 1))
 
-    @property
-    def E0(self) -> float:
-        """Ground state energy of the ensemble."""
+    # Construct 2-body Majorana operators
+    @majorana_pairs.default
+    def __majorana_pairs_default(self) -> tuple[tuple[csr_matrix, ...], ...]:
+        """Default value for Majorana fermion operators."""
+
+        # Alias number of Majorana fermions
+        N = self.N
+
+        # Alias Dyson index
+        beta = self.beta
+
+        # =================================================
+
+        # Create and return tuple of 2-body Majorana operators
+        return create_majorana_pairs(N=N, real_basis=(beta == 1))
+
+    @E0.default
+    def __E0_default(self) -> float:
+        """Default value for ground state energy."""
 
         # Alias number of Majorana fermions
         N = self.N
@@ -127,7 +144,7 @@ class SYK(ManyBodyEnsemble):
 
         # =================================================
 
-        # Return ground state energy based on N and J
+        # Return SYK  ground state energy
         return 2 * sigma * np.sqrt(comb(N, q) / (1 - eta))
 
     @property
@@ -175,15 +192,6 @@ class SYK(ManyBodyEnsemble):
         majorana_pairs = self.majorana_pairs
 
         # =================================================
-
-        # If Majorana pairs not set, create and alias them
-        if majorana_pairs is None:
-            object.__setattr__(
-                self,
-                "majorana_pairs",
-                create_majorana_pairs(N=N, real_basis=(beta == 1)),
-            )
-            majorana_pairs = self.majorana_pairs
 
         # If offset is not None, add to provided matrix
         if offset is not None:

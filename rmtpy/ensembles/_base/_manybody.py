@@ -45,6 +45,9 @@ class ManyBodyEnsemble(Ensemble):
         metadata={"dir_name": "J"},
     )
 
+    # Ground state energy
+    E0: float = field(init=False, repr=False)
+
     # Validator to ensure N is an even integer
     @N.validator
     def __N_validator(self, _, value: int) -> None:
@@ -61,9 +64,9 @@ class ManyBodyEnsemble(Ensemble):
         # Dimension of disconnected parity sector
         return 2 ** (self.N // 2 - 1)
 
-    @property
-    def E0(self) -> float:
-        """Ground state energy of the ensemble."""
+    @E0.default
+    def __E0_default(self) -> float:
+        """Default value for ground state energy."""
 
         # Return ground state energy based on N and J
         return self.N * self.J
