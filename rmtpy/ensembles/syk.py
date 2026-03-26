@@ -144,7 +144,7 @@ class SYK(ManyBodyEnsemble):
 
         # =================================================
 
-        # Return SYK  ground state energy
+        # Return SYK ground state energy
         return 2 * sigma * np.sqrt(comb(N, q) / (1 - eta))
 
     @property
