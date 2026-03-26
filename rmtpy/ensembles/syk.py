@@ -15,7 +15,7 @@ from scipy.sparse import csr_matrix
 
 # Local application imports
 from ._base import ManyBodyEnsemble
-from ..utils import create_majorana_pairs
+from ..utils import block_slice, create_majorana_pairs
 
 
 # -----------------------------
@@ -26,6 +26,9 @@ class SYK(ManyBodyEnsemble):
 
     # SYK q-parameter
     q: int = field(converter=int, validator=gt(0))
+
+    # Parity
+    parity: int = field(default=0, repr=False)
 
     # Dyson index
     beta: int = field(init=False, repr=False)
@@ -41,6 +44,9 @@ class SYK(ManyBodyEnsemble):
 
     # Majorana fermion operators
     majorana_pairs: tuple[tuple[csr_matrix, ...], ...] = field(init=False, repr=False)
+
+    # Block slice for parity sector
+    block_slice: slice = field(init=False, repr=False)
 
     # Validator to ensure q is even
     @q.validator
@@ -110,22 +116,7 @@ class SYK(ManyBodyEnsemble):
         # Calculate standard deviation based on N, J, eta, and q
         return J * np.sqrt(factorial(q - 1) / N ** (q - 1))
 
-    # Construct 2-body Majorana operators
-    @majorana_pairs.default
-    def __majorana_pairs_default(self) -> tuple[tuple[csr_matrix, ...], ...]:
-        """Default value for Majorana fermion operators."""
-
-        # Alias number of Majorana fermions
-        N = self.N
-
-        # Alias Dyson index
-        beta = self.beta
-
-        # =================================================
-
-        # Create and return tuple of 2-body Majorana operators
-        return create_majorana_pairs(N=N, real_basis=(beta == 1))
-
+    # Set ground state energy based on N, q, sigma, and eta
     @E0.default
     def __E0_default(self) -> float:
         """Default value for ground state energy."""
@@ -146,6 +137,38 @@ class SYK(ManyBodyEnsemble):
 
         # Return SYK ground state energy
         return 2 * sigma * np.sqrt(comb(N, q) / (1 - eta))
+
+    # Construct 2-body Majorana operators
+    @majorana_pairs.default
+    def __majorana_pairs_default(self) -> tuple[tuple[csr_matrix, ...], ...]:
+        """Default value for Majorana fermion operators."""
+
+        # Alias number of Majorana fermions
+        N = self.N
+
+        # Alias Dyson index
+        beta = self.beta
+
+        # =================================================
+
+        # Create and return tuple of 2-body Majorana operators
+        return create_majorana_pairs(N=N, real_basis=(beta == 1))
+
+    # Set block slice for parity sector
+    @block_slice.default
+    def __block_slice_default(self) -> slice:
+        """Default value for block slice of parity sector."""
+
+        # Alias number of Majorana fermions
+        N = self.N
+
+        # Alias parity
+        parity = self.parity
+
+        # =================================================
+
+        # Return block slice for parity sector
+        return block_slice(N=N, parity=parity)
 
     @property
     def _dir_name(self) -> str:
@@ -190,6 +213,9 @@ class SYK(ManyBodyEnsemble):
 
         # Alias tuple of Majorana pairs
         majorana_pairs = self.majorana_pairs
+
+        # Alias block slice for parity sector
+        block_slice = self.block_slice
 
         # =================================================
 
@@ -236,9 +262,9 @@ class SYK(ManyBodyEnsemble):
 
             # Store q-body operator as COO matrix
             if beta == 1:
-                q_body_coo = q_body[:d, :d].real.tocoo()
+                q_body_coo = q_body[block_slice].real.tocoo()
             else:
-                q_body_coo = q_body[:d, :d].tocoo()
+                q_body_coo = q_body[block_slice].tocoo()
 
             # Free memory of full q-body operator
             del q_body
