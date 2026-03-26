@@ -159,7 +159,7 @@ def block_slice(N: int, parity: int = 0) -> tuple[slice, slice]:
     index = omega.nonzero()[0][0]
 
     # Determine slice of parity sector block based on index and parity
-    start = d if (parity ^ (index < d)) else 0
+    start = 0 if ((index < d) ^ parity) else d
     return slice(start, start + d), slice(start, start + d)
 
 
