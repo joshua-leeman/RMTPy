@@ -10,7 +10,7 @@ from collections.abc import Iterator
 # Third-party imports
 import numpy as np
 from attrs import field, frozen
-from attrs.validators import gt
+from attrs.validators import ge, gt
 from scipy.integrate import cumulative_trapezoid
 from scipy.interpolate import interp1d
 from scipy.linalg import eigh, eigvalsh
@@ -26,16 +26,14 @@ from ._ensemble import Ensemble
 @frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
 class ManyBodyEnsemble(Ensemble):
 
-    # Dyson index (default is 0)
-    beta: int | float = field(init=False, default=0, repr=False)
+    # Dyson index (default is 0, non-chaotic)
+    beta: int | float = field(init=False, default=0, validator=ge(0))
 
     # Number of Majorana particles
-    N: int = field(
-        converter=int, validator=gt(2), metadata={"dir_name": "N", "latex_name": "N"}
-    )
+    N: int = field(converter=int, metadata={"dir_name": "N", "latex_name": "N"})
 
     # Dimension of Hilbert space
-    dim: int = field(init=False, repr=False)
+    dim: int = field(init=False)
 
     # Interaction strength
     J: float = field(
@@ -51,10 +49,11 @@ class ManyBodyEnsemble(Ensemble):
     # Validator to ensure N is an even integer
     @N.validator
     def __N_validator(self, _, value: int) -> None:
-        """Ensure N is an even integer."""
+        """Ensure N is an even integer greater than 2."""
 
-        if value % 2 != 0:
-            raise ValueError(f"N must be an even integer, got {value}.")
+        # Ensure N is an even integer greater than 2
+        if value % 2 != 0 or value <= 2:
+            raise ValueError(f"N must be an even integer greater than 2, got {value}.")
 
     # Set dimension of Hilbert space based on number of Majorana particles
     @dim.default
