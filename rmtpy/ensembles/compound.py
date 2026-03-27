@@ -26,42 +26,8 @@ class Compound:
     # Number of open channels
     channels: int = field(converter=int, validator=gt(0))
 
-    # Strength of interaction
-    strength: float = field(converter=float, validator=gt(0.0))
-
     # Couplings matrix
     couplings: np.ndarray = field(init=False, repr=False)
-
-    @couplings.default
-    def __couplings_default(self) -> np.ndarray:
-        """Create couplings matrix W."""
-
-        # Alias ensemble, its dimension, and its data type
-        ensemble = self.ensemble
-        dim = ensemble.dim
-        dtype = ensemble.dtype
-
-        # Alias number of channels
-        M = self.channels
-
-        # Alias strength
-        v = self.strength
-
-        # Check if underlying ensemble is time-reversal symmetric
-        if ensemble.beta == 1:
-            # Select first M columns of Hadamard matrix as couplings
-            W = hadamard(dim, dtype=dtype)[:, :M]
-        else:
-            # Select first M columns of DFT matrix as couplings
-            j = np.arange(dim, dtype=dtype)[:, np.newaxis]
-            k = np.arange(dim, dtype=dtype)[np.newaxis, :]
-            W = np.exp(-2j * np.pi * j * k / dim)[:, :M]
-
-        # Normalize and scale couplings by dimension and strength
-        W *= v / np.sqrt(dim)
-
-        # Return couplings matrix
-        return np.asfortranarray(W)
 
     def generate_H_eff(self, out: np.ndarray | None = None) -> np.ndarray:
         """Generate a random effective Hamiltonian."""
