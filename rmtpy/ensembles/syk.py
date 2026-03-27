@@ -152,7 +152,7 @@ class SYK(ManyBodyEnsemble):
         # =================================================
 
         # Create and return tuple of 2-body Majorana operators
-        return create_majorana_pairs(N=Nm, real_basis=(beta == 1))
+        return create_majorana_pairs(Nm=Nm, real_basis=(beta == 1))
 
     # Set block slice for parity sector
     @block_slice.default
@@ -168,7 +168,7 @@ class SYK(ManyBodyEnsemble):
         # =================================================
 
         # Return block slice for parity sector
-        return block_slice(N=Nm, parity=parity)
+        return block_slice(Nm=Nm, parity=parity)
 
     @property
     def _dir_name(self) -> str:
