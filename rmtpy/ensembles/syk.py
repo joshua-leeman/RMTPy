@@ -63,7 +63,7 @@ class SYK(ManyBodyEnsemble):
         """Default value for Dyson index."""
 
         # Alias number of Majorana fermions
-        N = self.N
+        Nm = self.Nm
 
         # Alias q-parameter
         q = self.q
@@ -71,18 +71,18 @@ class SYK(ManyBodyEnsemble):
         # =================================================
 
         # Map to determine SYK Dyson index
-        index_map = {(0, 0): 1, (0, 4): 4}  # (N, q) --> beta
+        index_map = {(0, 0): 1, (0, 4): 4}  # (Nm, q) --> beta
 
-        # Return appropriate index based on q and N
-        return index_map.get((q % 4, N % 8), 2) if q > 2 else 0
+        # Return appropriate index based on q and Nm
+        return index_map.get((q % 4, Nm % 8), 2) if q > 2 else 0
 
-    # Set suppression factor based on q and N
+    # Set suppression factor based on q and Nm
     @eta.default
     def __eta_default(self) -> float:
         """Default value for suppression factor."""
 
         # Alias number of Majorana fermions
-        N = self.N
+        Nm = self.Nm
 
         # Alias q-parameter
         q = self.q
@@ -91,19 +91,19 @@ class SYK(ManyBodyEnsemble):
 
         # First calculate product factor
         product = np.sum(
-            (-1) ** (q - k) * comb(q, k) * comb(N - q, q - k) for k in range(q + 1)
+            (-1) ** (q - k) * comb(q, k) * comb(Nm - q, q - k) for k in range(q + 1)
         )
 
         # Calculate and return suppression factor
-        return product / comb(N, q)
+        return product / comb(Nm, q)
 
-    # Set standard deviation based on N, J, eta, and q
+    # Set standard deviation based on Nm, J, eta, and q
     @sigma.default
     def __sigma_default(self) -> float:
         """Default value for standard deviation of couplings."""
 
         # Alias number of Majorana fermions
-        N = self.N
+        Nm = self.Nm
 
         # Alias q-parameter
         q = self.q
@@ -113,16 +113,16 @@ class SYK(ManyBodyEnsemble):
 
         # =================================================
 
-        # Calculate standard deviation based on N, J, eta, and q
-        return J * np.sqrt(factorial(q - 1) / N ** (q - 1))
+        # Calculate standard deviation based on Nm, J, eta, and q
+        return J * np.sqrt(factorial(q - 1) / Nm ** (q - 1))
 
-    # Set ground state energy based on N, q, sigma, and eta
+    # Set ground state energy based on Nm, q, sigma, and eta
     @E0.default
     def __E0_default(self) -> float:
         """Default value for ground state energy."""
 
         # Alias number of Majorana fermions
-        N = self.N
+        Nm = self.Nm
 
         # Alias q-parameter
         q = self.q
@@ -136,7 +136,7 @@ class SYK(ManyBodyEnsemble):
         # =================================================
 
         # Return SYK ground state energy
-        return 2 * sigma * np.sqrt(comb(N, q) / (1 - eta))
+        return 2 * sigma * np.sqrt(comb(Nm, q) / (1 - eta))
 
     # Construct 2-body Majorana operators
     @majorana_pairs.default
@@ -144,7 +144,7 @@ class SYK(ManyBodyEnsemble):
         """Default value for Majorana fermion operators."""
 
         # Alias number of Majorana fermions
-        N = self.N
+        Nm = self.Nm
 
         # Alias Dyson index
         beta = self.beta
@@ -152,7 +152,7 @@ class SYK(ManyBodyEnsemble):
         # =================================================
 
         # Create and return tuple of 2-body Majorana operators
-        return create_majorana_pairs(N=N, real_basis=(beta == 1))
+        return create_majorana_pairs(N=Nm, real_basis=(beta == 1))
 
     # Set block slice for parity sector
     @block_slice.default
@@ -160,7 +160,7 @@ class SYK(ManyBodyEnsemble):
         """Default value for block slice of parity sector."""
 
         # Alias number of Majorana fermions
-        N = self.N
+        Nm = self.Nm
 
         # Alias parity
         parity = self.parity
@@ -168,7 +168,7 @@ class SYK(ManyBodyEnsemble):
         # =================================================
 
         # Return block slice for parity sector
-        return block_slice(N=N, parity=parity)
+        return block_slice(N=Nm, parity=parity)
 
     @property
     def _dir_name(self) -> str:
@@ -197,7 +197,7 @@ class SYK(ManyBodyEnsemble):
         rdtype = self.real_dtype
 
         # Alias number of Majorana fermions
-        N = self.N
+        Nm = self.Nm
 
         # Alias q-parameter
         q = self.q
@@ -239,13 +239,13 @@ class SYK(ManyBodyEnsemble):
                 H = np.zeros((d, d), cdtype, order="F")
 
         # Pre-draw all random coefficients
-        coeffs = rng.standard_normal(comb(N, q), rdtype)
+        coeffs = rng.standard_normal(comb(Nm, q), rdtype)
 
         # Scale coefficients by standard deviation
         coeffs *= sigma
 
         # Retrieve indices for Hamiltonian terms
-        indices = tuple(combinations(range(N), q))
+        indices = tuple(combinations(range(Nm), q))
 
         # Generate and sum q-body operators
         for coeff, idx_tuple in zip(coeffs, indices):
@@ -288,7 +288,7 @@ class SYK(ManyBodyEnsemble):
         rdtype = self.real_dtype
 
         # Alias number of Majorana fermions
-        N = self.N
+        Nm = self.Nm
 
         # Alias q-parameter
         q = self.q
@@ -327,7 +327,7 @@ class SYK(ManyBodyEnsemble):
 
         # Construct product and final result
         P = np.exp(logP) * np.sqrt(1.0 - (eigval[mask] / E0) ** 2)
-        P /= np.pi * np.sqrt(comb(N, q)) * sigma
+        P /= np.pi * np.sqrt(comb(Nm, q)) * sigma
 
         # Store non-trivial PDF values
         pdf[mask] = P

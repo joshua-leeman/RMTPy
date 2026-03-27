@@ -2,15 +2,14 @@
 
 # Third-party imports
 import numpy as np
-from scipy.linalg import eig
 from scipy.sparse import csr_matrix, eye_array, kron
 
 
 # ------------------------
 # Create Majorana Fermions
 # ------------------------
-def create_majoranas(N: int) -> tuple[csr_matrix, ...]:
-    """Create list of N Majorana fermion operators."""
+def create_majoranas(Nm: int) -> tuple[csr_matrix, ...]:
+    """Create list of Nm Majorana fermion operators."""
 
     # Create Pauli matrices
     pauli = (
@@ -24,7 +23,7 @@ def create_majoranas(N: int) -> tuple[csr_matrix, ...]:
     majorana_c0 = pauli[2]
 
     # With loop, build Majorana operators from the initial ones
-    for i in range(N // 2 - 1):
+    for i in range(Nm // 2 - 1):
         # Create identity matrix corresponding to old Majorana operators
         eye_mat = eye_array(2 ** (i + 1), format="csr")
 
@@ -38,7 +37,7 @@ def create_majoranas(N: int) -> tuple[csr_matrix, ...]:
         majorana[-1] = kron(pauli[1], eye_mat, format="csr")
 
         # If not the last Majorana operators, update new as old
-        if i < N // 2 - 2:
+        if i < Nm // 2 - 2:
             majorana_0 = majorana
             majorana_c0 = kron(pauli[2], eye_mat, format="csr")
         # Else, return the last Majorana operators
@@ -50,19 +49,19 @@ def create_majoranas(N: int) -> tuple[csr_matrix, ...]:
 # Create Complex Fermions
 # -----------------------
 def create_complex_fermions(
-    N: int | None = None, majorana: tuple[csr_matrix, ...] | None = None
+    Nm: int | None = None, majorana: tuple[csr_matrix, ...] | None = None
 ) -> tuple[tuple[csr_matrix, ...], tuple[csr_matrix, ...]]:
     """Create tuples of creation and annihilation operators for complex fermions."""
 
     # If majorana is None, create Majorana operators
     if majorana is None:
-        # Check if N are provided
-        if N is not None:
+        # Check if Nm are provided
+        if Nm is not None:
             # Create Majorana operators
-            majorana = create_majoranas(N)
+            majorana = create_majoranas(Nm)
         else:
-            # Raise error if N is not provided
-            raise ValueError("N must be provided if majorana is None.")
+            # Raise error if Nm is not provided
+            raise ValueError("Nm must be provided if majorana is None.")
     else:
         # Check if majorana is a list of Majorana operators
         if not isinstance(majorana, tuple) or not all(
@@ -131,15 +130,15 @@ def vacuum_state(
 # ----------------------------
 # Slice of Parity Sector Block
 # ----------------------------
-def block_slice(N: int, parity: int = 0) -> tuple[slice, slice]:
-    """Return slice of parity sector block for N Majorana fermions and given parity."""
+def block_slice(Nm: int, parity: int = 0) -> tuple[slice, slice]:
+    """Return slice of parity sector block for Nm Majorana fermions and given parity."""
 
     # Ensure parity is either 0 or 1
     if parity not in (0, 1):
         raise ValueError("Parity must be either 0 (even) or 1 (odd).")
 
     # Create complex fermions
-    c = create_complex_fermions(N)
+    c = create_complex_fermions(Nm)
 
     # Construct vacuum state
     omega = vacuum_state(c)
@@ -151,7 +150,7 @@ def block_slice(N: int, parity: int = 0) -> tuple[slice, slice]:
         raise ValueError("Vacuum state must be normalized.")
 
     # Alias dimension of parity sector blocks
-    d = 2 ** (N // 2 - 1)
+    d = 2 ** (Nm // 2 - 1)
 
     # =================================================
 
@@ -193,7 +192,7 @@ def to_real_basis(majorana: tuple[csr_matrix, ...]) -> tuple[csr_matrix, ...]:
     """Rotate Majorana operators to real basis."""
 
     # Alias number of Majorana operators
-    N = len(majorana)
+    Nm = len(majorana)
 
     # =================================================
 
@@ -201,10 +200,10 @@ def to_real_basis(majorana: tuple[csr_matrix, ...]) -> tuple[csr_matrix, ...]:
     P = particle_hole_operator(majorana)
 
     # Initialize list of Majorana operators in real basis
-    real_majorana = [None for _ in range(N)]
+    real_majorana = [None for _ in range(Nm)]
 
     # Rotate Majorana operators to real basis
-    for k in range(N):
+    for k in range(Nm):
         PmajP = P.dot(majorana[k].dot(P))
         commutator = majorana[k].dot(P) - P.dot(majorana[k])
         real_majorana[k] = (majorana[k] + PmajP + 1j * commutator) / 2
@@ -217,7 +216,7 @@ def to_real_basis(majorana: tuple[csr_matrix, ...]) -> tuple[csr_matrix, ...]:
 # Construct Products of Pairs of Majoranas
 # ----------------------------------------
 def create_majorana_pairs(
-    N: int | None = None,
+    Nm: int | None = None,
     majorana: tuple[csr_matrix, ...] | None = None,
     real_basis: bool = False,
 ) -> tuple[tuple[csr_matrix, ...], ...]:
@@ -225,17 +224,17 @@ def create_majorana_pairs(
 
     # If majorana is None, create Majorana operators
     if majorana is None:
-        # Check if N are provided
-        if N is not None:
+        # Check if Nm are provided
+        if Nm is not None:
             # Create Majorana operators
-            majorana = create_majoranas(N)
+            majorana = create_majoranas(Nm)
 
             # If real_basis is True, convert Majorana operators to real basis
             if real_basis:
                 majorana = to_real_basis(majorana)
         else:
-            # Raise error if N is not provided
-            raise ValueError("N must be provided if majorana is None.")
+            # Raise error if Nm is not provided
+            raise ValueError("Nm must be provided if majorana is None.")
     else:
         # Check if majorana is a list of Majorana operators
         if not isinstance(majorana, tuple) or not all(
@@ -245,14 +244,14 @@ def create_majorana_pairs(
             raise ValueError("majorana must be a tuple of Majorana operators.")
 
         # Store number of Majorana operators
-        N = len(majorana)
+        Nm = len(majorana)
 
     # Initialize nested list of Majorana pairs
-    pairs = [[None for _ in range(N)] for _ in range(N)]
+    pairs = [[None for _ in range(Nm)] for _ in range(Nm)]
 
     # Fill upper triangle of Majorana pairs
-    for i in range(N):
-        for j in range(i + 1, N):
+    for i in range(Nm):
+        for j in range(i + 1, Nm):
             pairs[i][j] = majorana[i].dot(majorana[j])
 
     # Return Majorana pairs

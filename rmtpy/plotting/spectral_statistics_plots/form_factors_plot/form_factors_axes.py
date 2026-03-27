@@ -31,7 +31,11 @@ class FormFactorsAxes(PlotAxes):
     unf_xticks: tuple[float, ...] = (-1.0, -0.5, 0.0)  # factor of 2 pi
 
     # x-axis tick labels
-    xtick_labels: tuple[str, ...] = (r"$1/N$", r"$D^{1/2}/N$", r"$D/N$")
+    xtick_labels: tuple[str, ...] = (
+        r"$1/N_\textrm{m}$",
+        r"$D^{1/2}/N_\textrm{m}$",
+        r"$D/N_\textrm{m}$",
+    )
     unf_xtick_labels: tuple[str, ...] = (r"$D^{-1}$", r"$D^{-1/2}$", r"$D^0$")
 
     # -----------------

@@ -30,7 +30,9 @@ class ManyBodyEnsemble(Ensemble):
     beta: int | float = field(init=False, default=0, validator=ge(0))
 
     # Number of Majorana particles
-    N: int = field(converter=int, metadata={"dir_name": "N", "latex_name": "N"})
+    Nm: int = field(
+        converter=int, metadata={"dir_name": "Nm", "latex_name": r"N_\textrm{m}"}
+    )
 
     # Dimension of Hilbert space
     dim: int = field(init=False)
@@ -46,14 +48,14 @@ class ManyBodyEnsemble(Ensemble):
     # Ground state energy
     E0: float = field(init=False, repr=False)
 
-    # Validator to ensure N is an even integer
-    @N.validator
-    def __N_validator(self, _, value: int) -> None:
-        """Ensure N is an even integer greater than 2."""
+    # Validator to ensure Nm is an even integer
+    @Nm.validator
+    def __Nm_validator(self, _, value: int) -> None:
+        """Ensure Nm is an even integer greater than 2."""
 
-        # Ensure N is an even integer greater than 2
+        # Ensure Nm is an even integer greater than 2
         if value % 2 != 0 or value <= 2:
-            raise ValueError(f"N must be an even integer greater than 2, got {value}.")
+            raise ValueError(f"Nm must be an even integer greater than 2, got {value}.")
 
     # Set dimension of Hilbert space based on number of Majorana particles
     @dim.default
@@ -61,14 +63,14 @@ class ManyBodyEnsemble(Ensemble):
         """Calculate the dimension of the Hilbert space."""
 
         # Dimension of disconnected parity sector
-        return 2 ** (self.N // 2 - 1)
+        return 2 ** (self.Nm // 2 - 1)
 
     @E0.default
     def __E0_default(self) -> float:
         """Default value for ground state energy."""
 
-        # Return ground state energy based on N and J
-        return self.N * self.J
+        # Return ground state energy based on Nm and J
+        return self.Nm * self.J
 
     @property
     def univ_class(self) -> str | None:
