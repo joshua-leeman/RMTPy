@@ -79,7 +79,7 @@ class Ensemble(ABC):
                 # Safely evaluate string and store seed
                 object.__setattr__(self, "seed", ast.literal_eval(self.seed))
 
-            # If seed is a dictionary, assume it is a bit generator state
+            # If seed is a dictionary, assume it is a BitGenerator state
             if isinstance(self.seed, dict):
                 # Determine BitGenerator type from dictionary
                 bit_gen_cls = getattr(np.random, self.seed["bit_generator"])
