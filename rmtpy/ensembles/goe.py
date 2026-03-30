@@ -9,7 +9,7 @@ from attrs import field, frozen
 from numba import njit
 
 # Local application imports
-from ._base import GaussianEnsemble
+from ._base import AZEnsemble
 
 
 @njit(cache=True, fastmath=True)
@@ -55,7 +55,7 @@ def _create_goe_matrix(
 # Gaussian Orthogonal Ensemble (GOE)
 # ----------------------------------
 @frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
-class GOE(GaussianEnsemble):
+class GOE(AZEnsemble):
 
     # Dyson index (for GOE is 1)
     beta: int = field(init=False, default=1, repr=False)

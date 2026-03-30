@@ -1,4 +1,4 @@
-# rmtpy/ensembles/_gaussian.py
+# rmtpy/ensembles/_az_ensemble.py
 
 # Postponed evaluation of annotations
 from __future__ import annotations
@@ -11,11 +11,11 @@ from attrs import field, frozen
 from ._manybody import ManyBodyEnsemble
 
 
-# ----------------------------
-# Gaussian Ensemble Base Class
-# ----------------------------
+# -------------------------------------
+# Altland-Zirnbauer Ensemble Base Class
+# -------------------------------------
 @frozen(kw_only=True)
-class GaussianEnsemble(ManyBodyEnsemble):
+class AZEnsemble(ManyBodyEnsemble):
 
     # Complex standard deviation of matrix entries
     sigma: float = field(init=False, repr=False)

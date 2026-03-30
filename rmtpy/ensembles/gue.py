@@ -9,7 +9,7 @@ from attrs import field, frozen
 from numba import njit
 
 # Local application imports
-from ._base import GaussianEnsemble
+from ._base import AZEnsemble
 
 
 @njit(cache=True, fastmath=True)
@@ -61,7 +61,7 @@ def _create_gue_matrix(
 # Gaussian Unitary Ensemble (GUE)
 # -------------------------------
 @frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
-class GUE(GaussianEnsemble):
+class GUE(AZEnsemble):
 
     # Dyson index (for GUE is 2)
     beta: int = field(init=False, default=2, repr=False)

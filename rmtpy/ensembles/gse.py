@@ -9,7 +9,7 @@ from attrs import field, frozen
 from numba import njit
 
 # Local application imports
-from ._base import GaussianEnsemble
+from ._base import AZEnsemble
 from .gue import _create_gue_matrix
 
 
@@ -115,7 +115,7 @@ def _create_gse_matrix(
 # Gaussian Symplectic Ensemble (GSE)
 # ----------------------------------
 @frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
-class GSE(GaussianEnsemble):
+class GSE(AZEnsemble):
 
     # Dyson index (for GSE is 4)
     beta: int = field(init=False, default=4, repr=False)

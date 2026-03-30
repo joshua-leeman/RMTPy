@@ -9,7 +9,7 @@ from attrs import field, frozen
 from numba import njit
 
 # Local application imports
-from ._base import GaussianEnsemble
+from ._base import AZEnsemble
 from .gue import _create_gue_matrix
 
 
@@ -122,7 +122,7 @@ def _create_bdgc_matrix(
 # Bogoliubov-de Gennes C Ensemble (BdG(C))
 # ----------------------------------------
 @frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
-class BdGC(GaussianEnsemble):
+class BdGC(AZEnsemble):
 
     # Dyson index (for BdG(C) is 2)
     beta: int = field(init=False, default=2, repr=False)

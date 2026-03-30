@@ -9,7 +9,7 @@ from attrs import field, frozen
 from numba import njit
 
 # Local application imports
-from ._base import GaussianEnsemble
+from ._base import AZEnsemble
 
 
 @njit(cache=True, fastmath=True)
@@ -52,7 +52,7 @@ def _create_bdgd_matrix(
 # Bogoliubov-de Gennes D Ensemble (BdG(D))
 # ----------------------------------------
 @frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
-class BdGD(GaussianEnsemble):
+class BdGD(AZEnsemble):
 
     # Dyson index (for BdG(D) is 2)
     beta: int = field(init=False, default=2, repr=False)
