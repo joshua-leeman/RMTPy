@@ -112,7 +112,7 @@ class ManyBodyEnsemble(Ensemble):
         else:
             H = np.empty((d, d), cdtype, order="F")
 
-        # Loop over realizations
+        # For each realization . . .
         for _ in range(realizs):
             # Generate random matrix
             self.generate_matrix(out=H)
@@ -127,13 +127,13 @@ class ManyBodyEnsemble(Ensemble):
         cdtype = self.dtype.type
         rdtype = self.real_dtype.type
 
+        # Alias Dyson index
+        beta = self.beta
+
         # Alias dimension of matrix
         d = self.dim
 
         # =================================================
-
-        # Alias Dyson index
-        beta = self.beta
 
         # If Dyson index is 1, allocate memory for real symmetric matrices
         if beta == 1:
@@ -143,7 +143,7 @@ class ManyBodyEnsemble(Ensemble):
         else:
             H = np.empty((d, d), cdtype, order="F")
 
-        # Loop over realizations
+        # For each realization . . .
         for _ in range(realizs):
             # Generate random matrix
             self.generate_matrix(out=H)
