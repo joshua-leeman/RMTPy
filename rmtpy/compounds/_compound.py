@@ -139,6 +139,49 @@ class Compound(ABC):
         # Set uniform strengths to square root of ground state energy
         return math.sqrt(E0)
 
+    def generate_H_eff(
+        self, out: np.ndarray | None = None, offset: np.ndarray | None = None
+    ) -> np.ndarray:
+        """Generate a random effective Hamiltonian."""
+
+        # Alias ensemble
+        ensemble = self.ensemble
+
+        # Alias complex data type of ensemble
+        cdtype = ensemble.dtype.type
+
+        # Alias dimension of ensemble matrices
+        d = ensemble.dim
+
+        # =================================================
+
+        # If offset is not None, add to provided matrix
+        if offset is not None:
+            # Alias provided matrix
+            H_eff = offset
+
+            # Add random matrix from ensemble to H_eff
+            ensemble.generate_matrix(offset=H_eff)
+
+        # Otherwise, write to provided memory
+        else:
+            # Alias memory for output matrix
+            if out is not None:
+                # Alias provided matrix
+                H_eff = out
+            else:
+                # Create empty matrix
+                H_eff = np.empty((d, d), cdtype, order="F")
+
+            # Create random Hamiltonian
+            ensemble.generate_matrix(out=H_eff)
+
+        # Add width matrix contribution to H_eff
+        self.generate_width_matrix(offset=H_eff)
+
+        # Return effective Hamiltonian
+        return H_eff
+
     def resonance_stream(self, realizs: int) -> Iterator[np.ndarray]:
         """Iterator to stream effective Hamiltonian eigenvalues (resonances) realizations."""
 
@@ -153,7 +196,7 @@ class Compound(ABC):
         # Allocate memory for random effective Hamiltonians
         H_eff = np.empty((dim, dim), dtype=dtype, order="F")
 
-        # Loop over realizations . . .
+        # For each realization . . .
         for _ in range(realizs):
             # Generate effective Hamiltonian
             self.generate_H_eff(out=H_eff)
@@ -183,7 +226,7 @@ class Compound(ABC):
         # Allocate memory for coefficient matrix conjugate
         Cc = np.empty((num, L, L), dtype=dtype, order="C")
 
-        # From K-matrix realizations . . .
+        # For K-matrix realizations . . .
         for C in self.K_matrix_stream(energies, realizs):
 
             # Calculate coefficient matrix
@@ -206,7 +249,7 @@ class Compound(ABC):
 
         # =================================================
 
-        # From K, K_2 matrix realizations . . .
+        # For K, K_2 matrix realizations . . .
         for C, pi_K_2 in self.K_K2_matrix_stream(energies, realizs):
 
             # Calculate coefficient matrix
@@ -225,7 +268,7 @@ class Compound(ABC):
             # Yield Q-matrix realization
             yield Q
 
-    def time_delay_stream(
+    def time_delays_stream(
         self, energies: float | np.ndarray, realizs: int
     ) -> Iterator[np.ndarray]:
         """Iterator to stream time delay realizations at given energies."""
@@ -233,20 +276,26 @@ class Compound(ABC):
         # Ensure energies is a 1D array
         energies = _to_1D_array(energies)
 
-        # Alias number of energies
-        num = energies.size
-
-        # Alias ensemble data type
-        dtype = self.ensemble.dtype
-
-        # Alias number of open channels
-        L = self.channels
-
         # =================================================
 
+        # For Q-matrix realizations . . .
+        for Q in self.Q_matrix_stream(energies, realizs):
+
+            # Batch-compute eigenvalues of Q-matrix realization and yield
+            yield np.linalg.eigvalsh(Q)
+
     @abstractmethod
-    def generate_H_eff(self) -> np.ndarray:
-        """Generate a random effective Hamiltonian."""
+    def generate_width_matrix(
+        self, out: np.ndarray | None = None, offset: np.ndarray | None = None
+    ) -> np.ndarray:
+        """Generate the width matrix."""
+
+        # This method should be implemented by subclasses
+        pass
+
+    @abstractmethod
+    def partial_widths_stream(self, realizs: int) -> Iterator[np.ndarray]:
+        """Iterator to stream partial widths realizations."""
 
         # This method should be implemented by subclasses
         pass
