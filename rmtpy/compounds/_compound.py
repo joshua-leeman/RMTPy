@@ -18,10 +18,39 @@ from ..ensembles import ManyBodyEnsemble
 from collections.abc import Iterator
 
 
+# ------------------------
+# Energies Array Converter
+# ------------------------
+def _to_1D_array(energies: float | np.ndarray) -> np.ndarray:
+    """Ensure energies is a 1D array with real values."""
+
+    # If energies is not a float or an array, raise an error
+    if not isinstance(energies, (float, np.ndarray)):
+        raise TypeError(
+            f"Energies must be a float or a numpy array, got {type(energies).__name__} instead."
+        )
+
+    # If energies is a float, convert it to a 1D array with one element
+    elif isinstance(energies, float):
+        return np.array([energies], dtype=np.float64, order="F")
+
+    # Else ensure it is 1D and has real values
+    else:
+        if energies.ndim != 1:
+            raise ValueError(
+                f"Energies must be a 1D array, got {energies.ndim}D array."
+            )
+        elif not np.isrealobj(energies):
+            raise ValueError("Energies must have real values.")
+
+        # Return energies as a 1D array
+        return energies.astype(np.float64)
+
+
 # -----------------------------
 # Couplings Strengths Converter
 # -----------------------------
-def __to_full_array(value: float | np.ndarray, self_: Compound) -> np.ndarray:
+def _to_full_array(value: float | np.ndarray, self_: Compound) -> np.ndarray:
     """If value is a scalar, create an array of coupling strengths with the same value for all entries."""
 
     # Alias number of open channels
@@ -31,7 +60,7 @@ def __to_full_array(value: float | np.ndarray, self_: Compound) -> np.ndarray:
 
     # If value is a scalar, set all couplings to the same value
     if isinstance(value, (int, float)):
-        return np.full(channels, value, order="F")
+        return np.full(channels, value)
 
     # If value is an array, ensure it has the correct shape
     elif isinstance(value, np.ndarray):
@@ -66,7 +95,7 @@ class Compound(ABC):
     channels: int = field(init=False)
 
     # Coupling strengths
-    strengths: np.ndarray = field(converter=Converter(__to_full_array, takes_self=True))
+    strengths: np.ndarray = field(converter=Converter(_to_full_array, takes_self=True))
 
     @fermions.validator
     def __fermions_validator(self, _, value: int) -> None:
@@ -133,13 +162,12 @@ class Compound(ABC):
             yield eigvals(H_eff, overwrite_a=True, check_finite=False)
 
     def S_matrix_stream(
-        self, energies: np.ndarray, realizs: int
+        self, energies: float | np.ndarray, realizs: int
     ) -> Iterator[np.ndarray]:
         """Iterator to stream S matrix realizations at given energies."""
 
         # Ensure energies is a 1D array
-        if energies.ndim != 1:
-            raise ValueError(f"Energies must be 1D array, got {energies.ndim}D array.")
+        energies = _to_1D_array(energies)
 
         # Alias number of energies
         num = energies.size
@@ -169,34 +197,52 @@ class Compound(ABC):
             yield solve(C, Cc, overwrite_a=True, overwrite_b=True, check_finite=False)
 
     def Q_matrix_stream(
-        self, energies: np.ndarray, realizs: int
+        self, energies: float | np.ndarray, realizs: int
     ) -> Iterator[np.ndarray]:
         """Iterator to stream Q matrix realizations at given energies."""
 
         # Ensure energies is a 1D array
-        if energies.ndim != 1:
-            raise ValueError(f"Energies must be 1D array, got {energies.ndim}D array.")
+        energies = _to_1D_array(energies)
 
         # =================================================
 
         # From K, K_2 matrix realizations . . .
-        for C, K_2 in self.K_K2_matrix_stream(energies, realizs):
+        for C, pi_K_2 in self.K_K2_matrix_stream(energies, realizs):
 
             # Calculate coefficient matrix
             C *= -1j * np.pi
             C.diagonal(axis1=-2, axis2=-1)[:] += 1
 
             # Scale K_2 matrix by pi
-            K_2 *= np.pi
+            pi_K_2 *= np.pi
 
             # Calculate Q-matrix realization
-            Q = solve(C, K_2, overwrite_a=True, overwrite_b=True, check_finite=False)
+            Q = solve(C, pi_K_2, overwrite_a=True, overwrite_b=True, check_finite=False)
 
             # Add its conjugate transpose to itself in place
             Q += Q.swapaxes(-1, -2).conj()
 
             # Yield Q-matrix realization
             yield Q
+
+    def time_delay_stream(
+        self, energies: float | np.ndarray, realizs: int
+    ) -> Iterator[np.ndarray]:
+        """Iterator to stream time delay realizations at given energies."""
+
+        # Ensure energies is a 1D array
+        energies = _to_1D_array(energies)
+
+        # Alias number of energies
+        num = energies.size
+
+        # Alias ensemble data type
+        dtype = self.ensemble.dtype
+
+        # Alias number of open channels
+        L = self.channels
+
+        # =================================================
 
     @abstractmethod
     def generate_H_eff(self) -> np.ndarray:
@@ -207,7 +253,7 @@ class Compound(ABC):
 
     @abstractmethod
     def K_matrix_stream(
-        self, energies: np.ndarray, realizs: int
+        self, energies: float | np.ndarray, realizs: int
     ) -> Iterator[np.ndarray]:
         """Iterator to stream K matrix realizations at energies."""
 
@@ -216,7 +262,7 @@ class Compound(ABC):
 
     @abstractmethod
     def K_K2_matrix_stream(
-        self, energies: np.ndarray, realizs: int
+        self, energies: float | np.ndarray, realizs: int
     ) -> Iterator[tuple[np.ndarray, np.ndarray]]:
         """Iterator to stream K and K_2 matrix realizations at energies."""
 
