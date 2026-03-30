@@ -15,6 +15,7 @@ from scipy.linalg import eigvals, solve
 
 # Local application imports
 from ..ensembles import ManyBodyEnsemble
+from ..utils.converter import rmtpy_converter
 from collections.abc import Iterator
 
 

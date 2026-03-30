@@ -17,7 +17,7 @@ from attrs import asdict, field, fields_dict, frozen
 from attrs.validators import gt
 
 # Local application imports
-from ._converter import converter
+from ...utils.converter import rmtpy_converter
 
 
 # -------------------------------
@@ -138,7 +138,7 @@ class Ensemble(ABC):
         """Create an instance of the ensemble with given parameters."""
 
         # Convert dictionary to ensemble instance
-        return converter.structure(src, cls)
+        return rmtpy_converter.structure(src, cls)
 
     @property
     def matrix_memory(self) -> int:

@@ -14,13 +14,13 @@ from cattrs import Converter
 # Module-level Converter
 # ----------------------
 # Initialize converter instance
-converter = Converter()
+rmtpy_converter = Converter()
 
 # Unstructure hook: from np.dtype to JSON-serializable type
-converter.register_unstructure_hook(np.dtype, lambda dt: dt.name)
+rmtpy_converter.register_unstructure_hook(np.dtype, lambda dt: dt.name)
 
 # Structure hook: from string to np.dtype
-converter.register_structure_hook(np.dtype, lambda s, _: np.dtype(s))
+rmtpy_converter.register_structure_hook(np.dtype, lambda s, _: np.dtype(s))
 
 
 # ---------------------------------

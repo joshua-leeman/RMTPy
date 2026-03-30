@@ -17,8 +17,9 @@ from attrs.validators import gt
 
 # Local application imports
 from ..dataclasses import Data
-from ..ensembles import Ensemble, converter
+from ..ensembles import Ensemble
 from ..plotting import Plot
+from ..utils import rmtpy_converter
 
 
 # -------------------------------
@@ -89,7 +90,7 @@ class Simulation(ABC):
         self.metadata["args"] = {}
 
         # Add ensemble name to metadata
-        self.metadata["args"]["ensemble"] = converter.unstructure(self.ensemble)
+        self.metadata["args"]["ensemble"] = rmtpy_converter.unstructure(self.ensemble)
 
         # Add number of realizations to metadata
         self.metadata["args"]["realizs"] = self.realizs

@@ -10,7 +10,7 @@ from numpy.lib.npyio import NpzFile
 
 # Local application imports
 from ._data import Data, DATA_REGISTRY
-from ..ensembles import converter
+from ..utils import rmtpy_converter
 
 # Load Data Function
 from ._data import load_data
@@ -66,7 +66,7 @@ def normalize_source(src: str | Path | dict[str, Any]) -> dict[str, Any]:
 # ----------------------------
 # Register Data Structure Hook
 # ----------------------------
-@converter.register_structure_hook
+@rmtpy_converter.register_structure_hook
 def data_structure_hook(src: str | Path | dict[str, Any] | NpzFile | Data, _) -> Data:
     """Structure hook to convert unstructured data to Data instance."""
 

@@ -17,9 +17,10 @@ from .spectral_density_axes import SpectralDensityAxes
 from .spectral_density_legend import SpectralDensityLegend
 from ..._base import Plot
 from ....dataclasses.spectral_statistics_data import SpectralDensityData
-from ....ensembles import Ensemble, ManyBodyEnsemble, converter
+from ....ensembles import Ensemble, ManyBodyEnsemble
 from ....ensembles.poisson import Poisson
 from ....ensembles.syk import SYK
+from ....utils import rmtpy_converter
 
 
 # -------------------------------
@@ -103,7 +104,7 @@ class SpectralDensityPlot(Plot):
             raise ValueError("Metadata is not properly structured.")
 
         # Initialize ensemble
-        self.ensemble: ManyBodyEnsemble = converter.structure(ens_meta, Ensemble)
+        self.ensemble: ManyBodyEnsemble = rmtpy_converter.structure(ens_meta, Ensemble)
 
         # Alias ensemble and ensemble attributes
         ensemble = self.ensemble

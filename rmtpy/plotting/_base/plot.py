@@ -18,7 +18,7 @@ from matplotlib import rcParams
 from .axes import PlotAxes
 from .legend import PlotLegend
 from ...dataclasses import Data
-from ...ensembles import converter
+from ...utils import rmtpy_converter
 
 
 # -------------------------
@@ -61,7 +61,7 @@ def plot_data(data_path: str | Path, unfold: bool = False) -> None:
     data_path = Path(data_path)
 
     # Create Plot instance from data file
-    plot = converter.structure(data_path, Plot)
+    plot = rmtpy_converter.structure(data_path, Plot)
 
     # Set unfold flag
     plot.unfold = unfold

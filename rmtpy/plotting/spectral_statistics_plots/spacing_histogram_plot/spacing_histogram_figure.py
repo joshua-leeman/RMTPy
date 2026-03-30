@@ -17,7 +17,8 @@ from .spacing_histogram_axes import SpacingHistogramAxes
 from .spacing_histogram_legend import SpacingHistogramLegend
 from ..._base import Plot
 from ....dataclasses.spectral_statistics_data import SpacingHistogramData
-from ....ensembles import Ensemble, ManyBodyEnsemble, converter
+from ....ensembles import Ensemble, ManyBodyEnsemble
+from ....utils import rmtpy_converter
 
 
 # --------------------------------
@@ -90,7 +91,7 @@ class SpacingHistogramPlot(Plot):
             raise ValueError("Metadata is not properly structured.")
 
         # Initialize ensemble
-        self.ensemble: ManyBodyEnsemble = converter.structure(ens_meta, Ensemble)
+        self.ensemble: ManyBodyEnsemble = rmtpy_converter.structure(ens_meta, Ensemble)
 
         # Alias ensemble and ensemble attributes
         ensemble = self.ensemble

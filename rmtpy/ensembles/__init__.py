@@ -9,11 +9,10 @@ from typing import Any
 from ._base import (
     Ensemble,
     ManyBodyEnsemble,
-    normalize_dict,
     create_ensemble,
-    converter,
     ENSEMBLE_REGISTRY,
 )
+from ..utils import normalize_dict, rmtpy_converter
 
 # Import all ensemble classes to register them
 from .bdgc import BdGC
@@ -29,7 +28,8 @@ from .syk import SYK
 # Default Structure Hook Dictionary
 # ---------------------------------
 ENS_STRUCTURE_HOOKS: dict[str, Callable] = {
-    key: converter.get_structure_hook(val) for key, val in ENSEMBLE_REGISTRY.items()
+    key: rmtpy_converter.get_structure_hook(val)
+    for key, val in ENSEMBLE_REGISTRY.items()
 }
 
 
@@ -37,14 +37,15 @@ ENS_STRUCTURE_HOOKS: dict[str, Callable] = {
 # Default Unstructure Hook Dictionary
 # -----------------------------------
 ENS_UNSTRUCTURE_HOOKS: dict[str, Callable] = {
-    key: converter.get_unstructure_hook(val) for key, val in ENSEMBLE_REGISTRY.items()
+    key: rmtpy_converter.get_unstructure_hook(val)
+    for key, val in ENSEMBLE_REGISTRY.items()
 }
 
 
 # --------------------------------
 # Register Ensemble Structure Hook
 # --------------------------------
-@converter.register_structure_hook
+@rmtpy_converter.register_structure_hook
 def _ens_structure_hook(src: dict[str, Any] | Ensemble, _) -> Ensemble:
     """Convert a general dictionary to an Ensemble instance."""
 
@@ -84,7 +85,7 @@ def _ens_structure_hook(src: dict[str, Any] | Ensemble, _) -> Ensemble:
 # ----------------------------------
 # Register Ensemble Unstructure Hook
 # ----------------------------------
-@converter.register_unstructure_hook
+@rmtpy_converter.register_unstructure_hook
 def _ens_unstructure_hook(ensemble: Ensemble) -> dict[str, str | dict[str, Any]]:
     """Convert an Ensemble instance to a normalized dictionary."""
 

@@ -10,7 +10,7 @@ from typing import Any
 # Local application imports
 from ._simulation import Simulation, SIMULATION_REGISTRY
 from ..dataclasses import DATA_REGISTRY
-from ..ensembles import normalize_dict, converter
+from ..utils import normalize_dict, rmtpy_converter
 
 # Simulation functions
 from .spectral_statistics_simulation import spectral_statistics
@@ -20,7 +20,8 @@ from .spectral_statistics_simulation import spectral_statistics
 # Default Structure Hook Dictionary
 # ---------------------------------
 SIM_STRUCTURE_HOOKS: dict[str, Callable] = {
-    key: converter.get_structure_hook(val) for key, val in SIMULATION_REGISTRY.items()
+    key: rmtpy_converter.get_structure_hook(val)
+    for key, val in SIMULATION_REGISTRY.items()
 }
 
 
@@ -28,14 +29,15 @@ SIM_STRUCTURE_HOOKS: dict[str, Callable] = {
 # Default Unstructure Hook Dictionary
 # -----------------------------------
 SIM_UNSTRUCTURE_HOOKS: dict[str, Callable] = {
-    key: converter.get_unstructure_hook(val) for key, val in SIMULATION_REGISTRY.items()
+    key: rmtpy_converter.get_unstructure_hook(val)
+    for key, val in SIMULATION_REGISTRY.items()
 }
 
 
 # ----------------------------------
 # Register Simulation Structure Hook
 # ----------------------------------
-@converter.register_structure_hook
+@rmtpy_converter.register_structure_hook
 def sim_structure_hook(src: str | Path | dict[str, Any] | Simulation, _) -> Simulation:
     """Convert serialized data from a directory to a Simulation instance."""
 

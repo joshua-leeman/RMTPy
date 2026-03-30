@@ -17,7 +17,7 @@ import numpy as np
 from attrs import asdict, field, frozen
 
 # Local application imports
-from ..ensembles import converter
+from ..utils import rmtpy_converter
 
 
 # ------------------
@@ -86,7 +86,7 @@ class Data(ABC):
         path = Path(path)
 
         # Return Data instance from .npz file
-        return converter.structure(path, cls)
+        return rmtpy_converter.structure(path, cls)
 
     def __attrs_post_init__(self) -> None:
         """Initialize metadata after object creation."""

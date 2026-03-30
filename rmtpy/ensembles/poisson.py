@@ -12,7 +12,8 @@ from attrs import field, frozen
 from scipy.linalg import eigh
 
 # Local application imports
-from ._base import ManyBodyEnsemble, converter
+from ._base import ManyBodyEnsemble
+from ..utils import rmtpy_converter
 
 
 # ----------------
@@ -41,7 +42,7 @@ class Poisson(ManyBodyEnsemble):
         """Post-initialization method to initialize eigenvector ensemble."""
 
         # Unstructure Poisson class instance to dictionary
-        dic = converter.unstructure(self)
+        dic = rmtpy_converter.unstructure(self)
 
         # Change name in dictionary to eigvecs_flag
         dic["name"] = self.eigvecs_flag
@@ -50,7 +51,7 @@ class Poisson(ManyBodyEnsemble):
         dic["args"].pop("eigvecs_flag")
 
         # Create ensemble instance from modified dictionary
-        ens = converter.structure(dic, ManyBodyEnsemble)
+        ens = rmtpy_converter.structure(dic, ManyBodyEnsemble)
 
         # Store ensemble instance in eigvecs_ensemble attribute
         object.__setattr__(self, "eigvecs_ensemble", ens)

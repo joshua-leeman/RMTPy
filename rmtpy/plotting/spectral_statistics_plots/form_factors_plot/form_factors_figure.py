@@ -20,7 +20,8 @@ from .form_factors_axes import FormFactorsAxes
 from .form_factors_legend import FormFactorsLegend
 from ..._base import Plot
 from ....dataclasses.spectral_statistics_data import FormFactorsData
-from ....ensembles import Ensemble, ManyBodyEnsemble, converter
+from ....ensembles import Ensemble, ManyBodyEnsemble
+from ....utils import rmtpy_converter
 
 
 # ------------------------------------
@@ -117,7 +118,7 @@ class FormFactorsPlot(Plot):
             raise ValueError("Metadata is not properly structured.")
 
         # Initialize ensemble
-        self.ensemble: ManyBodyEnsemble = converter.structure(ens_meta, Ensemble)
+        self.ensemble: ManyBodyEnsemble = rmtpy_converter.structure(ens_meta, Ensemble)
 
         # Alias ensemble and ensemble attributes
         ensemble = self.ensemble

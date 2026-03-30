@@ -3,5 +3,4 @@
 # Local application imports
 from ._gaussian import AZEnsemble
 from ._ensemble import Ensemble, create_ensemble, ENSEMBLE_REGISTRY
-from ._converter import normalize_dict, converter
 from ._manybody import ManyBodyEnsemble

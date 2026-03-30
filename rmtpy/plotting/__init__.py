@@ -11,7 +11,7 @@ from numpy.lib.npyio import NpzFile
 # Local application imports
 from ._base import Plot, PLOT_REGISTRY
 from ..dataclasses import normalize_metadata, normalize_source, DATA_REGISTRY
-from ..ensembles import converter
+from ..utils import rmtpy_converter
 
 # Import all plot classes to register them
 from .spectral_statistics_plots import FormFactorsPlot
@@ -25,7 +25,7 @@ from ._base import plot_data
 # ----------------------------
 # Register Plot Structure Hook
 # ----------------------------
-@converter.register_structure_hook
+@rmtpy_converter.register_structure_hook
 def plot_structure_hook(src: str | Path | dict[str, Any] | NpzFile | Plot, _) -> Plot:
     """Structure hook to convert unstructured data to Plot instance."""
 
@@ -56,7 +56,7 @@ def plot_structure_hook(src: str | Path | dict[str, Any] | NpzFile | Plot, _) ->
         raise ValueError(f"No registered Data class found for Plot in {src}")
 
     # Initialize Data instance from source
-    data_inst = converter.structure(src_dict, data_cls)
+    data_inst = rmtpy_converter.structure(src_dict, data_cls)
 
     # Return constructed Plot instance
     return plot_cls(data=data_inst)
