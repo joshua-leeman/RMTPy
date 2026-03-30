@@ -73,7 +73,6 @@ class Poisson(ManyBodyEnsemble):
 
         # Alias data types of eigenvalues and eigenvectors
         rdtype = self.real_dtype.type
-        cdtype = self.dtype.type
 
         # Alias dimension of matrix
         d = self.dim
@@ -86,21 +85,10 @@ class Poisson(ManyBodyEnsemble):
 
         # =================================================
 
-        # Allocate memory for random eigenvalues
-        eigvals = np.empty(d, rdtype, order="F")
-
-        # If ensemble flag is GOE, allocate memory for real eigenvectors
-        if self.eigvecs_flag == "GOE":
-            U = np.empty((d, d), rdtype, order="F")
-
-        # Else, allocate memory for complex eigenvectors
-        else:
-            U = np.empty((d, d), cdtype, order="F")
-
         # Loop over realizations
         for _ in range(realizs):
             # Generate iid uniform random eigenvalues
-            rng.random(d, rdtype, out=eigvals)
+            eigvals = rng.random(d, rdtype)
             eigvals -= 0.5
             eigvals *= std
 
@@ -133,13 +121,10 @@ class Poisson(ManyBodyEnsemble):
 
         # =================================================
 
-        # Allocate memory for random eigenvalues
-        eigvals = np.empty(d, rdtype, order="F")
-
         # Loop over realizations
         for _ in range(realizs):
             # Generate iid uniform random eigenvalues
-            rng.random(d, rdtype, out=eigvals)
+            eigvals = rng.random(d, rdtype)
             eigvals -= 0.5
             eigvals *= std
 
