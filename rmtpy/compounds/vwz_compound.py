@@ -18,7 +18,6 @@ class VWZCompound(Compound):
 
     def add_width_matrix(self, matrix: np.ndarray) -> np.ndarray:
         ensemble: WignerDysonEnsemble = self.ensemble
-        complex_dtype: type[np.complexfloating] = ensemble.dtype.type
         dimension: int = ensemble.dimension
         rng: np.random.Generator = ensemble.rng
         num_channels: int = self.num_channels
