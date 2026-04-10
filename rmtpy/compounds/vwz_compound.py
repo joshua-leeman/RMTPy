@@ -16,9 +16,7 @@ class VWZCompound(Compound):
         converter=WignerDysonEnsemble.create, validator=instance_of(WignerDysonEnsemble)
     )
 
-    def generate_width_matrix(
-        self, out: np.ndarray | None = None, offset: np.ndarray | None = None
-    ) -> np.ndarray:
+    def add_width_matrix(self, matrix: np.ndarray) -> np.ndarray:
         ensemble: WignerDysonEnsemble = self.ensemble
         complex_dtype: type[np.complexfloating] = ensemble.dtype.type
         dimension: int = ensemble.dimension
@@ -26,21 +24,9 @@ class VWZCompound(Compound):
         num_channels: int = self.num_channels
         strengths: np.ndarray = self.channel_coupling_strengths
 
-        if out is not None and offset is not None:
-            raise ValueError("Cannot specify both out and offset parameters.")
-        elif offset is not None:
-            width_matrix: np.ndarray = offset
-        elif out is not None:
-            width_matrix: np.ndarray = out
-            width_matrix.fill(0)
-        else:
-            width_matrix: np.ndarray = np.zeros(
-                (dimension, dimension), dtype=complex_dtype, order="F"
-            )
-
         random_idx: np.ndarray = rng.choice(dimension, size=num_channels, replace=False)
-        width_matrix[random_idx, random_idx] += -1j * (strengths**2) / 2
-        return width_matrix
+        matrix[random_idx, random_idx] += -1j * (strengths**2) / 2
+        return matrix
 
     def partial_widths_stream(self, realizs: int) -> Iterator[np.ndarray]:
         ensemble: WignerDysonEnsemble = self.ensemble
