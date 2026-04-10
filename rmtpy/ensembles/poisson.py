@@ -1,180 +1,101 @@
-# rmtpy/ensembles/poisson.py
-
-# Postponed evaluation of annotations
 from __future__ import annotations
 
-# Standard library imports
 from collections.abc import Iterator
+from typing import Any
 
-# Third-party imports
 import numpy as np
 from attrs import field, frozen
 from scipy.linalg import eigh
 
-# Local application imports
-from ._base import ManyBodyEnsemble
+from ._many_body import ManyBodyEnsemble
+from ._wigner_dyson import WIGNER_DYSON_ENSEMBLE_FLAGS, WignerDysonEnsemble
 from ..utils import rmtpy_converter
 
 
-# ----------------
-# Poisson Ensemble
-# ----------------
 @frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
-class Poisson(ManyBodyEnsemble):
+class PoissonEnsemble(ManyBodyEnsemble):
+    eigvecs_flag: str = field(default="GaussianUnitaryEnsemble")
 
-    # Standard deviation of eigenvalues
-    sigma: float = field(init=False, repr=False)
+    @eigvecs_flag.validator
+    def _validate_eigvecs_flag(self, _: field, value: str) -> None:
+        if value not in WIGNER_DYSON_ENSEMBLE_FLAGS:
+            raise ValueError(
+                f"eigvecs_flag must indicate a Wigner-Dyson ensemble, got {value}"
+            )
 
-    # Flag of ensemble from which to draw eigenvectors
-    eigvecs_flag: str = field(default="GUE")
+    eigvecs_ensemble: WignerDysonEnsemble = field(init=False, repr=False)
+    dyson_index: int = field(init=False, default=0, repr=False)
+    std_dev: float = field(init=False, repr=False)
 
-    # Ensemble from which to draw eigenvectors
-    eigvecs_ensemble: ManyBodyEnsemble = field(init=False, repr=False)
+    @std_dev.default
+    def _std_dev_default(self) -> float:
+        return 2 * self.ground_state_energy
 
-    @sigma.default
-    def __sigma_default(self) -> float:
-        """Default value for sigma."""
-
-        # Calculate standard deviation based on E0
-        return 2 * self.E0
+    _nickname: str = field(init=False, default="Poisson", repr=False)
 
     def __attrs_post_init__(self) -> None:
-        """Post-initialization method to initialize eigenvector ensemble."""
+        ensemble_dict: dict[str, Any] = rmtpy_converter.unstructure(self)
+        ensemble_dict["name"] = self.eigvecs_flag
+        ensemble: WignerDysonEnsemble = rmtpy_converter.structure(
+            ensemble_dict, WignerDysonEnsemble
+        )
+        object.__setattr__(self, "eigvecs_ensemble", ensemble)
 
-        # Unstructure Poisson class instance to dictionary
-        dic = rmtpy_converter.unstructure(self)
-
-        # Change name in dictionary to eigvecs_flag
-        dic["name"] = self.eigvecs_flag
-
-        # Remove eigvecs_flag from dictionary
-        dic["args"].pop("eigvecs_flag")
-
-        # Create ensemble instance from modified dictionary
-        ens = rmtpy_converter.structure(dic, ManyBodyEnsemble)
-
-        # Store ensemble instance in eigvecs_ensemble attribute
-        object.__setattr__(self, "eigvecs_ensemble", ens)
-
-    def generate_matrix(
-        self, out: np.ndarray | None = None, offset: np.ndarray | None = None
-    ) -> np.ndarray:
-        """Generate a random matrix from the Poisson ensemble."""
-
-        # Pass since matrix generation is not implemented
+    def generate_matrix(self) -> np.ndarray:
         raise NotImplementedError(
             "Matrix generation is not implemented for the Poisson ensemble."
         )
 
+    def matrix_stream(
+        self, realizs: int, use_complex_dtype: bool = True
+    ) -> Iterator[np.ndarray]:
+        raise NotImplementedError(
+            "Matrix stream is not implemented for the Poisson ensemble."
+        )
+
     def eigsys_stream(self, realizs: int) -> Iterator[tuple[np.ndarray, np.ndarray]]:
-        """Iterator to stream eigensystem realizations."""
+        real_dtype: type[np.floating] = self.real_dtype.type
+        rng: np.random.Generator = self.rng
+        dimension: int = self.dimension
+        std_dev: float = self.std_dev
+        eigvecs_ensemble: ManyBodyEnsemble = self.eigvecs_ensemble
 
-        # Alias random number generator
-        rng = self.rng
-
-        # Alias data types of eigenvalues and eigenvectors
-        rdtype = self.real_dtype.type
-
-        # Alias dimension of matrix
-        d = self.dim
-
-        # Alias standard deviation of eigenvalues
-        std = self.sigma
-
-        # Alias ensemble for generating eigenvectors
-        eigvecs_ens = self.eigvecs_ensemble
-
-        # =================================================
-
-        # Loop over realizations
         for _ in range(realizs):
-            # Generate iid uniform random eigenvalues
-            eigvals = rng.random(d, rdtype)
+            eigvals: np.ndarray = rng.random(dimension, real_dtype)
             eigvals -= 0.5
-            eigvals *= std
-
-            # Sort eigenvalues
+            eigvals *= std_dev
             eigvals.sort()
-
-            # Generate matrix from eigvecs_ensemble in place of U
-            eigvecs_ens.generate_matrix(out=U)
-
-            # Diagonalize matrix for eigenvectors
+            eigvecs_ensemble.generate_matrix(out=U)
             _, U = eigh(U, overwrite_a=True, check_finite=False)
-
-            # Yield eigenvalues and eigenvectors
             yield eigvals, U
 
     def eigvals_stream(self, realizs: int) -> Iterator[np.ndarray]:
-        """Iterator to stream spectrum realizations."""
+        real_dtype: type[np.floating] = self.real_dtype.type
+        rng: np.random.Generator = self.rng
+        dimension: int = self.dimension
+        std_dev: float = self.std_dev
 
-        # Alias random number generator
-        rng = self.rng
-
-        # Alias data type of eigenvalues
-        rdtype = self.real_dtype.type
-
-        # Alias dimension of matrix
-        d = self.dim
-
-        # Alias standard deviation of eigenvalues
-        std = self.sigma
-
-        # =================================================
-
-        # Loop over realizations
         for _ in range(realizs):
-            # Generate iid uniform random eigenvalues
-            eigvals = rng.random(d, rdtype)
+            eigvals: np.ndarray = rng.random(dimension, real_dtype)
             eigvals -= 0.5
-            eigvals *= std
-
-            # Sort eigenvalues
+            eigvals *= std_dev
             eigvals.sort()
-
-            # Yield sorted eigenvalues
             yield eigvals
 
-    def pdf(self, eigval: np.ndarray) -> np.ndarray:
-        """Probability density function of the Poisson ensemble."""
+    def spectral_pdf(self, eigval: np.ndarray) -> np.ndarray:
+        real_dtype: type[np.floating] = self.real_dtype.type
+        energy_0: float = self.ground_state_energy
 
-        # Alias data type of eigenvalues
-        rdtype = self.real_dtype.type
-
-        # Alias ground state energy
-        E0 = self.E0
-
-        # =================================================
-
-        # Initialize distribution with zeros
-        pdf = np.zeros_like(eigval, rdtype)
-
-        # Calculate non-zero elements
-        pdf[np.abs(eigval) < E0] = 1 / 2 / E0
-
-        # Return probability density function
+        pdf: np.ndarray = np.zeros_like(eigval, real_dtype)
+        pdf[np.abs(eigval) < energy_0] = 1 / 2 / energy_0
         return pdf
 
     def cdf(self, eigval: np.ndarray) -> np.ndarray:
-        """Cumulative distribution function of the Poisson ensemble."""
+        real_dtype: type[np.floating] = self.real_dtype.type
+        energy_0: float = self.ground_state_energy
 
-        # Alias data type of eigenvalues
-        rdtype = self.real_dtype.type
-
-        # Alias ground state energy
-        E0 = self.E0
-
-        # =================================================
-
-        # Initialize distribution with zeros
-        cdf = np.zeros_like(eigval, rdtype)
-
-        # Calculate non-trivial elements
-        mask = np.abs(eigval) < E0
-        cdf[mask] = eigval[mask] / (2 * E0) + 0.5
-
-        # Calculate remaining elements
-        cdf[eigval > E0] = 1.0
-
-        # Return cumulative distribution function
+        cdf: np.ndarray = np.zeros_like(eigval, real_dtype)
+        mask: np.ndarray = np.abs(eigval) < energy_0
+        cdf[mask] = eigval[mask] / (2 * energy_0) + 0.5
+        cdf[eigval > energy_0] = 1.0
         return cdf

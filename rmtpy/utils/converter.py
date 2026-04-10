@@ -1,90 +1,47 @@
-# rmtpy/ensembles/_base/_converter.py
-
-# Standard library imports
 import re
 from typing import Any
 
-# Third-party imports
 import numpy as np
-from attrs import fields_dict
+from attrs import Attribute, fields_dict
 from cattrs import Converter
 
-
-# ----------------------
-# Module-level Converter
-# ----------------------
-# Initialize converter instance
 rmtpy_converter = Converter()
-
-# Unstructure hook: from np.dtype to JSON-serializable type
-rmtpy_converter.register_unstructure_hook(np.dtype, lambda dt: dt.name)
-
-# Structure hook: from string to np.dtype
+rmtpy_converter.register_unstructure_hook(np.dtype, lambda dtype: dtype.name)
 rmtpy_converter.register_structure_hook(np.dtype, lambda s, _: np.dtype(s))
 
 
-# ---------------------------------
-# Normalize Unstructured Dictionary
-# ---------------------------------
-def normalize_dict(
-    src: dict[str, Any], registry: dict[str, type]
-) -> dict[str, str | dict[str, Any]]:
-    """Normalize form of class dictionary."""
+def insert_underscores(string: str) -> str:
+    string = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", string)
+    return re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", string)
 
-    # If src is not a dictionary, raise TypeError
+
+def normalize_dict(src: dict[str, Any], registry: dict[str, type]) -> dict[str, Any]:
     if not isinstance(src, dict):
-        raise TypeError(f"Expected a dictionary, got {type(src).__name__}")
+        raise TypeError(f"Expected a dictionary, got {type(src).__name__}.")
 
-    # Initialize empty dictionary
-    norm_dict = {}
-
-    # Loop through values in input dictionary
+    normalized_dict: dict[str, Any] = {}
     for val in src.values():
-        # Only consider string values
-        if isinstance(val, str):
-            # Normalize value to registry key format
-            key = re.sub(r"[_ ]", "", val).lower()
+        if not isinstance(val, str):
+            continue
+        registry_key: str = to_registry_key(val)
+        if registry_key in registry:
+            registered_cls: type = registry[registry_key]
+            normalized_dict["name"] = registered_cls.__name__
+            break
 
-            # Check if key is in class registry
-            if key in registry:
-                # Retrieve class class from registry
-                regd_cls = registry[key]
+    if normalized_dict.get("name") is None:
+        raise KeyError("Registered class name not found in dictionary as value.")
 
-                # Store class name in norm_dict and break loop
-                norm_dict["name"] = regd_cls.__name__
-                break
-
-    # If norm_dict is still empty, raise KeyError
-    if not norm_dict:
-        raise KeyError("Registered class name not found in dictionary")
-
-    # Determine set of expected arguments for registered class
-    exp_args = {arg for arg, attr in fields_dict(regd_cls).items() if attr.init}
-
-    # Check if there are no expected arguments
-    if not exp_args:
-        # Update norm_dict with empty args
-        norm_dict.update({"args": {}})
-
-        # Return normalized dictionary
-        return norm_dict
-
-    # Loop through values in input dictionary again
+    cls_attrs: dict[str, Attribute] = fields_dict(registered_cls)
+    cls_args: set[str] = {arg for arg, attr in cls_attrs.items() if attr.init}
     for val in src.values():
-        # Check if value is a dictionary with expected arguments
-        if isinstance(val, dict) and set(val.keys()).issubset(exp_args):
-            # Update norm_dict with expected arguments and break loop
-            norm_dict.update({"args": val})
+        if isinstance(val, dict) and set(val.keys()).issubset(cls_args):
+            normalized_dict.update({"args": val})
+            return normalized_dict
 
-            # Return normalized dictionary
-            return norm_dict
+    normalized_dict.update({"args": {arg: src[arg] for arg in cls_args if arg in src}})
+    return normalized_dict
 
-    # Else, check if expected arguments are top-level keys
-    if set(src.keys()).isdisjoint(exp_args):
-        raise TypeError(f"Invalid or missing arguments for {regd_cls.__name__}")
 
-    # Extract top-level expected arguments and update norm_dict
-    norm_dict.update({"args": {arg: src[arg] for arg in src if arg in exp_args}})
-
-    # Return normalized dictionary
-    return norm_dict
+def to_registry_key(string: str) -> str:
+    return re.sub(r"[_ ]", "", string).lower()

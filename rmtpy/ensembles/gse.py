@@ -1,165 +1,84 @@
-# rmtpy/ensembles/gse.py
-
-# Postponed evaluation of annotations
 from __future__ import annotations
 
-# Third-party imports
+from collections.abc import Iterator
+
 import numpy as np
 from attrs import field, frozen
 from numba import njit
 
-# Local application imports
-from ._base import AZEnsemble
+from ._wigner_dyson import WignerDysonEnsemble
 from .gue import _create_gue_matrix
 
 
 @njit(cache=True, fastmath=True)
-def _add_gse_matrix(
-    H: np.ndarray, d: int, rdtype: type, rng: np.random.Generator, std: float
-) -> np.ndarray:
-    """Add a GSE matrix to H with the given parameters."""
-
-    # Alias block dimension
-    b = d // 2
-
-    # Loop over block diagonal indices
-    for i in range(b):
-        # Realize single complex normal with standard deviation
-        diag = rng.standard_normal(None, rdtype) * std * 2
-
-        # Add to ith diagonal elements of top-left block and bottom-right block
-        H[i, i] += diag
-        H[i + b, i + b] += diag
-
-        # Realize d - i - 1 complex normals with standard deviation
-        rands = (
-            rng.standard_normal(d - 1 - i, rdtype)
-            + 1j * rng.standard_normal(d - 1 - i, rdtype)
-        ) * std
-
-        # Add to upper triangular part of top-left block
-        H[i, i + 1 : b] += rands
-
-        # Add conjugate to lower triangular part of top-left block
-        H[i + 1 : b, i] += np.conj(rands)
-
-        # Add conjugate to upper triangular part of bottom-right block
-        H[i + b, i + b + 1 :] += np.conj(rands)
-
-        # Add to lower triangular part of bottom-right block
-        H[i + b + 1 :, i + b] += rands
-
-        # Again realize d - i - 1 complex normals with standard deviation
-        rands[:] = (
-            rng.standard_normal(d - 1 - i, rdtype)
-            + 1j * rng.standard_normal(d - 1 - i, rdtype)
-        ) * std
-
-        # Add to upper triangular part of top-right block
-        H[i, i + b + 1 :] += rands
-
-        # Subtract from lower triangular part of top-right block
-        H[i + 1 : b, i + b] -= rands
-
-        # Subtract conjugate from upper triangular part of bottom-left block
-        H[i + b, i + 1 : b] -= np.conj(rands)
-
-        # Add conjugate to lower triangular part of bottom-left block
-        H[i + b + 1 :, i] += np.conj(rands)
-
-
-@njit(cache=True, fastmath=True)
 def _create_skew_matrix(
-    H: np.ndarray, b: int, rdtype: type, rng: np.random.Generator, std: float
-) -> None:
-    """Create a complex anti-symmetric matrix with the given parameters."""
-
-    # Loop over diagonal indices
-    for i in range(b):
-        # Set ith diagonal element
-        H[i, i] = 0.0
-
-        # Set b - 1 - i standard normals for upper triangle
-        H[i, i + 1 :] = (
-            rng.standard_normal(b - 1 - i, rdtype)
-            + 1j * rng.standard_normal(b - 1 - i, rdtype)
-        ) * std
-
-        # Set complex anti-symmetric elements in lower triangle
-        H[i + 1 :, i] = -H[i, i + 1 :]
+    matrix: np.ndarray,
+    rng: np.random.Generator,
+    real_dtype: type[np.floating],
+    std_dev: float,
+) -> np.ndarray:
+    size: int = matrix.shape[0]
+    for i in range(size):
+        matrix[i, i] = 0.0
+        matrix[i, i + 1 :] = std_dev * (
+            rng.standard_normal(size - 1 - i, real_dtype)
+            + 1j * rng.standard_normal(size - 1 - i, real_dtype)
+        )
+        matrix[i + 1 :, i] = -matrix[i, i + 1 :]
 
 
 def _create_gse_matrix(
-    H: np.ndarray, d: int, rdtype: type, rng: np.random.Generator, std: float
+    matrix: np.ndarray,
+    rng: np.random.Generator,
+    real_dtype: type[np.floating],
+    std_dev: float,
 ) -> np.ndarray:
-    """Create a GSE matrix with the given parameters."""
+    halfway: int = matrix.shape[0] // 2
+    top_left_block = matrix[:halfway, :halfway]
+    top_right_block = matrix[:halfway, halfway:]
+    bottom_left_block = matrix[halfway:, :halfway]
+    bottom_right_block = matrix[halfway:, halfway:]
 
-    # Alias block dimension
-    b = d // 2
+    _create_gue_matrix(top_left_block, rng, real_dtype, std_dev)
+    np.conj(top_left_block, out=bottom_right_block)
 
-    # Create GUE matrix in top-left block
-    _create_gue_matrix(H[:b, :b], b, rdtype, rng, std)
-
-    # Create conjugate of GUE matrix in bottom-right block
-    np.conj(H[:b, :b], out=H[b:, b:])
-
-    # Create complex anti-symmetric in top-right block
-    _create_skew_matrix(H[:b, b:], b, rdtype, rng, std)
-
-    # Set complex anti-symmetric elements in bottom-left block
-    np.negative(H[:b, b:], out=H[b:, :b])
-    np.conj(H[b:, :b], out=H[b:, :b])
+    _create_skew_matrix(top_right_block, rng, real_dtype, std_dev)
+    np.negative(top_right_block, out=bottom_left_block)
+    np.conj(bottom_left_block, out=bottom_left_block)
 
 
-# ----------------------------------
-# Gaussian Symplectic Ensemble (GSE)
-# ----------------------------------
 @frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
-class GSE(AZEnsemble):
+class GaussianSymplecticEnsemble(WignerDysonEnsemble):
+    dyson_index: int = field(init=False, default=4, repr=False)
+    std_dev: float = field(init=False, repr=False)
 
-    # Dyson index (for GSE is 4)
-    beta: int = field(init=False, default=4, repr=False)
+    @std_dev.default
+    def _std_dev_default(self) -> float:
+        return self.ground_state_energy / 2 / np.sqrt(2 * self.dimension)
 
-    def generate_matrix(
-        self, out: np.ndarray | None = None, offset: np.ndarray | None = None
-    ) -> np.ndarray:
-        """Generate a random matrix from the GSE."""
+    _nickname: str = field(init=False, default="GSE", repr=False)
 
-        # Alias random number generator
-        rng = self.rng
+    def generate_matrix(self, use_complex_dtype: bool = True) -> np.ndarray:
+        complex_dtype: type[np.complexfloating] = self.complex_dtype.type
+        real_dtype: type[np.floating] = self.real_dtype.type
+        rng: np.random.Generator = self.rng
+        size: int = self.dimension
+        std_dev: float = self.std_dev
 
-        # Alias data types of matrix elements
-        cdtype = self.dtype.type
-        rdtype = self.real_dtype.type
+        matrix: np.ndarray = np.empty((size, size), complex_dtype, order="F")
+        _create_gse_matrix(matrix, rng, real_dtype, std_dev)
+        return matrix
 
-        # Alias dimension of matrix
-        d = self.dim
+    def matrix_stream(
+        self, realizs: int, use_complex_dtype: bool = True
+    ) -> Iterator[np.ndarray]:
+        complex_dtype: type[np.complexfloating] = self.complex_dtype.type
+        real_dtype: type[np.floating] = self.real_dtype.type
+        rng: np.random.Generator = self.rng
+        size: int = self.dimension
+        std_dev: float = self.std_dev
 
-        # Alias standard deviation of matrix elements
-        std = self.sigma / 2
-
-        # =================================================
-
-        # If offset is not None, add to provided matrix
-        if offset is not None:
-            # Alias provided matrix
-            H = offset
-
-            # Add GSE matrix to H
-            _add_gse_matrix(H, d, rdtype, rng, std)
-
-        # Otherwise, write to provided memory
-        else:
-            # Alias memory for output matrix
-            if out is not None:
-                # Alias provided matrix
-                H = out
-            else:
-                # Create empty matrix
-                H = np.empty((d, d), cdtype, order="F")
-
-            # Create GSE matrix
-            _create_gse_matrix(H, d, rdtype, rng, std)
-
-        # Return GSE matrix
-        return H
+        matrix: np.ndarray = np.empty((size, size), complex_dtype, order="F")
+        for _ in range(realizs):
+            _create_gse_matrix(matrix, rng, real_dtype, std_dev)
+            yield matrix

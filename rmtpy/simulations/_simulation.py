@@ -1,9 +1,5 @@
-# rmtpy/simulations/_simulation.py
-
-# Postponed evaluation of annotations
 from __future__ import annotations
 
-# Standard library imports
 import inspect
 import json
 import re
@@ -11,185 +7,150 @@ from abc import ABC
 from pathlib import Path
 from typing import Any
 
-# Third-party imports
 from attrs import asdict, field, fields, fields_dict, frozen
 from attrs.validators import gt
+from cattrs.dispatch import StructureHook, UnstructureHook
 
-# Local application imports
-from ..dataclasses import Data
-from ..ensembles import Ensemble
-from ..plotting import Plot
-from ..utils import rmtpy_converter
+from ._data import DATA_REGISTRY, Data
+from ._plot import Plot
+from ..ensembles import RandomMatrixEnsemble
+from ..utils import rmtpy_converter, insert_underscores, normalize_dict
 
 
-# -------------------------------
-# Monte Carlo Simulation Registry
-# -------------------------------
 SIMULATION_REGISTRY: dict[str, type[Simulation]] = {}
+SIMULATION_STRUCTURE_HOOKS: dict[str, StructureHook] = {
+    key: rmtpy_converter.get_structure_hook(val)
+    for key, val in SIMULATION_REGISTRY.items()
+}
+SIMULATION_UNSTRUCTURE_HOOKS: dict[str, UnstructureHook] = {
+    key: rmtpy_converter.get_unstructure_hook(val)
+    for key, val in SIMULATION_REGISTRY.items()
+}
 
 
-# ---------------------------------
-# Monte Carlo Simulation Base Class
-# ---------------------------------
 @frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
 class Simulation(ABC):
+    ensemble: RandomMatrixEnsemble = field(converter=RandomMatrixEnsemble.create)
 
-    # Random matrix ensemble
-    ensemble: Ensemble = field(converter=Ensemble.create)
+    @ensemble.validator
+    def _ensemble_is_concrete(self, _, value: RandomMatrixEnsemble) -> None:
+        if inspect.isabstract(value):
+            raise ValueError(f"Ensemble must be concrete.")
 
-    # Number of realizations
     realizs: int = field(
         converter=int,
         validator=gt(0),
         metadata={"dir_name": "realizs", "latex_name": "R"},
     )
 
-    # Metadata
     metadata: dict[str, Any] = field(init=False, factory=dict, repr=False)
-
-    # Directory name
     dir_name: str = field(init=False, repr=False)
 
     @dir_name.default
-    def __dir_name_default(self) -> str:
-        """Generate default directory name based on class name."""
-
-        # Insert underscores between words and acronyms in class name
-        name = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", type(self).__name__)
-        return re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", name).lower()
-
-    @ensemble.validator
-    def __ensemble_is_concrete(self, _, value: Ensemble) -> None:
-        """Ensure ensemble is a concrete subclass of Ensemble."""
-
-        # If ensemble is abstract, raise error
-        if inspect.isabstract(value):
-            raise ValueError(
-                f"Class must be a concrete subclass of Ensemble, got {type(value).__name__} instead."
-            )
+    def _dir_name_default(self) -> str:
+        return insert_underscores(type(self).__name__).lower()
 
     @classmethod
     def __attrs_init_subclass__(cls) -> None:
-        """Register concrete subclasses in the simulation registry."""
-
-        # Include only concrete classes in registry
         if not inspect.isabstract(cls):
-            # Convert simulation class to registry key format
-            sim_key = re.sub(r"_", "", cls.__name__).lower()
-
-            # Normalize class name to registry key format
+            sim_key: str = re.sub(r"_", "", cls.__name__).lower()
             SIMULATION_REGISTRY[sim_key] = cls
 
     def __attrs_post_init__(self) -> None:
-        """Initialize metadata after object creation."""
-
-        # Add simulation name to metadata
         self.metadata["name"] = type(self).__name__
-
-        # Initialize arguments dictionary
         self.metadata["args"] = {}
-
-        # Add ensemble name to metadata
         self.metadata["args"]["ensemble"] = rmtpy_converter.unstructure(self.ensemble)
-
-        # Add number of realizations to metadata
         self.metadata["args"]["realizs"] = self.realizs
-
-        # Construct tuple of data attributes
-        data_attrs = tuple(
+        data_attrs: tuple[Data, ...] = tuple(
             getattr(self, f.name)
             for f in fields(type(self))
             if isinstance(getattr(self, f.name), Data)
         )
-
-        # Loop through data objects
         for data in data_attrs:
-            # Store simulation metadata to data object
             data.metadata.update({"simulation": self.metadata.copy()})
 
     def save_data(self, out_dir: str | Path) -> None:
-        """Save simulation results to disk."""
-
-        # Save metadata to .json file
         with open(out_dir / "metadata.json", "w") as file:
-            json.dump(self.metadata, file, indent=4)
+            json.dump(self.metadata, file, indent=4, default=str)
 
-        # Construct tuple of data attributes
-        data_attrs = (
+        data_attrs: tuple[Data, ...] = tuple(
             getattr(self, f.name)
             for f in fields(type(self))
             if isinstance(getattr(self, f.name), Data)
         )
-
-        # Loop through data objects
         for data in data_attrs:
-            # Generate output path for data object
-            out_path = out_dir / data.file_name / f"{data.file_name}.npz"
-
-            # Make sure directories exist
+            subdir_name = data.file_name.replace("_data", "")
+            out_path: Path = out_dir / subdir_name / f"{data.file_name}.npz"
             out_path.parent.mkdir(parents=True, exist_ok=True)
-
-            # Save data to disk
             data.save(out_path)
 
     def initialize_plots(self) -> None:
-        """Initialize plot instances for simulation."""
         pass
 
     def save_plots(self, out_dir: str | Path) -> None:
-        """Save simulation plots to disk."""
-
-        # Initialize plot instances if they have not been initialized
         self.initialize_plots()
-
-        # Construct tuple of plot attributes
-        plot_attrs = (
+        plot_attrs: tuple[Plot, ...] = tuple(
             getattr(self, f.name)
             for f in fields(type(self))
             if isinstance(getattr(self, f.name), Plot)
         )
-
-        # Loop through plot objects
         for plot in plot_attrs:
-            # Generate output path for plot object
-            out_path = out_dir / plot.data.file_name
-
-            # Make sure directories exist
+            subdir_name = plot.data.file_name.replace("_data", "")
+            out_path: Path = out_dir / subdir_name
             out_path.parent.mkdir(parents=True, exist_ok=True)
-
-            # Save plot to disk
             plot.plot(path=out_path)
 
     @property
     def to_dir(self) -> Path:
-        """Generate directory Path used for storing simulation data."""
-
-        # Begin path with class name
-        dir_path = Path(self._dir_name)
-
-        # Append ensemble directory representation
+        self_asdict: dict[str, Any] = asdict(self)
+        dir_path: Path = Path(self._dir_name)
         dir_path /= self.ensemble.to_dir
-
-        # Construct instance as dictionary
-        self_asdict = asdict(self)
-
-        # Loop through remaining attributes
         for name, attr in fields_dict(type(self)).items():
-            # Use only fields labeled for path inclusion
             if attr.metadata.get("dir_name", None) is not None:
-                # Sanitize field value for directory representation
-                val = re.sub(r"[^\w\-.]", "_", str(self_asdict[name]))
-
-                # Append string representation of field value to path
+                val: str = re.sub(r"[^\w\-.]", "_", str(self_asdict[name]))
                 dir_path /= f"{attr.metadata['dir_name']}_{val.replace('.', 'p')}"
-
-        # Return path
         return dir_path
 
     @property
     def _dir_name(self) -> str:
-        """Generate directory name used for storing simulation data."""
+        return insert_underscores(type(self).__name__).lower()
 
-        # Insert underscores between words and acronyms in class name
-        name = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", type(self).__name__)
-        return re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", name).lower()
+
+@rmtpy_converter.register_structure_hook
+def simulation_structure_hook(
+    src: str | Path | dict[str, Any] | Simulation, _
+) -> Simulation:
+    if type(src) in SIMULATION_REGISTRY.values():
+        return src
+    elif isinstance(src, (str, Path)):
+        path: Path = Path(src)
+        with open(path / "metadata.json", "r") as file:
+            metadata: dict[str, Any] = json.load(file)
+    elif isinstance(src, dict):
+        metadata: dict[str, Any] = src
+    else:
+        raise TypeError(f"Expected str, Path, dict, got {type(src).__name__}")
+
+    sim_dict: dict[str, Any] = normalize_dict(metadata, SIMULATION_REGISTRY)
+    sim_name: str = sim_dict.pop("name")
+    if not isinstance(sim_name, str):
+        raise ValueError(f"Invalid simulation name type: {type(sim_name).__name__}")
+
+    sim_key: str = re.sub(r"_", "", sim_name).lower()
+    sim_cls: type[Simulation] = SIMULATION_REGISTRY[sim_key]
+    sim_args: dict[str, Any] = sim_dict.pop("args")
+    if not isinstance(sim_args, dict):
+        raise ValueError(f"Invalid simulation args type: {type(sim_args).__name__}")
+
+    sim_inst: Simulation = SIMULATION_STRUCTURE_HOOKS[sim_key](sim_args, sim_cls)
+    if isinstance(src, (str, Path)):
+        data_dirs: tuple[Path, ...] = tuple(
+            folder for folder in path.iterdir() if folder.is_dir()
+        )
+        for folder in data_dirs:
+            data_cls: type[Data] | None = DATA_REGISTRY.get(folder.name, None)
+            if data_cls is None:
+                continue
+            data: Data = data_cls.load(folder / f"{folder.name}.npz")
+            object.__setattr__(sim_inst, folder.name + "_data", data)
+    return sim_inst

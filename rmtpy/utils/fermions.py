@@ -1,258 +1,162 @@
-# rmtpy/utils/fermions.py
+from collections.abc import Sequence
+from itertools import combinations
+from math import comb
 
-# Third-party imports
 import numpy as np
-from scipy.sparse import csr_matrix, eye_array, kron
+from scipy.sparse import coo_matrix, csr_matrix, eye_array, kron
 
 
-# ------------------------
-# Create Majorana Fermions
-# ------------------------
-def create_majoranas(Nm: int) -> tuple[csr_matrix, ...]:
-    """Create list of Nm Majorana fermion operators."""
+def create_majoranas_fermions(num_majoranas: int) -> tuple[csr_matrix, ...]:
+    pauli_matrices: tuple[csr_matrix, csr_matrix, csr_matrix] = [
+        csr_matrix([[0, 1], [1, 0]], dtype=np.complex64),
+        csr_matrix([[0, -1j], [1j, 0]], dtype=np.complex64),
+        csr_matrix([[1, 0], [0, -1]], dtype=np.complex64),
+    ]
+    majoranas_0: list[csr_matrix] = pauli_matrices[:2]
+    majoranas_c0: csr_matrix = pauli_matrices[2]
+    for i in range(num_majoranas // 2 - 1):
+        eye_matrix: csr_matrix = eye_array(2 ** (i + 1), format="csr")
+        majoranas: list[csr_matrix | None] = [None] * (len(majoranas_0) + 2)
+        for j in range(len(majoranas_0)):
+            majoranas[j] = kron(pauli_matrices[0], majoranas_0[j], format="csr")
+        majoranas[-2] = kron(pauli_matrices[0], majoranas_c0, format="csr")
+        majoranas[-1] = kron(pauli_matrices[1], eye_matrix, format="csr")
 
-    # Create Pauli matrices
-    pauli = (
-        csr_matrix([[0, 1], [1, 0]]),  #     sigma_x
-        csr_matrix([[0, -1j], [1j, 0]]),  #  sigma_y
-        csr_matrix([[1, 0], [0, -1]]),  #    sigma_z
-    )
-
-    # Create initial Majorana operators
-    majorana_0 = pauli[:2]
-    majorana_c0 = pauli[2]
-
-    # With loop, build Majorana operators from the initial ones
-    for i in range(Nm // 2 - 1):
-        # Create identity matrix corresponding to old Majorana operators
-        eye_mat = eye_array(2 ** (i + 1), format="csr")
-
-        # Initialize new Majorana operators
-        majorana = [None for _ in range(len(majorana_0) + 2)]
-
-        # Create new Majorana operators
-        for j in range(len(majorana_0)):
-            majorana[j] = kron(pauli[0], majorana_0[j], format="csr")
-        majorana[-2] = kron(pauli[0], majorana_c0, format="csr")
-        majorana[-1] = kron(pauli[1], eye_mat, format="csr")
-
-        # If not the last Majorana operators, update new as old
-        if i < Nm // 2 - 2:
-            majorana_0 = majorana
-            majorana_c0 = kron(pauli[2], eye_mat, format="csr")
-        # Else, return the last Majorana operators
+        if i < num_majoranas // 2 - 2:
+            majoranas_0 = majoranas
+            majoranas_c0 = kron(pauli_matrices[2], eye_matrix, format="csr")
         else:
-            return tuple(majorana)
+            return tuple(majoranas)
 
 
-# -----------------------
-# Create Complex Fermions
-# -----------------------
+def resolve_majoranas(
+    num_majoranas: int | None = None, majoranas: Sequence[csr_matrix] | None = None
+) -> Sequence[csr_matrix]:
+    if majoranas is None and num_majoranas is None:
+        raise ValueError("Either majoranas or num_majoranas must be provided.")
+    if majoranas is not None:
+        if num_majoranas is not None:
+            raise ValueError("Cannot specify both majoranas and num_majoranas.")
+        if not isinstance(majoranas, Sequence):
+            raise ValueError("majoranas must be a sequence of Majorana operators.")
+        if not all(isinstance(maj, csr_matrix) for maj in majoranas):
+            raise ValueError("All elements of majoranas must be csr_matrix instances.")
+    if majoranas is None:
+        majoranas: tuple[csr_matrix, ...] = create_majoranas_fermions(num_majoranas)
+
+    return majoranas
+
+
 def create_complex_fermions(
-    Nm: int | None = None, majorana: tuple[csr_matrix, ...] | None = None
+    num_majoranas: int | None = None, majoranas: Sequence[csr_matrix] | None = None
 ) -> tuple[tuple[csr_matrix, ...], tuple[csr_matrix, ...]]:
-    """Create tuples of creation and annihilation operators for complex fermions."""
+    majoranas: tuple[csr_matrix, ...] = resolve_majoranas(num_majoranas, majoranas)
 
-    # If majorana is None, create Majorana operators
-    if majorana is None:
-        # Check if Nm are provided
-        if Nm is not None:
-            # Create Majorana operators
-            majorana = create_majoranas(Nm)
-        else:
-            # Raise error if Nm is not provided
-            raise ValueError("Nm must be provided if majorana is None.")
-    else:
-        # Check if majorana is a list of Majorana operators
-        if not isinstance(majorana, tuple) or not all(
-            isinstance(m, csr_matrix) for m in majorana
-        ):
-            # Raise error if majorana is not a tuple of Majorana operators
-            raise ValueError("majorana must be a tuple of Majorana operators.")
+    num_complex_fermions: int = len(majoranas) // 2
+    annihilation_operators: list[csr_matrix | None] = [None] * num_complex_fermions
+    creation_operators: list[csr_matrix | None] = [None] * num_complex_fermions
 
-    # Alias number of complex fermion operators
-    Nc = len(majorana) // 2
-
-    # =================================================
-
-    # Initialize lists of creation and annihilation operators
-    annihilation = [None for _ in range(Nc)]
-    creation = [None for _ in range(Nc)]
-
-    # Create creation and annihilation operators from Majoranas
-    for k in range(Nc):
-        annihilation[k] = (majorana[2 * k] - 1j * majorana[2 * k + 1]) / 2
-        creation[k] = (majorana[2 * k] + 1j * majorana[2 * k + 1]) / 2
-
-    # Return tuples of creation and annihilation operators
-    return tuple(annihilation), tuple(creation)
+    for k in range(num_complex_fermions):
+        annihilation_operators[k] = (majoranas[2 * k] - 1j * majoranas[2 * k + 1]) / 2
+        creation_operators[k] = (majoranas[2 * k] + 1j * majoranas[2 * k + 1]) / 2
+    return tuple(annihilation_operators), tuple(creation_operators)
 
 
-# ----------------------
-# Construct Vacuum State
-# ----------------------
-def vacuum_state(
-    complex_fermions: tuple[tuple[csr_matrix, ...], tuple[csr_matrix, ...]],
+def create_vacuum_state(
+    complex_fermions: Sequence[Sequence[csr_matrix], Sequence[csr_matrix]],
 ) -> csr_matrix:
-    """Construct vacuum state from complex fermion operators."""
+    num_complex_fermions: int = len(complex_fermions[0])
+    dimension: int = 2**num_complex_fermions
 
-    # Alias complex fermions operators
-    c = complex_fermions
+    vacuum_projector: csr_matrix = eye_array(dimension, format="csr")
+    for k in range(num_complex_fermions):
+        vacuum_projector = complex_fermions[1][k].dot(vacuum_projector)
+        vacuum_projector = complex_fermions[0][k].dot(vacuum_projector)
 
-    # Alias number of complex fermion operators
-    Nc = len(c[0])
+    arbitrary_state: csr_matrix = csr_matrix(np.ones((dimension, 1)))
+    vacuum_state: csr_matrix = vacuum_projector.dot(arbitrary_state)
 
-    # Alias dimension of total Hilbert space
-    d = 2**Nc
+    vacuum_state_norm: complex = vacuum_state.multiply(vacuum_state.conj()).sum()
+    if vacuum_state_norm != 1.0:
+        vacuum_state /= np.sqrt(vacuum_state_norm)
 
-    # =================================================
-
-    # Construct projector onto vacuum state
-    projector = eye_array(d, format="csr")
-    for k in range(Nc):
-        projector = c[0][k].dot(c[1][k].dot(projector))
-
-    # Choose arbitrary state
-    psi = csr_matrix(np.ones((d, 1)))
-
-    # Project psi onto vacuum state and ensure normalization
-    omega = projector.dot(psi)
-
-    # Normalize psi if needed
-    norm = omega.multiply(omega.conj()).sum()
-    if norm != 1.0:
-        omega /= np.sqrt(norm)
-
-    # Return vacuum state
-    return omega
+    return vacuum_state
 
 
-# ----------------------------
-# Slice of Parity Sector Block
-# ----------------------------
-def block_slice(Nm: int, parity: int = 0) -> tuple[slice, slice]:
-    """Return slice of parity sector block for Nm Majorana fermions and given parity."""
-
-    # Ensure parity is either 0 or 1
+def create_block_slice(num_majoranas: int, parity: int = 0) -> tuple[slice, slice]:
     if parity not in (0, 1):
         raise ValueError("Parity must be either 0 (even) or 1 (odd).")
 
-    # Create complex fermions
-    c = create_complex_fermions(Nm)
-
-    # Construct vacuum state
-    omega = vacuum_state(c)
-
-    # Ensure vacuum state is normalized and has only one nonzero entry
-    if omega.count_nonzero() != 1:
+    complex_fermions: tuple[tuple[csr_matrix, ...], tuple[csr_matrix, ...]] = (
+        create_complex_fermions(num_majoranas=num_majoranas)
+    )
+    vacuum_state: csr_matrix = create_vacuum_state(complex_fermions)
+    if vacuum_state.count_nonzero() != 1:
         raise ValueError("Vacuum state must have only one nonzero entry.")
-    elif not np.isclose(omega.multiply(omega.conj()).sum(), 1.0):
+    elif not np.isclose(vacuum_state.multiply(vacuum_state.conj()).sum(), 1.0):
         raise ValueError("Vacuum state must be normalized.")
 
-    # Alias dimension of parity sector blocks
-    d = 2 ** (Nm // 2 - 1)
-
-    # =================================================
-
-    # Get index of nonzero entry in vacuum state
-    index = omega.nonzero()[0][0]
-
-    # Determine slice of parity sector block based on index and parity
-    start = 0 if ((index < d) ^ parity) else d
-    return slice(start, start + d), slice(start, start + d)
+    size: int = 2 ** (num_majoranas // 2 - 1)
+    nonzero_index: int = vacuum_state.nonzero()[0][0]
+    block_idx: int = 0 if ((nonzero_index < size) ^ parity) else size
+    return slice(block_idx, block_idx + size), slice(block_idx, block_idx + size)
 
 
-# ------------------------------------------------
-# Construct Unitary Part of Particle-Hole Operator
-# ------------------------------------------------
-def particle_hole_operator(majorana: tuple[csr_matrix, ...]) -> csr_matrix:
-    """Construct unitary part of particle-hole operator from Majorana operators."""
+def create_particle_hole_operator(majoranas: tuple[csr_matrix, ...]) -> csr_matrix:
+    num_complex_fermions: int = len(majoranas) // 2
+    dimension: int = 2**num_complex_fermions
 
-    # Alias number of complex fermion operators
-    Nc = len(majorana) // 2
-
-    # Alias dimension of total Hilbert space
-    d = 2**Nc
-
-    # =================================================
-
-    # Construct unitary part of particle-hole operator
-    P = eye_array(d, format="csr")
-    for k in range(Nc):
-        P = majorana[2 * k].dot(P)
-
-    # Return unitary part of particle-hole operator
-    return P
+    particle_hole_operator: csr_matrix = eye_array(dimension, format="csr")
+    for k in range(num_complex_fermions):
+        particle_hole_operator = majoranas[2 * k].dot(particle_hole_operator)
+    return particle_hole_operator
 
 
-# ------------------------------
-# Rotate Majoranas to Real Basis
-# ------------------------------
-def to_real_basis(majorana: tuple[csr_matrix, ...]) -> tuple[csr_matrix, ...]:
-    """Rotate Majorana operators to real basis."""
+def majoranas_to_real_basis(majoranas: Sequence[csr_matrix]) -> tuple[csr_matrix, ...]:
+    num_majoranas: int = len(majoranas)
+    particle_hole_operator: csr_matrix = create_particle_hole_operator(majoranas)
 
-    # Alias number of Majorana operators
-    Nm = len(majorana)
-
-    # =================================================
-
-    # Construct unitary part of particle-hole operator
-    P = particle_hole_operator(majorana)
-
-    # Initialize list of Majorana operators in real basis
-    real_majorana = [None for _ in range(Nm)]
-
-    # Rotate Majorana operators to real basis
-    for k in range(Nm):
-        PmajP = P.dot(majorana[k].dot(P))
-        commutator = majorana[k].dot(P) - P.dot(majorana[k])
-        real_majorana[k] = (majorana[k] + PmajP + 1j * commutator) / 2
-
-    # Return Majorana operators in real basis
-    return tuple(real_majorana)
+    real_majoranas: list[csr_matrix | None] = [None] * num_majoranas
+    for k in range(num_majoranas):
+        maj_P: csr_matrix = majoranas[k].dot(particle_hole_operator)
+        P_maj: csr_matrix = particle_hole_operator.dot(majoranas[k])
+        P_maj_P: csr_matrix = particle_hole_operator.dot(maj_P)
+        real_majoranas[k] = (majoranas[k] + P_maj_P + 1j * (maj_P - P_maj)) / 2
+    return tuple(real_majoranas)
 
 
-# ----------------------------------------
-# Construct Products of Pairs of Majoranas
-# ----------------------------------------
-def create_majorana_pairs(
-    Nm: int | None = None,
-    majorana: tuple[csr_matrix, ...] | None = None,
-    real_basis: bool = False,
-) -> tuple[tuple[csr_matrix, ...], ...]:
-    """Create all ψ_j * ψ_k (j < k) pairs of Majorana fermion operators."""
+def create_q_body_majorana_terms(
+    q: int,
+    parity_block: slice,
+    num_majoranas: int | None = None,
+    majoranas: Sequence[csr_matrix] | None = None,
+    in_real_basis: bool = False,
+) -> tuple[tuple[np.ndarray, ...], ...]:
+    majoranas: tuple[csr_matrix, ...] = resolve_majoranas(num_majoranas, majoranas)
 
-    # If majorana is None, create Majorana operators
-    if majorana is None:
-        # Check if Nm are provided
-        if Nm is not None:
-            # Create Majorana operators
-            majorana = create_majoranas(Nm)
+    num_majoranas: int = len(majoranas)
+    num_terms: int = comb(num_majoranas, q)
+    nonzeros: int = 2 ** (num_majoranas // 2 - 1)
 
-            # If real_basis is True, convert Majorana operators to real basis
-            if real_basis:
-                majorana = to_real_basis(majorana)
-        else:
-            # Raise error if Nm is not provided
-            raise ValueError("Nm must be provided if majorana is None.")
+    if in_real_basis:
+        majoranas = majoranas_to_real_basis(majoranas)
+        q_body_data: np.ndarray = np.empty((num_terms, nonzeros), np.int8, order="C")
     else:
-        # Check if majorana is a list of Majorana operators
-        if not isinstance(majorana, tuple) or not all(
-            isinstance(m, csr_matrix) for m in majorana
-        ):
-            # Raise error if majorana is not a tuple of Majorana operators
-            raise ValueError("majorana must be a tuple of Majorana operators.")
+        q_body_data: np.ndarray = np.empty(
+            (num_terms, nonzeros), np.complex64, order="C"
+        )
 
-        # Store number of Majorana operators
-        Nm = len(majorana)
+    q_body_idxs: np.ndarray = np.empty((num_terms, 2, nonzeros), np.int32, order="C")
+    for term_num, idx_tuple in enumerate(combinations(range(num_majoranas), q)):
+        q_body_term: csr_matrix = majoranas[idx_tuple[0]]
+        for k in range(1, q):
+            q_body_term = q_body_term.dot(majoranas[idx_tuple[k]])
+        if in_real_basis:
+            q_body_term = q_body_term.real.astype(np.int8)
+        q_body_term: coo_matrix = q_body_term[parity_block].tocoo()
 
-    # Initialize nested list of Majorana pairs
-    pairs = [[None for _ in range(Nm)] for _ in range(Nm)]
+        q_body_idxs[term_num, 0, :] = q_body_term.row
+        q_body_idxs[term_num, 1, :] = q_body_term.col
+        q_body_data[term_num, :] = q_body_term.data
 
-    # Fill upper triangle of Majorana pairs
-    for i in range(Nm):
-        for j in range(i + 1, Nm):
-            pairs[i][j] = majorana[i].dot(majorana[j])
-
-    # Return Majorana pairs
-    return tuple(tuple(row) for row in pairs)
+    return q_body_idxs, q_body_data

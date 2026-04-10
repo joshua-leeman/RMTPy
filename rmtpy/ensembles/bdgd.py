@@ -1,116 +1,70 @@
-# rmtpy/ensembles/bdgd.py
-
-# Postponed evaluation of annotations
 from __future__ import annotations
 
-# Third-party imports
+from collections.abc import Iterator
+
 import numpy as np
 from attrs import field, frozen
 from numba import njit
 
-# Local application imports
-from ._base import AZEnsemble
-
-
-@njit(cache=True, fastmath=True)
-def _add_bdgd_matrix(
-    H: np.ndarray, d: int, rdtype: type, rng: np.random.Generator, std: float
-) -> np.ndarray:
-    """Add a BdG(D) matrix to H with the given parameters."""
-
-    # Loop over diagonal indices
-    for i in range(d):
-        # Realize d - i - 1 normals with standard deviation
-        rands = rng.standard_normal(d - i - 1, rdtype) * std
-
-        # Add to upper triangular part
-        H[i, i + 1 :] += 1j * rands
-
-        # Add conjugate to lower triangular part
-        H[i + 1 :, i] -= 1j * rands
+from ._wigner_dyson import WignerDysonEnsemble
 
 
 @njit(cache=True, fastmath=True)
 def _create_bdgd_matrix(
-    H: np.ndarray, d: int, rdtype: type, rng: np.random.Generator, std: float
+    matrix: np.ndarray,
+    rng: np.random.Generator,
+    real_dtype: type[np.floating],
+    std_dev: float,
 ) -> np.ndarray:
-    """Create a BdG(D) matrix with the given parameters."""
-
-    # Loop over diagonal indices
-    for i in range(d):
-        # Set ith diagonal element
-        H[i, i] = 0.0
-
-        # Set d - i - 1 standard normals
-        H[i, i + 1 :] = 1j * rng.standard_normal(d - i - 1, rdtype) * std
-
-        # Set conjugate off-diagonal elements
-        H[i + 1 :, i] = np.conj(H[i, i + 1 :])
+    size: int = matrix.shape[0]
+    for i in range(size):
+        matrix[i, i] = 0.0
+        matrix[i, i + 1 :] = std_dev * (
+            1j * rng.standard_normal(size - i - 1, real_dtype)
+        )
+        matrix[i + 1 :, i] = np.conj(matrix[i, i + 1 :])
 
 
-# ----------------------------------------
-# Bogoliubov-de Gennes D Ensemble (BdG(D))
-# ----------------------------------------
 @frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
-class BdGD(AZEnsemble):
+class BogoliubovDeGennesDEnsemble(WignerDysonEnsemble):
+    dyson_index: int = field(init=False, default=2, repr=False)
+    std_dev: float = field(init=False, repr=False)
 
-    # Dyson index (for BdG(D) is 2)
-    beta: int = field(init=False, default=2, repr=False)
+    @std_dev.default
+    def _std_dev_default(self) -> float:
+        return self.ground_state_energy / 2 / np.sqrt(self.dimension)
+
+    _nickname: str = field(init=False, default="BdGD", repr=False)
 
     @property
     def _dir_name(self) -> str:
-        """Generate directory name used for storing BdG(D) instance data."""
-
-        # Return formatted class name
         return "BdG_D"
 
     @property
     def _latex_name(self) -> str:
-        """Generate LaTeX representation of BdG(D) class name."""
-
-        # Return formatted LaTeX name
         return "\\textrm{{BdG(D)}}"
 
-    def generate_matrix(
-        self, out: np.ndarray | None = None, offset: np.ndarray | None = None
-    ) -> np.ndarray:
-        """Generate a random matrix from the BdG(D) ensemble."""
+    def generate_matrix(self, use_complex_dtype: bool = True) -> np.ndarray:
+        complex_dtype: type[np.complexfloating] = self.complex_dtype.type
+        real_dtype: type[np.floating] = self.real_dtype.type
+        rng: np.random.Generator = self.rng
+        size: int = self.dimension
+        std_dev: float = self.std_dev
 
-        # Alias random number generator
-        rng = self.rng
+        matrix: np.ndarray = np.empty((size, size), complex_dtype, order="F")
+        _create_bdgd_matrix(matrix, rng, real_dtype, std_dev)
+        return matrix
 
-        # Alias data types of matrix elements
-        cdtype = self.dtype.type
-        rdtype = self.real_dtype.type
+    def matrix_stream(
+        self, realizs: int, use_complex_dtype: bool = True
+    ) -> Iterator[np.ndarray]:
+        complex_dtype: type[np.complexfloating] = self.complex_dtype.type
+        real_dtype: type[np.floating] = self.real_dtype.type
+        rng: np.random.Generator = self.rng
+        size: int = self.dimension
+        std_dev: float = self.std_dev
 
-        # Alias dimension of matrix
-        d = self.dim
-
-        # Alias standard deviation of matrix elements
-        std = self.sigma / np.sqrt(2)
-
-        # =================================================
-
-        # If offset is not None, add to provided matrix
-        if offset is not None:
-            # Alias provided matrix
-            H = offset
-
-            # Add BdG(D) matrix to H
-            _add_bdgd_matrix(H, d, rdtype, rng, std)
-
-        # Otherwise, write to provided memory
-        else:
-            # Alias memory for output matrix
-            if out is not None:
-                # Alias provided matrix
-                H = out
-            else:
-                # Create empty matrix
-                H = np.empty((d, d), cdtype, order="F")
-
-            # Create BdG(D) matrix
-            _create_bdgd_matrix(H, d, rdtype, rng, std)
-
-        # Return BdG(D) matrix
-        return H
+        matrix: np.ndarray = np.empty((size, size), complex_dtype, order="F")
+        for _ in range(realizs):
+            _create_bdgd_matrix(matrix, rng, real_dtype, std_dev)
+            yield matrix
