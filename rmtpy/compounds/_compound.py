@@ -4,6 +4,7 @@ import inspect
 import math
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
+from typing import Any
 
 import numpy as np
 from attrs import Converter, field, frozen
@@ -11,6 +12,16 @@ from attrs.validators import instance_of
 from scipy.linalg import eigvals, solve
 
 from ..ensembles import ManyBodyEnsemble
+from ..utils import rmtpy_converter, insert_underscores, normalize_dict, to_registry_key
+
+
+COMPOUND_REGISTRY: dict[str, type[Compound]] = {}
+COMPOUND_STRUCTURE_HOOKS: dict[str, Converter] = {}
+COMPOUND_UNSTRUCTURE_HOOKS: dict[str, Converter] = {}
+
+
+def create_quantum_chaotic_compound(**kwargs: Any) -> Compound:
+    return Compound.create(kwargs)
 
 
 def _to_1D_array(energies: float | np.ndarray) -> np.ndarray:
@@ -79,6 +90,18 @@ class Compound(ABC):
     def _channel_coupling_strengths_default(self) -> float:
         return np.sqrt(self.ensemble.ground_state_energy)
 
+    @classmethod
+    def __attrs_init_subclass__(cls) -> None:
+        if not inspect.isabstract(cls):
+            key: str = to_registry_key(cls.__name__)
+            COMPOUND_REGISTRY[key] = cls
+            COMPOUND_STRUCTURE_HOOKS[key] = rmtpy_converter.get_structure_hook(cls)
+            COMPOUND_UNSTRUCTURE_HOOKS[key] = rmtpy_converter.get_unstructure_hook(cls)
+
+    @classmethod
+    def create(cls, src: dict[str, Any] | Compound) -> Compound:
+        return rmtpy_converter.structure(src, cls)
+
     def generate_effective_hamiltonian(self) -> np.ndarray:
         H_eff: np.ndarray = self.ensemble.generate_matrix()
         self.generate_width_matrix(offset=H_eff)
@@ -124,7 +147,8 @@ class Compound(ABC):
         self, energies: float | np.ndarray, realizs: int
     ) -> Iterator[np.ndarray]:
         energies: np.ndarray = _to_1D_array(energies)
-        for reaction_matrix, reaction_matrix_2 in self.reaction1_2_matrices_stream(
+
+        for reaction_matrix, reaction_matrix_2 in self.reaction_matrix_pair_stream(
             energies, realizs
         ):
             i: np.ndarray = np.arange(self.num_channels)
@@ -164,7 +188,7 @@ class Compound(ABC):
         pass
 
     @abstractmethod
-    def reaction_and_reaction_2_matrices_stream(
+    def reaction_matrix_pair_stream(
         self, energies: float | np.ndarray, realizs: int
     ) -> Iterator[tuple[np.ndarray, np.ndarray]]:
         pass
