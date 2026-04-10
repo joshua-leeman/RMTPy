@@ -164,7 +164,7 @@ class Compound(ABC):
         pass
 
     @abstractmethod
-    def reaction1_2_matrices_stream(
+    def reaction_and_reaction_2_matrices_stream(
         self, energies: float | np.ndarray, realizs: int
     ) -> Iterator[tuple[np.ndarray, np.ndarray]]:
         pass

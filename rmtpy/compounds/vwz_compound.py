@@ -103,7 +103,7 @@ class VWZCompound(Compound):
 
             yield reaction_matrix
 
-    def reaction1_2_matrices_stream(
+    def reaction_and_reaction_2_matrices_stream(
         self, energies: float | np.ndarray, realizs: int
     ) -> Iterator[tuple[np.ndarray, np.ndarray]]:
         ensemble: WignerDysonEnsemble = self.ensemble
