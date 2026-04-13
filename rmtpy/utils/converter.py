@@ -23,9 +23,9 @@ def normalize_dict(src: dict[str, Any], registry: dict[str, type]) -> dict[str, 
     for val in src.values():
         if not isinstance(val, str):
             continue
-        registry_key: str = to_registry_key(val)
-        if registry_key in registry:
-            registered_cls: type = registry[registry_key]
+        key: str = to_registry_key(val)
+        if key in registry:
+            registered_cls: type = registry[key]
             normalized_dict["name"] = registered_cls.__name__
             break
 
@@ -39,7 +39,7 @@ def normalize_dict(src: dict[str, Any], registry: dict[str, type]) -> dict[str, 
             normalized_dict.update({"args": val})
             return normalized_dict
 
-    normalized_dict.update({"args": {arg: src[arg] for arg in cls_args if arg in src}})
+    normalized_dict.update({"args": {arg: src[arg] for arg in src if arg in cls_args}})
     return normalized_dict
 
 

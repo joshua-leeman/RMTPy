@@ -22,7 +22,7 @@ class FormFactorsLegend(PlotLegend):
 
 @dataclass(repr=False, eq=False, kw_only=True)
 class FormFactorsAxes(PlotAxes):
-    xticks: tuple[float, ...] = (0.0, 0.5, 1.0)  # factor of j_1_1/(E0)
+    xticks: tuple[float, ...] = (0.0, 0.5, 1.0)  # log scale base dimension
     xlabel: str = r"$N_\textrm{\tiny m} Jt / j_\textrm{\tiny 1,1}$"
     xtick_labels: tuple[str, ...] = (
         r"$1$",
@@ -30,7 +30,7 @@ class FormFactorsAxes(PlotAxes):
         r"$D$",
     )
 
-    yticks: tuple[float, ...] = (-2, -1, 0)  # log scale base dim
+    yticks: tuple[float, ...] = (-2, -1, 0)  # log scale base dimension
     ylabel: str = r"$K(t)$"
     ytick_labels: tuple[str, ...] = (
         r"$D^{-2}$",
@@ -45,7 +45,7 @@ class FormFactorsPlot(Plot):
     axes: FormFactorsAxes = field(default_factory=FormFactorsAxes)
     num_points: int = 1000
 
-    xlim: tuple[float, float] = (-0.5, 1.5)  # log scale base dim
+    xlim: tuple[float, float] = (-0.5, 1.5)  # log scale base dimension
     ylim: tuple[float, float] = (-2.2, 0.2)
 
     # thouless_marker: str = "*"
@@ -100,7 +100,7 @@ class FormFactorsPlot(Plot):
         energy_0: float = self.ensemble.ground_state_energy
         dimension: int = self.ensemble.dimension
 
-        self.legend = FormFactorsLegend(
+        self.legend: FormFactorsLegend = FormFactorsLegend(
             handles=self.legend_handles, labels=self.legend_labels
         )
 

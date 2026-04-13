@@ -35,29 +35,32 @@ def create_random_matrix_ensemble(**kwargs: Any) -> RandomMatrixEnsemble:
 @frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
 class RandomMatrixEnsemble(ABC):
     dimension: int = field(
-        converter=int, validator=gt(0), metadata={"dir_name": "dim", "latex_name": "D"}
+        converter=int,
+        validator=gt(0),
+        metadata={"dir_name": "dim", "latex_name": "D"},
     )
     dtype: np.dtype = field(default=np.dtype("complex128"), converter=np.dtype)
     seed: SeedLike = field(
-        default=None, converter=lambda s: literal_eval(s) if isinstance(s, str) else s
+        default=None,
+        converter=lambda s: literal_eval(s) if isinstance(s, str) else s,
     )
 
     complex_dtype: np.dtype = field(init=False, repr=False)
 
     @complex_dtype.default
-    def _complex_dtype_default(self) -> np.dtype:
+    def _default_complex_dtype(self) -> np.dtype:
         return np.dtype(self.dtype.char.upper())
 
     real_dtype: np.dtype = field(init=False, repr=False)
 
     @real_dtype.default
-    def _real_dtype_default(self) -> np.dtype:
+    def _default_real_dtype(self) -> np.dtype:
         return np.dtype(self.dtype.char.lower())
 
     rng: np.random.Generator = field(init=False, repr=False)
 
     @rng.default
-    def _rng_default(self) -> np.random.Generator:
+    def _default_rng(self) -> np.random.Generator:
         return np.random.default_rng(self.seed)
 
     _nickname: str = field(init=False, default="RME", repr=False)
@@ -75,7 +78,7 @@ class RandomMatrixEnsemble(ABC):
         return rmtpy_converter.structure(src, cls)
 
     @property
-    def _dir_name(self) -> str:
+    def _path_name(self) -> str:
         return insert_underscores(self._nickname)
 
     @property
@@ -83,19 +86,19 @@ class RandomMatrixEnsemble(ABC):
         return f"\\textrm{{{re.sub(r'_', ' ', self._nickname)}}}"
 
     @property
-    def to_dir(self) -> Path:
+    def to_path(self) -> Path:
+        path: Path = Path(self._path_name)
         self_asdict: dict[str, Any] = asdict(self)
-        dir_path: Path = Path(self._dir_name)
         for name, attr in fields_dict(type(self)).items():
             if attr.metadata.get("dir_name") is not None:
                 val: str = re.sub(r"[^\w\-.]", "_", str(self_asdict[name]))
-                dir_path /= f"{attr.metadata['dir_name']}_{val.replace('.', 'p')}"
-        return dir_path
+                path /= f"{attr.metadata['dir_name']}_{val.replace('.', 'p')}"
+        return path
 
     @property
     def to_latex(self) -> str:
-        self_asdict: dict[str, Any] = asdict(self)
         latex_str: str = f"${self._latex_name}"
+        self_asdict: dict[str, Any] = asdict(self)
         for name, attr in fields_dict(type(self)).items():
             if attr.metadata.get("latex_name") is not None:
                 latex_str += rf"\ {attr.metadata['latex_name']}={self_asdict[name]}"

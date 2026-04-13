@@ -22,7 +22,7 @@ class UnfoldedFormFactorsLegend(PlotLegend):
 
 @dataclass(repr=False, eq=False, kw_only=True)
 class UnfoldedFormFactorsAxes(PlotAxes):
-    xticks: tuple[float, ...] = (-1.0, -0.5, 0.0)  # factor of 2 pi
+    xticks: tuple[float, ...] = (-1.0, -0.5, 0.0)  # log scale base dimension
     xlabel: str = r"$\tau / \tau_\textrm{\tiny H}$"
     xtick_labels: tuple[str, ...] = (
         r"$D^{-1}$",
@@ -30,7 +30,7 @@ class UnfoldedFormFactorsAxes(PlotAxes):
         r"$1$",
     )
 
-    yticks: tuple[float, ...] = (-2, -1, 0)  # log scale base dim
+    yticks: tuple[float, ...] = (-2, -1, 0)  # log scale base dimension
     ylabel: str = r"$K(\tau)$"
     ytick_labels: tuple[str, ...] = (
         r"$D^{-2}$",
@@ -45,7 +45,7 @@ class UnfoldedFormFactorsPlot(Plot):
     axes: UnfoldedFormFactorsAxes = field(default_factory=UnfoldedFormFactorsAxes)
     num_points: int = 1000
 
-    xlim: tuple[float, float] = (-1.5, 0.5)  # log scale base dim
+    xlim: tuple[float, float] = (-1.5, 0.5)  # log scale base dimension
     ylim: tuple[float, float] = (-2.2, 0.2)
 
     # thouless_marker: str = "*"
@@ -117,7 +117,7 @@ class UnfoldedFormFactorsPlot(Plot):
                 self.universal_csff_legend,
             )
 
-        self.legend = UnfoldedFormFactorsLegend(
+        self.legend: UnfoldedFormFactorsLegend = UnfoldedFormFactorsLegend(
             handles=self.legend_handles, labels=self.legend_labels
         )
         if self.legend.title is None:

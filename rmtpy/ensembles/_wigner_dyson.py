@@ -19,9 +19,16 @@ WIGNER_DYSON_ENSEMBLE_FLAGS = {
 class WignerDysonEnsemble(ManyBodyEnsemble):
     _nickname: str = field(init=False, default="WDE", repr=False)
 
-    def spectral_pdf(self, eigvals: np.ndarray) -> np.ndarray:
+    def spectral_pdf(
+        self,
+        eigvals: int | float | np.ndarray,
+        _realizs: int = 100,
+        _factor: float = 1.2,
+    ) -> np.ndarray:
         real_dtype: type[np.floating] = self.real_dtype.type
-        energy_0 = self.ground_state_energy
+        energy_0: float = self.ground_state_energy
+        if isinstance(eigvals, (int, float)):
+            eigvals: np.ndarray = np.array([eigvals], dtype=real_dtype)
 
         x: np.ndarray = eigvals / energy_0
         mask: np.ndarray = np.abs(x) < 1.0
@@ -30,8 +37,11 @@ class WignerDysonEnsemble(ManyBodyEnsemble):
         pdf[mask] *= 2 / np.pi / energy_0
         return pdf
 
-    def spectral_cdf(self, eigvals: np.ndarray) -> np.ndarray:
-        energy_0 = self.ground_state_energy
+    def spectral_cdf(self, eigvals: int | float | np.ndarray) -> np.ndarray:
+        energy_0: float = self.ground_state_energy
+
+        if isinstance(eigvals, (int, float)):
+            eigvals: np.ndarray = np.array([eigvals], dtype=self.real_dtype.type)
 
         x: np.ndarray = np.clip(eigvals / energy_0, -1.0, 1.0)
         cdf: np.ndarray = np.sqrt(1 - x * x)

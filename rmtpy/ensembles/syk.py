@@ -72,14 +72,14 @@ class SachdevYeKitaevEnsemble(ManyBodyEnsemble):
     dyson_index: int = field(init=False, repr=False)
 
     @dyson_index.default
-    def _dyson_index_default(self) -> int:
+    def _default_dyson_index(self) -> int:
         map: dict[tuple[int, int], int] = {(0, 0): 1, (0, 4): 4}
         return map.get((self.q % 4, self.num_majoranas % 8), 2) if self.q > 2 else 0
 
     suppression: float = field(init=False, repr=False)
 
     @suppression.default
-    def _suppression_default(self) -> float:
+    def _default_suppression(self) -> float:
         if self.q > self.num_majoranas:
             raise ValueError(
                 "SYK q-parameter cannot be greater than the number of Majorana particles."
@@ -94,7 +94,7 @@ class SachdevYeKitaevEnsemble(ManyBodyEnsemble):
     std_dev: float = field(init=False, repr=False)
 
     @std_dev.default
-    def _std_dev_default(self) -> float:
+    def _default_std_dev(self) -> float:
         return self.interaction_strength * np.sqrt(
             factorial(self.q - 1) / self.num_majoranas ** (self.q - 1)
         )
@@ -102,7 +102,7 @@ class SachdevYeKitaevEnsemble(ManyBodyEnsemble):
     ground_state_energy: float = field(init=False, repr=False)
 
     @ground_state_energy.default
-    def _ground_state_energy_default(self) -> float:
+    def _default_ground_state_energy(self) -> float:
         return (2 * self.std_dev) * np.sqrt(
             comb(self.num_majoranas, self.q) / (1 - self.suppression)
         )
@@ -112,7 +112,7 @@ class SachdevYeKitaevEnsemble(ManyBodyEnsemble):
     _parity_block: slice = field(init=False, repr=False)
 
     @_parity_block.default
-    def _parity_block_default(self) -> slice:
+    def _default_parity_block(self) -> slice:
         return create_block_slice(num_majoranas=self.num_majoranas, parity=self.parity)
 
     _nickname: str = field(init=False, default="SYK", repr=False)
@@ -128,8 +128,8 @@ class SachdevYeKitaevEnsemble(ManyBodyEnsemble):
         object.__setattr__(self, "_q_body_terms_data", q_body_terms_data)
 
     @property
-    def _dir_name(self) -> str:
-        return super()._dir_name + f"_{self.q}"
+    def _path_name(self) -> str:
+        return super()._path_name + f"_{self.q}"
 
     @property
     def _latex_name(self) -> str:
@@ -192,7 +192,13 @@ class SachdevYeKitaevEnsemble(ManyBodyEnsemble):
                 )
                 yield matrix
 
-    def spectral_pdf(self, eigvals: np.ndarray, num_terms: int = 100) -> np.ndarray:
+    def spectral_pdf(
+        self,
+        eigvals: int | float | np.ndarray,
+        _num_terms: int = 100,
+        _realizs: int = 100,
+        _factor: float = 1.2,
+    ) -> np.ndarray:
         real_dtype: type[np.floating] = self.real_dtype.type
         num_majoranas: int = self.num_majoranas
         q: int = self.q
@@ -200,10 +206,13 @@ class SachdevYeKitaevEnsemble(ManyBodyEnsemble):
         std_dev: float = self.std_dev
         e0: float = self.ground_state_energy
 
+        if isinstance(eigvals, (int, float)):
+            eigvals: np.ndarray = np.array([eigvals], dtype=real_dtype)
+
         mask: np.ndarray = np.abs(eigvals) < e0
         eigval_sq: np.ndarray = (eigvals[mask] ** 2)[:, None]
 
-        k: np.ndarray = np.arange(num_terms)
+        k: np.ndarray = np.arange(_num_terms)
         etak1: np.ndarray = eta ** (k + 1)
         term1: np.ndarray = 1 - (4 * eigval_sq / e0**2) * etak1 / (1.0 + etak1) ** 2
         term2: np.ndarray = (1.0 - eta ** (2 * k + 2)) / (1.0 - eta ** (2 * k + 1))

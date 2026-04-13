@@ -53,13 +53,13 @@ class BogoliubovDeGennesCEnsemble(WignerDysonEnsemble):
     std_dev: float = field(init=False, repr=False)
 
     @std_dev.default
-    def _std_dev_default(self) -> float:
+    def _default_std_dev(self) -> float:
         return self.ground_state_energy / 2 / np.sqrt(2 * self.dimension)
 
     _nickname: str = field(init=False, default="BdGC", repr=False)
 
     @property
-    def _dir_name(self) -> str:
+    def _path_name(self) -> str:
         return "BdG_C"
 
     @property

@@ -1,2 +1,2 @@
-from .spectral_histogram_plot import SpectralHistogramPlot
-from .unfolded_spectral_histogram_plot import UnfoldedSpectralHistogramPlot
+from .spectral_histogram import SpectralHistogramPlot
+from .unfolded_spectral_histogram import UnfoldedSpectralHistogramPlot

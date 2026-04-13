@@ -7,8 +7,9 @@ import numpy as np
 from attrs import field, frozen
 from attrs.validators import ge, gt, le
 from scipy.integrate import cumulative_trapezoid
-from scipy.interpolate import interp1d
+from scipy.interpolate import PchipInterpolator
 from scipy.linalg import eigh, eigvalsh
+from scipy.ndimage import gaussian_filter1d
 from scipy.special import gamma
 
 from ._ensemble import RandomMatrixEnsemble
@@ -32,13 +33,13 @@ class ManyBodyEnsemble(RandomMatrixEnsemble):
     dimension: int = field(init=False)
 
     @dimension.default
-    def _dimension_default(self) -> int:
+    def _default_dimension(self) -> int:
         return 2 ** (self.num_majoranas // 2 - 1)
 
     ground_state_energy: float = field(init=False, repr=False)
 
     @ground_state_energy.default
-    def _ground_state_energy_default(self) -> float:
+    def _default_ground_state_energy(self) -> float:
         return self.num_majoranas * self.interaction_strength
 
     _nickname: str = field(init=False, default="MBE", repr=False)
@@ -66,32 +67,62 @@ class ManyBodyEnsemble(RandomMatrixEnsemble):
     def matrix_stream(self, realizs: int) -> Iterator[np.ndarray]:
         raise NotImplementedError("Subclasses must implement matrix_stream method.")
 
-    def spectral_pdf(self, eigvals: np.ndarray) -> np.ndarray:
-        raise NotImplementedError("Subclasses must implement spectral_pdf method.")
-        # # Define function to compute PDF
-        # @lru_cache(maxsize=1)
-        # def numerical_pdf(realizs: int = 100, factor: float = 1.1) -> interp1d:
-        #     """Create numerical PDF using eigenvalue realizations."""
-        #     pass
-        # # Return PDF values for given eigenvalues
-        # return numerical_pdf()(eigvals)
-        # Raise NotImplementedError if not implemented
-        # raise NotImplementedError("Subclasses must implement spectral_pdf method.")
+    def spectral_pdf(
+        self,
+        eigvals: int | float | np.ndarray,
+        _num_bins: int = 200,
+        _factor: float = 1.2,
+        _sigma: float = 2.0,
+    ) -> np.ndarray:
+        total_counts_per_dimension: int = 2**12 // self.dimension
+        realizs: int = max(total_counts_per_dimension, 1)
 
-    def spectral_cdf(self, eigvals: np.ndarray) -> np.ndarray:
         @lru_cache(maxsize=1)
-        def numerical_cdf(num_pts: int = 2**12, factor: int = 1.1) -> interp1d:
+        def cached_numerical_pdf() -> PchipInterpolator:
+            energy_0: float = self.ground_state_energy
+            bins: np.ndarray = _factor * np.linspace(-energy_0, energy_0, _num_bins + 1)
+            counts: np.ndarray = np.zeros(_num_bins)
+
+            for tmp_eigvals in self.eigvals_stream(realizs):
+                counts[:] += np.histogram(tmp_eigvals, bins=bins)[0]
+
+            histogram: np.ndarray = counts / np.sum(counts * np.diff(bins))
+            smoothed_histogram: np.ndarray = gaussian_filter1d(histogram, sigma=_sigma)
+
+            centers: np.ndarray = (bins[:-1] + bins[1:]) / 2
+            return PchipInterpolator(centers, smoothed_histogram, extrapolate=True)
+
+        real_dtype: type[np.floating] = self.real_dtype.type
+        if isinstance(eigvals, (int, float)):
+            eigvals: np.ndarray = np.array([eigvals], dtype=real_dtype)
+
+        return cached_numerical_pdf()(eigvals)
+
+    def spectral_cdf(
+        self,
+        eigvals: int | float | np.ndarray,
+        _num_pts: int = 2**12,
+        _factor: float = 1.2,
+        _num_bins: int = 200,
+        _sigma: float = 2.0,
+    ) -> np.ndarray:
+        @lru_cache(maxsize=1)
+        def cached_numerical_cdf() -> PchipInterpolator:
             energy_0: float = self.ground_state_energy
 
-            energies: np.ndarray = factor * np.linspace(-energy_0, energy_0, num_pts)
-            pdf_vals: np.ndarray = self.spectral_pdf(energies)
-            cdf_vals: np.ndarray = cumulative_trapezoid(pdf_vals, energies, initial=0)
-            cdf_interp: interp1d = interp1d(
-                energies, cdf_vals, bounds_error=False, fill_value=(0, 1)
+            energies: np.ndarray = _factor * np.linspace(-energy_0, energy_0, _num_pts)
+            pdf_vals: np.ndarray = self.spectral_pdf(
+                energies, _num_bins, _factor, _sigma
             )
-            return cdf_interp
+            cdf_vals: np.ndarray = cumulative_trapezoid(pdf_vals, energies, initial=0)
 
-        return numerical_cdf()(eigvals)
+            return PchipInterpolator(energies, cdf_vals, extrapolate=True)
+
+        real_dtype: type[np.floating] = self.real_dtype.type
+        if isinstance(eigvals, (int, float)):
+            eigvals: np.ndarray = np.array([eigvals], dtype=real_dtype)
+
+        return cached_numerical_cdf()(eigvals)
 
     def unfold(self, eigvals: np.ndarray) -> np.ndarray:
         return self.dimension * (

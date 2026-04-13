@@ -3,8 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 
 import numpy as np
-from attrs import frozen, field
-from attrs.validators import instance_of
+from attrs import frozen
 
 from ._compound import Compound, _to_1D_array
 from ..ensembles import WignerDysonEnsemble
@@ -12,10 +11,6 @@ from ..ensembles import WignerDysonEnsemble
 
 @frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
 class VWZCompound(Compound):
-    ensemble: WignerDysonEnsemble = field(
-        converter=WignerDysonEnsemble.create, validator=instance_of(WignerDysonEnsemble)
-    )
-
     def add_width_matrix(self, matrix: np.ndarray) -> np.ndarray:
         ensemble: WignerDysonEnsemble = self.ensemble
         dimension: int = ensemble.dimension
@@ -24,7 +19,7 @@ class VWZCompound(Compound):
         strengths: np.ndarray = self.channel_coupling_strengths
 
         random_idx: np.ndarray = rng.choice(dimension, size=num_channels, replace=False)
-        matrix[random_idx, random_idx] += -1j * (strengths**2) / 2
+        matrix[random_idx, random_idx] -= 1j * (strengths**2) / 2
         return matrix
 
     def partial_widths_stream(self, realizs: int) -> Iterator[np.ndarray]:

@@ -12,7 +12,7 @@ class FormFactorsData(Data):
     dimension: int = field()
     log_D_time_support: tuple[float, float] = field(
         default=(-1.5, 0.5)
-    )  # log scale base dim
+    )  # log scale base dimension
     scale: float = field(default=2 * np.pi)
     num_times: int = field(converter=int, validator=gt(0), default=3000)
 

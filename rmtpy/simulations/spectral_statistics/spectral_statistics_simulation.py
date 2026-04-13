@@ -1,25 +1,28 @@
 from __future__ import annotations
 
 import inspect
+import re
 from pathlib import Path
+from typing import Any
 
 import numpy as np
-from attrs import frozen, field
-from attrs.validators import instance_of
+from attrs import asdict, frozen, field, fields_dict
+from attrs.validators import instance_of, gt
 from scipy.interpolate import PchipInterpolator
 from scipy.signal import find_peaks
 from scipy.special import jn_zeros
 
 from .spectral_histogram import SpectralHistogramPlot
 from .spectral_histogram import UnfoldedSpectralHistogramPlot
-from .spacings_histogram import SpacingsHistogramPlot
-from .spacings_histogram import UnfoldedSpacingsHistogramPlot
+from .spacing_histogram import SpacingHistogramPlot
+from .spacing_histogram import UnfoldedSpacingHistogramPlot
 from .spectral_form_factors import FormFactorsPlot
 from .spectral_form_factors import UnfoldedFormFactorsPlot
 from .spectral_form_factors import FormFactorsData
 from .._histogram import Histogram
 from .._simulation import Simulation
 from ...ensembles import ManyBodyEnsemble
+from ...utils import rmtpy_converter
 
 
 def thouless_time(times: np.ndarray, form_factor: np.ndarray) -> float:
@@ -55,6 +58,12 @@ class SpectralStatisticsSimulation(Simulation):
         if inspect.isabstract(value):
             raise ValueError(f"ManyBodyEnsemble must be concrete.")
 
+    realizs: int = field(
+        converter=int,
+        validator=gt(0),
+        metadata={"dir_name": "realizs", "latex_name": "R"},
+    )
+
     spectral_plot: SpectralHistogramPlot | None = field(init=False, default=None)
     spectral_support: tuple[float, float] = field(
         default=(-1.2, 1.2)
@@ -85,36 +94,37 @@ class SpectralStatisticsSimulation(Simulation):
             scale=self.ensemble.dimension,
         )
 
-    spacings_plot: SpacingsHistogramPlot | None = field(init=False, default=None)
-    spacings_support: tuple[float, float] = field(
+    spacing_plot: SpacingHistogramPlot | None = field(init=False, default=None)
+    spacing_support: tuple[float, float] = field(
         default=(0.0, 4.0)
     )  # units of global mean spacing
-    spacings_histogram: Histogram = field()
+    spacing_histogram: Histogram = field()
 
-    @spacings_histogram.default
-    def _default_spacings_histogram(self) -> Histogram:
+    @spacing_histogram.default
+    def _default_spacing_histogram(self) -> Histogram:
         global_mean_spacing: float = (
             2 * self.ensemble.ground_state_energy / self.ensemble.dimension
         )
-        spacings_histogram = Histogram(
-            file_name="spacings_histogram",
-            support=self.spacings_support,
+
+        spacing_histogram = Histogram(
+            file_name="spacing_histogram",
+            support=self.spacing_support,
             scale=global_mean_spacing,
         )
-        spacings_histogram.metadata["global_mean_spacing"] = global_mean_spacing
-        return spacings_histogram
+        spacing_histogram.metadata["global_mean_spacing"] = global_mean_spacing
+        return spacing_histogram
 
-    unfolded_spacings_plot: UnfoldedSpacingsHistogramPlot | None = field(
+    unfolded_spacing_plot: UnfoldedSpacingHistogramPlot | None = field(
         init=False, default=None
     )
-    unfolded_spacings_support: tuple[float, float] = field(default=(0.0, 4.0))
-    unfolded_spacings_histogram: Histogram = field()
+    unfolded_spacing_support: tuple[float, float] = field(default=(0.0, 4.0))
+    unfolded_spacing_histogram: Histogram = field()
 
-    @unfolded_spacings_histogram.default
-    def _default_unfolded_spacings_histogram(self) -> Histogram:
+    @unfolded_spacing_histogram.default
+    def _default_unfolded_spacing_histogram(self) -> Histogram:
         return Histogram(
-            file_name="unfolded_spacings_histogram",
-            support=self.unfolded_spacings_support,
+            file_name="unfolded_spacing_histogram",
+            support=self.unfolded_spacing_support,
         )
 
     form_factors_plot: FormFactorsPlot | None = field(init=False, default=None)
@@ -150,6 +160,22 @@ class SpectralStatisticsSimulation(Simulation):
             scale=2 * np.pi,
         )
 
+    @property
+    def to_path(self) -> Path:
+        self_asdict: dict[str, Any] = asdict(self)
+        path: Path = Path(self._path_name)
+        path /= self.ensemble.to_path
+        for name, attr in fields_dict(type(self)).items():
+            if attr.metadata.get("dir_name", None) is not None:
+                val: str = re.sub(r"[^\w\-.]", "_", str(self_asdict[name]))
+                path /= f"{attr.metadata['dir_name']}_{val.replace('.', 'p')}"
+        return path
+
+    def _populate_metadata(self) -> None:
+        super()._populate_metadata()
+        self.metadata["args"]["ensemble"] = rmtpy_converter.unstructure(self.ensemble)
+        self.metadata["args"]["realizs"] = self.realizs
+
     def initialize_plots(self) -> None:
         object.__setattr__(
             self,
@@ -163,13 +189,13 @@ class SpectralStatisticsSimulation(Simulation):
         )
         object.__setattr__(
             self,
-            "spacings_plot",
-            SpacingsHistogramPlot(data=self.spacings_histogram),
+            "spacing_plot",
+            SpacingHistogramPlot(data=self.spacing_histogram),
         )
         object.__setattr__(
             self,
-            "unfolded_spacings_plot",
-            UnfoldedSpacingsHistogramPlot(data=self.unfolded_spacings_histogram),
+            "unfolded_spacing_plot",
+            UnfoldedSpacingHistogramPlot(data=self.unfolded_spacing_histogram),
         )
         object.__setattr__(
             self,
@@ -185,10 +211,10 @@ class SpectralStatisticsSimulation(Simulation):
     def realize_monte_carlo(self) -> None:
         degeneracy: int = self.ensemble.eigval_degeneracy
         spectral_histogram: Histogram = self.spectral_histogram
-        spacings_histogram: Histogram = self.spacings_histogram
+        spacing_histogram: Histogram = self.spacing_histogram
         form_factors_data: FormFactorsData = self.form_factors_data
         unfolded_spectral_histogram: Histogram = self.unfolded_spectral_histogram
-        unfolded_spacings_histogram: Histogram = self.unfolded_spacings_histogram
+        unfolded_spacing_histogram: Histogram = self.unfolded_spacing_histogram
         unfolded_form_factors_data: FormFactorsData = self.unfolded_form_factors_data
 
         for eigvals in self.ensemble.eigvals_stream(self.realizs):
@@ -198,7 +224,7 @@ class SpectralStatisticsSimulation(Simulation):
                 neighbor_spacings = np.repeat(
                     neighbor_spacings[1::degeneracy], degeneracy
                 )
-            spacings_histogram.add_histogram_contribution(neighbor_spacings)
+            spacing_histogram.add_histogram_contribution(neighbor_spacings)
             form_factors_data.compute_moment_contributions(eigvals)
 
             unfolded_eigvals = self.ensemble.unfold(eigvals)
@@ -209,16 +235,16 @@ class SpectralStatisticsSimulation(Simulation):
                 neighbor_spacings = np.repeat(
                     neighbor_spacings[1::degeneracy], degeneracy
                 )
-            unfolded_spacings_histogram.add_histogram_contribution(neighbor_spacings)
+            unfolded_spacing_histogram.add_histogram_contribution(neighbor_spacings)
             unfolded_form_factors_data.compute_moment_contributions(unfolded_eigvals)
 
     def calculate_statistics(self) -> None:
         self.spectral_histogram.compute_histogram()
-        self.spacings_histogram.compute_histogram()
+        self.spacing_histogram.compute_histogram()
         self.form_factors_data.compute_form_factors()
 
         self.unfolded_spectral_histogram.compute_histogram()
-        self.unfolded_spacings_histogram.compute_histogram()
+        self.unfolded_spacing_histogram.compute_histogram()
         self.unfolded_form_factors_data.compute_form_factors()
 
     def run(self, out_dir: str | Path = "output") -> None:
@@ -226,7 +252,7 @@ class SpectralStatisticsSimulation(Simulation):
         self.calculate_statistics()
 
         out_dir: Path = Path(out_dir)
-        base_dir: Path = out_dir / self.to_dir
+        base_dir: Path = out_dir / self.to_path
         base_dir.mkdir(parents=True, exist_ok=True)
 
         self.save_data(out_dir=base_dir)

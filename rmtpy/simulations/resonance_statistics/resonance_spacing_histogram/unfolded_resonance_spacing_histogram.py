@@ -14,13 +14,13 @@ from ....utils import rmtpy_converter
 
 
 @dataclass(repr=False, eq=False, kw_only=True)
-class UnfoldedSpacingsHistogramLegend(PlotLegend):
+class UnfoldedResonanceSpacingHistogramLegend(PlotLegend):
     loc: str = "upper right"
     bbox: tuple[float, float] = (0.94, 0.95)
 
 
 @dataclass(repr=False, eq=False, kw_only=True)
-class UnfoldedSpacingsHistogramAxes(PlotAxes):
+class UnfoldedResonanceSpacingHistogramAxes(PlotAxes):
     xticks: tuple[float, ...] = (0.0, 1.0, 2.0, 3.0, 4.0)
     xticks_minor: tuple[float, ...] = (0.5, 1.5, 2.5, 3.5)
     xlabel: str = r"$s$"
@@ -42,10 +42,10 @@ class UnfoldedSpacingsHistogramAxes(PlotAxes):
 
 
 @dataclass(repr=False, eq=False, kw_only=True)
-class UnfoldedSpacingsHistogramPlot(Plot):
+class UnfoldedResonanceSpacingHistogramPlot(Plot):
     data: Histogram
-    axes: UnfoldedSpacingsHistogramAxes = field(
-        default_factory=UnfoldedSpacingsHistogramAxes
+    axes: UnfoldedResonanceSpacingHistogramAxes = field(
+        default_factory=UnfoldedResonanceSpacingHistogramAxes
     )
     num_points: int = 1000
 
@@ -71,7 +71,9 @@ class UnfoldedSpacingsHistogramPlot(Plot):
 
     def set_derived_attributes(self) -> None:
         try:
-            ensemble_meta = self.data.metadata["simulation"]["args"]["ensemble"]
+            ensemble_meta: dict = self.data.metadata["simulation"]["args"]["compound"][
+                "args"
+            ]["ensemble"]
         except KeyError:
             raise ValueError("Ensemble metadata not found.")
         except TypeError:
@@ -81,8 +83,10 @@ class UnfoldedSpacingsHistogramPlot(Plot):
             ensemble_meta, ManyBodyEnsemble
         )
 
-        self.legend = UnfoldedSpacingsHistogramLegend(
-            handles=self.legend_handles, labels=self.legend_labels
+        self.legend: UnfoldedResonanceSpacingHistogramLegend = (
+            UnfoldedResonanceSpacingHistogramLegend(
+                handles=self.legend_handles, labels=self.legend_labels
+            )
         )
         if self.legend.title is None:
             self.legend.title = self.ensemble.to_latex + "\nunfolded"
@@ -94,7 +98,7 @@ class UnfoldedSpacingsHistogramPlot(Plot):
         self.xlim = tuple(x for x in self.xlim)
         self.ylim = tuple(y for y in self.ylim)
 
-        axes = self.axes
+        axes: UnfoldedResonanceSpacingHistogramAxes = self.axes
         axes.xticks = tuple(xtick for xtick in axes.xticks)
         axes.yticks = tuple(ytick for ytick in axes.yticks)
         axes.xticks_minor = tuple(xtick for xtick in axes.xticks_minor)
@@ -103,23 +107,19 @@ class UnfoldedSpacingsHistogramPlot(Plot):
     def plot(self, path: str | Path) -> None:
         self.set_derived_attributes()
 
-        histogram_bins = self.data.bins
-        histogram = self.data.histogram
-
         self.create_figure()
 
         self.ax.hist(
-            histogram_bins[:-1],
-            bins=histogram_bins,
-            weights=histogram,
+            self.data.bins[:-1],
+            bins=self.data.bins,
+            weights=self.data.histogram,
             color=self.histogram_color,
             alpha=self.histogram_alpha,
             zorder=self.histogram_zorder,
         )
 
-        spacings = np.linspace(0, self.xlim[1], self.num_points)
-
-        surmise = self.ensemble.wigner_surmise(spacings)
+        spacings: np.ndarray = np.linspace(0, self.xlim[1], self.num_points)
+        surmise: np.ndarray = self.ensemble.wigner_surmise(spacings)
 
         self.ax.plot(
             spacings,

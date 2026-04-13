@@ -12,7 +12,7 @@ from matplotlib import rcParams
 from matplotlib.axes import Axes
 from numpy.lib.npyio import NpzFile
 
-from ._data import DATA_REGISTRY, Data, normalize_metadata, normalize_source
+from ._data import DATA_REGISTRY, Data, _normalize_metadata, _normalize_source
 from ..utils import rmtpy_converter
 
 
@@ -36,7 +36,7 @@ def _configure_matplotlib() -> None:
         rcParams["text.latex.preamble"] = "\n".join(
             [
                 r"\usepackage{amsmath}",
-                r"\newcommand{\ensavg}[1]{\langle\hspace{-0.7ex}\langle #1 \rangle\hspace{-0.7ex}\rangle}",
+                r"\newcommand{\ensavg}[1]{\langle\hspace{-0.7ex}\langle #1 \hspace{-0.3ex} \rangle\hspace{-0.7ex}\rangle}",
             ]
         )
     except:
@@ -185,8 +185,8 @@ class Plot(ABC):
 
 @rmtpy_converter.register_structure_hook
 def plot_structure_hook(src: str | Path | dict[str, Any] | NpzFile | Plot, _) -> Plot:
-    src_dict: dict[str, Any] = normalize_source(src)
-    metadata: dict[str, Any] = normalize_metadata(src_dict["metadata"])
+    src_dict: dict[str, Any] = _normalize_source(src)
+    metadata: dict[str, Any] = _normalize_metadata(src_dict["metadata"])
     src_dict["metadata"] = metadata
 
     plot_key: str | None = metadata.get("name", None)

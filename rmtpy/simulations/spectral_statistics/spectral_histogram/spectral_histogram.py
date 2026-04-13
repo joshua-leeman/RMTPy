@@ -120,7 +120,7 @@ class SpectralHistogramPlot(Plot):
         )
         energy_0: float = self.ensemble.ground_state_energy
 
-        self.legend = SpectralHistogramLegend(
+        self.legend: SpectralHistogramLegend = SpectralHistogramLegend(
             handles=self.legend_handles, labels=self.legend_labels
         )
         if self.legend.title is None:

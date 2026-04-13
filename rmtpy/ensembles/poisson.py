@@ -17,7 +17,7 @@ class PoissonEnsemble(ManyBodyEnsemble):
     eigvecs_flag: str = field(default="GaussianUnitaryEnsemble")
 
     @eigvecs_flag.validator
-    def _validate_eigvecs_flag(self, _: field, value: str) -> None:
+    def _eigvecs_flag_validator(self, _: field, value: str) -> None:
         if value not in WIGNER_DYSON_ENSEMBLE_FLAGS:
             raise ValueError(
                 f"eigvecs_flag must indicate a Wigner-Dyson ensemble, got {value}"
@@ -28,7 +28,7 @@ class PoissonEnsemble(ManyBodyEnsemble):
     std_dev: float = field(init=False, repr=False)
 
     @std_dev.default
-    def _std_dev_default(self) -> float:
+    def _default_std_dev(self) -> float:
         return 2 * self.ground_state_energy
 
     _nickname: str = field(init=False, default="Poisson", repr=False)
@@ -82,20 +82,31 @@ class PoissonEnsemble(ManyBodyEnsemble):
             eigvals.sort()
             yield eigvals
 
-    def spectral_pdf(self, eigval: np.ndarray) -> np.ndarray:
+    def spectral_pdf(
+        self,
+        eigvals: int | float | np.ndarray,
+        _realizs: int = 100,
+        _factor: float = 1.2,
+    ) -> np.ndarray:
         real_dtype: type[np.floating] = self.real_dtype.type
         energy_0: float = self.ground_state_energy
 
-        pdf: np.ndarray = np.zeros_like(eigval, real_dtype)
-        pdf[np.abs(eigval) < energy_0] = 1 / 2 / energy_0
+        if isinstance(eigvals, (int, float)):
+            eigvals: np.ndarray = np.array([eigvals], dtype=real_dtype)
+
+        pdf: np.ndarray = np.zeros_like(eigvals, real_dtype)
+        pdf[np.abs(eigvals) < energy_0] = 1 / 2 / energy_0
         return pdf
 
-    def cdf(self, eigval: np.ndarray) -> np.ndarray:
+    def cdf(self, eigvals: int | float | np.ndarray) -> np.ndarray:
         real_dtype: type[np.floating] = self.real_dtype.type
         energy_0: float = self.ground_state_energy
 
-        cdf: np.ndarray = np.zeros_like(eigval, real_dtype)
-        mask: np.ndarray = np.abs(eigval) < energy_0
-        cdf[mask] = eigval[mask] / (2 * energy_0) + 0.5
-        cdf[eigval > energy_0] = 1.0
+        if isinstance(eigvals, (int, float)):
+            eigvals: np.ndarray = np.array([eigvals], dtype=real_dtype)
+
+        cdf: np.ndarray = np.zeros_like(eigvals, real_dtype)
+        mask: np.ndarray = np.abs(eigvals) < energy_0
+        cdf[mask] = eigvals[mask] / (2 * energy_0) + 0.5
+        cdf[eigvals > energy_0] = 1.0
         return cdf

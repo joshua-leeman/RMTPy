@@ -8,12 +8,10 @@ from pathlib import Path
 from typing import Any
 
 from attrs import asdict, field, fields, fields_dict, frozen
-from attrs.validators import gt
 from cattrs.dispatch import StructureHook, UnstructureHook
 
 from ._data import DATA_REGISTRY, Data
 from ._plot import Plot
-from ..ensembles import RandomMatrixEnsemble
 from ..utils import rmtpy_converter, insert_underscores, normalize_dict
 
 
@@ -30,25 +28,7 @@ SIMULATION_UNSTRUCTURE_HOOKS: dict[str, UnstructureHook] = {
 
 @frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
 class Simulation(ABC):
-    ensemble: RandomMatrixEnsemble = field(converter=RandomMatrixEnsemble.create)
-
-    @ensemble.validator
-    def _ensemble_is_concrete(self, _, value: RandomMatrixEnsemble) -> None:
-        if inspect.isabstract(value):
-            raise ValueError(f"Ensemble must be concrete.")
-
-    realizs: int = field(
-        converter=int,
-        validator=gt(0),
-        metadata={"dir_name": "realizs", "latex_name": "R"},
-    )
-
     metadata: dict[str, Any] = field(init=False, factory=dict, repr=False)
-    dir_name: str = field(init=False, repr=False)
-
-    @dir_name.default
-    def _dir_name_default(self) -> str:
-        return insert_underscores(type(self).__name__).lower()
 
     @classmethod
     def __attrs_init_subclass__(cls) -> None:
@@ -57,26 +37,31 @@ class Simulation(ABC):
             SIMULATION_REGISTRY[sim_key] = cls
 
     def __attrs_post_init__(self) -> None:
-        self.metadata["name"] = type(self).__name__
-        self.metadata["args"] = {}
-        self.metadata["args"]["ensemble"] = rmtpy_converter.unstructure(self.ensemble)
-        self.metadata["args"]["realizs"] = self.realizs
+        self._populate_metadata()
+
         data_attrs: tuple[Data, ...] = tuple(
-            getattr(self, f.name)
-            for f in fields(type(self))
-            if isinstance(getattr(self, f.name), Data)
+            getattr(self, simulation_field.name)
+            for simulation_field in fields(type(self))
+            if isinstance(getattr(self, simulation_field.name), Data)
         )
         for data in data_attrs:
             data.metadata.update({"simulation": self.metadata.copy()})
 
-    def save_data(self, out_dir: str | Path) -> None:
+    def _populate_metadata(self) -> None:
+        self.metadata["name"] = type(self).__name__
+        self.metadata["args"] = {}
+
+    def _save_metadata(self, out_dir: str | Path) -> None:
         with open(out_dir / "metadata.json", "w") as file:
             json.dump(self.metadata, file, indent=4, default=str)
 
+    def save_data(self, out_dir: str | Path) -> None:
+        self._save_metadata(out_dir)
+
         data_attrs: tuple[Data, ...] = tuple(
-            getattr(self, f.name)
-            for f in fields(type(self))
-            if isinstance(getattr(self, f.name), Data)
+            getattr(self, simulation_field.name)
+            for simulation_field in fields(type(self))
+            if isinstance(getattr(self, simulation_field.name), Data)
         )
         for data in data_attrs:
             subdir_name = data.file_name.replace("_data", "")
@@ -90,9 +75,9 @@ class Simulation(ABC):
     def save_plots(self, out_dir: str | Path) -> None:
         self.initialize_plots()
         plot_attrs: tuple[Plot, ...] = tuple(
-            getattr(self, f.name)
-            for f in fields(type(self))
-            if isinstance(getattr(self, f.name), Plot)
+            getattr(self, simulation_field.name)
+            for simulation_field in fields(type(self))
+            if isinstance(getattr(self, simulation_field.name), Plot)
         )
         for plot in plot_attrs:
             subdir_name = plot.data.file_name.replace("_data", "")
@@ -101,19 +86,18 @@ class Simulation(ABC):
             plot.plot(path=out_path)
 
     @property
-    def to_dir(self) -> Path:
+    def _path_name(self) -> str:
+        return insert_underscores(type(self).__name__).lower()
+
+    @property
+    def to_path(self) -> Path:
         self_asdict: dict[str, Any] = asdict(self)
-        dir_path: Path = Path(self._dir_name)
-        dir_path /= self.ensemble.to_dir
+        path: Path = Path(self._path_name)
         for name, attr in fields_dict(type(self)).items():
             if attr.metadata.get("dir_name", None) is not None:
                 val: str = re.sub(r"[^\w\-.]", "_", str(self_asdict[name]))
-                dir_path /= f"{attr.metadata['dir_name']}_{val.replace('.', 'p')}"
-        return dir_path
-
-    @property
-    def _dir_name(self) -> str:
-        return insert_underscores(type(self).__name__).lower()
+                path /= f"{attr.metadata['dir_name']}_{val.replace('.', 'p')}"
+        return path
 
 
 @rmtpy_converter.register_structure_hook
@@ -131,18 +115,24 @@ def simulation_structure_hook(
     else:
         raise TypeError(f"Expected str, Path, dict, got {type(src).__name__}")
 
-    sim_dict: dict[str, Any] = normalize_dict(metadata, SIMULATION_REGISTRY)
-    sim_name: str = sim_dict.pop("name")
-    if not isinstance(sim_name, str):
-        raise ValueError(f"Invalid simulation name type: {type(sim_name).__name__}")
+    simulation_dict: dict[str, Any] = normalize_dict(metadata, SIMULATION_REGISTRY)
+    simulation_name: str = simulation_dict.pop("name")
+    if not isinstance(simulation_name, str):
+        raise ValueError(
+            f"Invalid simulation name type: {type(simulation_name).__name__}"
+        )
 
-    sim_key: str = re.sub(r"_", "", sim_name).lower()
-    sim_cls: type[Simulation] = SIMULATION_REGISTRY[sim_key]
-    sim_args: dict[str, Any] = sim_dict.pop("args")
-    if not isinstance(sim_args, dict):
-        raise ValueError(f"Invalid simulation args type: {type(sim_args).__name__}")
+    key: str = re.sub(r"_", "", simulation_name).lower()
+    simulation_cls: type[Simulation] = SIMULATION_REGISTRY[key]
+    simulation_args: dict[str, Any] = simulation_dict.pop("args")
+    if not isinstance(simulation_args, dict):
+        raise ValueError(
+            f"Invalid simulation args type: {type(simulation_args).__name__}"
+        )
 
-    sim_inst: Simulation = SIMULATION_STRUCTURE_HOOKS[sim_key](sim_args, sim_cls)
+    simulation_inst: Simulation = SIMULATION_STRUCTURE_HOOKS[key](
+        simulation_args, simulation_cls
+    )
     if isinstance(src, (str, Path)):
         data_dirs: tuple[Path, ...] = tuple(
             folder for folder in path.iterdir() if folder.is_dir()
@@ -152,5 +142,5 @@ def simulation_structure_hook(
             if data_cls is None:
                 continue
             data: Data = data_cls.load(folder / f"{folder.name}.npz")
-            object.__setattr__(sim_inst, folder.name + "_data", data)
-    return sim_inst
+            object.__setattr__(simulation_inst, folder.name + "_data", data)
+    return simulation_inst

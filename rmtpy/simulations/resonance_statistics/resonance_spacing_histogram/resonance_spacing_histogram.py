@@ -14,13 +14,13 @@ from ....utils import rmtpy_converter
 
 
 @dataclass(repr=False, eq=False, kw_only=True)
-class SpacingsHistogramLegend(PlotLegend):
+class ResonanceSpacingHistogramLegend(PlotLegend):
     loc: str = "upper right"
     bbox: tuple[float, float] = (0.94, 0.95)
 
 
 @dataclass(repr=False, eq=False, kw_only=True)
-class SpacingsHistogramAxes(PlotAxes):
+class ResonanceSpacingHistogramAxes(PlotAxes):
     xticks: tuple[float, ...] = (0.0, 1.0, 2.0, 3.0, 4.0)  # units of mean spacing
     xticks_minor: tuple[float, ...] = (0.5, 1.5, 2.5, 3.5)
     xlabel: str = r"$\Delta E$"
@@ -42,9 +42,11 @@ class SpacingsHistogramAxes(PlotAxes):
 
 
 @dataclass(repr=False, eq=False, kw_only=True)
-class SpacingsHistogramPlot(Plot):
+class ResonanceSpacingHistogramPlot(Plot):
     data: Histogram
-    axes: SpacingsHistogramAxes = field(default_factory=SpacingsHistogramAxes)
+    axes: ResonanceSpacingHistogramAxes = field(
+        default_factory=ResonanceSpacingHistogramAxes
+    )
     num_points: int = 1000
 
     xlim: tuple[float, float] = (0.0, 4.0)  # units of mean spacing
@@ -69,7 +71,9 @@ class SpacingsHistogramPlot(Plot):
 
     def set_derived_attributes(self) -> None:
         try:
-            ensemble_meta: dict = self.data.metadata["simulation"]["args"]["ensemble"]
+            ensemble_meta: dict = self.data.metadata["simulation"]["args"]["compound"][
+                "args"
+            ]["ensemble"]
         except KeyError:
             raise ValueError("Ensemble metadata not found.")
         except TypeError:
@@ -78,7 +82,7 @@ class SpacingsHistogramPlot(Plot):
             ensemble_meta, ManyBodyEnsemble
         )
 
-        self.legend = SpacingsHistogramLegend(
+        self.legend: ResonanceSpacingHistogramLegend = ResonanceSpacingHistogramLegend(
             handles=self.legend_handles, labels=self.legend_labels
         )
         if self.legend.title is None:
@@ -93,7 +97,7 @@ class SpacingsHistogramPlot(Plot):
         self.xlim = tuple(x * mean_spacing for x in self.xlim)
         self.ylim = tuple(y / mean_spacing for y in self.ylim)
 
-        axes: SpacingsHistogramAxes = self.axes
+        axes: ResonanceSpacingHistogramAxes = self.axes
         axes.xticks = tuple(xtick * mean_spacing for xtick in axes.xticks)
         axes.yticks = tuple(ytick / mean_spacing for ytick in axes.yticks)
         axes.xticks_minor = tuple(xtick * mean_spacing for xtick in axes.xticks_minor)

@@ -82,7 +82,7 @@ class UnfoldedSpectralHistogramPlot(Plot):
         )
         dimension: int = self.ensemble.dimension
 
-        self.legend = UnfoldedSpectralHistogramLegend(
+        self.legend: UnfoldedSpectralHistogramLegend = UnfoldedSpectralHistogramLegend(
             handles=self.legend_handles, labels=self.legend_labels
         )
         if self.legend.title is None:
@@ -91,7 +91,7 @@ class UnfoldedSpectralHistogramPlot(Plot):
         self.xlim = tuple(x * dimension for x in self.xlim)
         self.ylim = tuple(y / dimension for y in self.ylim)
 
-        axes = self.axes
+        axes: UnfoldedSpectralHistogramAxes = self.axes
         axes.xticks = tuple(xtick * dimension for xtick in axes.xticks)
         axes.yticks = tuple(ytick / dimension for ytick in axes.yticks)
         axes.xticks_minor = tuple(xtick * dimension for xtick in axes.xticks_minor)

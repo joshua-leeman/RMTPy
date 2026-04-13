@@ -56,9 +56,9 @@ class Data(ABC):
         return rmtpy_converter.structure(path, cls)
 
     def __attrs_post_init__(self) -> None:
-        data_key: str = insert_underscores(type(self).__name__)
-        data_key = data_key.lower()
-        self.metadata["name"] = data_key
+        key: str = insert_underscores(type(self).__name__)
+        key = key.lower()
+        self.metadata["name"] = key
 
     def save(self, path: str | Path) -> None:
         path: Path = Path(path)
@@ -79,13 +79,13 @@ def data_structure_hook(src: str | Path | dict[str, Any] | NpzFile | Data, _) ->
     metadata: dict[str, Any] = _normalize_metadata(src_dict["metadata"])
     src_dict["metadata"] = metadata
 
-    data_key: str | None = metadata.get("name", None)
-    if data_key in DATA_REGISTRY:
-        data_cls: type[Data] = DATA_REGISTRY[data_key]
+    key: str | None = metadata.get("name", None)
+    if key in DATA_REGISTRY:
+        data_cls: type[Data] = DATA_REGISTRY[key]
     else:
         raise ValueError(f"No registered Data class found in {src}")
 
-    data_inst: Data = data_cls(file_name=file_name)
+    data_instance: Data = data_cls(file_name=file_name)
     for key in src_dict:
-        object.__setattr__(data_inst, key, src_dict[key])
-    return data_inst
+        object.__setattr__(data_instance, key, src_dict[key])
+    return data_instance
