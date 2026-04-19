@@ -43,6 +43,11 @@ class Data(ABC):
     file_name: str = field(converter=lambda name: str(name) + "_data")
     metadata: dict[str, Any] = field(init=False, factory=dict, repr=False)
 
+    def __attrs_post_init__(self) -> None:
+        key: str = insert_underscores(type(self).__name__)
+        key = key.lower()
+        self.metadata["name"] = key
+
     @classmethod
     def __attrs_init_subclass__(cls) -> None:
         if not inspect.isabstract(cls):
@@ -54,11 +59,6 @@ class Data(ABC):
     def load(cls, path: str | Path) -> Data:
         path: Path = Path(path)
         return rmtpy_converter.structure(path, cls)
-
-    def __attrs_post_init__(self) -> None:
-        key: str = insert_underscores(type(self).__name__)
-        key = key.lower()
-        self.metadata["name"] = key
 
     def save(self, path: str | Path) -> None:
         path: Path = Path(path)

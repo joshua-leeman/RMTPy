@@ -21,27 +21,26 @@ class UnfoldedWidthHistogramLegend(PlotLegend):
 
 @dataclass(repr=False, eq=False, kw_only=True)
 class UnfoldedWidthHistogramAxes(PlotAxes):
-    xticks: tuple[float, ...] = tuple(range(-3, 3))  # log scale base 10
-    xticks_minor: tuple[float, ...] = tuple(np.arange(-3.5, 2.5, 1.0))
-    xlabel: str = r"$\widetilde{\Gamma}$"
+    xticks: tuple[float, ...] = tuple(range(-4, 5, 2))  # log scale base 10
+    xticks_minor: tuple[float, ...] = tuple(range(-3, 4, 2))
+    xlabel: str = r"$\gamma$"
     xtick_labels: tuple[str, ...] = (
-        r"$10^{-3}$",
+        r"$10^{-4}$",
         r"$10^{-2}$",
-        r"$10^{-1}$",
         r"$10^{0}$",
-        r"$10^{1}$",
         r"$10^{2}$",
+        r"$10^{4}$",
     )
 
-    yticks: tuple[float, ...] = tuple(range(-5, 4, 2))  # log scale base 10
-    yticks_minor: tuple[float, ...] = tuple(range(-4, 3, 2))
-    ylabel: str = r"$\ensavg{\rho(\widetilde{\Gamma})}$"
+    yticks: tuple[float, ...] = tuple(range(-4, 5, 2))  # log scale base 10
+    yticks_minor: tuple[float, ...] = tuple(range(-3, 4, 2))
+    ylabel: str = r"$\diff {P} / \diff \log \gamma$"
     ytick_labels: tuple[str, ...] = (
-        r"$10^{-5}$",
-        r"$10^{-3}$",
-        r"$10^{-1}$",
-        r"$10^{1}$",
-        r"$10^{3}$",
+        r"$10^{-4}$",
+        r"$10^{-2}$",
+        r"$10^{0}$",
+        r"$10^{2}$",
+        r"$10^{4}$",
     )
 
 
@@ -51,7 +50,7 @@ class UnfoldedWidthHistogramPlot(Plot):
     axes: UnfoldedWidthHistogramAxes = field(default_factory=UnfoldedWidthHistogramAxes)
 
     xlim: tuple[float, float] = (-3.5, 2.5)  # log scale base 10
-    ylim: tuple[float, float] = (-5.5, 3.5)  # log scale base 10
+    ylim: tuple[float, float] = (-4.5, 4.5)  # log scale base 10
 
     histogram_zorder: int = 1
     histogram_alpha: float = 0.5
@@ -80,12 +79,16 @@ class UnfoldedWidthHistogramPlot(Plot):
         self.legend: UnfoldedWidthHistogramLegend = UnfoldedWidthHistogramLegend(
             handles=self.legend_handles, labels=self.legend_labels
         )
+        ten_exponent: float = np.log10(
+            mean_coupling_squared / ensemble.ground_state_energy
+        )
+        ten_exponent = 0.00 if np.isclose(ten_exponent, 0) else ten_exponent
         if self.legend.title is None:
             self.legend.title = (
                 self.compound.to_latex
                 + "\n"
                 + r"$\nu^2 = "
-                + f"10^{{{np.log10(mean_coupling_squared / ensemble.ground_state_energy):.2f}}}E_0$"
+                + f"10^{{{ten_exponent:.2f}}}E_0$"
                 + "\nunfolded"
             )
 

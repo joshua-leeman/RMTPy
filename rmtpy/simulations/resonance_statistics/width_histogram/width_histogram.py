@@ -5,6 +5,7 @@ from pathlib import Path
 
 import numpy as np
 from matplotlib.patches import Patch
+from matplotlib.ticker import NullFormatter
 
 from ..._histogram import Histogram
 from ..._plot import PlotAxes, PlotLegend, Plot
@@ -21,9 +22,9 @@ class WidthHistogramLegend(PlotLegend):
 
 @dataclass(repr=False, eq=False, kw_only=True)
 class WidthHistogramAxes(PlotAxes):
-    xticks: tuple[float, ...] = tuple(range(-3, 3))  # log scale base 10
-    xticks_minor: tuple[float, ...] = tuple(np.arange(-3.5, 2.5, 1.0))
-    xlabel: str = r"$\Gamma \ensavg{\rho(E)}$"
+    xticks: tuple[float, ...] = tuple(range(-3, 4))  # log scale base 10
+    xticks_minor: tuple[float, ...] = tuple()
+    xlabel: str = r"$\Gamma / E_0$"
     xtick_labels: tuple[str, ...] = (
         r"$10^{-3}$",
         r"$10^{-2}$",
@@ -31,16 +32,20 @@ class WidthHistogramAxes(PlotAxes):
         r"$10^{0}$",
         r"$10^{1}$",
         r"$10^{2}$",
+        r"$10^{3}$",
     )
 
-    yticks: tuple[float, ...] = tuple(range(-5, 4, 2))  # log scale base 10
-    yticks_minor: tuple[float, ...] = tuple(range(-4, 3, 2))
-    ylabel: str = r"$\ensavg{\rho(\Gamma)}$"
+    yticks: tuple[float, ...] = tuple(range(-4, 4))  # log scale base 10
+    yticks_minor: tuple[float, ...] = tuple()
+    ylabel: str = r"$\diff {P} / \diff \log (\Gamma / E_0)$"
     ytick_labels: tuple[str, ...] = (
-        r"$10^{-5}$",
+        r"$10^{-4}$",
         r"$10^{-3}$",
+        r"$10^{-2}$",
         r"$10^{-1}$",
+        r"$10^{0}$",
         r"$10^{1}$",
+        r"$10^{2}$",
         r"$10^{3}$",
     )
 
@@ -50,8 +55,8 @@ class WidthHistogramPlot(Plot):
     data: Histogram
     axes: WidthHistogramAxes = field(default_factory=WidthHistogramAxes)
 
-    xlim: tuple[float, float] = (-3.5, 2.5)  # log scale base 10
-    ylim: tuple[float, float] = (-5.5, 3.5)  # log scale base 10
+    xlim: tuple[float, float] = (-3.2, 3.2)  # log scale base 10
+    ylim: tuple[float, float] = (-4.2, 3.2)  # log scale base 10
 
     histogram_zorder: int = 1
     histogram_alpha: float = 0.5
@@ -76,6 +81,7 @@ class WidthHistogramPlot(Plot):
             self.compound.channel_coupling_strengths**2
         )
         ensemble: ManyBodyEnsemble = self.compound.ensemble
+        energy_0: float = ensemble.ground_state_energy
 
         self.legend: WidthHistogramLegend = WidthHistogramLegend(
             handles=self.legend_handles, labels=self.legend_labels
@@ -85,7 +91,7 @@ class WidthHistogramPlot(Plot):
                 self.compound.to_latex
                 + "\n"
                 + r"$\nu^2 = "
-                + f"10^{{{np.log10(mean_coupling_squared / ensemble.ground_state_energy):.2f}}}E_0$"
+                + f"10^{{{np.log10(mean_coupling_squared / energy_0):.2f}}}E_0$"
             )
 
         axes: WidthHistogramAxes = self.axes
@@ -104,6 +110,9 @@ class WidthHistogramPlot(Plot):
 
         self.ax.set_xscale("log", base=10)
         self.ax.set_yscale("log", base=10)
+
+        self.ax.xaxis.set_minor_formatter(NullFormatter())
+        self.ax.yaxis.set_minor_formatter(NullFormatter())
 
         centers = np.sqrt(self.data.bins[:-1] * self.data.bins[1:])
         log_weights = self.data.histogram * centers

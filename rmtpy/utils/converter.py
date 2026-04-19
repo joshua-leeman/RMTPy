@@ -34,12 +34,19 @@ def normalize_dict(src: dict[str, Any], registry: dict[str, type]) -> dict[str, 
 
     cls_attrs: dict[str, Attribute] = fields_dict(registered_cls)
     cls_args: set[str] = {arg for arg, attr in cls_attrs.items() if attr.init}
-    for val in src.values():
-        if isinstance(val, dict) and set(val.keys()).issubset(cls_args):
-            normalized_dict.update({"args": val})
-            return normalized_dict
+    arg_dict: dict[str, Any] = {}
 
-    normalized_dict.update({"args": {arg: src[arg] for arg in src if arg in cls_args}})
+    for val in src.values():
+        if not isinstance(val, dict):
+            continue
+        for key in val.keys():
+            if key in cls_args:
+                arg_dict[key] = val[key]
+
+    if arg_dict == {}:
+        arg_dict = {arg: src[arg] for arg in src if arg in cls_args}
+
+    normalized_dict.update({"args": arg_dict})
     return normalized_dict
 
 

@@ -138,6 +138,7 @@ def create_q_body_majorana_terms(
     num_terms: int = comb(num_majoranas, q)
     nonzeros: int = 2 ** (num_majoranas // 2 - 1)
 
+    q_body_idxs: np.ndarray = np.empty((num_terms, 2, nonzeros), np.int32, order="C")
     if in_real_basis:
         majoranas = majoranas_to_real_basis(majoranas)
         q_body_data: np.ndarray = np.empty((num_terms, nonzeros), np.int8, order="C")
@@ -146,7 +147,6 @@ def create_q_body_majorana_terms(
             (num_terms, nonzeros), np.complex64, order="C"
         )
 
-    q_body_idxs: np.ndarray = np.empty((num_terms, 2, nonzeros), np.int32, order="C")
     for term_num, idx_tuple in enumerate(combinations(range(num_majoranas), q)):
         q_body_term: csr_matrix = majoranas[idx_tuple[0]]
         for k in range(1, q):

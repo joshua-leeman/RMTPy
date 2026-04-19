@@ -7,5 +7,5 @@ from .ensembles.gue import GaussianUnitaryEnsemble
 from .ensembles.poisson import PoissonEnsemble
 from .ensembles.syk import SachdevYeKitaevEnsemble
 
+from .compounds.compound import Compound
 from .compounds.poisson_compound import PoissonCompound
-from .compounds.vwz_compound import VWZCompound

@@ -30,12 +30,6 @@ SIMULATION_UNSTRUCTURE_HOOKS: dict[str, UnstructureHook] = {
 class Simulation(ABC):
     metadata: dict[str, Any] = field(init=False, factory=dict, repr=False)
 
-    @classmethod
-    def __attrs_init_subclass__(cls) -> None:
-        if not inspect.isabstract(cls):
-            sim_key: str = re.sub(r"_", "", cls.__name__).lower()
-            SIMULATION_REGISTRY[sim_key] = cls
-
     def __attrs_post_init__(self) -> None:
         self._populate_metadata()
 
@@ -46,6 +40,12 @@ class Simulation(ABC):
         )
         for data in data_attrs:
             data.metadata.update({"simulation": self.metadata.copy()})
+
+    @classmethod
+    def __attrs_init_subclass__(cls) -> None:
+        if not inspect.isabstract(cls):
+            sim_key: str = re.sub(r"_", "", cls.__name__).lower()
+            SIMULATION_REGISTRY[sim_key] = cls
 
     def _populate_metadata(self) -> None:
         self.metadata["name"] = type(self).__name__

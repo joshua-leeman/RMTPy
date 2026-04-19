@@ -135,7 +135,7 @@ class SachdevYeKitaevEnsemble(ManyBodyEnsemble):
     def _latex_name(self) -> str:
         return super()._latex_name + f"_{self.q}"
 
-    def generate_matrix(self, use_complex_dtype: bool = True) -> np.ndarray:
+    def generate_matrix(self, use_complex_dtype: bool = False) -> np.ndarray:
         complex_dtype: type[np.complexfloating] = self.complex_dtype.type
         real_dtype: type[np.floating] = self.real_dtype.type
         rng: np.random.Generator = self.rng
@@ -162,7 +162,7 @@ class SachdevYeKitaevEnsemble(ManyBodyEnsemble):
         return matrix
 
     def matrix_stream(
-        self, realizs: int, use_complex_dtype: bool = True
+        self, realizs: int, use_complex_dtype: bool = False
     ) -> Iterator[np.ndarray]:
         complex_dtype: type[np.complexfloating] = self.complex_dtype.type
         real_dtype: type[np.floating] = self.real_dtype.type
@@ -196,8 +196,9 @@ class SachdevYeKitaevEnsemble(ManyBodyEnsemble):
         self,
         eigvals: int | float | np.ndarray,
         _num_terms: int = 100,
-        _realizs: int = 100,
+        _num_bins: int = 200,
         _factor: float = 1.2,
+        _sigma: float = 2.0,
     ) -> np.ndarray:
         real_dtype: type[np.floating] = self.real_dtype.type
         num_majoranas: int = self.num_majoranas

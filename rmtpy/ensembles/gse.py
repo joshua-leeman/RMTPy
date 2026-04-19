@@ -20,11 +20,11 @@ def _create_skew_matrix(
     size: int = matrix.shape[0]
     for i in range(size):
         matrix[i, i] = 0.0
-        matrix[i, i + 1 :] = std_dev * (
+        matrix[i + 1 :, i] = std_dev * (
             rng.standard_normal(size - 1 - i, real_dtype)
             + 1j * rng.standard_normal(size - 1 - i, real_dtype)
         )
-        matrix[i + 1 :, i] = -matrix[i, i + 1 :]
+        matrix[i, i + 1 :] = -matrix[i + 1 :, i]
 
 
 def _create_gse_matrix(
@@ -58,7 +58,7 @@ class GaussianSymplecticEnsemble(WignerDysonEnsemble):
 
     _nickname: str = field(init=False, default="GSE", repr=False)
 
-    def generate_matrix(self, use_complex_dtype: bool = True) -> np.ndarray:
+    def generate_matrix(self, use_complex_dtype: bool = False) -> np.ndarray:
         complex_dtype: type[np.complexfloating] = self.complex_dtype.type
         real_dtype: type[np.floating] = self.real_dtype.type
         rng: np.random.Generator = self.rng
@@ -70,7 +70,7 @@ class GaussianSymplecticEnsemble(WignerDysonEnsemble):
         return matrix
 
     def matrix_stream(
-        self, realizs: int, use_complex_dtype: bool = True
+        self, realizs: int, use_complex_dtype: bool = False
     ) -> Iterator[np.ndarray]:
         complex_dtype: type[np.complexfloating] = self.complex_dtype.type
         real_dtype: type[np.floating] = self.real_dtype.type

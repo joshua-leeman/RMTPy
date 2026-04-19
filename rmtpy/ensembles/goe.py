@@ -19,8 +19,8 @@ def _create_goe_matrix(
     size: int = matrix.shape[0]
     for i in range(size):
         matrix[i, i] = 2 * std_dev * rng.standard_normal(None, real_dtype)
-        matrix[i, i + 1 :] = std_dev * rng.standard_normal(size - i - 1, real_dtype)
-        matrix[i + 1 :, i] = matrix[i, i + 1 :]
+        matrix[i + 1 :, i] = std_dev * rng.standard_normal(size - i - 1, real_dtype)
+        matrix[i, i + 1 :] = matrix[i + 1 :, i]
 
 
 @frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)

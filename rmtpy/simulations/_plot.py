@@ -37,6 +37,7 @@ def _configure_matplotlib() -> None:
             [
                 r"\usepackage{amsmath}",
                 r"\newcommand{\ensavg}[1]{\langle\hspace{-0.7ex}\langle #1 \hspace{-0.3ex} \rangle\hspace{-0.7ex}\rangle}",
+                r"\newcommand{\diff}{\mathrm{d}}",
             ]
         )
     except:
@@ -141,7 +142,9 @@ class Plot(ABC):
 
     dpi: int = 300
 
-    @classmethod
+    def __post_init__(self) -> None:
+        _configure_matplotlib()
+
     def __init_subclass__(cls) -> None:
         if not inspect.isabstract(cls):
             plot_key: str = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", cls.__name__)
@@ -152,9 +155,6 @@ class Plot(ABC):
     @property
     def file_name(self) -> str:
         return self.data.file_name.replace("_data", "_plot")
-
-    def __post_init__(self) -> None:
-        _configure_matplotlib()
 
     def create_figure(self) -> None:
         self.fig, self.ax = plt.subplots()

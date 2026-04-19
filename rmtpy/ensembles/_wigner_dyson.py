@@ -6,12 +6,15 @@ from attrs import field, frozen
 from ._many_body import ManyBodyEnsemble
 
 
-WIGNER_DYSON_ENSEMBLE_FLAGS = {
-    "BogoliubovDeGennesCEnsemble",
-    "BogoliubovDeGennesDEnsemble",
-    "GaussianOrthogonalEnsemble",
-    "GaussianUnitaryEnsemble",
-    "GaussianSymplecticEnsemble",
+WIGNER_DYSON_ENSEMBLE_FLAGS_TO_NAMES = {
+    "bdgc": "bogoliubovdegennescensemble",
+    "bdgd": "bogoliubovdegennesdensemble",
+    "goe": "gaussianorthogonalensemble",
+    "gue": "gaussianunitaryensemble",
+    "gse": "gaussiansymplecticensemble",
+}
+WIGNER_DYSON_ENSEMBLE_NAMES_TO_FLAGS = {
+    v: k for k, v in WIGNER_DYSON_ENSEMBLE_FLAGS_TO_NAMES.items()
 }
 
 

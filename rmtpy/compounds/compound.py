@@ -4,9 +4,7 @@ import hashlib
 import inspect
 import re
 import math
-from abc import ABC, abstractmethod
 from collections.abc import Iterator
-from functools import lru_cache
 from pathlib import Path
 from typing import Any, Sequence
 
@@ -15,12 +13,12 @@ from attrs import Converter, asdict, field, fields_dict, frozen
 from attrs.validators import instance_of
 from scipy.integrate import cumulative_trapezoid
 from scipy.interpolate import PchipInterpolator
-from scipy.linalg import eigvals, solve
+from scipy.linalg import solve
 from scipy.ndimage import gaussian_filter1d
 from cattrs.dispatch import StructureHook, UnstructureHook
 
-from ..ensembles import ManyBodyEnsemble
-from ..utils import rmtpy_converter, insert_underscores, normalize_dict, to_registry_key
+from ..ensembles import ManyBodyEnsemble, WignerDysonEnsemble
+from ..utils import rmtpy_converter, normalize_dict, to_registry_key
 
 
 COMPOUND_REGISTRY: dict[str, type[Compound]] = {}
@@ -79,7 +77,7 @@ def _to_full_array(value: int | float | np.ndarray, self_: Compound) -> np.ndarr
 
 
 @frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
-class Compound(ABC):
+class Compound:
     num_free_complex_fermions: int = field(
         default=1,
         converter=int,
@@ -112,6 +110,13 @@ class Compound(ABC):
         num_complex_fermions: int = self.ensemble.num_majoranas // 2
         return math.comb(num_complex_fermions, self.num_free_complex_fermions)
 
+    @num_channels.validator
+    def _num_channels_validator(self, _, value: int) -> None:
+        if value > self.ensemble.dimension // 2:
+            raise ValueError(
+                "Number of open channels cannot exceed half the dimension of the ensemble."
+            )
+
     channel_coupling_strengths: np.ndarray = field(
         repr=False,
         converter=Converter(_to_full_array, takes_self=True),
@@ -133,6 +138,10 @@ class Compound(ABC):
     def _default_coupling_strengths_id(self) -> str:
         return _create_hashed_id(self.channel_coupling_strengths)
 
+    def __attrs_post_init__(self) -> None:
+        if not isinstance(self.ensemble, WignerDysonEnsemble):
+            raise TypeError("The ensemble must be an instance of WignerDysonEnsemble.")
+
     @classmethod
     def __attrs_init_subclass__(cls) -> None:
         if not inspect.isabstract(cls):
@@ -147,7 +156,7 @@ class Compound(ABC):
 
     @property
     def _path_name(self) -> str:
-        return insert_underscores(f"{self.ensemble._nickname}Compound")
+        return self.ensemble._path_name + f"_Compound"
 
     @property
     def _latex_name(self) -> str:
@@ -191,26 +200,28 @@ class Compound(ABC):
     def rng_state(self) -> dict[str, Any]:
         return self.ensemble.rng.bit_generator.state
 
-    def set_rng_state(self, rng_state: dict[str, Any] | None) -> None:
-        if rng_state is not None:
-            self.ensemble.set_rng_state(rng_state)
-
-    def unstructure(self) -> dict[str, Any]:
-        return rmtpy_converter.unstructure(self)
-
     def generate_effective_hamiltonian(self) -> np.ndarray:
-        hamiltonian: np.ndarray = self.ensemble.generate_matrix()
-        self.add_width_matrix(matrix=hamiltonian)
+        num_channels: int = self.num_channels
+        strengths: np.ndarray = self.channel_coupling_strengths
+
+        hamiltonian: np.ndarray = self.ensemble.generate_matrix(use_complex_dtype=True)
+        hamiltonian[np.diag_indices(num_channels)] -= 0.5j * (strengths**2)
         return hamiltonian
 
     def effective_hamiltonian_stream(self, realizs: int) -> Iterator[np.ndarray]:
+        num_channels: int = self.num_channels
+        strengths: np.ndarray = self.channel_coupling_strengths
+
         for hamiltonian in self.ensemble.matrix_stream(realizs, use_complex_dtype=True):
-            self.add_width_matrix(matrix=hamiltonian)
+            hamiltonian[np.diag_indices(num_channels)] -= 0.5j * (strengths**2)
             yield hamiltonian
 
     def resonances_stream(self, realizs: int) -> Iterator[np.ndarray]:
+        lapack_geev: type = self.ensemble._pick_lapack_geev(use_complex_dtype=True)
         for effective_hamiltonian in self.effective_hamiltonian_stream(realizs):
-            yield eigvals(effective_hamiltonian, overwrite_a=True, check_finite=False)
+            yield lapack_geev(
+                effective_hamiltonian, compute_vl=0, compute_vr=0, overwrite_a=True
+            )[0]
 
     def resonance_pdf(
         self,
@@ -257,11 +268,123 @@ class Compound(ABC):
             self.resonance_cdf(resonances) - self.resonance_cdf(np.array([0.0]))
         )
 
-    def unfold_locally(self, resonances: np.ndarray, widths: np.ndarray) -> np.ndarray:
+    def unfold_widths(self, resonances: np.ndarray, widths: np.ndarray) -> np.ndarray:
         return self.ensemble.dimension * (
             self.resonance_cdf(resonances + widths / 2)
             - self.resonance_cdf(resonances - widths / 2)
         )
+
+    def partial_widths_stream(self, realizs: int) -> Iterator[np.ndarray]:
+        for _, eigvecs in self.ensemble.eigsys_stream(realizs):
+            coupling_matrix: np.ndarray = eigvecs[:, : self.num_channels]
+            coupling_matrix *= self.channel_coupling_strengths[None, :]
+            coupling_matrix *= coupling_matrix.conj()
+
+            yield coupling_matrix.real
+
+    def reaction_matrix_stream(
+        self, energies: float | np.ndarray, realizs: int
+    ) -> Iterator[np.ndarray]:
+        ensemble: ManyBodyEnsemble = self.ensemble
+        complex_dtype: type[np.complexfloating] = ensemble.dtype.type
+        real_dtype: type[np.floating] = ensemble.real_dtype.type
+        dimension: int = ensemble.dimension
+        num_channels: int = self.num_channels
+        strengths: np.ndarray = self.channel_coupling_strengths
+
+        energies: np.ndarray = _to_1D_array(energies)
+        num_energies = energies.size
+
+        resolvent: np.ndarray = np.empty(
+            (num_energies, dimension), real_dtype, order="C"
+        )
+        reaction_matrix: np.ndarray = np.empty(
+            (num_energies, num_channels, num_channels), complex_dtype, order="C"
+        )
+
+        for eigvals, eigvecs in ensemble.eigsys_stream(realizs):
+            coupling_matrix: np.ndarray = eigvecs[:, :num_channels]
+            coupling_matrix *= strengths[None, :] / np.sqrt(2)
+
+            if np.isrealobj(coupling_matrix):
+                coupling_matrix_conj: np.ndarray = coupling_matrix
+            else:
+                coupling_matrix_conj: np.ndarray = np.conjugate(
+                    coupling_matrix, out=eigvecs[:, -num_channels:]
+                )
+
+            np.subtract(energies[:, None], eigvals[None, :], out=resolvent)
+            np.reciprocal(resolvent, out=resolvent)
+
+            np.einsum(
+                "ad, nd, db -> nab",
+                coupling_matrix_conj.T,
+                resolvent,
+                coupling_matrix,
+                out=reaction_matrix,
+                optimize=True,
+            )
+
+            yield reaction_matrix
+
+    def reaction_matrix_pair_stream(
+        self, energies: float | np.ndarray, realizs: int
+    ) -> Iterator[tuple[np.ndarray, np.ndarray]]:
+        ensemble: ManyBodyEnsemble = self.ensemble
+        complex_dtype: type[np.complexfloating] = ensemble.dtype.type
+        real_dtype: type[np.floating] = ensemble.real_dtype.type
+        dimension: int = ensemble.dimension
+        num_channels: int = self.num_channels
+        strengths: np.ndarray = self.channel_coupling_strengths
+
+        energies: np.ndarray = _to_1D_array(energies)
+        num_energies: int = energies.size
+
+        resolvent: np.ndarray = np.empty(
+            (num_energies, dimension), real_dtype, order="C"
+        )
+        reaction_matrix: np.ndarray = np.empty(
+            (num_energies, num_channels, num_channels), complex_dtype, order="C"
+        )
+        reaction_matrix_2: np.ndarray = np.empty(
+            (num_energies, num_channels, num_channels), complex_dtype, order="C"
+        )
+
+        for eigvals, eigvecs in ensemble.eigsys_stream(realizs):
+            coupling_matrix: np.ndarray = eigvecs[:, :num_channels]
+            coupling_matrix *= strengths[None, :] / np.sqrt(2)
+
+            if np.isrealobj(coupling_matrix):
+                coupling_matrix_conj: np.ndarray = coupling_matrix
+            else:
+                coupling_matrix_conj: np.ndarray = np.conjugate(
+                    coupling_matrix, out=eigvecs[:, -num_channels:]
+                )
+
+            np.subtract(energies[:, None], eigvals[None, :], out=resolvent)
+            np.reciprocal(resolvent, out=resolvent)
+
+            np.einsum(
+                "ad, nd, db -> nab",
+                coupling_matrix_conj.T,
+                resolvent,
+                coupling_matrix,
+                out=reaction_matrix,
+                optimize=True,
+            )
+
+            np.square(resolvent, out=resolvent)
+
+            np.einsum(
+                "ad, nd, db -> nab",
+                coupling_matrix_conj.T,
+                resolvent,
+                coupling_matrix,
+                out=reaction_matrix_2,
+                optimize=True,
+            )
+
+            yield reaction_matrix, reaction_matrix_2
 
     def scattering_matrix_stream(
         self, energies: float | np.ndarray, realizs: int
@@ -276,9 +399,10 @@ class Compound(ABC):
             order="C",
         )
         for reaction_matrix in self.reaction_matrix_stream(energies, realizs):
-            i: np.ndarray = np.arange(self.num_channels)
+            diag_indices: np.ndarray = np.arange(self.num_channels)
             reaction_matrix *= 1j
-            reaction_matrix[:, i, i] += 1
+            reaction_matrix[:, diag_indices, diag_indices] += 1
+
             np.conjugate(reaction_matrix.swapaxes(-1, -2), out=numerator)
             denominator: np.ndarray = reaction_matrix
 
@@ -296,25 +420,32 @@ class Compound(ABC):
         energies: np.ndarray = _to_1D_array(energies)
 
         for matrix, matrix_2 in self.reaction_matrix_pair_stream(energies, realizs):
-            i: np.ndarray = np.arange(self.num_channels)
+            diag_indices: np.ndarray = np.arange(self.num_channels)
             matrix *= -1j
-            matrix[:, i, i] += 1
+            matrix[:, diag_indices, diag_indices] += 1
 
-            Q: np.ndarray = solve(
+            wigner_smith_matrix: np.ndarray = solve(
                 matrix,
                 matrix_2,
                 overwrite_a=True,
                 overwrite_b=True,
                 check_finite=False,
             )
-            Q += Q.swapaxes(-1, -2).conj()
-            yield Q
+            wigner_smith_matrix += wigner_smith_matrix.swapaxes(-1, -2).conj()
+            yield wigner_smith_matrix
 
     def time_delays_stream(
         self, energies: float | np.ndarray, realizs: int
     ) -> Iterator[np.ndarray]:
         for wigner_smith_matrix in self.wigner_smith_matrix_stream(energies, realizs):
             yield np.linalg.eigvalsh(wigner_smith_matrix)
+
+    def set_rng_state(self, rng_state: dict[str, Any] | None) -> None:
+        if rng_state is not None:
+            self.ensemble.set_rng_state(rng_state)
+
+    def unstructure(self) -> dict[str, Any]:
+        return rmtpy_converter.unstructure(self)
 
     def _create_numerical_resonance_pdf(
         self, num_bins: int = 200, factor: float = 1.2, sigma: float = 2.0
@@ -330,10 +461,10 @@ class Compound(ABC):
             resonances: np.ndarray = complex_energies.real
             counts[:] += np.histogram(resonances, bins=bins)[0]
 
-        centers: np.ndarray = (bins[:-1] + bins[1:]) / 2
         histogram: np.ndarray = counts / np.sum(counts * np.diff(bins))
         smoothed_histogram: np.ndarray = gaussian_filter1d(histogram, sigma=sigma)
 
+        centers: np.ndarray = (bins[:-1] + bins[1:]) / 2
         return PchipInterpolator(centers, smoothed_histogram, extrapolate=True)
 
     def _create_numerical_resonance_cdf(
@@ -345,26 +476,6 @@ class Compound(ABC):
         cdf_vals: np.ndarray = cumulative_trapezoid(pdf_vals, energies, initial=0)
 
         return PchipInterpolator(energies, cdf_vals, extrapolate=True)
-
-    @abstractmethod
-    def add_width_matrix(self, matrix: np.ndarray) -> np.ndarray:
-        pass
-
-    @abstractmethod
-    def partial_widths_stream(self, realizs: int) -> Iterator[np.ndarray]:
-        pass
-
-    @abstractmethod
-    def reaction_matrix_stream(
-        self, energies: float | np.ndarray, realizs: int
-    ) -> Iterator[np.ndarray]:
-        pass
-
-    @abstractmethod
-    def reaction_matrix_pair_stream(
-        self, energies: float | np.ndarray, realizs: int
-    ) -> Iterator[tuple[np.ndarray, np.ndarray]]:
-        pass
 
 
 @rmtpy_converter.register_structure_hook
@@ -392,3 +503,9 @@ def compound_unstructure_hook(
         compound_instance.ensemble
     )
     return unstructured_compound
+
+
+key: str = to_registry_key(Compound.__name__)
+COMPOUND_REGISTRY[key] = Compound
+COMPOUND_STRUCTURE_HOOKS[key] = rmtpy_converter.get_structure_hook(Compound)
+COMPOUND_UNSTRUCTURE_HOOKS[key] = rmtpy_converter.get_unstructure_hook(Compound)

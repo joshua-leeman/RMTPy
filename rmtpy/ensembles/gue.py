@@ -19,11 +19,11 @@ def _create_gue_matrix(
     size: int = matrix.shape[0]
     for i in range(size):
         matrix[i, i] = 2 * std_dev * rng.standard_normal(None, real_dtype)
-        matrix[i, i + 1 :] = std_dev * (
+        matrix[i + 1 :, i] = std_dev * (
             rng.standard_normal(size - i - 1, real_dtype)
             + 1j * rng.standard_normal(size - i - 1, real_dtype)
         )
-        matrix[i + 1 :, i] = np.conj(matrix[i, i + 1 :])
+        matrix[i, i + 1 :] = np.conj(matrix[i + 1 :, i])
 
 
 @frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
@@ -36,7 +36,7 @@ class GaussianUnitaryEnsemble(WignerDysonEnsemble):
     def _default_std_dev(self) -> float:
         return self.ground_state_energy / 2 / np.sqrt(2 * self.dimension)
 
-    def generate_matrix(self, use_complex_dtype: bool = True) -> np.ndarray:
+    def generate_matrix(self, use_complex_dtype: bool = False) -> np.ndarray:
         complex_dtype: type[np.complexfloating] = self.complex_dtype.type
         real_dtype: type[np.floating] = self.real_dtype.type
         rng: np.random.Generator = self.rng
@@ -48,7 +48,7 @@ class GaussianUnitaryEnsemble(WignerDysonEnsemble):
         return matrix
 
     def matrix_stream(
-        self, realizs: int, use_complex_dtype: bool = True
+        self, realizs: int, use_complex_dtype: bool = False
     ) -> Iterator[np.ndarray]:
         complex_dtype: type[np.complexfloating] = self.complex_dtype.type
         real_dtype: type[np.floating] = self.real_dtype.type
