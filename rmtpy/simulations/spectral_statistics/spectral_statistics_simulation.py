@@ -239,12 +239,12 @@ class SpectralStatisticsSimulation(Simulation):
             unfolded_form_factors_data.compute_moment_contributions(unfolded_eigvals)
 
     def calculate_statistics(self) -> None:
-        self.spectral_histogram.compute_histogram()
-        self.spacing_histogram.compute_histogram()
+        self.spectral_histogram.compute_histogram_density()
+        self.spacing_histogram.compute_histogram_density()
         self.form_factors_data.compute_form_factors()
 
-        self.unfolded_spectral_histogram.compute_histogram()
-        self.unfolded_spacing_histogram.compute_histogram()
+        self.unfolded_spectral_histogram.compute_histogram_density()
+        self.unfolded_spacing_histogram.compute_histogram_density()
         self.unfolded_form_factors_data.compute_form_factors()
 
     def run(self, out_dir: str | Path = "output") -> None:

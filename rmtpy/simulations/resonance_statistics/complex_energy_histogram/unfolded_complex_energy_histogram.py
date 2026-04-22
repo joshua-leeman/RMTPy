@@ -59,6 +59,12 @@ class UnfoldedComplexEnergyHistogramPlot(Plot):
     histogram_color: str = "OrangeRed"
     histogram_legend: str = "simulation"
 
+    width_curve_zorder: int = 2
+    width_curve_alpha: float = 1.0
+    width_curve_linewidth: float = 1.0
+    width_curve_color: str = "Cyan"
+    width_curve_legend: str = "average width"
+
     legend_labels: tuple[str] = None
     legend_handles: tuple[Patch] = None
 
@@ -116,4 +122,16 @@ class UnfoldedComplexEnergyHistogramPlot(Plot):
             alpha=self.histogram_alpha,
             zorder=self.histogram_zorder,
         )
+
+        x_values, ave_y_given_x = self.data.compute_average_curve()
+
+        self.ax.plot(
+            x_values,
+            ave_y_given_x,
+            color=self.width_curve_color,
+            alpha=self.width_curve_alpha,
+            linewidth=self.width_curve_linewidth,
+            zorder=self.width_curve_zorder,
+        )
+
         self.finish_plot(path=path)

@@ -180,7 +180,7 @@ class ResonanceStatisticsSimulation(Simulation):
             file_name="complex_energy_histogram",
             x_support=self.complex_energy_support[0],
             y_support=self.complex_energy_support[1],
-            x_num_bins=200,
+            x_num_bins=400,
             y_num_bins=400,
         )
         histogram.y_bins[:] = np.logspace(
@@ -204,7 +204,7 @@ class ResonanceStatisticsSimulation(Simulation):
             file_name="unfolded_complex_energy_histogram",
             x_support=self.unfolded_complex_energy_support[0],
             y_support=self.unfolded_complex_energy_support[1],
-            x_num_bins=200,
+            x_num_bins=400,
             y_num_bins=400,
         )
         histogram.y_bins[:] = np.logspace(
@@ -384,20 +384,16 @@ class ResonanceStatisticsSimulation(Simulation):
             unfolded_form_factors_data.compute_moment_contributions(unfolded_resonances)
 
     def calculate_statistics(self) -> None:
-        self.resonance_histogram.compute_histogram()
-        self.width_histogram.compute_histogram()
-        self.resonance_spacing_histogram.compute_histogram()
-        self.complex_energy_histogram.compute_histogram_with_normalization(
-            normalization=self.realizs * self.compound.ensemble.dimension
-        )
+        self.resonance_histogram.compute_histogram_density()
+        self.width_histogram.compute_histogram_density()
+        self.resonance_spacing_histogram.compute_histogram_density()
+        self.complex_energy_histogram.compute_histogram_probabilities()
         self.form_factors_data.compute_form_factors()
 
-        self.unfolded_resonance_histogram.compute_histogram()
-        self.unfolded_width_histogram.compute_histogram()
-        self.unfolded_resonance_spacing_histogram.compute_histogram()
-        self.unfolded_complex_energy_histogram.compute_histogram_with_normalization(
-            normalization=self.realizs * self.compound.ensemble.dimension
-        )
+        self.unfolded_resonance_histogram.compute_histogram_density()
+        self.unfolded_width_histogram.compute_histogram_density()
+        self.unfolded_resonance_spacing_histogram.compute_histogram_density()
+        self.unfolded_complex_energy_histogram.compute_histogram_probabilities()
         self.unfolded_form_factors_data.compute_form_factors()
 
     def run(self, out_dir: str | Path = "output") -> None:
