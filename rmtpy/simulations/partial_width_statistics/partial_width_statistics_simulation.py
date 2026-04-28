@@ -9,7 +9,7 @@ import numpy as np
 from attrs import asdict, frozen, field, fields_dict
 from attrs.validators import instance_of, gt
 
-from .width_histogram import WidthHistogramPlot
+from .partial_width_histogram import PartialWidthHistogramPlot
 from .._histogram import Histogram
 from .._simulation import Simulation
 from ...compounds import Compound
@@ -45,7 +45,9 @@ class PartialWidthStatisticsSimulation(Simulation):
         default=(-5.0, 0.0)
     )  # log scale base 10
 
-    partial_width_00_plot: WidthHistogramPlot | None = field(init=False, default=None)
+    partial_width_00_plot: PartialWidthHistogramPlot | None = field(
+        init=False, default=None
+    )
     partial_width_00_histogram: Histogram = field()
 
     @partial_width_00_histogram.default
@@ -59,7 +61,9 @@ class PartialWidthStatisticsSimulation(Simulation):
         histogram.metadata["ave_width"] = 0.0
         return histogram
 
-    partial_width_10_plot: WidthHistogramPlot | None = field(init=False, default=None)
+    partial_width_10_plot: PartialWidthHistogramPlot | None = field(
+        init=False, default=None
+    )
     partial_width_10_histogram: Histogram = field()
 
     @partial_width_10_histogram.default
@@ -73,7 +77,9 @@ class PartialWidthStatisticsSimulation(Simulation):
         histogram.metadata["ave_width"] = 0.0
         return histogram
 
-    partial_width_11_plot: WidthHistogramPlot | None = field(init=False, default=None)
+    partial_width_11_plot: PartialWidthHistogramPlot | None = field(
+        init=False, default=None
+    )
     partial_width_11_histogram: Histogram = field()
 
     @partial_width_11_histogram.default
@@ -91,7 +97,7 @@ class PartialWidthStatisticsSimulation(Simulation):
         default=(-2.0, 3.0)
     )  # log scale base 10
 
-    total_width_0_histogram_plot: WidthHistogramPlot | None = field(
+    total_width_0_histogram_plot: PartialWidthHistogramPlot | None = field(
         init=False, default=None
     )
     total_width_0_histogram: Histogram = field()
@@ -107,7 +113,7 @@ class PartialWidthStatisticsSimulation(Simulation):
         histogram.metadata["ave_width"] = 0.0
         return histogram
 
-    total_width_1_histogram_plot: WidthHistogramPlot | None = field(
+    total_width_1_histogram_plot: PartialWidthHistogramPlot | None = field(
         init=False, default=None
     )
     total_width_1_histogram: Histogram = field()
@@ -154,7 +160,7 @@ class PartialWidthStatisticsSimulation(Simulation):
             object.__setattr__(
                 self,
                 histogram.file_name.replace("histogram", "plot"),
-                WidthHistogramPlot(data=histogram),
+                PartialWidthHistogramPlot(data=histogram),
             )
 
     def realize_monte_carlo(self) -> None:
