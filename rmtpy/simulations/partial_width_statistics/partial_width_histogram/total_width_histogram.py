@@ -7,10 +7,10 @@ import numpy as np
 from matplotlib.patches import Patch
 from matplotlib.ticker import NullFormatter
 
-from .._histogram import Histogram
-from .._plot import PlotAxes, PlotLegend, Plot
-from ...compounds import Compound
-from ...utils import rmtpy_converter
+from ..._histogram import Histogram
+from ..._plot import PlotAxes, PlotLegend, Plot
+from ....compounds import Compound
+from ....utils import rmtpy_converter
 
 
 @dataclass(repr=False, eq=False, kw_only=True)

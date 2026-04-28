@@ -10,7 +10,7 @@ from attrs import asdict, frozen, field, fields_dict
 from attrs.validators import instance_of, gt
 
 from .partial_width_histogram import PartialWidthHistogramPlot
-from .total_width_histogram import TotalWidthHistogramPlot
+from .partial_width_histogram import TotalWidthHistogramPlot
 from .._histogram import Histogram
 from .._simulation import Simulation
 from ...compounds import Compound
