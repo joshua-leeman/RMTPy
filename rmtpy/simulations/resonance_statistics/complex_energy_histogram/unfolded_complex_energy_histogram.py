@@ -123,7 +123,7 @@ class UnfoldedComplexEnergyHistogramPlot(Plot):
             zorder=self.histogram_zorder,
         )
 
-        x_values, ave_y_given_x = self.data.compute_average_curve()
+        x_values, ave_y_given_x = self.data.compute_average_x_curve()
 
         self.ax.plot(
             x_values,

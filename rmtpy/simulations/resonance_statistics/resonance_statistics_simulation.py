@@ -95,17 +95,12 @@ class ResonanceStatisticsSimulation(Simulation):
 
     @width_histogram.default
     def _default_width_histogram(self) -> Histogram:
-        histogram: Histogram = Histogram(
+        return Histogram(
             file_name="width_histogram",
+            log_base=10.0,
             support=self.width_support,
             num_bins=200,
         )
-        histogram.bins[:] = histogram.scale * np.logspace(
-            self.width_support[0],
-            self.width_support[1],
-            histogram.num_bins + 1,
-        )
-        return histogram
 
     unfolded_width_plot: UnfoldedWidthHistogramPlot | None = field(
         init=False, default=None
@@ -117,17 +112,12 @@ class ResonanceStatisticsSimulation(Simulation):
 
     @unfolded_width_histogram.default
     def _default_unfolded_width_histogram(self) -> Histogram:
-        histogram: Histogram = Histogram(
+        return Histogram(
             file_name="unfolded_width_histogram",
+            log_base=10.0,
             support=self.unfolded_width_support,
             num_bins=200,
         )
-        histogram.bins[:] = np.logspace(
-            self.unfolded_width_support[0],
-            self.unfolded_width_support[1],
-            histogram.num_bins + 1,
-        )
-        return histogram
 
     resonance_spacing_plot: ResonanceSpacingHistogramPlot | None = field(
         init=False, default=None
@@ -176,19 +166,14 @@ class ResonanceStatisticsSimulation(Simulation):
 
     @complex_energy_histogram.default
     def _default_complex_energy_histogram(self) -> Histogram2D:
-        histogram: Histogram2D = Histogram2D(
+        return Histogram2D(
             file_name="complex_energy_histogram",
             x_support=self.complex_energy_support[0],
-            y_support=self.complex_energy_support[1],
             x_num_bins=400,
+            y_log_base=10.0,
+            y_support=self.complex_energy_support[1],
             y_num_bins=400,
         )
-        histogram.y_bins[:] = np.logspace(
-            self.complex_energy_support[1][0],
-            self.complex_energy_support[1][1],
-            histogram.y_num_bins + 1,
-        )
-        return histogram
 
     unfolded_complex_energy_plot: UnfoldedComplexEnergyHistogramPlot | None = field(
         init=False, default=None
@@ -200,19 +185,14 @@ class ResonanceStatisticsSimulation(Simulation):
 
     @unfolded_complex_energy_histogram.default
     def _default_unfolded_complex_energy_histogram(self) -> Histogram2D:
-        histogram: Histogram2D = Histogram2D(
+        return Histogram2D(
             file_name="unfolded_complex_energy_histogram",
             x_support=self.unfolded_complex_energy_support[0],
-            y_support=self.unfolded_complex_energy_support[1],
             x_num_bins=400,
+            y_log_base=10.0,
+            y_support=self.unfolded_complex_energy_support[1],
             y_num_bins=400,
         )
-        histogram.y_bins[:] = np.logspace(
-            self.unfolded_complex_energy_support[1][0],
-            self.unfolded_complex_energy_support[1][1],
-            histogram.y_num_bins + 1,
-        )
-        return histogram
 
     form_factors_plot: ResonanceFormFactorsPlot | None = field(init=False, default=None)
     form_factors_support: tuple[float, float] = field(

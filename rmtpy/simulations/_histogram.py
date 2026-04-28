@@ -11,6 +11,7 @@ from ._data import Data
 
 @frozen(kw_only=True, repr=False, eq=False, weakref_slot=False, getstate_setstate=False)
 class Histogram(Data):
+    log_base: float | None = None
     support: tuple[float, float]
     scale: float = 1.0
     num_bins: int = 100
@@ -19,9 +20,17 @@ class Histogram(Data):
 
     @bins.default
     def _default_bins(self) -> np.ndarray:
-        return self.scale * np.linspace(
-            self.support[0], self.support[1], self.num_bins + 1
-        )
+        if self.log_base is None:
+            return self.scale * np.linspace(
+                self.support[0], self.support[1], self.num_bins + 1
+            )
+        else:
+            return self.scale * np.logspace(
+                np.log(self.support[0]) / np.log(self.log_base),
+                np.log(self.support[1]) / np.log(self.log_base),
+                self.num_bins + 1,
+                base=self.log_base,
+            )
 
     counts: np.ndarray = field(init=False)
 
@@ -45,7 +54,10 @@ class Histogram(Data):
     def realizs(self) -> int:
         return self._realizs_count[0]
 
-    def add_histogram_contribution(self, data: np.ndarray) -> None:
+    def add_histogram_contribution(self, data: int | float | np.ndarray) -> None:
+        if isinstance(data, (int, float)):
+            data = np.array([data], dtype=np.float64)
+
         indices = np.searchsorted(self.bins, data, side="right") - 1
         valid = (indices >= 0) & (indices < len(self.counts))
         np.add.at(self.counts, indices[valid], 1)
@@ -102,44 +114,71 @@ class Histogram(Data):
 
     def _create_numerical_pdf(self, sigma: float = 2.0) -> PchipInterpolator:
         self.compute_histogram_density()
-        centers: np.ndarray = (self.bins[:-1] + self.bins[1:]) / 2
-        pdf_vals: np.ndarray = gaussian_filter1d(self.histogram, sigma=sigma)
 
+        if self.log_base is not None:
+            centers: np.ndarray = (self.bins[:-1] + self.bins[1:]) / 2
+        else:
+            centers: np.ndarray = np.sqrt(self.bins[:-1] * self.bins[1:])
+
+        pdf_vals: np.ndarray = gaussian_filter1d(self.histogram, sigma=sigma)
         return PchipInterpolator(centers, pdf_vals, extrapolate=True)
 
     def _create_numerical_cdf(self, sigma: float = 2.0) -> PchipInterpolator:
         self.compute_histogram_density()
-        centers: np.ndarray = (self.bins[:-1] + self.bins[1:]) / 2
+
+        if self.log_base is not None:
+            centers: np.ndarray = (self.bins[:-1] + self.bins[1:]) / 2
+        else:
+            centers: np.ndarray = np.sqrt(self.bins[:-1] * self.bins[1:])
+
         pdf_vals: np.ndarray = self.numerical_pdf(centers, sigma=sigma)
         cdf_vals: np.ndarray = cumulative_trapezoid(pdf_vals, centers, initial=0)
-
         return PchipInterpolator(centers, cdf_vals, extrapolate=True)
 
 
 @frozen(kw_only=True, repr=False, eq=False, weakref_slot=False, getstate_setstate=False)
 class Histogram2D(Data):
+    x_log_base: float | None = None
     x_support: tuple[float, float]
-    y_support: tuple[float, float]
     x_scale: float = 1.0
-    y_scale: float = 1.0
     x_num_bins: int = 100
+
+    y_log_base: float | None = None
+    y_support: tuple[float, float]
+    y_scale: float = 1.0
     y_num_bins: int = 100
 
     x_bins: np.ndarray = field(init=False)
 
     @x_bins.default
     def _default_x_bins(self) -> np.ndarray:
-        return self.x_scale * np.linspace(
-            self.x_support[0], self.x_support[1], self.x_num_bins + 1
-        )
+        if self.x_log_base is None:
+            return self.x_scale * np.linspace(
+                self.x_support[0], self.x_support[1], self.x_num_bins + 1
+            )
+        else:
+            return self.x_scale * np.logspace(
+                np.log(self.x_support[0]) / np.log(self.x_log_base),
+                np.log(self.x_support[1]) / np.log(self.x_log_base),
+                self.x_num_bins + 1,
+                base=self.x_log_base,
+            )
 
     y_bins: np.ndarray = field(init=False)
 
     @y_bins.default
     def _default_y_bins(self) -> np.ndarray:
-        return self.y_scale * np.linspace(
-            self.y_support[0], self.y_support[1], self.y_num_bins + 1
-        )
+        if self.y_log_base is None:
+            return self.y_scale * np.linspace(
+                self.y_support[0], self.y_support[1], self.y_num_bins + 1
+            )
+        else:
+            return self.y_scale * np.logspace(
+                np.log(self.y_support[0]) / np.log(self.y_log_base),
+                np.log(self.y_support[1]) / np.log(self.y_log_base),
+                self.y_num_bins + 1,
+                base=self.y_log_base,
+            )
 
     counts: np.ndarray = field(init=False)
 
@@ -224,7 +263,7 @@ class Histogram2D(Data):
             - self.numerical_cdf(values - widths / 2)
         )
 
-    def compute_average_curve(self) -> tuple[np.ndarray, np.ndarray]:
+    def compute_average_x_curve(self) -> tuple[np.ndarray, np.ndarray]:
         self.compute_histogram_density()
         bin_areas: np.ndarray = (
             np.diff(self.x_bins)[:, None] * np.diff(self.y_bins)[None, :]
@@ -239,10 +278,18 @@ class Histogram2D(Data):
             where=prob_x[:, None] > 0,
         )
 
-        y_vals: np.ndarray = np.sqrt(self.y_bins[:-1] * self.y_bins[1:])
+        if self.y_log_base is None:
+            y_vals: np.ndarray = (self.y_bins[:-1] + self.y_bins[1:]) / 2
+        else:
+            y_vals: np.ndarray = np.sqrt(self.y_bins[:-1] * self.y_bins[1:])
+
         ave_y_given_x: np.ndarray = np.sum(prob_y_given_x * y_vals[None, :], axis=1)
 
-        x_vals: np.ndarray = (self.x_bins[:-1] + self.x_bins[1:]) / 2
+        if self.x_log_base is not None:
+            x_vals: np.ndarray = (self.x_bins[:-1] + self.x_bins[1:]) / 2
+        else:
+            x_vals: np.ndarray = np.sqrt(self.x_bins[:-1] * self.x_bins[1:])
+
         return x_vals, ave_y_given_x
 
     def _create_numerical_pdf(self, sigma: float = 2.0) -> PchipInterpolator:
