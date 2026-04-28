@@ -114,13 +114,10 @@ class WidthHistogramPlot(Plot):
         self.ax.xaxis.set_minor_formatter(NullFormatter())
         self.ax.yaxis.set_minor_formatter(NullFormatter())
 
-        centers = np.sqrt(self.data.bins[:-1] * self.data.bins[1:])
-        log_weights = self.data.histogram * centers
-
         self.ax.hist(
             self.data.bins[:-1],
             bins=self.data.bins,
-            weights=log_weights,
+            weights=self.data.histogram,
             color=self.histogram_color,
             alpha=self.histogram_alpha,
             zorder=self.histogram_zorder,

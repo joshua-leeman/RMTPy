@@ -6,6 +6,7 @@ from typing import Any
 import numpy as np
 from attrs import field, frozen
 from numba import njit
+from scipy.special import gamma
 
 from ._many_body import ManyBodyEnsemble
 from ._wigner_dyson import (
@@ -170,6 +171,17 @@ class PoissonEnsemble(ManyBodyEnsemble):
         cdf[mask] = eigvals[mask] / (2 * energy_0) + 0.5
         cdf[eigvals > energy_0] = 1.0
         return cdf
+
+    def porter_thomas_distribution(
+        self, widths: np.ndarray, num_channels: int = 1
+    ) -> np.ndarray:
+        if self.eigvecs_ensemble.dyson_index == 1:
+            real_dof: int = num_channels
+        else:
+            real_dof: int = 2 * num_channels
+
+        coeff: float = (real_dof / 2) ** (real_dof / 2) / gamma(real_dof / 2)
+        return coeff * widths ** (real_dof / 2 - 1) * np.exp(-real_dof * widths / 2)
 
     def _pick_blas_copy(self, use_complex_dtype: bool) -> type:
         return self.eigvecs_ensemble._pick_blas_copy(use_complex_dtype)

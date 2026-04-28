@@ -140,6 +140,17 @@ class ManyBodyEnsemble(RandomMatrixEnsemble):
         b: float = (gamma((idx + 2) / 2) / gamma((idx + 1) / 2)) ** 2
         return 2 * a * spacings**idx * np.exp(-b * spacings**2) / degeneracy
 
+    def porter_thomas_distribution(
+        self, widths: np.ndarray, num_channels: int = 1
+    ) -> np.ndarray:
+        if self.dyson_index == 1:
+            real_dof: int = num_channels
+        else:
+            real_dof: int = 2 * num_channels
+
+        coeff: float = (real_dof / 2) ** (real_dof / 2) / gamma(real_dof / 2)
+        return coeff * widths ** (real_dof / 2 - 1) * np.exp(-real_dof * widths / 2)
+
     def universal_csff(self, unfolded_times: np.ndarray) -> np.ndarray:
         real_dtype: type[np.floating] = self.real_dtype.type
         dyson_index: int | float = self.dyson_index

@@ -10,6 +10,7 @@ from attrs import asdict, frozen, field, fields_dict
 from attrs.validators import instance_of, gt
 
 from .partial_width_histogram import PartialWidthHistogramPlot
+from .total_width_histogram import TotalWidthHistogramPlot
 from .._histogram import Histogram
 from .._simulation import Simulation
 from ...compounds import Compound
@@ -42,10 +43,10 @@ class PartialWidthStatisticsSimulation(Simulation):
             raise ValueError(f"Compound must be concrete.")
 
     partial_widths_support: tuple[float, float] = field(
-        default=(-5.0, 0.0)
+        default=(-5.0, 2.0)
     )  # log scale base 10
 
-    partial_width_00_plot: PartialWidthHistogramPlot | None = field(
+    partial_width_00_histogram_plot: PartialWidthHistogramPlot | None = field(
         init=False, default=None
     )
     partial_width_00_histogram: Histogram = field()
@@ -56,12 +57,13 @@ class PartialWidthStatisticsSimulation(Simulation):
             file_name="partial_width_00_histogram",
             log_base=10.0,
             support=self.partial_widths_support,
+            num_bins=60,
         )
         histogram.metadata["index"] = (0, 0)
         histogram.metadata["ave_width"] = 0.0
         return histogram
 
-    partial_width_10_plot: PartialWidthHistogramPlot | None = field(
+    partial_width_10_histogram_plot: PartialWidthHistogramPlot | None = field(
         init=False, default=None
     )
     partial_width_10_histogram: Histogram = field()
@@ -72,12 +74,13 @@ class PartialWidthStatisticsSimulation(Simulation):
             file_name="partial_width_10_histogram",
             log_base=10.0,
             support=self.partial_widths_support,
+            num_bins=60,
         )
         histogram.metadata["index"] = (1, 0)
         histogram.metadata["ave_width"] = 0.0
         return histogram
 
-    partial_width_11_plot: PartialWidthHistogramPlot | None = field(
+    partial_width_11_histogram_plot: PartialWidthHistogramPlot | None = field(
         init=False, default=None
     )
     partial_width_11_histogram: Histogram = field()
@@ -88,6 +91,7 @@ class PartialWidthStatisticsSimulation(Simulation):
             file_name="partial_width_11_histogram",
             log_base=10.0,
             support=self.partial_widths_support,
+            num_bins=60,
         )
         histogram.metadata["index"] = (1, 1)
         histogram.metadata["ave_width"] = 0.0
@@ -108,6 +112,7 @@ class PartialWidthStatisticsSimulation(Simulation):
             file_name="total_width_0_histogram",
             log_base=10.0,
             support=self.total_widths_support,
+            num_bins=100,
         )
         histogram.metadata["index"] = (0,)
         histogram.metadata["ave_width"] = 0.0
@@ -124,20 +129,13 @@ class PartialWidthStatisticsSimulation(Simulation):
             file_name="total_width_1_histogram",
             log_base=10.0,
             support=self.total_widths_support,
+            num_bins=100,
         )
         histogram.metadata["index"] = (1,)
         histogram.metadata["ave_width"] = 0.0
         return histogram
 
-    width_histograms: list[Histogram] = field(init=False, repr=False)
-
-    @width_histograms.default
-    def _default_width_histograms(self) -> list[Histogram]:
-        return [
-            getattr(self, attribute_name)
-            for attribute_name in asdict(self).keys()
-            if type(getattr(self, attribute_name)) == Histogram
-        ]
+    width_histograms: list[Histogram] = field(init=False, repr=False, factory=list)
 
     @property
     def to_path(self) -> Path:
@@ -155,13 +153,27 @@ class PartialWidthStatisticsSimulation(Simulation):
         self.metadata["args"]["realizs"] = self.realizs
         self.metadata["args"]["compound"] = rmtpy_converter.unstructure(self.compound)
 
+        for attribute_name in asdict(self).keys():
+            attribute_value = getattr(self, attribute_name)
+            if type(attribute_value) == Histogram:
+                self.width_histograms.append(attribute_value)
+
     def initialize_plots(self) -> None:
         for histogram in self.width_histograms:
-            object.__setattr__(
-                self,
-                histogram.file_name.replace("histogram", "plot"),
-                PartialWidthHistogramPlot(data=histogram),
-            )
+            if len(histogram.metadata["index"]) == 2:
+                object.__setattr__(
+                    self,
+                    histogram.file_name.replace("data", "plot"),
+                    PartialWidthHistogramPlot(data=histogram),
+                )
+            elif len(histogram.metadata["index"]) == 1:
+                object.__setattr__(
+                    self,
+                    histogram.file_name.replace("data", "plot"),
+                    TotalWidthHistogramPlot(data=histogram),
+                )
+            else:
+                raise ValueError("Invalid width index in histogram metadata.")
 
     def realize_monte_carlo(self) -> None:
         width_histograms: list[Histogram] = [
@@ -175,10 +187,8 @@ class PartialWidthStatisticsSimulation(Simulation):
                 width_index: tuple[int, ...] = histogram.metadata["index"]
                 if len(width_index) == 2:
                     width_value: float = partial_widths[width_index[0]][width_index[1]]
-                elif len(width_index) == 1:
-                    width_value: float = np.sum(partial_widths[width_index[0]])
                 else:
-                    raise ValueError("Invalid width index in histogram metadata.")
+                    width_value: float = np.sum(partial_widths[width_index[0]])
 
                 histogram.add_histogram_contribution(width_value)
                 histogram.metadata["ave_width"] += width_value

@@ -26,8 +26,8 @@ class Histogram(Data):
             )
         else:
             return self.scale * np.logspace(
-                np.log(self.support[0]) / np.log(self.log_base),
-                np.log(self.support[1]) / np.log(self.log_base),
+                self.support[0],
+                self.support[1],
                 self.num_bins + 1,
                 base=self.log_base,
             )
@@ -115,7 +115,7 @@ class Histogram(Data):
     def _create_numerical_pdf(self, sigma: float = 2.0) -> PchipInterpolator:
         self.compute_histogram_density()
 
-        if self.log_base is not None:
+        if self.log_base is None:
             centers: np.ndarray = (self.bins[:-1] + self.bins[1:]) / 2
         else:
             centers: np.ndarray = np.sqrt(self.bins[:-1] * self.bins[1:])
@@ -126,7 +126,7 @@ class Histogram(Data):
     def _create_numerical_cdf(self, sigma: float = 2.0) -> PchipInterpolator:
         self.compute_histogram_density()
 
-        if self.log_base is not None:
+        if self.log_base is None:
             centers: np.ndarray = (self.bins[:-1] + self.bins[1:]) / 2
         else:
             centers: np.ndarray = np.sqrt(self.bins[:-1] * self.bins[1:])
@@ -158,8 +158,8 @@ class Histogram2D(Data):
             )
         else:
             return self.x_scale * np.logspace(
-                np.log(self.x_support[0]) / np.log(self.x_log_base),
-                np.log(self.x_support[1]) / np.log(self.x_log_base),
+                self.x_support[0],
+                self.x_support[1],
                 self.x_num_bins + 1,
                 base=self.x_log_base,
             )
@@ -174,8 +174,8 @@ class Histogram2D(Data):
             )
         else:
             return self.y_scale * np.logspace(
-                np.log(self.y_support[0]) / np.log(self.y_log_base),
-                np.log(self.y_support[1]) / np.log(self.y_log_base),
+                self.y_support[0],
+                self.y_support[1],
                 self.y_num_bins + 1,
                 base=self.y_log_base,
             )
@@ -285,7 +285,7 @@ class Histogram2D(Data):
 
         ave_y_given_x: np.ndarray = np.sum(prob_y_given_x * y_vals[None, :], axis=1)
 
-        if self.x_log_base is not None:
+        if self.x_log_base is None:
             x_vals: np.ndarray = (self.x_bins[:-1] + self.x_bins[1:]) / 2
         else:
             x_vals: np.ndarray = np.sqrt(self.x_bins[:-1] * self.x_bins[1:])

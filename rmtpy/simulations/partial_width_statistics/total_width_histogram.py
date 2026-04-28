@@ -5,56 +5,54 @@ from pathlib import Path
 
 import numpy as np
 from matplotlib.patches import Patch
+from matplotlib.ticker import NullFormatter
 
-from ..._histogram import Histogram
-from ..._plot import PlotAxes, PlotLegend, Plot
-from ....compounds import Compound
-from ....ensembles import ManyBodyEnsemble
-from ....utils import rmtpy_converter
+from .._histogram import Histogram
+from .._plot import PlotAxes, PlotLegend, Plot
+from ...compounds import Compound
+from ...utils import rmtpy_converter
 
 
 @dataclass(repr=False, eq=False, kw_only=True)
-class UnfoldedWidthHistogramLegend(PlotLegend):
+class TotalWidthHistogramLegend(PlotLegend):
     loc: str = "upper right"
     bbox: tuple[float, float] = (0.94, 0.95)
 
 
 @dataclass(repr=False, eq=False, kw_only=True)
-class UnfoldedWidthHistogramAxes(PlotAxes):
-    xticks: tuple[float, ...] = tuple(range(-4, 5, 2))  # log scale base 10
-    xticks_minor: tuple[float, ...] = tuple(range(-3, 4, 2))
-    xlabel: str = r"$\gamma$"
+class TotalWidthHistogramAxes(PlotAxes):
+    xticks: tuple[float, ...] = tuple(range(-1, 2))  # log scale base 10
+    xticks_minor: tuple[float, ...] = tuple()
+    xlabel: str = r"$Y = \Gamma / \ensavg{\Gamma}$"
     xtick_labels: tuple[str, ...] = (
-        r"$10^{-4}$",
-        r"$10^{-2}$",
+        r"$10^{-1}$",
         r"$10^{0}$",
-        r"$10^{2}$",
-        r"$10^{4}$",
+        r"$10^{1}$",
     )
 
-    yticks: tuple[float, ...] = tuple(range(-4, 5, 2))  # log scale base 10
-    yticks_minor: tuple[float, ...] = tuple(range(-3, 4, 2))
-    ylabel: str = r"$\diff {P} / \diff \log \gamma$"
+    yticks: tuple[float, ...] = tuple(range(-3, 2))  # log scale base 10
+    yticks_minor: tuple[float, ...] = tuple()
+    ylabel: str = r"$P(Y)$"
     ytick_labels: tuple[str, ...] = (
-        r"$10^{-4}$",
+        r"$10^{-3}$",
         r"$10^{-2}$",
+        r"$10^{-1}$",
         r"$10^{0}$",
-        r"$10^{2}$",
-        r"$10^{4}$",
+        r"$10^{1}$",
     )
 
 
 @dataclass(repr=False, eq=False, kw_only=True)
-class UnfoldedWidthHistogramPlot(Plot):
+class TotalWidthHistogramPlot(Plot):
     data: Histogram
-    axes: UnfoldedWidthHistogramAxes = field(default_factory=UnfoldedWidthHistogramAxes)
+    axes: TotalWidthHistogramAxes = field(default_factory=TotalWidthHistogramAxes)
 
-    xlim: tuple[float, float] = (-3.5, 2.5)  # log scale base 10
-    ylim: tuple[float, float] = (-4.5, 4.5)  # log scale base 10
+    xlim: tuple[float, float] = (-1.2, 1.2)  # log scale base 10
+    ylim: tuple[float, float] = (-3.2, 1.2)  # log scale base 10
 
     histogram_zorder: int = 1
     histogram_alpha: float = 0.5
-    histogram_color: str = "SeaGreen"
+    histogram_color: str = "BlueViolet"
     histogram_legend: str = "simulation"
 
     legend_labels: tuple[str] = (histogram_legend,)
@@ -71,28 +69,14 @@ class UnfoldedWidthHistogramPlot(Plot):
             raise ValueError("Metadata is not properly structured.")
 
         self.compound: Compound = rmtpy_converter.structure(compound_meta, Compound)
-        mean_coupling_squared: float = np.mean(
-            self.compound.channel_coupling_strengths**2
-        )
-        ensemble: ManyBodyEnsemble = self.compound.ensemble
 
-        self.legend: UnfoldedWidthHistogramLegend = UnfoldedWidthHistogramLegend(
+        self.legend: TotalWidthHistogramLegend = TotalWidthHistogramLegend(
             handles=self.legend_handles, labels=self.legend_labels
         )
-        ten_exponent: float = np.log10(
-            mean_coupling_squared / ensemble.ground_state_energy
-        )
-        ten_exponent = 0.00 if np.isclose(ten_exponent, 0) else ten_exponent
         if self.legend.title is None:
-            self.legend.title = (
-                self.compound.to_latex
-                + "\n"
-                + r"$\nu^2 = "
-                + f"10^{{{ten_exponent:.2f}}}E_0$"
-                + "\nunfolded"
-            )
+            self.legend.title = self.compound.to_latex
 
-        axes: UnfoldedWidthHistogramAxes = self.axes
+        axes: TotalWidthHistogramAxes = self.axes
         self.xlim = tuple(10**x for x in self.xlim)
         self.ylim = tuple(10**y for y in self.ylim)
 
@@ -109,6 +93,11 @@ class UnfoldedWidthHistogramPlot(Plot):
         self.ax.set_xscale("log", base=10)
         self.ax.set_yscale("log", base=10)
 
+        self.ax.xaxis.set_minor_formatter(NullFormatter())
+        self.ax.yaxis.set_minor_formatter(NullFormatter())
+
+        centers = np.sqrt(self.data.bins[:-1] * self.data.bins[1:])
+
         self.ax.hist(
             self.data.bins[:-1],
             bins=self.data.bins,
@@ -116,6 +105,15 @@ class UnfoldedWidthHistogramPlot(Plot):
             color=self.histogram_color,
             alpha=self.histogram_alpha,
             zorder=self.histogram_zorder,
+        )
+
+        ensemble = self.compound.ensemble
+        num_channels = self.compound.num_channels
+
+        self.ax.plot(
+            centers,
+            ensemble.porter_thomas_distribution(centers, num_channels),
+            color="Black",
         )
 
         self.finish_plot(path=path)
