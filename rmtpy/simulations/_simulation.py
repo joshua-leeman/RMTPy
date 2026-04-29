@@ -14,7 +14,6 @@ from ._data import DATA_REGISTRY, Data
 from ._plot import Plot
 from ..utils import rmtpy_converter, insert_underscores, normalize_dict
 
-
 SIMULATION_REGISTRY: dict[str, type[Simulation]] = {}
 SIMULATION_STRUCTURE_HOOKS: dict[str, StructureHook] = {
     key: rmtpy_converter.get_structure_hook(val)
@@ -33,11 +32,22 @@ class Simulation(ABC):
     def __attrs_post_init__(self) -> None:
         self._populate_metadata()
 
-        data_attrs: tuple[Data, ...] = tuple(
+        data_attrs: list[Data] = [
             getattr(self, simulation_field.name)
             for simulation_field in fields(type(self))
             if isinstance(getattr(self, simulation_field.name), Data)
-        )
+        ]
+        list_attrs: list[list[Any]] = [
+            getattr(self, simulation_field.name)
+            for simulation_field in fields(type(self))
+            if isinstance(getattr(self, simulation_field.name), list)
+        ]
+        data_attrs += [
+            data_object
+            for sublist in list_attrs
+            for data_object in sublist
+            if isinstance(data_object, Data)
+        ]
         for data in data_attrs:
             data.metadata.update({"simulation": self.metadata.copy()})
 
@@ -58,11 +68,22 @@ class Simulation(ABC):
     def save_data(self, out_dir: str | Path) -> None:
         self._save_metadata(out_dir)
 
-        data_attrs: tuple[Data, ...] = tuple(
+        data_attrs: list[Data] = [
             getattr(self, simulation_field.name)
             for simulation_field in fields(type(self))
             if isinstance(getattr(self, simulation_field.name), Data)
-        )
+        ]
+        list_attrs: list[list[Any]] = [
+            getattr(self, simulation_field.name)
+            for simulation_field in fields(type(self))
+            if isinstance(getattr(self, simulation_field.name), list)
+        ]
+        data_attrs += [
+            data_object
+            for sublist in list_attrs
+            for data_object in sublist
+            if isinstance(data_object, Data)
+        ]
         for data in data_attrs:
             subdir_name = data.file_name.replace("_data", "")
             out_path: Path = out_dir / subdir_name / f"{data.file_name}.npz"
@@ -74,11 +95,23 @@ class Simulation(ABC):
 
     def save_plots(self, out_dir: str | Path) -> None:
         self.initialize_plots()
-        plot_attrs: tuple[Plot, ...] = tuple(
+
+        plot_attrs: list[Plot] = list(
             getattr(self, simulation_field.name)
             for simulation_field in fields(type(self))
             if isinstance(getattr(self, simulation_field.name), Plot)
         )
+        list_attrs: list[list[Any]] = [
+            getattr(self, simulation_field.name)
+            for simulation_field in fields(type(self))
+            if isinstance(getattr(self, simulation_field.name), list)
+        ]
+        plot_attrs += [
+            plot_object
+            for sublist in list_attrs
+            for plot_object in sublist
+            if isinstance(plot_object, Plot)
+        ]
         for plot in plot_attrs:
             subdir_name = plot.data.file_name.replace("_data", "")
             out_path: Path = out_dir / subdir_name

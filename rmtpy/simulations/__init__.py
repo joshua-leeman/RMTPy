@@ -5,7 +5,7 @@ from .resonance_statistics import (
     ResonanceStatisticsSimulation,
     run_resonance_statistics,
 )
-from .partial_width_statistics import (
-    PartialWidthStatisticsSimulation,
-    run_partial_width_statistics,
+from .partial_widths_statistics import (
+    PartialWidthsStatisticsSimulation,
+    run_partial_widths_statistics,
 )
