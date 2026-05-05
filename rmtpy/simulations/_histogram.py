@@ -212,9 +212,7 @@ class Histogram2D(Data):
         self._realizs_count[0] += 1
 
     def compute_histogram_density(self) -> None:
-        bin_areas: np.ndarray = (
-            np.diff(self.x_bins)[:, None] * np.diff(self.y_bins)[None, :]
-        )
+        bin_areas: np.ndarray = np.outer(np.diff(self.x_bins), np.diff(self.y_bins))
         self.histogram[:] = self.counts / (np.sum(self.counts) * bin_areas)
 
     def compute_histogram_probabilities(self) -> None:
@@ -265,9 +263,7 @@ class Histogram2D(Data):
 
     def compute_average_x_curve(self) -> tuple[np.ndarray, np.ndarray]:
         self.compute_histogram_density()
-        bin_areas: np.ndarray = (
-            np.diff(self.x_bins)[:, None] * np.diff(self.y_bins)[None, :]
-        )
+        bin_areas: np.ndarray = np.outer(np.diff(self.x_bins), np.diff(self.y_bins))
         prob_x_and_y: np.ndarray = self.histogram * bin_areas
 
         prob_x: np.ndarray = np.sum(prob_x_and_y, axis=1)
