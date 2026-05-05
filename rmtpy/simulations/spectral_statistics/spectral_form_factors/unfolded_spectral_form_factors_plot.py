@@ -48,6 +48,12 @@ class UnfoldedFormFactorsPlot(Plot):
     xlim: tuple[float, float] = (-1.5, 0.5)  # log scale base dimension
     ylim: tuple[float, float] = (-2.2, 0.2)
 
+    grid_zorder: int = 0
+    grid_width: float = rcParams["grid.linewidth"]
+    grid_alpha: float = 1.0
+    grid_color: str = rcParams["grid.color"]
+    grid_linestyle: str = "dotted"
+
     # thouless_marker: str = "*"
     # thouless_size: int = 12
     # thouless_color: str = "Black"
@@ -73,12 +79,6 @@ class UnfoldedFormFactorsPlot(Plot):
     universal_csff_alpha: float = 1.0
     universal_csff_color: str = "Black"
     universal_csff_legend: str = "universal"
-
-    grid_zorder: int = 0
-    grid_width: float = rcParams["grid.linewidth"]
-    grid_alpha: float = 1.0
-    grid_color: str = rcParams["grid.color"]
-    grid_linestyle: str = "dotted"
 
     legend_labels: tuple[str, str, str] = (
         sff_legend,
@@ -147,6 +147,17 @@ class UnfoldedFormFactorsPlot(Plot):
         )
         self.ax.yaxis.set_minor_locator(NullLocator())
 
+        self.ax.vlines(
+            self.axes.xticks,
+            ymin=self.ylim[0],
+            ymax=self.ylim[1],
+            colors=self.grid_color,
+            linestyles=self.grid_linestyle,
+            linewidth=self.grid_width,
+            alpha=self.grid_alpha,
+            zorder=self.grid_zorder,
+        )
+
         self.ax.plot(
             self.data.times,
             self.data.form_factor,
@@ -177,17 +188,6 @@ class UnfoldedFormFactorsPlot(Plot):
             linewidth=self.universal_csff_width,
             zorder=self.universal_csff_zorder,
             label=self.universal_csff_legend,
-        )
-
-        self.ax.vlines(
-            self.axes.xticks,
-            ymin=self.ylim[0],
-            ymax=self.ylim[1],
-            colors=self.grid_color,
-            linestyles=self.grid_linestyle,
-            linewidth=self.grid_width,
-            alpha=self.grid_alpha,
-            zorder=self.grid_zorder,
         )
 
         self.finish_plot(path=path)

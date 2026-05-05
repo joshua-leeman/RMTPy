@@ -132,6 +132,17 @@ class FormFactorsPlot(Plot):
         )
         self.ax.yaxis.set_minor_locator(NullLocator())
 
+        self.ax.vlines(
+            self.axes.xticks,
+            ymin=self.ylim[0],
+            ymax=self.ylim[1],
+            colors=self.grid_color,
+            linestyles=self.grid_linestyle,
+            linewidth=self.grid_width,
+            alpha=self.grid_alpha,
+            zorder=self.grid_zorder,
+        )
+
         self.ax.plot(
             self.data.times,
             self.data.form_factor,
@@ -150,17 +161,6 @@ class FormFactorsPlot(Plot):
             linewidth=self.csff_width,
             zorder=self.csff_zorder,
             label=self.csff_legend,
-        )
-
-        self.ax.vlines(
-            self.axes.xticks,
-            ymin=self.ylim[0],
-            ymax=self.ylim[1],
-            colors=self.grid_color,
-            linestyles=self.grid_linestyle,
-            linewidth=self.grid_width,
-            alpha=self.grid_alpha,
-            zorder=self.grid_zorder,
         )
 
         self.finish_plot(path=path)
