@@ -79,14 +79,14 @@ class ManyBodyEnsemble(RandomMatrixEnsemble):
 
     def spectral_pdf(
         self,
-        eigvals: int | float | np.ndarray,
+        energies: int | float | np.ndarray,
         _factor: float = 1.2,
         _num_bins: int = 200,
         _sigma: float = 2.0,
     ) -> np.ndarray:
         real_dtype: type[np.floating] = self.real_dtype.type
-        if isinstance(eigvals, (int, float)):
-            eigvals: np.ndarray = np.array([eigvals], dtype=real_dtype)
+        if isinstance(energies, (int, float)):
+            energies: np.ndarray = np.array([energies], dtype=real_dtype)
 
         if self._numerical_spectral_pdf is None:
             object.__setattr__(
@@ -95,18 +95,18 @@ class ManyBodyEnsemble(RandomMatrixEnsemble):
                 self._create_numerical_spectral_pdf(_num_bins, _factor, _sigma),
             )
 
-        return self._numerical_spectral_pdf(eigvals)
+        return self._numerical_spectral_pdf(energies)
 
     def spectral_cdf(
         self,
-        eigvals: int | float | np.ndarray,
+        energies: int | float | np.ndarray,
         _factor: float = 1.2,
         _num_bins: int = 200,
         _sigma: float = 2.0,
     ) -> np.ndarray:
         real_dtype: type[np.floating] = self.real_dtype.type
-        if isinstance(eigvals, (int, float)):
-            eigvals: np.ndarray = np.array([eigvals], dtype=real_dtype)
+        if isinstance(energies, (int, float)):
+            energies: np.ndarray = np.array([energies], dtype=real_dtype)
 
         if self._numerical_spectral_cdf is None:
             object.__setattr__(
@@ -115,17 +115,17 @@ class ManyBodyEnsemble(RandomMatrixEnsemble):
                 self._create_numerical_spectral_cdf(_num_bins, _factor, _sigma),
             )
 
-        return self._numerical_spectral_cdf(eigvals)
+        return self._numerical_spectral_cdf(energies)
 
-    def unfold(self, eigvals: np.ndarray) -> np.ndarray:
+    def unfold(self, energies: np.ndarray) -> np.ndarray:
         return self.dimension * (
-            self.spectral_cdf(eigvals) - self.spectral_cdf(np.array([0.0]))
+            self.spectral_cdf(energies) - self.spectral_cdf(np.array([0.0]))
         )
 
-    def unfold_widths(self, eigvals: np.ndarray, widths: np.ndarray) -> np.ndarray:
+    def unfold_widths(self, energies: np.ndarray, widths: np.ndarray) -> np.ndarray:
         return self.dimension * (
-            self.spectral_cdf(eigvals + widths / 2)
-            - self.spectral_cdf(eigvals - widths / 2)
+            self.spectral_cdf(energies + widths / 2)
+            - self.spectral_cdf(energies - widths / 2)
         )
 
     def wigner_surmise(self, spacings: np.ndarray) -> np.ndarray:
@@ -195,7 +195,7 @@ class ManyBodyEnsemble(RandomMatrixEnsemble):
         for tmp_eigvals in self.eigvals_stream(realizs):
             counts[:] += np.histogram(tmp_eigvals, bins=bins)[0]
 
-        histogram: np.ndarray = counts / np.sum(counts * np.diff(bins))
+        histogram: np.ndarray = counts / (np.sum(counts) * np.diff(bins))
         smoothed_histogram: np.ndarray = gaussian_filter1d(histogram, sigma=sigma)
 
         centers: np.ndarray = (bins[:-1] + bins[1:]) / 2
