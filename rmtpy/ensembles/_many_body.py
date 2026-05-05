@@ -129,16 +129,16 @@ class ManyBodyEnsemble(RandomMatrixEnsemble):
         )
 
     def wigner_surmise(self, spacings: np.ndarray) -> np.ndarray:
-        degeneracy: int = self.eigval_degeneracy
-        spacings /= degeneracy
-
         idx: int | float = self.dyson_index
         if idx == 0:
             return np.exp(-spacings)
 
+        degeneracy: int = self.eigval_degeneracy
+        adj_spacings: np.ndarray = spacings / degeneracy
+
         a: float = gamma((idx + 2) / 2) ** (idx + 1) / gamma((idx + 1) / 2) ** (idx + 2)
         b: float = (gamma((idx + 2) / 2) / gamma((idx + 1) / 2)) ** 2
-        return 2 * a * spacings**idx * np.exp(-b * spacings**2) / degeneracy
+        return 2 * a * adj_spacings**idx * np.exp(-b * adj_spacings**2) / degeneracy
 
     def porter_thomas_distribution(
         self, widths: np.ndarray, num_channels: int = 1

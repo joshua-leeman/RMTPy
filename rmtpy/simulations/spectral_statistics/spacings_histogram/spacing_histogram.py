@@ -114,7 +114,6 @@ class SpacingsHistogramPlot(Plot):
         )
 
         spacings: np.ndarray = np.linspace(0, self.xlim[1], self.num_points)
-
         mean_spacing: float = self.data.metadata["global_mean_spacing"]
         surmise: np.ndarray = self.ensemble.wigner_surmise(spacings / mean_spacing)
         surmise /= mean_spacing
