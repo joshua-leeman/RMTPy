@@ -20,7 +20,6 @@ from cattrs.dispatch import StructureHook, UnstructureHook
 from ..ensembles import ManyBodyEnsemble, WignerDysonEnsemble
 from ..utils import rmtpy_converter, normalize_dict, to_registry_key
 
-
 COMPOUND_REGISTRY: dict[str, type[Compound]] = {}
 COMPOUND_STRUCTURE_HOOKS: dict[str, StructureHook] = {}
 COMPOUND_UNSTRUCTURE_HOOKS: dict[str, UnstructureHook] = {}
@@ -225,14 +224,14 @@ class Compound:
 
     def resonance_pdf(
         self,
-        values: int | float | np.ndarray,
+        energies: int | float | np.ndarray,
         _num_bins: int = 200,
         _factor: float = 1.2,
         _sigma: float = 2.0,
     ) -> np.ndarray:
         real_dtype: type[np.floating] = self.ensemble.real_dtype.type
-        if isinstance(values, (int, float)):
-            values: np.ndarray = np.array([values], dtype=real_dtype)
+        if isinstance(energies, (int, float)):
+            energies: np.ndarray = np.array([energies], dtype=real_dtype)
 
         if self._numerical_resonance_pdf is None:
             object.__setattr__(
@@ -241,18 +240,18 @@ class Compound:
                 self._create_numerical_resonance_pdf(_num_bins, _factor, _sigma),
             )
 
-        return self._numerical_resonance_pdf(values)
+        return self._numerical_resonance_pdf(energies)
 
     def resonance_cdf(
         self,
-        values: int | float | np.ndarray,
+        energies: int | float | np.ndarray,
         _factor: float = 1.2,
         _num_bins: int = 200,
         _sigma: float = 2.0,
     ) -> np.ndarray:
         real_dtype: type[np.floating] = self.ensemble.real_dtype.type
-        if isinstance(values, (int, float)):
-            values: np.ndarray = np.array([values], dtype=real_dtype)
+        if isinstance(energies, (int, float)):
+            energies: np.ndarray = np.array([energies], dtype=real_dtype)
 
         if self._numerical_resonance_cdf is None:
             object.__setattr__(
@@ -261,17 +260,17 @@ class Compound:
                 self._create_numerical_resonance_cdf(_num_bins, _factor, _sigma),
             )
 
-        return self._numerical_resonance_cdf(values)
+        return self._numerical_resonance_cdf(energies)
 
-    def unfold(self, resonances: np.ndarray) -> np.ndarray:
+    def unfold(self, energies: np.ndarray) -> np.ndarray:
         return self.ensemble.dimension * (
-            self.resonance_cdf(resonances) - self.resonance_cdf(np.array([0.0]))
+            self.resonance_cdf(energies) - self.resonance_cdf(np.array([0.0]))
         )
 
-    def unfold_widths(self, resonances: np.ndarray, widths: np.ndarray) -> np.ndarray:
+    def unfold_widths(self, energies: np.ndarray, widths: np.ndarray) -> np.ndarray:
         return self.ensemble.dimension * (
-            self.resonance_cdf(resonances + widths / 2)
-            - self.resonance_cdf(resonances - widths / 2)
+            self.resonance_cdf(energies + widths / 2)
+            - self.resonance_cdf(energies - widths / 2)
         )
 
     def partial_widths_stream(self, realizs: int) -> Iterator[np.ndarray]:
@@ -461,7 +460,7 @@ class Compound:
             resonances: np.ndarray = complex_energies.real
             counts[:] += np.histogram(resonances, bins=bins)[0]
 
-        histogram: np.ndarray = counts / np.sum(counts * np.diff(bins))
+        histogram: np.ndarray = counts / (np.sum(counts) * np.diff(bins))
         smoothed_histogram: np.ndarray = gaussian_filter1d(histogram, sigma=sigma)
 
         centers: np.ndarray = (bins[:-1] + bins[1:]) / 2

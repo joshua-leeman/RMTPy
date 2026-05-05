@@ -192,8 +192,6 @@ class Histogram2D(Data):
     def _default_histogram(self) -> np.ndarray:
         return np.empty((self.x_num_bins, self.y_num_bins))
 
-    _numerical_pdf: PchipInterpolator | None = field(init=False, default=None)
-    _numerical_cdf: PchipInterpolator | None = field(init=False, default=None)
     _realizs_count: int = field(
         init=False, factory=lambda: np.zeros((1,), dtype=np.int32)
     )
@@ -217,49 +215,6 @@ class Histogram2D(Data):
 
     def compute_histogram_probabilities(self) -> None:
         self.histogram[:] = self.counts / np.sum(self.counts)
-
-    def numerical_pdf(
-        self, values: int | float | np.ndarray, _sigma: float = 1.5
-    ) -> np.ndarray:
-        if isinstance(values, (int, float)):
-            values: np.ndarray = np.array([values], dtype=np.float64)
-
-        if self._numerical_pdf is None:
-            object.__setattr__(
-                self,
-                "_numerical_pdf",
-                self._create_numerical_pdf(sigma=_sigma),
-            )
-
-        return self._numerical_pdf(values)
-
-    def numerical_cdf(
-        self, values: int | float | np.ndarray, _sigma: float = 1.5
-    ) -> np.ndarray:
-        if isinstance(values, (int, float)):
-            values: np.ndarray = np.array([values], dtype=np.float64)
-
-        if self._numerical_cdf is None:
-            object.__setattr__(
-                self,
-                "_numerical_cdf",
-                self._create_numerical_cdf(sigma=_sigma),
-            )
-
-        return self._numerical_cdf(values)
-
-    def unfold(self, dimension: int, values: np.ndarray) -> np.ndarray:
-        return dimension * (
-            self.numerical_cdf(values) - self.numerical_cdf(np.array([0.0]))
-        )
-
-    def unfold_widths(
-        self, dimension: int, values: np.ndarray, widths: np.ndarray
-    ) -> np.ndarray:
-        return dimension * (
-            self.numerical_cdf(values + widths / 2)
-            - self.numerical_cdf(values - widths / 2)
-        )
 
     def compute_average_x_curve(self) -> tuple[np.ndarray, np.ndarray]:
         self.compute_histogram_density()
@@ -287,18 +242,3 @@ class Histogram2D(Data):
             x_vals: np.ndarray = np.sqrt(self.x_bins[:-1] * self.x_bins[1:])
 
         return x_vals, ave_y_given_x
-
-    def _create_numerical_pdf(self, sigma: float = 2.0) -> PchipInterpolator:
-        self.compute_histogram_density()
-        centers: np.ndarray = (self.x_bins[:-1] + self.x_bins[1:]) / 2
-        pdf_vals: np.ndarray = gaussian_filter1d(self.histogram, sigma=sigma)
-
-        return PchipInterpolator(centers, pdf_vals, extrapolate=True)
-
-    def _create_numerical_cdf(self, sigma: float = 2.0) -> PchipInterpolator:
-        self.compute_histogram_density()
-        centers: np.ndarray = (self.x_bins[:-1] + self.x_bins[1:]) / 2
-        pdf_vals: np.ndarray = self.numerical_pdf(centers, sigma=sigma)
-        cdf_vals: np.ndarray = cumulative_trapezoid(pdf_vals, centers, initial=0)
-
-        return PchipInterpolator(centers, cdf_vals, extrapolate=True)
