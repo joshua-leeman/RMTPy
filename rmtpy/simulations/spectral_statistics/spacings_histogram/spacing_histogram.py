@@ -14,42 +14,40 @@ from ....utils import rmtpy_converter
 
 
 @dataclass(repr=False, eq=False, kw_only=True)
-class UnfoldedSpacingHistogramLegend(PlotLegend):
+class SpacingsHistogramLegend(PlotLegend):
     loc: str = "upper right"
     bbox: tuple[float, float] = (0.94, 0.95)
 
 
 @dataclass(repr=False, eq=False, kw_only=True)
-class UnfoldedSpacingHistogramAxes(PlotAxes):
-    xticks: tuple[float, ...] = (0.0, 1.0, 2.0, 3.0, 4.0)
+class SpacingsHistogramAxes(PlotAxes):
+    xticks: tuple[float, ...] = (0.0, 1.0, 2.0, 3.0, 4.0)  # units of mean spacing
     xticks_minor: tuple[float, ...] = (0.5, 1.5, 2.5, 3.5)
-    xlabel: str = r"$s$"
+    xlabel: str = r"$\Delta E$"
     xtick_labels: tuple[str, ...] = (
-        r"$0.0$",
-        r"$1.0$",
-        r"$2.0$",
-        r"$3.0$",
-        r"$4.0$",
+        r"$0$",
+        r"$d$",
+        r"$2d$",
+        r"$3d$",
+        r"$4d$",
     )
 
     yticks: tuple[float, ...] = (0.5, 1.0)
     yticks_minor: tuple[float, ...] = (0.25, 0.75)
-    ylabel: str = r"$\ensavg{f(s)}$"
+    ylabel: str = r"$\ensavg{f(\Delta E)}$"
     ytick_labels: tuple[str, ...] = (
-        r"$0.5$",
-        r"$1.0$",
+        r"$\frac{1}{2}d^{-1}$",
+        r"$d^{-1}$",
     )
 
 
 @dataclass(repr=False, eq=False, kw_only=True)
-class UnfoldedSpacingHistogramPlot(Plot):
+class SpacingsHistogramPlot(Plot):
     data: Histogram
-    axes: UnfoldedSpacingHistogramAxes = field(
-        default_factory=UnfoldedSpacingHistogramAxes
-    )
+    axes: SpacingsHistogramAxes = field(default_factory=SpacingsHistogramAxes)
     num_points: int = 1000
 
-    xlim: tuple[float, float] = (0.0, 4.0)
+    xlim: tuple[float, float] = (0.0, 4.0)  # units of mean spacing
     ylim: tuple[float, float] = (0.0, 1.2)
 
     histogram_zorder: int = 1
@@ -76,29 +74,30 @@ class UnfoldedSpacingHistogramPlot(Plot):
             raise ValueError("Ensemble metadata not found.")
         except TypeError:
             raise ValueError("Metadata is not properly structured.")
-
         self.ensemble: ManyBodyEnsemble = rmtpy_converter.structure(
             ensemble_meta, ManyBodyEnsemble
         )
 
-        self.legend: UnfoldedSpacingHistogramLegend = UnfoldedSpacingHistogramLegend(
+        self.legend: SpacingsHistogramLegend = SpacingsHistogramLegend(
             handles=self.legend_handles, labels=self.legend_labels
         )
         if self.legend.title is None:
-            self.legend.title = self.ensemble.to_latex + "\nunfolded"
+            self.legend.title = self.ensemble.to_latex
 
         if self.ensemble.universality_class is not None:
             self.surmise_legend = f"{self.ensemble.universality_class} surmise"
-            self.labels = (self.histogram_legend, self.surmise_legend)
+            self.legend_labels = (self.histogram_legend, self.surmise_legend)
 
-        self.xlim = tuple(x for x in self.xlim)
-        self.ylim = tuple(y for y in self.ylim)
+        mean_spacing: float = self.data.metadata["global_mean_spacing"]
 
-        axes: UnfoldedSpacingHistogramAxes = self.axes
-        axes.xticks = tuple(xtick for xtick in axes.xticks)
-        axes.yticks = tuple(ytick for ytick in axes.yticks)
-        axes.xticks_minor = tuple(xtick for xtick in axes.xticks_minor)
-        axes.yticks_minor = tuple(ytick for ytick in axes.yticks_minor)
+        self.xlim = tuple(x * mean_spacing for x in self.xlim)
+        self.ylim = tuple(y / mean_spacing for y in self.ylim)
+
+        axes: SpacingsHistogramAxes = self.axes
+        axes.xticks = tuple(xtick * mean_spacing for xtick in axes.xticks)
+        axes.yticks = tuple(ytick / mean_spacing for ytick in axes.yticks)
+        axes.xticks_minor = tuple(xtick * mean_spacing for xtick in axes.xticks_minor)
+        axes.yticks_minor = tuple(ytick / mean_spacing for ytick in axes.yticks_minor)
 
     def plot(self, path: str | Path) -> None:
         self.set_derived_attributes()
@@ -115,7 +114,10 @@ class UnfoldedSpacingHistogramPlot(Plot):
         )
 
         spacings: np.ndarray = np.linspace(0, self.xlim[1], self.num_points)
-        surmise: np.ndarray = self.ensemble.wigner_surmise(spacings)
+
+        mean_spacing: float = self.data.metadata["global_mean_spacing"]
+        surmise: np.ndarray = self.ensemble.wigner_surmise(spacings / mean_spacing)
+        surmise /= mean_spacing
 
         self.ax.plot(
             spacings,

@@ -12,13 +12,13 @@ from scipy.interpolate import PchipInterpolator
 from scipy.signal import find_peaks
 from scipy.special import jn_zeros
 
-from .spectral_histogram import SpectralHistogramPlot
-from .spectral_histogram import UnfoldedSpectralHistogramPlot
-from .spacing_histogram import SpacingHistogramPlot
-from .spacing_histogram import UnfoldedSpacingHistogramPlot
-from .spectral_form_factors import FormFactorsPlot
-from .spectral_form_factors import UnfoldedFormFactorsPlot
-from .spectral_form_factors import FormFactorsData
+from .spectral_histogram import SpectralHistogramPlot, UnfoldedSpectralHistogramPlot
+from .spacings_histogram import SpacingsHistogramPlot, UnfoldedSpacingsHistogramPlot
+from .spectral_form_factors import (
+    FormFactorsData,
+    FormFactorsPlot,
+    UnfoldedFormFactorsPlot,
+)
 from .._histogram import Histogram
 from .._simulation import Simulation
 from ...ensembles import ManyBodyEnsemble
@@ -94,37 +94,37 @@ class SpectralStatisticsSimulation(Simulation):
             scale=self.ensemble.dimension,
         )
 
-    spacing_plot: SpacingHistogramPlot | None = field(init=False, default=None)
-    spacing_support: tuple[float, float] = field(
+    spacings_plot: SpacingsHistogramPlot | None = field(init=False, default=None)
+    spacings_support: tuple[float, float] = field(
         default=(0.0, 4.0)
     )  # units of global mean spacing
-    spacing_histogram: Histogram = field()
+    spacings_histogram: Histogram = field()
 
-    @spacing_histogram.default
-    def _default_spacing_histogram(self) -> Histogram:
+    @spacings_histogram.default
+    def _default_spacings_histogram(self) -> Histogram:
         global_mean_spacing: float = (
             2 * self.ensemble.ground_state_energy / self.ensemble.dimension
         )
 
-        spacing_histogram = Histogram(
-            file_name="spacing_histogram",
-            support=self.spacing_support,
+        spacings_histogram = Histogram(
+            file_name="spacings_histogram",
+            support=self.spacings_support,
             scale=global_mean_spacing,
         )
-        spacing_histogram.metadata["global_mean_spacing"] = global_mean_spacing
-        return spacing_histogram
+        spacings_histogram.metadata["global_mean_spacing"] = global_mean_spacing
+        return spacings_histogram
 
-    unfolded_spacing_plot: UnfoldedSpacingHistogramPlot | None = field(
+    unfolded_spacings_plot: UnfoldedSpacingsHistogramPlot | None = field(
         init=False, default=None
     )
-    unfolded_spacing_support: tuple[float, float] = field(default=(0.0, 4.0))
-    unfolded_spacing_histogram: Histogram = field()
+    unfolded_spacings_support: tuple[float, float] = field(default=(0.0, 4.0))
+    unfolded_spacings_histogram: Histogram = field()
 
-    @unfolded_spacing_histogram.default
-    def _default_unfolded_spacing_histogram(self) -> Histogram:
+    @unfolded_spacings_histogram.default
+    def _default_unfolded_spacings_histogram(self) -> Histogram:
         return Histogram(
-            file_name="unfolded_spacing_histogram",
-            support=self.unfolded_spacing_support,
+            file_name="unfolded_spacings_histogram",
+            support=self.unfolded_spacings_support,
         )
 
     form_factors_plot: FormFactorsPlot | None = field(init=False, default=None)
@@ -189,13 +189,13 @@ class SpectralStatisticsSimulation(Simulation):
         )
         object.__setattr__(
             self,
-            "spacing_plot",
-            SpacingHistogramPlot(data=self.spacing_histogram),
+            "spacings_plot",
+            SpacingsHistogramPlot(data=self.spacings_histogram),
         )
         object.__setattr__(
             self,
-            "unfolded_spacing_plot",
-            UnfoldedSpacingHistogramPlot(data=self.unfolded_spacing_histogram),
+            "unfolded_spacings_plot",
+            UnfoldedSpacingsHistogramPlot(data=self.unfolded_spacings_histogram),
         )
         object.__setattr__(
             self,
@@ -211,10 +211,10 @@ class SpectralStatisticsSimulation(Simulation):
     def realize_monte_carlo(self) -> None:
         degeneracy: int = self.ensemble.eigval_degeneracy
         spectral_histogram: Histogram = self.spectral_histogram
-        spacing_histogram: Histogram = self.spacing_histogram
+        spacings_histogram: Histogram = self.spacings_histogram
         form_factors_data: FormFactorsData = self.form_factors_data
         unfolded_spectral_histogram: Histogram = self.unfolded_spectral_histogram
-        unfolded_spacing_histogram: Histogram = self.unfolded_spacing_histogram
+        unfolded_spacings_histogram: Histogram = self.unfolded_spacings_histogram
         unfolded_form_factors_data: FormFactorsData = self.unfolded_form_factors_data
 
         for eigvals in self.ensemble.eigvals_stream(self.realizs):
@@ -224,7 +224,7 @@ class SpectralStatisticsSimulation(Simulation):
                 neighbor_spacings = np.repeat(
                     neighbor_spacings[1::degeneracy], degeneracy
                 )
-            spacing_histogram.add_histogram_contribution(neighbor_spacings)
+            spacings_histogram.add_histogram_contribution(neighbor_spacings)
             form_factors_data.compute_moment_contributions(eigvals)
 
             unfolded_eigvals = self.ensemble.unfold(eigvals)
@@ -235,16 +235,16 @@ class SpectralStatisticsSimulation(Simulation):
                 neighbor_spacings = np.repeat(
                     neighbor_spacings[1::degeneracy], degeneracy
                 )
-            unfolded_spacing_histogram.add_histogram_contribution(neighbor_spacings)
+            unfolded_spacings_histogram.add_histogram_contribution(neighbor_spacings)
             unfolded_form_factors_data.compute_moment_contributions(unfolded_eigvals)
 
     def calculate_statistics(self) -> None:
         self.spectral_histogram.compute_histogram_density()
-        self.spacing_histogram.compute_histogram_density()
+        self.spacings_histogram.compute_histogram_density()
         self.form_factors_data.compute_form_factors()
 
         self.unfolded_spectral_histogram.compute_histogram_density()
-        self.unfolded_spacing_histogram.compute_histogram_density()
+        self.unfolded_spacings_histogram.compute_histogram_density()
         self.unfolded_form_factors_data.compute_form_factors()
 
     def run(self, out_dir: str | Path = "output") -> None:
