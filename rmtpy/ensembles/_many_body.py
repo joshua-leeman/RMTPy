@@ -85,6 +85,7 @@ class ManyBodyEnsemble(RandomMatrixEnsemble):
         _sigma: float = 2.0,
     ) -> np.ndarray:
         real_dtype: type[np.floating] = self.real_dtype.type
+
         if isinstance(energies, (int, float)):
             energies: np.ndarray = np.array([energies], dtype=real_dtype)
 
@@ -105,6 +106,7 @@ class ManyBodyEnsemble(RandomMatrixEnsemble):
         _sigma: float = 2.0,
     ) -> np.ndarray:
         real_dtype: type[np.floating] = self.real_dtype.type
+
         if isinstance(energies, (int, float)):
             energies: np.ndarray = np.array([energies], dtype=real_dtype)
 

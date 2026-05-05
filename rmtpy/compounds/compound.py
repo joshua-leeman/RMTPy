@@ -230,6 +230,7 @@ class Compound:
         _sigma: float = 2.0,
     ) -> np.ndarray:
         real_dtype: type[np.floating] = self.ensemble.real_dtype.type
+
         if isinstance(energies, (int, float)):
             energies: np.ndarray = np.array([energies], dtype=real_dtype)
 
@@ -250,6 +251,7 @@ class Compound:
         _sigma: float = 2.0,
     ) -> np.ndarray:
         real_dtype: type[np.floating] = self.ensemble.real_dtype.type
+
         if isinstance(energies, (int, float)):
             energies: np.ndarray = np.array([energies], dtype=real_dtype)
 
