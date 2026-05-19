@@ -1,9 +1,10 @@
+import math
 from collections.abc import Sequence
 from itertools import combinations
-from math import comb
 
 import numpy as np
 from scipy.sparse import coo_matrix, csr_matrix, eye_array, kron
+
 
 def create_majoranas_fermions(num_majoranas: int) -> tuple[csr_matrix, ...]:
     pauli_matrices: tuple[csr_matrix, csr_matrix, csr_matrix] = [
@@ -134,7 +135,7 @@ def create_q_body_majorana_terms(
     majoranas: tuple[csr_matrix, ...] = resolve_majoranas(num_majoranas, majoranas)
 
     num_majoranas: int = len(majoranas)
-    num_terms: int = comb(num_majoranas, q)
+    num_terms: int = math.comb(num_majoranas, q)
     nonzeros: int = 2 ** (num_majoranas // 2 - 1)
 
     q_bodys_idxs: np.ndarray = np.empty((num_terms, 2, nonzeros), np.int32, order="C")

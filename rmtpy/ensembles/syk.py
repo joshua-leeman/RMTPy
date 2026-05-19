@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+import math
 from collections.abc import Callable, Iterator
-from math import comb, factorial
 from typing import ClassVar
 
 import attrs
@@ -25,20 +25,20 @@ def compute_dyson_index(syk: SachdevYeKitaevEnsemble) -> int:
 
 def compute_spectral_radius(syk: SachdevYeKitaevEnsemble) -> float:
     return (2 * syk.std_dev) * np.sqrt(
-        comb(syk.num_majoranas, syk.q) / (1 - syk.suppression)
+        math.comb(syk.num_majoranas, syk.q) / (1 - syk.suppression)
     )
 
 
 def compute_standard_deviation(syk: SachdevYeKitaevEnsemble) -> float:
     return syk.interaction_strength * np.sqrt(
-        factorial(syk.q - 1) / syk.num_majoranas ** (syk.q - 1)
+        math.factorial(syk.q - 1) / syk.num_majoranas ** (syk.q - 1)
     )
 
 
 def compute_suppression_factor(syk: SachdevYeKitaevEnsemble) -> float:
     return np.sum(
-        ((-1) ** (syk.q - k) / comb(syk.num_majoranas, syk.q))
-        * (comb(syk.q, k) * comb(syk.num_majoranas - syk.q, syk.q - k))
+        ((-1) ** (syk.q - k) / math.comb(syk.num_majoranas, syk.q))
+        * (math.comb(syk.q, k) * math.comb(syk.num_majoranas - syk.q, syk.q - k))
         for k in range(syk.q + 1)
     )
 
