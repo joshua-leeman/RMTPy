@@ -7,9 +7,9 @@ import attrs
 import cattrs
 import numpy as np
 
-RMTPY_CONVERTER: cattrs.Converter = cattrs.Converter()
-RMTPY_CONVERTER.register_unstructure_hook(np.dtype, lambda dtype: np.dtype(dtype).name)
-RMTPY_CONVERTER.register_structure_hook(np.dtype, lambda dtype, _: np.dtype(dtype))
+CONVERTER: cattrs.Converter = cattrs.Converter()
+CONVERTER.register_unstructure_hook(np.dtype, lambda dtype: np.dtype(dtype).name)
+CONVERTER.register_structure_hook(np.dtype, lambda dtype, _: np.dtype(dtype))
 
 
 def create_hashed_id(array: np.ndarray, num_hex: int = 16) -> str:
