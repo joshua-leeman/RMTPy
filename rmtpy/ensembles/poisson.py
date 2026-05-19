@@ -1,193 +1,181 @@
 from __future__ import annotations
 
-from collections.abc import Iterator
-from typing import Any
+from collections.abc import Callable, Iterator
+from typing import Any, ClassVar
 
+import attrs
+import numba
 import numpy as np
-from attrs import field, frozen
-from numba import njit
-from scipy.special import gamma
 
-from ._many_body import ManyBodyEnsemble
-from ._wigner_dyson import (
-    WIGNER_DYSON_ENSEMBLE_FLAGS_TO_NAMES,
-    WIGNER_DYSON_ENSEMBLE_NAMES_TO_FLAGS,
+import rmtpy.conversion
+import rmtpy.universal
+from .many_body import ManyBodyEnsemble
+from .wigner_dyson import (
+    WIGNER_DYSON_ENSEMBLE_INITIALISMS_BY_NAME,
+    WIGNER_DYSON_ENSEMBLE_NAMES_BY_INITIALISM,
     WignerDysonEnsemble,
 )
-from ..utils import rmtpy_converter
+
+INITIALISM: str = "Poisson"
+
+EIGVECS_ENSEMBLE_FLAG_DEFAULT: str = "GUE"
+DYSON_INDEX: int = 0
 
 
-@njit(cache=True, fastmath=True)
-def _create_poisson_matrix(
-    matrix: np.ndarray, eigvals: np.ndarray, eigvecs: np.ndarray
-) -> np.ndarray:
+def compute_standard_deviation(poisson: PoissonEnsemble) -> float:
+    return 2 * poisson.spectral_radius
+
+
+@numba.njit(cache=True, fastmath=True)
+def mirror_upper_to_lower_triangle_complex(matrix: np.ndarray) -> np.ndarray:
     size: int = matrix.shape[0]
-    matrix.fill(0.0)
     for i in range(size):
-        for j in range(size):
-            for k in range(size):
-                matrix[i, j] += eigvals[k] * eigvecs[i, k] * eigvecs[j, k]
+        matrix[i + 1 :, i] = matrix[i, i + 1 :].conj()
 
 
-@frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
+@numba.njit(cache=True, fastmath=True)
+def mirror_upper_to_lower_triangle_real(matrix: np.ndarray) -> np.ndarray:
+    size: int = matrix.shape[0]
+    for i in range(size):
+        matrix[i + 1 :, i] = matrix[i, i + 1 :]
+
+
+@attrs.frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
 class PoissonEnsemble(ManyBodyEnsemble):
-    eigvecs_flag: str = field(default="gue", converter=str.lower)
+    initialism: ClassVar[str] = INITIALISM
 
-    @eigvecs_flag.validator
-    def _eigvecs_flag_validator(self, _: field, value: str) -> None:
-        if value in WIGNER_DYSON_ENSEMBLE_NAMES_TO_FLAGS:
-            return WIGNER_DYSON_ENSEMBLE_NAMES_TO_FLAGS[value]
-        elif value in WIGNER_DYSON_ENSEMBLE_FLAGS_TO_NAMES:
-            return value
-        else:
-            raise ValueError(
-                f"Invalid eigvecs_flag: {value}. Must be one of {list(WIGNER_DYSON_ENSEMBLE_NAMES_TO_FLAGS.keys())} or {list(WIGNER_DYSON_ENSEMBLE_FLAGS_TO_NAMES.keys())}."
-            )
-
-    eigvecs_ensemble: WignerDysonEnsemble | None = field(
-        init=False, default=None, repr=False
+    eigvecs_ensemble_flag: str = attrs.field(
+        default=EIGVECS_ENSEMBLE_FLAG_DEFAULT,
+        converter=[
+            str.lower,
+            lambda value: WIGNER_DYSON_ENSEMBLE_INITIALISMS_BY_NAME.get(value, value),
+        ],
+        validator=attrs.validators.in_(WIGNER_DYSON_ENSEMBLE_NAMES_BY_INITIALISM),
     )
-    dyson_index: int = field(init=False, default=0, repr=False)
-    std_dev: float = field(init=False, repr=False)
 
-    @std_dev.default
-    def _default_std_dev(self) -> float:
-        return 2 * self.ground_state_energy
+    std_dev: float = attrs.field(
+        default=attrs.Factory(compute_standard_deviation, takes_self=True),
+        init=False,
+        repr=False,
+    )
+    dyson_index: int = attrs.field(
+        default=DYSON_INDEX,
+        init=False,
+        repr=False,
+    )
 
-    _nickname: str = field(init=False, default="Poisson", repr=False)
+    eigvecs_ensemble: WignerDysonEnsemble = attrs.field(init=False, repr=False)
 
-    def __attrs_post_init__(self) -> None:
-        flag: str = self.eigvecs_flag
-        eigvecs_ensemble_dict: dict[str, Any] = rmtpy_converter.unstructure(self)
-        eigvecs_ensemble_dict["name"] = WIGNER_DYSON_ENSEMBLE_FLAGS_TO_NAMES[flag]
-        eigvecs_ensemble: WignerDysonEnsemble = rmtpy_converter.structure(
-            eigvecs_ensemble_dict, WignerDysonEnsemble
-        )
-        object.__setattr__(self, "eigvecs_ensemble", eigvecs_ensemble)
+    @eigvecs_ensemble.default
+    def create_eigvecs_ensemble_instance(self) -> WignerDysonEnsemble:
+        flag: str = self.eigvecs_ensemble_flag
+        ens_dict: dict[str, Any] = rmtpy.conversion.CONVERTER.unstructure(self)
+        ens_dict["name"] = WIGNER_DYSON_ENSEMBLE_NAMES_BY_INITIALISM[flag]
+        return rmtpy.conversion.CONVERTER.structure(ens_dict, WignerDysonEnsemble)
 
     @property
-    def _path_name(self) -> str:
-        return super()._path_name + f"_{self.eigvecs_ensemble._nickname.lower()}"
+    def path_name(self) -> str:
+        return super().as_path + f"_{type(self.eigvecs_ensemble).initialism.lower()}"
 
     def generate_matrix(self, use_complex_dtype: bool = False) -> np.ndarray:
-        complex_dtype: type[np.complexfloating] = self.complex_dtype.type
+        matrix, mirror_upper_triangle = self._initialize_matrix(use_complex_dtype)
         real_dtype: type[np.floating] = self.real_dtype.type
-        rng: np.random.Generator = self.rng
-        dim: int = self.dimension
-        std_dev: float = self.std_dev
-        eigvecs_ensemble: WignerDysonEnsemble = self.eigvecs_ensemble
-        eigvecs_ensemble_dyson_index: int = self.eigvecs_ensemble.dyson_index
 
-        lapack_heev: type = eigvecs_ensemble._pick_lapack_heev(use_complex_dtype)
-
-        if use_complex_dtype or eigvecs_ensemble_dyson_index != 1:
-            matrix: np.ndarray = np.empty((dim, dim), complex_dtype, order="F")
-        else:
-            matrix: np.ndarray = np.empty((dim, dim), real_dtype, order="F")
-
-        eigvals: np.ndarray = rng.random(dim, real_dtype)
+        eigvals: np.ndarray = self.rng.random(self.dimension, real_dtype)
         eigvals -= 0.5
-        eigvals *= std_dev
+        eigvals *= self.std_dev
 
+        lapack_heev: type = self._pick_lapack_heev(use_complex_dtype)
         eigvecs: np.ndarray = lapack_heev(
-            eigvecs_ensemble.generate_matrix(use_complex_dtype),
+            self.eigvecs_ensemble.generate_matrix(use_complex_dtype),
             compute_v=1,
             overwrite_a=True,
         )[1]
 
-        _create_poisson_matrix(matrix, eigvals, eigvecs)
+        blas_her: type = self._pick_blas_her(use_complex_dtype)
+        for mu in range(self.dimension):
+            blas_her(float(eigvals[mu]), x=eigvecs[:, mu], a=matrix, overwrite_a=1)
+        mirror_upper_triangle(matrix)
         return matrix
 
     def matrix_stream(
         self, realizs: int, use_complex_dtype: bool = False
     ) -> Iterator[np.ndarray]:
-        complex_dtype: type[np.complexfloating] = self.complex_dtype.type
-        real_dtype: type[np.floating] = self.real_dtype.type
-        eigvecs_ensemble_dyson_index: int = self.eigvecs_ensemble.dyson_index
-        dim: int = self.dimension
-
-        if use_complex_dtype or eigvecs_ensemble_dyson_index != 1:
-            matrix: np.ndarray = np.empty((dim, dim), complex_dtype, order="F")
-        else:
-            matrix: np.ndarray = np.empty((dim, dim), real_dtype, order="F")
-
+        matrix, mirror_upper_triangle = self._initialize_matrix(use_complex_dtype)
+        blas_her: type = self._pick_blas_her(use_complex_dtype)
         for eigvals, eigvecs in self.eigsys_stream(realizs, use_complex_dtype):
-            _create_poisson_matrix(matrix, eigvals, eigvecs)
+            for mu in range(self.dimension):
+                blas_her(float(eigvals[mu]), x=eigvecs[:, mu], a=matrix, overwrite_a=1)
+            mirror_upper_triangle(matrix)
             yield matrix
 
     def eigsys_stream(
         self, realizs: int, use_complex_dtype: bool = False
     ) -> Iterator[tuple[np.ndarray, np.ndarray]]:
         real_dtype: type[np.floating] = self.real_dtype.type
-        rng: np.random.Generator = self.rng
-        dimension: int = self.dimension
-        std_dev: float = self.std_dev
-        eigvecs_ensemble: ManyBodyEnsemble = self.eigvecs_ensemble
-
-        for _, eigvecs in eigvecs_ensemble.eigsys_stream(realizs, use_complex_dtype):
-            eigvals: np.ndarray = rng.random(dimension, real_dtype)
+        for _, vecs in self.eigvecs_ensemble.eigsys_stream(realizs, use_complex_dtype):
+            eigvals: np.ndarray = self.rng.random(self.dimension, real_dtype)
             eigvals -= 0.5
-            eigvals *= std_dev
-            yield eigvals, eigvecs
+            eigvals *= self.std_dev
+            yield np.sort(eigvals), vecs
 
-    def eigvals_stream(self, realizs: int) -> Iterator[np.ndarray]:
+    def eigvals_stream(
+        self, realizs: int, use_complex_dtype: bool = False
+    ) -> Iterator[np.ndarray]:
         real_dtype: type[np.floating] = self.real_dtype.type
-        rng: np.random.Generator = self.rng
-        dimension: int = self.dimension
-        std_dev: float = self.std_dev
-
         for _ in range(realizs):
-            eigvals: np.ndarray = rng.random(dimension, real_dtype)
+            eigvals: np.ndarray = self.rng.random(self.dimension, real_dtype)
             eigvals -= 0.5
-            eigvals *= std_dev
-            yield eigvals
+            eigvals *= self.std_dev
+            yield np.sort(eigvals)
 
-    def spectral_pdf(
-        self,
-        eigvals: int | float | np.ndarray,
-        _num_bins: int = 200,
-        _factor: float = 1.2,
-        _sigma: float = 2.0,
-    ) -> np.ndarray:
-        real_dtype: type[np.floating] = self.real_dtype.type
-        energy_0: float = self.ground_state_energy
-
-        if isinstance(eigvals, (int, float)):
-            eigvals: np.ndarray = np.array([eigvals], dtype=real_dtype)
-
-        pdf: np.ndarray = np.zeros_like(eigvals, real_dtype)
-        pdf[np.abs(eigvals) < energy_0] = 1 / 2 / energy_0
+    def spectral_pdf(self, eigvals: np.ndarray) -> np.ndarray:
+        eigvals = np.asarray(eigvals)
+        pdf: np.ndarray = np.zeros_like(eigvals, dtype=np.result_type(eigvals, float))
+        pdf[np.abs(eigvals) < self.spectral_radius] = 1 / 2 / self.spectral_radius
         return pdf
 
-    def cdf(self, eigvals: int | float | np.ndarray) -> np.ndarray:
-        real_dtype: type[np.floating] = self.real_dtype.type
-        energy_0: float = self.ground_state_energy
-
-        if isinstance(eigvals, (int, float)):
-            eigvals: np.ndarray = np.array([eigvals], dtype=real_dtype)
-
-        cdf: np.ndarray = np.zeros_like(eigvals, real_dtype)
-        mask: np.ndarray = np.abs(eigvals) < energy_0
-        cdf[mask] = eigvals[mask] / (2 * energy_0) + 0.5
-        cdf[eigvals > energy_0] = 1.0
+    def cdf(self, eigvals: np.ndarray) -> np.ndarray:
+        eigvals = np.asarray(eigvals)
+        cdf: np.ndarray = np.zeros_like(eigvals, dtype=np.result_type(eigvals, float))
+        mask: np.ndarray = np.abs(eigvals) < self.spectral_radius
+        cdf[mask] = eigvals[mask] / (2 * self.spectral_radius) + 0.5
+        cdf[eigvals > self.spectral_radius] = 1.0
         return cdf
 
     def porter_thomas_distribution(
-        self, widths: np.ndarray, num_channels: int = 1
+        self, num_channels: int, widths: np.ndarray
     ) -> np.ndarray:
-        if self.eigvecs_ensemble.dyson_index == 1:
-            real_dof: int = num_channels
-        else:
-            real_dof: int = 2 * num_channels
+        return rmtpy.universal.porter_thomas_distribution(
+            self.eigvecs_ensemble.dyson_index, num_channels, widths
+        )
 
-        coeff: float = (real_dof / 2) ** (real_dof / 2) / gamma(real_dof / 2)
-        return coeff * widths ** (real_dof / 2 - 1) * np.exp(-real_dof * widths / 2)
+    def _initialize_matrix(
+        self, use_complex_dtype: bool = False
+    ) -> tuple[np.ndarray, Callable[[np.ndarray], np.ndarray]]:
+        size: int = self.dimension
+        complex_dtype: type[np.complexfloating] = self.complex_dtype.type
+        real_dtype: type[np.floating] = self.real_dtype.type
+        if use_complex_dtype or self.eigvecs_ensemble.dyson_index != 1:
+            matrix: np.ndarray = np.empty((size, size), complex_dtype, order="F")
+            mirror_upper_triangle: Callable[[np.ndarray], np.ndarray] = (
+                mirror_upper_to_lower_triangle_complex
+            )
+        else:
+            matrix: np.ndarray = np.empty((size, size), real_dtype, order="F")
+            mirror_upper_triangle: Callable[[np.ndarray], np.ndarray] = (
+                mirror_upper_to_lower_triangle_real
+            )
+        return matrix, mirror_upper_triangle
 
     def _pick_blas_copy(self, use_complex_dtype: bool) -> type:
         return self.eigvecs_ensemble._pick_blas_copy(use_complex_dtype)
 
     def _pick_blas_gemm(self, use_complex_dtype: bool) -> type:
         return self.eigvecs_ensemble._pick_blas_gemm(use_complex_dtype)
+
+    def _pick_blas_her(self, use_complex_dtype: bool) -> type:
+        return self.eigvecs_ensemble._pick_blas_her(use_complex_dtype)
 
     def _pick_lapack_geev(self, use_complex_dtype: bool) -> type:
         return self.eigvecs_ensemble._pick_lapack_geev(use_complex_dtype)

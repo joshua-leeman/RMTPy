@@ -1,16 +1,25 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from typing import ClassVar
 
+import attrs
+import numba
 import numpy as np
-from attrs import field, frozen
-from numba import njit
 
-from ._wigner_dyson import WignerDysonEnsemble
+from .wigner_dyson import WignerDysonEnsemble
+
+INITIALISM: str = "GOE"
+
+DYSON_INDEX: int = 1
 
 
-@njit(cache=True, fastmath=True)
-def _create_goe_matrix(
+def compute_standard_deviation(goe: GaussianOrthogonalEnsemble) -> float:
+    return goe.spectral_radius / 2 / np.sqrt(goe.dimension)
+
+
+@numba.njit(cache=True, fastmath=True)
+def create_goe_matrix(
     matrix: np.ndarray,
     rng: np.random.Generator,
     real_dtype: type[np.floating],
@@ -23,46 +32,30 @@ def _create_goe_matrix(
         matrix[i, i + 1 :] = matrix[i + 1 :, i]
 
 
-@frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
+@attrs.frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
 class GaussianOrthogonalEnsemble(WignerDysonEnsemble):
-    dyson_index: int = field(init=False, default=1, repr=False)
-    std_dev: float = field(init=False, repr=False)
+    initialism: ClassVar[str] = INITIALISM
 
-    @std_dev.default
-    def _default_std_dev(self) -> float:
-        return self.ground_state_energy / 2 / np.sqrt(self.dimension)
-
-    _nickname: str = field(init=False, default="GOE", repr=False)
+    std_dev: float = attrs.field(
+        default=attrs.Factory(compute_standard_deviation, takes_self=True),
+        init=False,
+        repr=False,
+    )
+    dyson_index: int = attrs.field(
+        default=DYSON_INDEX,
+        init=False,
+        repr=False,
+    )
 
     def generate_matrix(self, use_complex_dtype: bool = False) -> np.ndarray:
-        complex_dtype: type[np.complexfloating] = self.complex_dtype.type
-        real_dtype: type[np.floating] = self.real_dtype.type
-        rng: np.random.Generator = self.rng
-        size: int = self.dimension
-        std_dev: float = self.std_dev
-
-        if use_complex_dtype:
-            matrix: np.ndarray = np.empty((size, size), complex_dtype, order="F")
-        else:
-            matrix: np.ndarray = np.empty((size, size), real_dtype, order="F")
-
-        _create_goe_matrix(matrix, rng, real_dtype, std_dev)
+        matrix: np.ndarray = self._initialize_matrix(use_complex_dtype)
+        create_goe_matrix(matrix, self.rng, self.real_dtype.type, self.std_dev)
         return matrix
 
     def matrix_stream(
         self, realizs: int, use_complex_dtype: bool = False
     ) -> Iterator[np.ndarray]:
-        complex_dtype: type[np.complexfloating] = self.complex_dtype.type
-        real_dtype: type[np.floating] = self.real_dtype.type
-        rng: np.random.Generator = self.rng
-        size: int = self.dimension
-        std_dev: float = self.std_dev
-
-        if use_complex_dtype:
-            matrix: np.ndarray = np.empty((size, size), complex_dtype, order="F")
-        else:
-            matrix: np.ndarray = np.empty((size, size), real_dtype, order="F")
-
+        matrix: np.ndarray = self._initialize_matrix(use_complex_dtype)
         for _ in range(realizs):
-            _create_goe_matrix(matrix, rng, real_dtype, std_dev)
+            create_goe_matrix(matrix, self.rng, self.real_dtype.type, self.std_dev)
             yield matrix

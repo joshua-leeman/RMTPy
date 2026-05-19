@@ -1,17 +1,28 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from typing import ClassVar
 
+import attrs
+import numba
 import numpy as np
-from attrs import field, frozen
-from numba import njit
 
-from ._wigner_dyson import WignerDysonEnsemble
-from .gue import _create_gue_matrix
+from .gue import create_gue_matrix
+from .wigner_dyson import WignerDysonEnsemble
+
+INITIALISM: str = "BdGC"
+TOKEN_NAME: str = "BdG_C"
+LATEX_NAME: str = "\\textrm{{BdG(C)}}"
+
+DYSON_INDEX: int = 2
 
 
-@njit(cache=True, fastmath=True)
-def _create_symm_matrix(
+def compute_standard_deviation(bdgc: BogoliubovDeGennesCEnsemble) -> float:
+    return bdgc.spectral_radius / 2 / np.sqrt(2 * bdgc.dimension)
+
+
+@numba.njit(cache=True, fastmath=True)
+def create_symm_matrix(
     matrix: np.ndarray,
     rng: np.random.Generator,
     real_dtype: type[np.floating],
@@ -27,7 +38,7 @@ def _create_symm_matrix(
         matrix[i, i + 1 :] = matrix[i + 1 :, i]
 
 
-def _create_bdgc_matrix(
+def create_bdgc_matrix(
     matrix: np.ndarray,
     rng: np.random.Generator,
     real_dtype: type[np.floating],
@@ -39,54 +50,46 @@ def _create_bdgc_matrix(
     bottom_left_block = matrix[halfway:, :halfway]
     bottom_right_block = matrix[halfway:, halfway:]
 
-    _create_gue_matrix(top_left_block, rng, real_dtype, std_dev)
+    create_gue_matrix(top_left_block, rng, real_dtype, std_dev)
     np.negative(top_left_block, out=bottom_right_block)
     np.conj(bottom_right_block, out=bottom_right_block)
 
-    _create_symm_matrix(top_right_block, rng, real_dtype, std_dev)
+    create_symm_matrix(top_right_block, rng, real_dtype, std_dev)
     np.conj(top_right_block, out=bottom_left_block)
 
 
-@frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
+@attrs.frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
 class BogoliubovDeGennesCEnsemble(WignerDysonEnsemble):
-    dyson_index: int = field(init=False, default=2, repr=False)
-    std_dev: float = field(init=False, repr=False)
+    initialism: ClassVar[str] = INITIALISM
 
-    @std_dev.default
-    def _default_std_dev(self) -> float:
-        return self.ground_state_energy / 2 / np.sqrt(2 * self.dimension)
-
-    _nickname: str = field(init=False, default="BdGC", repr=False)
+    std_dev: float = attrs.field(
+        default=attrs.Factory(compute_standard_deviation, takes_self=True),
+        init=False,
+        repr=False,
+    )
+    dyson_index: int = attrs.field(
+        default=DYSON_INDEX,
+        init=False,
+        repr=False,
+    )
 
     @property
-    def _path_name(self) -> str:
-        return "BdG_C"
+    def latex_name(self) -> str:
+        return LATEX_NAME
 
     @property
-    def _latex_name(self) -> str:
-        return "\\textrm{{BdG(C)}}"
+    def token_name(self) -> str:
+        return TOKEN_NAME
 
     def generate_matrix(self, use_complex_dtype: bool = False) -> np.ndarray:
-        complex_dtype: type[np.complexfloating] = self.complex_dtype.type
-        real_dtype: type[np.floating] = self.real_dtype.type
-        rng: np.random.Generator = self.rng
-        size: int = self.dimension
-        std_dev: float = self.std_dev
-
-        matrix: np.ndarray = np.empty((size, size), complex_dtype, order="F")
-        _create_bdgc_matrix(matrix, rng, real_dtype, std_dev)
+        matrix: np.ndarray = self._initialize_matrix(use_complex_dtype)
+        create_bdgc_matrix(matrix, self.rng, self.real_dtype.type, self.std_dev)
         return matrix
 
     def matrix_stream(
         self, realizs: int, use_complex_dtype: bool = False
     ) -> Iterator[np.ndarray]:
-        complex_dtype: type[np.complexfloating] = self.complex_dtype.type
-        real_dtype: type[np.floating] = self.real_dtype.type
-        rng: np.random.Generator = self.rng
-        size: int = self.dimension
-        std_dev: float = self.std_dev
-
-        matrix: np.ndarray = np.empty((size, size), complex_dtype, order="F")
+        matrix: np.ndarray = self._initialize_matrix(use_complex_dtype)
         for _ in range(realizs):
-            _create_bdgc_matrix(matrix, rng, real_dtype, std_dev)
+            create_bdgc_matrix(matrix, self.rng, self.real_dtype.type, self.std_dev)
             yield matrix
