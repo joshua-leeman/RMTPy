@@ -152,7 +152,7 @@ class SachdevYeKitaevEnsemble(ManyBodyEnsemble):
         repr=False,
     )
 
-    parity_block: tuple[slice, slice] = attrs.field(
+    _parity_block: tuple[slice, slice] = attrs.field(
         default=attrs.Factory(choose_matrix_block_slice, takes_self=True),
         init=False,
         repr=False,
@@ -177,7 +177,7 @@ class SachdevYeKitaevEnsemble(ManyBodyEnsemble):
             q_body_majorana_terms: tuple[tuple[np.ndarray, ...], ...] = (
                 rmtpy.fermions.create_q_body_majorana_terms(
                     q=self.q,
-                    parity_block=self.parity_block,
+                    parity_block=self._parity_block,
                     num_majoranas=self.num_majoranas,
                     in_real_basis=self.dyson_index == 1,
                 )
