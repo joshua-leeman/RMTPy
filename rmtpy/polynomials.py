@@ -1,6 +1,7 @@
 import numba
 import numpy as np
 
+
 def semicircle_weight_pdf(energies: np.ndarray, spectral_radius: float) -> np.ndarray:
     in_support: np.ndarray = np.abs(energies) < spectral_radius
     x: np.ndarray = np.asarray(energies)[in_support] / spectral_radius
@@ -12,7 +13,7 @@ def semicircle_weight_pdf(energies: np.ndarray, spectral_radius: float) -> np.nd
 
 @numba.njit(cache=True, fastmath=True)
 def chebyshev_polynomials_2(x: np.ndarray, degree: int) -> np.ndarray:
-    polynomials: np.ndarray = np.empty((degree + 1, x.size))
+    polynomials: np.ndarray = np.empty((degree + 1, x.size), dtype=np.float64)
 
     polynomials[0, :] = 1.0
 
@@ -50,7 +51,7 @@ def q_hermite_polynomial_weight_pdf(
 
 @numba.njit(cache=True, fastmath=True)
 def q_hermite_polynomials(x: np.ndarray, eta: float, degree: int) -> np.ndarray:
-    polynomials: np.ndarray = np.empty((degree + 1, x.size))
+    polynomials: np.ndarray = np.empty((degree + 1, x.size), dtype=np.float64)
 
     polynomials[0, :] = 1.0
 
