@@ -18,14 +18,14 @@ NUM_REALIZATIONS_MINIMUM: int = 10
 SUPPORT_SCALE_FACTOR_DEFAULT: float = 1.2
 
 
-def create_float_array(
+def array_of_floats(
     support: tuple[float, float], num_pts: int, log_base: float | None = None
 ) -> np.ndarray:
     rmtpy.validators.validate_support(support)
     if log_base is None:
-        return np.linspace(support[0], support[1], num_pts)
+        return np.linspace(*support, num_pts)
     else:
-        return np.logspace(support[0], support[1], num_pts, base=log_base)
+        return np.logspace(*support, num_pts, base=log_base)
 
 
 def compute_bin_centers(bins: np.ndarray) -> np.ndarray:
@@ -275,12 +275,12 @@ class DensityModel:
 
         if interval[0] > self.domain_range[0]:
             left_tail_range: tuple[float, float] = (self.domain_range[0], interval[0])
-            left_tail: np.ndarray = create_float_array(left_tail_range, self.num_pts)
+            left_tail: np.ndarray = array_of_floats(left_tail_range, self.num_pts)
             left_tail_mass: float = cumulative_trapezoid(pdf(left_tail), left_tail)[-1]
         else:
             left_tail_mass: float = 0.0
 
-        inputs: np.ndarray = create_float_array(interval, self.num_pts)
+        inputs: np.ndarray = array_of_floats(interval, self.num_pts)
         return create_cdf_interpolator_from_pdf(
             pdf, inputs, left_tail_mass=left_tail_mass
         )
