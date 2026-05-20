@@ -8,6 +8,11 @@ from .data import Data
 from .plot import Plot
 
 
+def validate_plot_cls(plot_cls: type[Plot]) -> None:
+    if not issubclass(plot_cls, Plot):
+        raise ValueError("`plot_cls` must be a subclass of `Plot`")
+
+
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
 class Observable:
     data: Data = attrs.field(
@@ -22,7 +27,7 @@ class Observable:
     plot_cls: type[Plot] | None = attrs.field(
         default=None,
         validator=attrs.validators.optional(
-            lambda _, __, plot_cls: issubclass(plot_cls, Plot)
+            lambda _, __, plot_cls: validate_plot_cls(plot_cls)
         ),
         repr=False,
     )
