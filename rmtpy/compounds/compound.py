@@ -1,24 +1,21 @@
 from __future__ import annotations
 
-import hashlib
 import inspect
-import re
 import math
-from collections.abc import Iterator
+import re
+from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import Any, Sequence
 
+import attrs
 import numpy as np
-from attrs import Converter, asdict, field, fields_dict, frozen
-from attrs.validators import instance_of
-from scipy.integrate import cumulative_trapezoid
+from cattrs.dispatch import StructureHook, UnstructureHook
 from scipy.interpolate import PchipInterpolator
 from scipy.linalg import solve
-from scipy.ndimage import gaussian_filter1d
-from cattrs.dispatch import StructureHook, UnstructureHook
 
-from ..ensembles import ManyBodyEnsemble, WignerDysonEnsemble
-from ..utils import rmtpy_converter, normalize_dict, to_registry_key
+import rmtpy.conversion
+import rmtpy.ensembles
+import rmtpy.validators
 
 COMPOUND_REGISTRY: dict[str, type[Compound]] = {}
 COMPOUND_STRUCTURE_HOOKS: dict[str, StructureHook] = {}
@@ -29,32 +26,7 @@ def create_quantum_chaotic_compound(**kwargs: Any) -> Compound:
     return Compound.create(kwargs)
 
 
-def _create_hashed_id(array: np.ndarray, num_hex: int = 16) -> str:
-    hash_object: hashlib._Hash = hashlib.sha256()
-    hash_object.update(str(array.dtype).encode())
-    hash_object.update(str(array.shape).encode())
-    hash_object.update(array.tobytes())
-    return hash_object.hexdigest()[:num_hex]
-
-
-def _to_1D_array(energies: float | np.ndarray) -> np.ndarray:
-    if not isinstance(energies, (int, float, np.ndarray)):
-        raise TypeError(
-            f"Energies must be a int, float or a numpy array, got {type(energies).__name__} instead."
-        )
-
-    if isinstance(energies, (int, float)):
-        return np.array([energies], dtype=np.float64, order="C")
-
-    if not np.isrealobj(energies):
-        raise ValueError("Energies must have real values.")
-    if energies.ndim != 1:
-        raise ValueError(f"Energies must be a 1D array, got {energies.ndim}D array.")
-
-    return energies.astype(np.float64)
-
-
-def _to_full_array(value: int | float | np.ndarray, self_: Compound) -> np.ndarray:
+def normalize_coupling_strengths(value: np.ndarray, self_: Compound) -> np.ndarray:
     if not isinstance(value, (int, float, Sequence, np.ndarray)):
         raise TypeError(
             f"Coupling strengths must be a scalar or a Sequence, got {type(value).__name__}."
@@ -72,12 +44,13 @@ def _to_full_array(value: int | float | np.ndarray, self_: Compound) -> np.ndarr
         )
     if not np.isrealobj(value) or np.any(value < 0):
         raise ValueError("Coupling strengths array must have real, nonnegative values.")
+
     return value
 
 
-@frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
+@attrs.frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
 class Compound:
-    num_free_complex_fermions: int = field(
+    num_free_complex_fermions: int = attrs.field(
         default=1,
         converter=int,
         metadata={"dir_name": "Nf", "latex_name": r"N_\textrm{\tiny f}"},
@@ -89,20 +62,15 @@ class Compound:
 
         if value < 0 or value > num_complex_fermions:
             raise ValueError(
-                f"Number of free complex fermions must be a nonnegative integer less than or equal to {num_complex_fermions}, got {value}."
+                f"Number of free complex fermions must be a nonnegative integer "
+                f"less than or equal to {num_complex_fermions}, got {value}."
             )
 
-    ensemble: ManyBodyEnsemble = field(
-        converter=ManyBodyEnsemble.create,
-        validator=instance_of(ManyBodyEnsemble),
+    ensemble: rmtpy.ensembles.ManyBodyEnsemble = attrs.field(
+        converter=rmtpy.ensembles.ManyBodyEnsemble.create,
     )
 
-    @ensemble.validator
-    def _ensemble_validator(self, _, value: ManyBodyEnsemble) -> None:
-        if inspect.isabstract(value):
-            raise ValueError(f"ManyBodyEnsemble must be concrete.")
-
-    num_channels: int = field(init=False)
+    num_channels: int = attrs.field(init=False)
 
     @num_channels.default
     def _default_num_channels(self) -> int:
@@ -113,63 +81,80 @@ class Compound:
     def _num_channels_validator(self, _, value: int) -> None:
         if value > self.ensemble.dimension // 2:
             raise ValueError(
-                "Number of open channels cannot exceed half the dimension of the ensemble."
+                "Number of open channels cannot exceed half the dimension."
             )
 
-    channel_coupling_strengths: np.ndarray = field(
+    channel_coupling_strengths: np.ndarray = attrs.field(
         repr=False,
-        converter=Converter(_to_full_array, takes_self=True),
+        converter=Converter(normalize_coupling_strengths, takes_self=True),
     )
 
     @channel_coupling_strengths.default
     def _default_channel_coupling_strengths(self) -> float:
-        return np.sqrt(self.ensemble.ground_state_energy)
+        return np.sqrt(self.ensemble.spectral_radius)
 
-    _numerical_resonance_pdf: PchipInterpolator | None = field(
-        init=False, default=None, repr=False
-    )
-    _numerical_resonance_cdf: PchipInterpolator | None = field(
-        init=False, default=None, repr=False
-    )
-    _coupling_strengths_id: str = field(init=False, repr=False)
+    _coupling_strengths_id: str = attrs.field(init=False, repr=False)
 
     @_coupling_strengths_id.default
     def _default_coupling_strengths_id(self) -> str:
-        return _create_hashed_id(self.channel_coupling_strengths)
+        return rmtpy.conversion.create_hashed_id(self.channel_coupling_strengths)
+
+    resonance_polynomials: Callable[[np.ndarray, int], np.ndarray] | None = attrs.field(
+        init=False, default=None, repr=False
+    )
+    resonance_polynomial_weight: Callable[[np.ndarray], np.ndarray] | None = (
+        attrs.field(init=False, default=None, repr=False)
+    )
+
+    _average_resonance_coeffs: np.ndarray | None = attrs.field(
+        init=False, default=None, repr=False
+    )
+    _average_resonance_coeffs_degree: int = attrs.field(
+        init=False, default=0, repr=False
+    )
+
+    _average_resonance_pdf_interpolators: dict[
+        tuple[int, float, float], PchipInterpolator
+    ] = attrs.field(init=False, factory=dict, repr=False)
+    _average_resonance_cdf_interpolators: dict[
+        tuple[int, int, float, float], PchipInterpolator
+    ] = attrs.field(init=False, factory=dict, repr=False)
 
     def __attrs_post_init__(self) -> None:
-        if not isinstance(self.ensemble, WignerDysonEnsemble):
+        if not isinstance(self.ensemble, rmtpy.ensembles.WignerDysonEnsemble):
             raise TypeError("The ensemble must be an instance of WignerDysonEnsemble.")
 
     @classmethod
     def __attrs_init_subclass__(cls) -> None:
         if not inspect.isabstract(cls):
-            key: str = to_registry_key(cls.__name__)
+            key: str = rmtpy.conversion.to_registry_key(cls.__name__)
             COMPOUND_REGISTRY[key] = cls
-            COMPOUND_STRUCTURE_HOOKS[key] = rmtpy_converter.get_structure_hook(cls)
-            COMPOUND_UNSTRUCTURE_HOOKS[key] = rmtpy_converter.get_unstructure_hook(cls)
+            COMPOUND_STRUCTURE_HOOKS[key] = RMTPY_CONVERTER.get_structure_hook(cls)
+            COMPOUND_UNSTRUCTURE_HOOKS[key] = RMTPY_CONVERTER.get_unstructure_hook(cls)
 
     @classmethod
     def create(cls, src: dict[str, Any] | Compound) -> Compound:
-        return rmtpy_converter.structure(src, cls)
+        return RMTPY_CONVERTER.structure(src, cls)
 
     @property
-    def _path_name(self) -> str:
-        return self.ensemble._path_name + f"_Compound"
+    def path_name(self) -> str:
+        return self.ensemble.path_name + "_Compound"
 
     @property
-    def _latex_name(self) -> str:
-        return f"\\textrm{{{re.sub(r'_', ' ', self.ensemble._nickname + ' Compound')}}}"
+    def latex_name(self) -> str:
+        return (
+            f"\\textrm{{{re.sub(r'_', ' ', self.ensemble.initialism + ' Compound')}}}"
+        )
 
     @property
     def to_path(self) -> Path:
-        path: Path = Path(self._path_name)
+        path: Path = Path(self.path_name)
         ensemble_path: Path = self.ensemble.to_path
         ensemble_args_path: Path = Path(*ensemble_path.parts[1:])
         path /= ensemble_args_path
 
-        self_asdict: dict[str, Any] = asdict(self)
-        for name, attr in fields_dict(type(self)).items():
+        self_asdict: dict[str, Any] = attrs.asdict(self)
+        for name, attr in attrs.fields_dict(type(self)).items():
             if attr.metadata.get("dir_name") is not None:
                 val: str = re.sub(r"[^\w\-.]", "_", str(self_asdict[name]))
                 path /= f"{attr.metadata['dir_name']}_{val.replace('.', 'p')}"
@@ -186,11 +171,11 @@ class Compound:
     def to_latex(self) -> str:
         ensemble_latex_str: str = self.ensemble.to_latex
         latex_str: str = ensemble_latex_str.replace(
-            self.ensemble._latex_name, self._latex_name
+            self.ensemble.latex_name, self.latex_name
         ).rstrip("$")
 
-        self_asdict: dict[str, Any] = asdict(self)
-        for name, attr in fields_dict(type(self)).items():
+        self_asdict: dict[str, Any] = attrs.asdict(self)
+        for name, attr in attrs.fields_dict(type(self)).items():
             if attr.metadata.get("latex_name") is not None:
                 latex_str += rf"\ {attr.metadata['latex_name']}={self_asdict[name]}"
         return latex_str + "$"
@@ -199,81 +184,39 @@ class Compound:
     def rng_state(self) -> dict[str, Any]:
         return self.ensemble.rng.bit_generator.state
 
-    def generate_effective_hamiltonian(self) -> np.ndarray:
-        num_channels: int = self.num_channels
-        strengths: np.ndarray = self.channel_coupling_strengths
+    @property
+    def has_resonance_polynomial_expansion(self) -> bool:
+        return self.resonance_polynomials is not None
 
+    @property
+    def has_resonance_polynomial_weight(self) -> bool:
+        return self.resonance_polynomial_weight is not None
+
+    def set_rng_state(self, rng_state: dict[str, Any] | None) -> None:
+        if rng_state is not None:
+            self.ensemble.set_rng_state(rng_state)
+
+    def unstructure(self) -> dict[str, Any]:
+        return RMTPY_CONVERTER.unstructure(self)
+
+    def generate_effective_hamiltonian(self) -> np.ndarray:
+        diag_indices: np.ndarray = np.diag_indices(self.num_channels)
         hamiltonian: np.ndarray = self.ensemble.generate_matrix(use_complex_dtype=True)
-        hamiltonian[np.diag_indices(num_channels)] -= 0.5j * (strengths**2)
+        hamiltonian[diag_indices] -= 0.5j * (self.channel_coupling_strengths**2)
         return hamiltonian
 
     def effective_hamiltonian_stream(self, realizs: int) -> Iterator[np.ndarray]:
-        num_channels: int = self.num_channels
-        strengths: np.ndarray = self.channel_coupling_strengths
-
+        diag_indices: np.ndarray = np.diag_indices(self.num_channels)
         for hamiltonian in self.ensemble.matrix_stream(realizs, use_complex_dtype=True):
-            hamiltonian[np.diag_indices(num_channels)] -= 0.5j * (strengths**2)
+            hamiltonian[diag_indices] -= 0.5j * (self.channel_coupling_strengths**2)
             yield hamiltonian
 
     def resonances_stream(self, realizs: int) -> Iterator[np.ndarray]:
         lapack_geev: type = self.ensemble._pick_lapack_geev(use_complex_dtype=True)
-        for effective_hamiltonian in self.effective_hamiltonian_stream(realizs):
+        for hamiltonian_eff in self.effective_hamiltonian_stream(realizs):
             yield lapack_geev(
-                effective_hamiltonian, compute_vl=0, compute_vr=0, overwrite_a=True
+                hamiltonian_eff, compute_vl=0, compute_vr=0, overwrite_a=True
             )[0]
-
-    def resonance_pdf(
-        self,
-        energies: int | float | np.ndarray,
-        _num_bins: int = 200,
-        _factor: float = 1.2,
-        _sigma: float = 2.0,
-    ) -> np.ndarray:
-        real_dtype: type[np.floating] = self.ensemble.real_dtype.type
-
-        if isinstance(energies, (int, float)):
-            energies: np.ndarray = np.array([energies], dtype=real_dtype)
-
-        if self._numerical_resonance_pdf is None:
-            object.__setattr__(
-                self,
-                "_numerical_resonance_pdf",
-                self._create_numerical_resonance_pdf(_num_bins, _factor, _sigma),
-            )
-
-        return self._numerical_resonance_pdf(energies)
-
-    def resonance_cdf(
-        self,
-        energies: int | float | np.ndarray,
-        _factor: float = 1.2,
-        _num_bins: int = 200,
-        _sigma: float = 2.0,
-    ) -> np.ndarray:
-        real_dtype: type[np.floating] = self.ensemble.real_dtype.type
-
-        if isinstance(energies, (int, float)):
-            energies: np.ndarray = np.array([energies], dtype=real_dtype)
-
-        if self._numerical_resonance_cdf is None:
-            object.__setattr__(
-                self,
-                "_numerical_resonance_cdf",
-                self._create_numerical_resonance_cdf(_num_bins, _factor, _sigma),
-            )
-
-        return self._numerical_resonance_cdf(energies)
-
-    def unfold(self, energies: np.ndarray) -> np.ndarray:
-        return self.ensemble.dimension * (
-            self.resonance_cdf(energies) - self.resonance_cdf(np.array([0.0]))
-        )
-
-    def unfold_widths(self, energies: np.ndarray, widths: np.ndarray) -> np.ndarray:
-        return self.ensemble.dimension * (
-            self.resonance_cdf(energies + widths / 2)
-            - self.resonance_cdf(energies - widths / 2)
-        )
 
     def partial_widths_stream(self, realizs: int) -> Iterator[np.ndarray]:
         for _, eigvecs in self.ensemble.eigsys_stream(realizs):
@@ -282,6 +225,178 @@ class Compound:
             coupling_matrix *= coupling_matrix.conj()
 
             yield coupling_matrix.real
+
+    def compute_resonance_polynomials(
+        self, energies: np.ndarray, degree: int
+    ) -> np.ndarray:
+        if not self.has_resonance_polynomial_expansion:
+            raise NotImplementedError()
+
+        validate_polynomial_degree(degree)
+        x: np.ndarray = np.asarray(energies) / self.ensemble.spectral_radius
+        return self.resonance_polynomials(x, degree)
+
+    def compute_resonance_polynomial_weight(self, energies: np.ndarray) -> np.ndarray:
+        if not self.has_resonance_polynomial_weight:
+            raise NotImplementedError()
+
+        return self.resonance_polynomial_weight(np.asarray(energies))
+
+    def compute_resonance_polynomial_norms(self, degree: int) -> np.ndarray:
+        validate_polynomial_degree(degree)
+        return np.ones(degree + 1)
+
+    def variate_resonance_coeffs(
+        self, resonances: np.ndarray, degree: int
+    ) -> np.ndarray:
+        energies = np.asarray(resonances).real
+        polynomials: np.ndarray = self.compute_resonance_polynomials(energies, degree)
+        norms: np.ndarray = self.compute_resonance_polynomial_norms(degree)
+        return np.mean(polynomials, axis=1) / norms
+
+    def variate_resonance_pdf(
+        self, resonances: np.ndarray, resonance_coeffs: np.ndarray
+    ) -> np.ndarray:
+        energies, coeffs = np.asarray(resonances).real, np.asarray(resonance_coeffs)
+        if coeffs.ndim != 1 or len(coeffs) == 0:
+            raise ValueError("resonance_coeffs must be a non-empty 1D array.")
+
+        degree: int = len(coeffs) - 1
+        polynomials: np.ndarray = self.compute_resonance_polynomials(energies, degree)
+        polynomials *= resonance_coeffs[:, None]
+        weight_function: np.ndarray = self.compute_resonance_polynomial_weight(energies)
+        return weight_function * np.sum(polynomials, axis=0)
+
+    def average_resonance_coeffs(self, degree: int) -> np.ndarray:
+        validate_polynomial_degree(degree)
+        cached_degree: int = self._average_resonance_coeffs_degree
+        cached_average_coeffs: np.ndarray | None = self._average_resonance_coeffs
+
+        if cached_average_coeffs is None or degree > cached_degree:
+            cached_average_coeffs = self._create_average_resonance_coeffs(degree)
+            object.__setattr__(self, "_average_resonance_coeffs", cached_average_coeffs)
+            object.__setattr__(self, "_average_resonance_coeffs_degree", degree)
+
+        return cached_average_coeffs[: degree + 1]
+
+    def average_resonance_pdf(
+        self,
+        energies: np.ndarray,
+        degree: int = 0,
+        num_pts: int = 1000,
+        factor: float = 1.2,
+        sigma: float = 2.0,
+    ) -> np.ndarray:
+        real_dtype: type[np.floating] = self.ensemble.real_dtype.type
+
+        if isinstance(energies, (int, float)):
+            energies: np.ndarray = np.array([energies], dtype=real_dtype)
+        else:
+            energies = np.asarray(energies)
+
+        if self.has_resonance_polynomial_expansion:
+            average_coeffs: np.ndarray = self.average_resonance_coeffs(degree)
+            return self.variate_resonance_pdf(energies, average_coeffs)
+
+        key: tuple[int, float, float] = (num_pts, factor, sigma)
+        if key not in self._average_resonance_pdf_interpolators:
+            self._average_resonance_pdf_interpolators[key] = (
+                self._create_average_resonance_pdf_interpolator(
+                    num_bins=num_pts, factor=factor, sigma=sigma
+                )
+            )
+
+        return self._average_resonance_pdf_interpolators[key](energies)
+
+    def average_resonance_cdf(
+        self,
+        energies: np.ndarray,
+        degree: int = 0,
+        num_pts: int = 1000,
+        factor: float = 1.2,
+        sigma: float = 2.0,
+    ) -> np.ndarray:
+        validate_polynomial_degree(degree)
+        real_dtype: type[np.floating] = self.ensemble.real_dtype.type
+
+        if isinstance(energies, (int, float)):
+            energies: np.ndarray = np.array([energies], dtype=real_dtype)
+        else:
+            energies = np.asarray(energies)
+
+        key: tuple[int, int, float, float] = (degree, num_pts, factor, sigma)
+        if key not in self._average_resonance_cdf_interpolators:
+            self._average_resonance_cdf_interpolators[key] = (
+                self._create_average_resonance_cdf_interpolator(
+                    degree=degree, num_pts=num_pts, factor=factor, sigma=sigma
+                )
+            )
+
+        return self._average_resonance_cdf_interpolators[key](energies)
+
+    def unfold_with_average_resonance_pdf(
+        self,
+        energies: np.ndarray,
+        degree: int = 0,
+        num_pts: int = 1000,
+        factor: float = 1.2,
+        sigma: float = 2.0,
+    ) -> np.ndarray:
+        cdf = 0
+        return unfold_with_cdf(energies, cdf, self.ensemble.dimension)
+
+    def unfold_widths_with_average_resonance_pdf(
+        self,
+        widths: np.ndarray,
+        energies: np.ndarray,
+        degree: int = 0,
+        num_pts: int = 1000,
+        factor: float = 1.2,
+        sigma: float = 2.0,
+    ) -> np.ndarray:
+        cdf = 0
+        return unfold_widths_with_cdf(widths, energies, cdf, self.ensemble.dimension)
+
+    def unfold_with_variate_resonance_pdf(
+        self,
+        energies: np.ndarray,
+        resonance_coeffs: np.ndarray | None = None,
+        resonances: np.ndarray | None = None,
+        degree: int = 0,
+        num_pts: int = 1000,
+        factor: float = 1.2,
+        sigma: float = 2.0,
+    ) -> np.ndarray:
+        cdf: PchipInterpolator = self.variate_resonance_cdf(
+            resonance_coeffs=resonance_coeffs,
+            resonances=resonances,
+            degree=degree,
+            num_pts=num_pts,
+            factor=factor,
+            sigma=sigma,
+        )
+        return unfold_with_cdf(energies, cdf, self.ensemble.dimension)
+
+    def unfold_widths_with_variate_resonance_pdf(
+        self,
+        widths: np.ndarray,
+        centers: np.ndarray,
+        resonance_coeffs: np.ndarray | None = None,
+        resonances: np.ndarray | None = None,
+        degree: int = 0,
+        num_pts: int = 1000,
+        factor: float = 1.2,
+        sigma: float = 2.0,
+    ) -> np.ndarray:
+        cdf: PchipInterpolator = self.variate_resonance_cdf(
+            resonance_coeffs=resonance_coeffs,
+            resonances=resonances,
+            degree=degree,
+            num_pts=num_pts,
+            factor=factor,
+            sigma=sigma,
+        )
+        return unfold_widths_with_cdf(widths, centers, cdf, self.ensemble.dimension)
 
     def reaction_matrix_stream(
         self, energies: float | np.ndarray, realizs: int
@@ -293,7 +408,7 @@ class Compound:
         num_channels: int = self.num_channels
         strengths: np.ndarray = self.channel_coupling_strengths
 
-        energies: np.ndarray = _to_1D_array(energies)
+        energies = np.asarray(energies)
         num_energies = energies.size
 
         resolvent: np.ndarray = np.empty(
@@ -338,7 +453,7 @@ class Compound:
         num_channels: int = self.num_channels
         strengths: np.ndarray = self.channel_coupling_strengths
 
-        energies: np.ndarray = _to_1D_array(energies)
+        energies = np.asarray(energies)
         num_energies: int = energies.size
 
         resolvent: np.ndarray = np.empty(
@@ -391,7 +506,7 @@ class Compound:
         self, energies: float | np.ndarray, realizs: int
     ) -> Iterator[np.ndarray]:
         complex_dtype: type[np.complexfloating] = self.ensemble.dtype.type
-        energies: np.ndarray = _to_1D_array(energies)
+        energies = np.asarray(energies)
         num_energies: int = energies.size
 
         numerator: np.ndarray = np.empty(
@@ -418,7 +533,7 @@ class Compound:
     def wigner_smith_matrix_stream(
         self, energies: float | np.ndarray, realizs: int
     ) -> Iterator[np.ndarray]:
-        energies: np.ndarray = _to_1D_array(energies)
+        energies = np.asarray(energies)
 
         for matrix, matrix_2 in self.reaction_matrix_pair_stream(energies, realizs):
             diag_indices: np.ndarray = np.arange(self.num_channels)
@@ -441,72 +556,97 @@ class Compound:
         for wigner_smith_matrix in self.wigner_smith_matrix_stream(energies, realizs):
             yield np.linalg.eigvalsh(wigner_smith_matrix)
 
-    def set_rng_state(self, rng_state: dict[str, Any] | None) -> None:
-        if rng_state is not None:
-            self.ensemble.set_rng_state(rng_state)
-
-    def unstructure(self) -> dict[str, Any]:
-        return rmtpy_converter.unstructure(self)
-
-    def _create_numerical_resonance_pdf(
-        self, num_bins: int = 200, factor: float = 1.2, sigma: float = 2.0
+    def _create_array_of_resonance_energies(
+        self, num_pts: int = 1000, factor: float = 1.2
     ) -> np.ndarray:
+        if num_pts < 2:
+            raise ValueError("At least two resonance energy points are required.")
+        if factor <= 0:
+            raise ValueError("Resonance energy factor must be positive.")
+
+        energy_0: float = self.ensemble.spectral_radius
+        return create_histogram_bins(
+            support=(-energy_0, energy_0), num_bins=num_pts - 1, scale=factor
+        )
+
+    def _create_array_of_resonance_bins(
+        self, num_bins: int = 200, factor: float = 1.2
+    ) -> np.ndarray:
+        if num_bins < 1:
+            raise ValueError("At least one resonance bin is required.")
+
+        return self._create_array_of_resonance_energies(num_bins + 1, factor)
+
+    def _create_average_resonance_coeffs(self, degree: int) -> np.ndarray:
+        total_counts_per_dimension: int = 2**13 // self.ensemble.dimension
+        realizs: int = max(total_counts_per_dimension, 10)
+
+        average_coeffs: np.ndarray = np.zeros(degree + 1)
+        for resonances in self.resonances_stream(realizs):
+            average_coeffs += self.variate_resonance_coeffs(resonances, degree)
+
+        average_coeffs /= realizs
+        return average_coeffs
+
+    def _create_average_resonance_pdf_interpolator(
+        self, num_bins: int = 200, factor: float = 1.2, sigma: float = 2.0
+    ) -> PchipInterpolator:
         total_counts_per_dimension: int = 2**13 // self.ensemble.dimension
         realizs: int = max(total_counts_per_dimension, 1)
 
-        energy_0: float = self.ensemble.ground_state_energy
-        bins: np.ndarray = factor * np.linspace(-energy_0, energy_0, num_bins + 1)
+        bins: np.ndarray = self._create_array_of_resonance_bins(num_bins, factor)
         counts: np.ndarray = np.zeros(num_bins)
 
         for complex_energies in self.resonances_stream(realizs):
             resonances: np.ndarray = complex_energies.real
             counts[:] += np.histogram(resonances, bins=bins)[0]
 
-        histogram: np.ndarray = counts / (np.sum(counts) * np.diff(bins))
-        smoothed_histogram: np.ndarray = gaussian_filter1d(histogram, sigma=sigma)
+        return create_pdf_interpolator_from_histogram(
+            bins=bins, counts=counts, sigma=sigma
+        )
 
-        centers: np.ndarray = (bins[:-1] + bins[1:]) / 2
-        return PchipInterpolator(centers, smoothed_histogram, extrapolate=True)
+    def _create_average_resonance_cdf_interpolator(
+        self,
+        degree: int = 0,
+        num_pts: int = 1000,
+        factor: float = 1.2,
+        sigma: float = 2.0,
+    ) -> PchipInterpolator:
+        energies: np.ndarray = self._create_array_of_resonance_energies(num_pts, factor)
+        return create_cdf_interpolator_from_pdf(
+            self.average_resonance_pdf,
+            inputs=energies,
+            degree=degree,
+            num_pts=num_pts,
+            factor=factor,
+            sigma=sigma,
+        )
 
-    def _create_numerical_resonance_cdf(
-        self, num_bins: int = 200, factor: float = 1.2, sigma: float = 2.0
-    ) -> np.ndarray:
-        energy_0: float = self.ensemble.ground_state_energy
-        energies: np.ndarray = factor * np.linspace(-energy_0, energy_0, num_bins + 1)
-        pdf_vals: np.ndarray = self.resonance_pdf(energies, num_bins, factor, sigma)
-        cdf_vals: np.ndarray = cumulative_trapezoid(pdf_vals, energies, initial=0)
 
-        return PchipInterpolator(energies, cdf_vals, extrapolate=True)
-
-
-@rmtpy_converter.register_structure_hook
+@RMTPY_CONVERTER.register_structure_hook
 def compound_structure_hook(src: dict[str, Any] | Compound, _) -> Compound:
     if type(src) in COMPOUND_REGISTRY.values():
         return src
 
-    compound_dict: dict[str, Any] = normalize_dict(src, COMPOUND_REGISTRY)
-    compound_arguments: dict[str, Any] = compound_dict.pop("args")
-    key: str = to_registry_key(compound_dict.pop("name"))
-    compound_class: type[Compound] = COMPOUND_REGISTRY[key]
-    compound_instance: Compound = compound_class(**compound_arguments)
-    return compound_instance
+    comp_dict: dict[str, Any] = rmtpy.conversion.normalize_dict(src, COMPOUND_REGISTRY)
+    comp_args: dict[str, Any] = comp_dict.pop("args")
+    key: str = rmtpy.conversion.to_registry_key(comp_dict.pop("name"))
+    comp_cls: type[Compound] = COMPOUND_REGISTRY[key]
+    comp_inst: Compound = comp_cls(**comp_args)
+    return comp_inst
 
 
-@rmtpy_converter.register_unstructure_hook
-def compound_unstructure_hook(
-    compound_instance: Compound,
-) -> dict[str, str | dict[str, Any]]:
-    compound_name: str = type(compound_instance).__name__
-    unstructured_compound: dict[str, Any] = asdict(compound_instance)
-    unstructured_compound["name"] = to_registry_key(compound_name)
-    unstructured_compound = normalize_dict(unstructured_compound, COMPOUND_REGISTRY)
-    unstructured_compound["args"]["ensemble"] = rmtpy_converter.unstructure(
-        compound_instance.ensemble
-    )
-    return unstructured_compound
+@RMTPY_CONVERTER.register_unstructure_hook
+def compound_unstructure_hook(compound: Compound) -> dict[str, Any]:
+    comp_name: str = type(compound).__name__
+    unstr_comp: dict[str, Any] = attrs.asdict(compound)
+    unstr_comp["name"] = rmtpy.conversion.to_registry_key(comp_name)
+    unstr_comp = rmtpy.conversion.normalize_dict(unstr_comp, COMPOUND_REGISTRY)
+    unstr_comp["args"]["ensemble"] = RMTPY_CONVERTER.unstructure(compound.ensemble)
+    return unstr_comp
 
 
-key: str = to_registry_key(Compound.__name__)
+key: str = rmtpy.conversion.to_registry_key(Compound.__name__)
 COMPOUND_REGISTRY[key] = Compound
-COMPOUND_STRUCTURE_HOOKS[key] = rmtpy_converter.get_structure_hook(Compound)
-COMPOUND_UNSTRUCTURE_HOOKS[key] = rmtpy_converter.get_unstructure_hook(Compound)
+COMPOUND_STRUCTURE_HOOKS[key] = RMTPY_CONVERTER.get_structure_hook(Compound)
+COMPOUND_UNSTRUCTURE_HOOKS[key] = RMTPY_CONVERTER.get_unstructure_hook(Compound)

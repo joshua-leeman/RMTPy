@@ -1,0 +1,53 @@
+from __future__ import annotations
+
+import inspect
+from collections.abc import Callable
+from typing import ClassVar
+
+import attrs
+import numpy as np
+
+import rmtpy.conversion
+import rmtpy.polynomials
+from .many_body import ManyBodyEnsemble
+
+INITIALISM: str = "WDE"
+
+SPECTRAL_POLYNOMIALS: Callable[[np.ndarray, int], np.ndarray] = (
+    rmtpy.polynomials.chebyshev_polynomials_2
+)
+
+WIGNER_DYSON_ENSEMBLE_NAMES_BY_INITIALISM = {}
+WIGNER_DYSON_ENSEMBLE_INITIALISMS_BY_NAME = {}
+
+
+def create_spectral_polynomial_weight(
+    wde: WignerDysonEnsemble,
+) -> Callable[[np.ndarray], np.ndarray]:
+    return lambda energies: rmtpy.polynomials.semicircle_weight_pdf(
+        energies, wde.spectral_radius
+    )
+
+
+@attrs.frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
+class WignerDysonEnsemble(ManyBodyEnsemble):
+    initialism: ClassVar[str] = INITIALISM
+
+    spectral_polynomials: Callable[[np.ndarray, int], np.ndarray] = attrs.field(
+        default=SPECTRAL_POLYNOMIALS,
+        init=False,
+        repr=False,
+    )
+    spectral_polynomial_weight: Callable[[np.ndarray], np.ndarray] = attrs.field(
+        default=attrs.Factory(create_spectral_polynomial_weight, takes_self=True),
+        init=False,
+        repr=False,
+    )
+
+    @classmethod
+    def __attrs_init_subclass__(cls) -> None:
+        super().__attrs_init_subclass__()
+        if not inspect.isabstract(cls):
+            initialism: str = rmtpy.conversion.to_registry_key(cls.initialism)
+            WIGNER_DYSON_ENSEMBLE_NAMES_BY_INITIALISM[initialism] = cls.__name__.lower()
+            WIGNER_DYSON_ENSEMBLE_INITIALISMS_BY_NAME[cls.__name__.lower()] = initialism

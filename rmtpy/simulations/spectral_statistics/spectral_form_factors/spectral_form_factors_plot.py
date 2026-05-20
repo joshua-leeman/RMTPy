@@ -8,11 +8,10 @@ from matplotlib.lines import Line2D
 from matplotlib.ticker import LogLocator, NullLocator
 from scipy.special import jn_zeros
 
-from .spectral_form_factors_data import FormFactorsData
-from ..._plot import PlotLegend, PlotAxes, Plot
+from ....conversion import rmtpy_converter
 from ....ensembles import ManyBodyEnsemble
-from ....utils import rmtpy_converter
-
+from ...plot import Plot, PlotAxes, PlotLegend
+from .spectral_form_factors_data import FormFactorsData
 
 @dataclass(repr=False, eq=False, kw_only=True)
 class FormFactorsLegend(PlotLegend):
@@ -97,7 +96,7 @@ class FormFactorsPlot(Plot):
         self.ensemble: ManyBodyEnsemble = rmtpy_converter.structure(
             ensemble_meta, ManyBodyEnsemble
         )
-        energy_0: float = self.ensemble.ground_state_energy
+        energy_0: float = self.ensemble.spectral_radius
         dimension: int = self.ensemble.dimension
 
         self.legend: FormFactorsLegend = FormFactorsLegend(

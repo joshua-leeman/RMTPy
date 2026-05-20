@@ -7,12 +7,11 @@ import numpy as np
 from matplotlib.patches import Patch
 from matplotlib.ticker import NullFormatter
 
-from ..._histogram import Histogram
-from ..._plot import PlotAxes, PlotLegend, Plot
 from ....compounds import Compound
+from ....conversion import rmtpy_converter
 from ....ensembles import ManyBodyEnsemble
-from ....utils import rmtpy_converter
-
+from ...histogram import Histogram
+from ...plot import Plot, PlotAxes, PlotLegend
 
 @dataclass(repr=False, eq=False, kw_only=True)
 class WidthHistogramLegend(PlotLegend):
@@ -81,7 +80,7 @@ class WidthHistogramPlot(Plot):
             self.compound.channel_coupling_strengths**2
         )
         ensemble: ManyBodyEnsemble = self.compound.ensemble
-        energy_0: float = ensemble.ground_state_energy
+        energy_0: float = ensemble.spectral_radius
 
         self.legend: WidthHistogramLegend = WidthHistogramLegend(
             handles=self.legend_handles, labels=self.legend_labels

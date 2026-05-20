@@ -7,12 +7,11 @@ import numpy as np
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 
-from ..._histogram import Histogram
-from ..._plot import PlotAxes, PlotLegend, Plot
 from ....compounds import Compound
+from ....conversion import rmtpy_converter
 from ....ensembles import ManyBodyEnsemble, PoissonEnsemble, SachdevYeKitaevEnsemble
-from ....utils import rmtpy_converter
-
+from ...histogram import Histogram
+from ...plot import Plot, PlotAxes, PlotLegend
 
 @dataclass(repr=False, eq=False, kw_only=True)
 class ResonanceHistogramLegend(PlotLegend):
@@ -119,7 +118,7 @@ class ResonanceHistogramPlot(Plot):
 
         self.compound: Compound = rmtpy_converter.structure(compound_meta, Compound)
         ensemble: ManyBodyEnsemble = self.compound.ensemble
-        energy_0: float = ensemble.ground_state_energy
+        energy_0: float = ensemble.spectral_radius
 
         self.legend: ResonanceHistogramLegend = ResonanceHistogramLegend(
             handles=self.legend_handles, labels=self.legend_labels

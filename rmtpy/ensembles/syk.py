@@ -153,7 +153,8 @@ class SachdevYeKitaevEnsemble(ManyBodyEnsemble):
         return super().as_latex + f"_{self.q}"
 
     def generate_matrix(self, use_complex_dtype: bool = False) -> np.ndarray:
-        matrix, create_syk_matrix = self._initialize_matrix(use_complex_dtype)
+        matrix = self._initialize_matrix(use_complex_dtype)
+        create_syk_matrix = self._pick_syk_matrix_builder(use_complex_dtype)
         create_syk_matrix(
             matrix,
             self.rng,
@@ -167,7 +168,8 @@ class SachdevYeKitaevEnsemble(ManyBodyEnsemble):
     def matrix_stream(
         self, realizs: int, use_complex_dtype: bool = False
     ) -> Iterator[np.ndarray]:
-        matrix, create_syk_matrix = self._initialize_matrix(use_complex_dtype)
+        matrix = self._initialize_matrix(use_complex_dtype)
+        create_syk_matrix = self._pick_syk_matrix_builder(use_complex_dtype)
         for _ in range(realizs):
             create_syk_matrix(
                 matrix,
@@ -179,20 +181,17 @@ class SachdevYeKitaevEnsemble(ManyBodyEnsemble):
             )
             yield matrix
 
-    def _initialize_matrix(
-        self, use_complex_dtype: bool = False
-    ) -> tuple[np.ndarray, Callable[[np.ndarray], np.ndarray]]:
+    def _initialize_matrix(self, use_complex_dtype: bool = False) -> np.ndarray:
         size: int = self.dimension
-        complex_dtype: type[np.complexfloating] = self.complex_dtype.type
-        real_dtype: type[np.floating] = self.real_dtype.type
         if use_complex_dtype or self.dyson_index != 1:
-            matrix: np.ndarray = np.empty((size, size), complex_dtype, order="F")
-            create_syk_matrix: Callable[[np.ndarray], np.ndarray] = (
-                create_syk_matrix_with_complex_entries
-            )
+            return np.empty((size, size), self.complex_dtype.type, order="F")
         else:
-            matrix: np.ndarray = np.empty((size, size), real_dtype, order="F")
-            create_syk_matrix: Callable[[np.ndarray], np.ndarray] = (
-                create_syk_matrix_with_real_entries
-            )
-        return matrix, create_syk_matrix
+            return np.empty((size, size), self.real_dtype.type, order="F")
+
+    def _pick_syk_matrix_builder(
+        self, use_complex_dtype: bool = False
+    ) -> Callable[[np.ndarray], np.ndarray]:
+        if use_complex_dtype or self.dyson_index != 1:
+            return create_syk_matrix_with_complex_entries
+        else:
+            return create_syk_matrix_with_real_entries

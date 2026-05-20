@@ -7,11 +7,10 @@ import numpy as np
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 
-from ..._histogram import Histogram
-from ..._plot import PlotAxes, PlotLegend, Plot
 from ....compounds import Compound
-from ....utils import rmtpy_converter
-
+from ....conversion import rmtpy_converter
+from ...histogram import Histogram
+from ...plot import Plot, PlotAxes, PlotLegend
 
 @dataclass(repr=False, eq=False, kw_only=True)
 class UnfoldedResonanceHistogramLegend(PlotLegend):

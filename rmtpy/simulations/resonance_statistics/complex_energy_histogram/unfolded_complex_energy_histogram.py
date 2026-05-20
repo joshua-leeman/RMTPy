@@ -8,11 +8,10 @@ from matplotlib.colors import LogNorm
 from matplotlib.patches import Patch
 from matplotlib.ticker import NullFormatter
 
-from ..._histogram import Histogram2D
-from ..._plot import PlotAxes, PlotLegend, Plot
 from ....compounds import Compound
-from ....utils import rmtpy_converter
-
+from ....conversion import rmtpy_converter
+from ...histogram import Histogram2D
+from ...plot import Plot, PlotAxes, PlotLegend
 
 @dataclass(repr=False, eq=False, kw_only=True)
 class UnfoldedComplexEnergyHistogramLegend(PlotLegend):
@@ -123,11 +122,11 @@ class UnfoldedComplexEnergyHistogramPlot(Plot):
             zorder=self.histogram_zorder,
         )
 
-        x_values, ave_y_given_x = self.data.compute_average_x_curve()
+        x_values, average_y_given_x = self.data.compute_average_x_curve()
 
         self.ax.plot(
             x_values,
-            ave_y_given_x,
+            average_y_given_x,
             color=self.width_curve_color,
             alpha=self.width_curve_alpha,
             linewidth=self.width_curve_linewidth,

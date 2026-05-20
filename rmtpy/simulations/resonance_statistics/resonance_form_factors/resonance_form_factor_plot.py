@@ -8,11 +8,10 @@ from matplotlib.lines import Line2D
 from matplotlib.ticker import LogLocator, NullLocator
 from scipy.special import jn_zeros
 
-from .resonance_form_factor_data import FormFactorsData
-from ..._plot import PlotLegend, PlotAxes, Plot
 from ....compounds import Compound
-from ....utils import rmtpy_converter
-
+from ....conversion import rmtpy_converter
+from ...plot import Plot, PlotAxes, PlotLegend
+from .resonance_form_factor_data import FormFactorsData
 
 @dataclass(repr=False, eq=False, kw_only=True)
 class ResonanceFormFactorsLegend(PlotLegend):
@@ -95,7 +94,7 @@ class ResonanceFormFactorsPlot(Plot):
         except TypeError:
             raise ValueError("Metadata is not properly structured.")
         self.compound: Compound = rmtpy_converter.structure(compound_meta, Compound)
-        energy_0: float = self.compound.ensemble.ground_state_energy
+        energy_0: float = self.compound.ensemble.spectral_radius
         dimension: int = self.compound.ensemble.dimension
 
         self.legend: ResonanceFormFactorsLegend = ResonanceFormFactorsLegend(

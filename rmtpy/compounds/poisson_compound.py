@@ -1,32 +1,25 @@
-from __future__ import annotations
-
 from collections.abc import Iterator
 
+import attrs
 import numpy as np
-from attrs import frozen
 
 from .compound import Compound
 from ..ensembles import PoissonEnsemble, WignerDysonEnsemble
 
 
-@frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
+@attrs.frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
 class PoissonCompound(Compound):
     def __attrs_post_init__(self) -> None:
         if not isinstance(self.ensemble, PoissonEnsemble):
             raise TypeError("The ensemble must be an instance of PoissonEnsemble.")
 
     def generate_effective_hamiltonian(self) -> np.ndarray:
-        ensemble: PoissonEnsemble = self.ensemble
-        eigvecs_ensemble: WignerDysonEnsemble = ensemble.eigvecs_ensemble
-        real_dtype: type[np.floating] = ensemble.real_dtype.type
-        rng: np.random.Generator = ensemble.rng
-        dimension: int = ensemble.dimension
-        std_dev: float = ensemble.std_dev
-        num_channels: int = self.num_channels
-        strengths: np.ndarray = self.channel_coupling_strengths
-
-        lapack_heev: type = eigvecs_ensemble._pick_lapack_heev(use_complex_dtype=True)
-        blas_gemm: type = eigvecs_ensemble._pick_blas_gemm(use_complex_dtype=True)
+        lapack_heev: type = self.ensemble.eigvecs_ensemble._pick_lapack_heev(
+            use_complex_dtype=True
+        )
+        blas_gemm: type = self.ensemble.eigvecs_ensemble._pick_blas_gemm(
+            use_complex_dtype=True
+        )
 
         eigvecs: np.ndarray = lapack_heev(
             eigvecs_ensemble.generate_matrix(use_complex_dtype=True),

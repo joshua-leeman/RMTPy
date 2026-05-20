@@ -6,12 +6,11 @@ from pathlib import Path
 import numpy as np
 from matplotlib.patches import Patch
 
-from ..._histogram import Histogram
-from ..._plot import PlotAxes, PlotLegend, Plot
 from ....compounds import Compound
+from ....conversion import rmtpy_converter
 from ....ensembles import ManyBodyEnsemble
-from ....utils import rmtpy_converter
-
+from ...histogram import Histogram
+from ...plot import Plot, PlotAxes, PlotLegend
 
 @dataclass(repr=False, eq=False, kw_only=True)
 class UnfoldedWidthHistogramLegend(PlotLegend):
@@ -79,9 +78,7 @@ class UnfoldedWidthHistogramPlot(Plot):
         self.legend: UnfoldedWidthHistogramLegend = UnfoldedWidthHistogramLegend(
             handles=self.legend_handles, labels=self.legend_labels
         )
-        ten_exponent: float = np.log10(
-            mean_coupling_squared / ensemble.ground_state_energy
-        )
+        ten_exponent: float = np.log10(mean_coupling_squared / ensemble.spectral_radius)
         ten_exponent = 0.00 if np.isclose(ten_exponent, 0) else ten_exponent
         if self.legend.title is None:
             self.legend.title = (

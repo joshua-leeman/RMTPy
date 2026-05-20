@@ -6,30 +6,30 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-from attrs import asdict, frozen, field, fields_dict
-from attrs.validators import instance_of, gt
+from attrs import asdict, field, fields_dict, frozen
+from attrs.validators import gt
 from scipy.special import jn_zeros
 
 from .complex_energy_histogram import (
     ComplexEnergyHistogramPlot,
     UnfoldedComplexEnergyHistogramPlot,
 )
-from .resonance_histogram import ResonanceHistogramPlot, UnfoldedResonanceHistogramPlot
-from .resonance_spacing_histogram import (
-    ResonanceSpacingHistogramPlot,
-    UnfoldedResonanceSpacingHistogramPlot,
-)
-from .width_histogram import WidthHistogramPlot, UnfoldedWidthHistogramPlot
+from ...compounds import Compound
+from ...conversion import rmtpy_converter
+from ...ensembles import ManyBodyEnsemble
+from ..histogram import Histogram, Histogram2D
 from .resonance_form_factors import (
     FormFactorsData,
     ResonanceFormFactorsPlot,
     UnfoldedResonanceFormFactorsPlot,
 )
-from .._histogram import Histogram, Histogram2D
-from .._simulation import Simulation
-from ...compounds import Compound
-from ...ensembles import ManyBodyEnsemble
-from ...utils import rmtpy_converter
+from .resonance_histogram import ResonanceHistogramPlot, UnfoldedResonanceHistogramPlot
+from .resonance_spacing_histogram import (
+    ResonanceSpacingHistogramPlot,
+    UnfoldedResonanceSpacingHistogramPlot,
+)
+from ..base import Simulation
+from .width_histogram import UnfoldedWidthHistogramPlot, WidthHistogramPlot
 
 
 def run_resonance_statistics(compound: Compound, realizs: int) -> None:
@@ -40,7 +40,7 @@ def run_resonance_statistics(compound: Compound, realizs: int) -> None:
     ResonanceStatisticsSimulation(compound=compound, realizs=realizs).run()
 
 
-@frozen(kw_only=True, repr=False, eq=False, weakref_slot=False, getstate_setstate=False)
+@frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
 class ResonanceStatisticsSimulation(Simulation):
     realizs: int = field(
         converter=int,
@@ -48,9 +48,7 @@ class ResonanceStatisticsSimulation(Simulation):
         metadata={"dir_name": "realizs", "latex_name": "R"},
     )
 
-    compound: Compound = field(
-        converter=Compound.create, validator=instance_of(Compound)
-    )
+    compound: Compound = field(converter=Compound.create)
 
     @compound.validator
     def _compound_validator(self, _, value: Compound) -> None:
@@ -68,7 +66,7 @@ class ResonanceStatisticsSimulation(Simulation):
         return Histogram(
             file_name="resonance_histogram",
             support=self.resonance_support,
-            scale=self.compound.ensemble.ground_state_energy,
+            scale=self.compound.ensemble.spectral_radius,
             num_bins=200,
         )
 
@@ -130,7 +128,7 @@ class ResonanceStatisticsSimulation(Simulation):
     @resonance_spacing_histogram.default
     def _default_resonance_spacing_histogram(self) -> Histogram:
         global_mean_spacing: float = (
-            2 * self.compound.ensemble.ground_state_energy
+            2 * self.compound.ensemble.spectral_radius
         ) / self.compound.ensemble.dimension
 
         spacing_histogram = Histogram(
@@ -207,7 +205,7 @@ class ResonanceStatisticsSimulation(Simulation):
             file_name="resonance_form_factors",
             dimension=self.compound.ensemble.dimension,
             log_D_time_support=self.form_factors_support,
-            scale=j_1_1 / self.compound.ensemble.ground_state_energy,
+            scale=j_1_1 / self.compound.ensemble.spectral_radius,
         )
 
     unfolded_form_factors_plot: UnfoldedResonanceFormFactorsPlot | None = field(
@@ -230,7 +228,7 @@ class ResonanceStatisticsSimulation(Simulation):
     @property
     def to_path(self) -> Path:
         self_asdict: dict[str, Any] = asdict(self)
-        path: Path = Path(self._path_name)
+        path: Path = Path(self.path_name)
         path /= self.compound.to_path
         for name, attr in fields_dict(type(self)).items():
             if attr.metadata.get("dir_name", None) is not None:
@@ -238,8 +236,8 @@ class ResonanceStatisticsSimulation(Simulation):
                 path /= f"{attr.metadata['dir_name']}_{val.replace('.', 'p')}"
         return path
 
-    def _populate_metadata(self) -> None:
-        super()._populate_metadata()
+    def populate_metadata(self) -> None:
+        super().populate_metadata()
         self.metadata["args"]["realizs"] = self.realizs
         self.metadata["args"]["compound"] = rmtpy_converter.unstructure(self.compound)
 
@@ -303,7 +301,7 @@ class ResonanceStatisticsSimulation(Simulation):
         compound: Compound = self.compound
         ensemble: ManyBodyEnsemble = self.compound.ensemble
         dimension: int = ensemble.dimension
-        energy_0: float = ensemble.ground_state_energy
+        energy_0: float = ensemble.spectral_radius
 
         resonance_histogram: Histogram = self.resonance_histogram
         width_histogram: Histogram = self.width_histogram

@@ -7,11 +7,10 @@ import numpy as np
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 
-from ..._histogram import Histogram
-from ..._plot import PlotAxes, PlotLegend, Plot
+from ....conversion import rmtpy_converter
 from ....ensembles import ManyBodyEnsemble, PoissonEnsemble, SachdevYeKitaevEnsemble
-from ....utils import rmtpy_converter
-
+from ...histogram import Histogram
+from ...plot import Plot, PlotAxes, PlotLegend
 
 @dataclass(repr=False, eq=False, kw_only=True)
 class SpectralHistogramLegend(PlotLegend):
@@ -118,7 +117,7 @@ class SpectralHistogramPlot(Plot):
         self.ensemble: ManyBodyEnsemble = rmtpy_converter.structure(
             ensemble_meta, ManyBodyEnsemble
         )
-        energy_0: float = self.ensemble.ground_state_energy
+        energy_0: float = self.ensemble.spectral_radius
 
         self.legend: SpectralHistogramLegend = SpectralHistogramLegend(
             handles=self.legend_handles, labels=self.legend_labels
@@ -174,7 +173,7 @@ class SpectralHistogramPlot(Plot):
         )
 
         energies: np.ndarray = np.linspace(self.xlim[0], self.xlim[1], self.num_points)
-        spectral_pdf: np.ndarray = self.ensemble.spectral_pdf(energies)
+        spectral_pdf: np.ndarray = self.ensemble.average_spectral_pdf(energies)
 
         self.ax.plot(
             energies,

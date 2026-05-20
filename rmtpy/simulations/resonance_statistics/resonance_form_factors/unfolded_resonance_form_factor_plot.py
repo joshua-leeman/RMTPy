@@ -8,12 +8,11 @@ from matplotlib import rcParams
 from matplotlib.lines import Line2D
 from matplotlib.ticker import LogLocator, NullLocator
 
-from .resonance_form_factor_data import FormFactorsData
-from ..._plot import PlotLegend, PlotAxes, Plot
 from ....compounds import Compound
+from ....conversion import rmtpy_converter
 from ....ensembles import ManyBodyEnsemble
-from ....utils import rmtpy_converter
-
+from ...plot import Plot, PlotAxes, PlotLegend
+from .resonance_form_factor_data import FormFactorsData
 
 @dataclass(repr=False, eq=False, kw_only=True)
 class UnfoldedResonanceFormFactorsLegend(PlotLegend):

@@ -1,20 +1,20 @@
 from __future__ import annotations
 
+import dataclasses
 import inspect
+import logging
 import re
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+import matplotlib
 import matplotlib.pyplot as plt
-from matplotlib import rcParams
 from matplotlib.axes import Axes
 from numpy.lib.npyio import NpzFile
 
-from ._data import DATA_REGISTRY, Data, _normalize_metadata, _normalize_source
-from ..utils import rmtpy_converter
-
+import rmtpy.conversion
+from .data import Data, normalize_metadata, normalize_source, REGISTRY as DATA_REGISTRY
 
 PLOT_REGISTRY: dict[str, type[Plot]] = {}
 
@@ -23,28 +23,51 @@ def plot_data(data_path: str | Path) -> None:
     data_path: Path = Path(data_path)
     out_dir: Path = data_path.parent
 
-    plot: Plot = rmtpy_converter.structure(data_path, Plot)
+    plot: Plot = rmtpy.conversion.CONVERTER.structure(data_path, Plot)
     plot.plot(path=out_dir)
 
 
-def _configure_matplotlib() -> None:
-    rcParams["axes.axisbelow"] = False
-    rcParams["font.family"] = "serif"
-    rcParams["font.serif"] = "Latin Modern Roman"
+def configure_matplotlib() -> None:
+    matplotlib.rcParams["axes.axisbelow"] = False
+    matplotlib.rcParams["font.family"] = "serif"
+    matplotlib.rcParams["font.serif"] = "Latin Modern Roman"
     try:
-        rcParams["text.usetex"] = True
-        rcParams["text.latex.preamble"] = "\n".join(
+        matplotlib.rcParams["text.usetex"] = True
+        matplotlib.rcParams["text.latex.preamble"] = "\n".join(
             [
                 r"\usepackage{amsmath}",
                 r"\newcommand{\ensavg}[1]{\langle\hspace{-0.7ex}\langle #1 \hspace{-0.3ex} \rangle\hspace{-0.7ex}\rangle}",
                 r"\newcommand{\diff}{\mathrm{d}}",
             ]
         )
-    except:
-        pass
+    except (KeyError, ValueError) as exc:
+        logging.getLogger(__name__).warning(
+            "Could not configure LaTeX rendering for Matplotlib: %s", exc
+        )
 
 
-@dataclass(repr=False, eq=False, kw_only=True)
+@rmtpy.conversion.CONVERTER.register_structure_hook
+def plot_structure_hook(src: str | Path | dict[str, Any] | NpzFile | Plot, _) -> Plot:
+    src_dict: dict[str, Any] = normalize_source(src)
+    metadata: dict[str, Any] = normalize_metadata(src_dict["metadata"])
+    src_dict["metadata"] = metadata
+
+    plot_key: str | None = metadata.get("name", None)
+    if plot_key in PLOT_REGISTRY:
+        plot_cls: type[Plot] = PLOT_REGISTRY[plot_key]
+    else:
+        raise ValueError(f"No registered Plot class found in {src}")
+
+    if plot_key in DATA_REGISTRY:
+        data_cls: type[Data] = DATA_REGISTRY[plot_key]
+    else:
+        raise ValueError(f"No registered Data class found for Plot in {src}")
+
+    data_inst: Data = rmtpy.conversion.CONVERTER.structure(src_dict, data_cls)
+    return plot_cls(data=data_inst)
+
+
+@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
 class PlotAxes(ABC):
     axes_width: float = 1.0
 
@@ -101,7 +124,7 @@ class PlotAxes(ABC):
             ax.tick_params(axis="y", labelsize=self.tick_fontsize)
 
 
-@dataclass(repr=False, eq=False, kw_only=True)
+@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
 class PlotLegend(ABC):
     handles: tuple | None = None
     labels: tuple[str, ...] | None = None
@@ -130,20 +153,20 @@ class PlotLegend(ABC):
             )
 
 
-@dataclass(repr=False, eq=False, kw_only=True)
+@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
 class Plot(ABC):
     data: Data
 
     xlim: tuple[float, float] | None = None
     ylim: tuple[float, float] | None = None
 
-    axes: PlotAxes = field(default_factory=PlotAxes)
-    legend: PlotLegend = field(default_factory=PlotLegend)
+    axes: PlotAxes = dataclasses.field(default_factory=PlotAxes)
+    legend: PlotLegend = dataclasses.field(default_factory=PlotLegend)
 
     dpi: int = 300
 
     def __post_init__(self) -> None:
-        _configure_matplotlib()
+        configure_matplotlib()
 
     def __init_subclass__(cls) -> None:
         if not inspect.isabstract(cls):
@@ -181,24 +204,3 @@ class Plot(ABC):
     @abstractmethod
     def plot(self, path: str | Path) -> None:
         pass
-
-
-@rmtpy_converter.register_structure_hook
-def plot_structure_hook(src: str | Path | dict[str, Any] | NpzFile | Plot, _) -> Plot:
-    src_dict: dict[str, Any] = _normalize_source(src)
-    metadata: dict[str, Any] = _normalize_metadata(src_dict["metadata"])
-    src_dict["metadata"] = metadata
-
-    plot_key: str | None = metadata.get("name", None)
-    if plot_key in PLOT_REGISTRY:
-        plot_cls: type[Plot] = PLOT_REGISTRY[plot_key]
-    else:
-        raise ValueError(f"No registered Plot class found in {src}")
-
-    if plot_key in DATA_REGISTRY:
-        data_cls: type[Data] = DATA_REGISTRY[plot_key]
-    else:
-        raise ValueError(f"No registered Data class found for Plot in {src}")
-
-    data_inst: Data = rmtpy_converter.structure(src_dict, data_cls)
-    return plot_cls(data=data_inst)

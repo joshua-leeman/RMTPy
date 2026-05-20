@@ -6,14 +6,14 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-from attrs import asdict, frozen, field, fields_dict
-from attrs.validators import instance_of, gt
+from attrs import asdict, field, fields_dict, frozen
+from attrs.validators import gt
 
-from .partial_width_histogram import PartialWidthHistogramPlot, TotalWidthHistogramPlot
-from .._histogram import Histogram
-from .._simulation import Simulation
 from ...compounds import Compound
-from ...utils import rmtpy_converter
+from ...conversion import rmtpy_converter
+from ..histogram import Histogram
+from .partial_width_histogram import PartialWidthHistogramPlot, TotalWidthHistogramPlot
+from ..base import Simulation
 
 
 def run_partial_widths_statistics(compound: Compound, realizs: int) -> None:
@@ -24,7 +24,7 @@ def run_partial_widths_statistics(compound: Compound, realizs: int) -> None:
     PartialWidthsStatisticsSimulation(compound=compound, realizs=realizs).run()
 
 
-@frozen(kw_only=True, repr=False, eq=False, weakref_slot=False, getstate_setstate=False)
+@frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
 class PartialWidthsStatisticsSimulation(Simulation):
     width_indices: tuple[tuple[int, ...]] = field(
         converter=tuple, default=((0, 0), (1, 0), (1, 1), (0,), (1,))
@@ -36,9 +36,7 @@ class PartialWidthsStatisticsSimulation(Simulation):
         metadata={"dir_name": "realizs", "latex_name": "R"},
     )
 
-    compound: Compound = field(
-        converter=Compound.create, validator=instance_of(Compound)
-    )
+    compound: Compound = field(converter=Compound.create)
 
     @compound.validator
     def _compound_validator(self, _, value: Compound) -> None:
@@ -77,7 +75,7 @@ class PartialWidthsStatisticsSimulation(Simulation):
                 raise ValueError("Invalid width index in width_indices.")
 
             histogram.metadata["index"] = width_index
-            histogram.metadata["ave_width"] = 0.0
+            histogram.metadata["average_width"] = 0.0
             histograms.append(histogram)
 
         return histograms
@@ -89,7 +87,7 @@ class PartialWidthsStatisticsSimulation(Simulation):
     @property
     def to_path(self) -> Path:
         self_asdict: dict[str, Any] = asdict(self)
-        path: Path = Path(self._path_name)
+        path: Path = Path(self.path_name)
         path /= self.compound.to_path
         for name, attr in fields_dict(type(self)).items():
             if attr.metadata.get("dir_name", None) is not None:
@@ -97,8 +95,8 @@ class PartialWidthsStatisticsSimulation(Simulation):
                 path /= f"{attr.metadata['dir_name']}_{val.replace('.', 'p')}"
         return path
 
-    def _populate_metadata(self) -> None:
-        super()._populate_metadata()
+    def populate_metadata(self) -> None:
+        super().populate_metadata()
         self.metadata["args"]["realizs"] = self.realizs
         self.metadata["args"]["compound"] = rmtpy_converter.unstructure(self.compound)
 
@@ -125,11 +123,11 @@ class PartialWidthsStatisticsSimulation(Simulation):
                     width_value: float = np.sum(partial_widths[width_index[0]])
 
                 histogram.add_histogram_contribution(width_value)
-                histogram.metadata["ave_width"] += width_value
+                histogram.metadata["average_width"] += width_value
 
         for histogram in self.width_histograms:
-            histogram.metadata["ave_width"] /= self.realizs
-            histogram.bins[:] /= histogram.metadata["ave_width"]
+            histogram.metadata["average_width"] /= self.realizs
+            histogram.bins[:] /= histogram.metadata["average_width"]
 
     def calculate_statistics(self) -> None:
         for histogram in self.width_histograms:

@@ -5,24 +5,29 @@ import re
 from pathlib import Path
 from typing import Any
 
+import attrs
 import numpy as np
-from attrs import asdict, frozen, field, fields_dict
-from attrs.validators import instance_of, gt
 from scipy.interpolate import PchipInterpolator
 from scipy.signal import find_peaks
 from scipy.special import jn_zeros
 
-from .spectral_histogram import SpectralHistogramPlot, UnfoldedSpectralHistogramPlot
-from .spacings_histogram import SpacingsHistogramPlot, UnfoldedSpacingsHistogramPlot
+import rmtpy.ensembles
+from ..histogram import Histogram
+from ..observable import Observable
+from ..base import Simulation
+from .spacings_histogram import (
+    SpacingsHistogramPlot,
+    UnfoldedSpacingsHistogramPlot,
+)
 from .spectral_form_factors import (
     FormFactorsData,
     FormFactorsPlot,
     UnfoldedFormFactorsPlot,
 )
-from .._histogram import Histogram
-from .._simulation import Simulation
-from ...ensembles import ManyBodyEnsemble
-from ...utils import rmtpy_converter
+from .spectral_histogram import (
+    SpectralHistogramPlot,
+    UnfoldedSpectralHistogramPlot,
+)
 
 
 def thouless_time(times: np.ndarray, form_factor: np.ndarray) -> float:
@@ -39,221 +44,218 @@ def thouless_time(times: np.ndarray, form_factor: np.ndarray) -> float:
     return float(times[thouless_idx])
 
 
-def run_spectral_statistics(ensemble: ManyBodyEnsemble, realizs: int) -> None:
-    if not isinstance(ensemble, ManyBodyEnsemble):
+def run_spectral_statistics(
+    ensemble: rmtpy.ensembles.ManyBodyEnsemble, realizs: int
+) -> None:
+    if not isinstance(ensemble, rmtpy.ensembles.ManyBodyEnsemble):
         raise TypeError("Ensemble must be an instance of ManyBodyEnsemble.")
-    elif not isinstance(realizs, int) or realizs <= 0:
-        raise ValueError("Number of realizations must be a positive integer.")
+
     SpectralStatisticsSimulation(ensemble=ensemble, realizs=realizs).run()
 
 
-@frozen(kw_only=True, repr=False, eq=False, weakref_slot=False, getstate_setstate=False)
+@attrs.frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
 class SpectralStatisticsSimulation(Simulation):
-    ensemble: ManyBodyEnsemble = field(
-        converter=ManyBodyEnsemble.create, validator=instance_of(ManyBodyEnsemble)
+    ensemble: rmtpy.ensembles.ManyBodyEnsemble = attrs.field(
+        converter=rmtpy.ensembles.ManyBodyEnsemble.create
     )
 
     @ensemble.validator
-    def _ensemble_validator(self, _, value: ManyBodyEnsemble) -> None:
+    def _ensemble_validator(self, _, value: rmtpy.ensembles.ManyBodyEnsemble) -> None:
         if inspect.isabstract(value):
-            raise ValueError(f"ManyBodyEnsemble must be concrete.")
+            raise ValueError("ManyBodyEnsemble must be concrete.")
 
-    realizs: int = field(
+    realizs: int = attrs.field(
         converter=int,
-        validator=gt(0),
+        validator=attrs.validators.gt(0),
         metadata={"dir_name": "realizs", "latex_name": "R"},
     )
 
-    spectral_plot: SpectralHistogramPlot | None = field(init=False, default=None)
-    spectral_support: tuple[float, float] = field(
-        default=(-1.2, 1.2)
-    )  # units of ground state energy
-    spectral_histogram: Histogram = field()
+    spectral: Observable = attrs.field()
 
-    @spectral_histogram.default
-    def _default_spectral_histogram(self) -> Histogram:
-        return Histogram(
-            file_name="spectral_histogram",
-            support=self.spectral_support,
-            scale=self.ensemble.ground_state_energy,
+    @spectral.default
+    def _default_spectral(self) -> Observable:
+        return Observable(
+            data=Histogram(
+                file_name="spectral_histogram",
+                scale=self.ensemble.spectral_radius,
+            ),
+            plot_cls=SpectralHistogramPlot,
+            finalize=lambda data: data.compute_histogram_density(),
         )
 
-    unfolded_spectral_plot: UnfoldedSpectralHistogramPlot | None = field(
-        init=False, default=None
-    )
-    unfolded_spectral_support: tuple[float, float] = field(
-        default=(-0.6, 0.6)
-    )  # units of dimension
-    unfolded_spectral_histogram: Histogram = field()
+    spectral_avg_unfolded: Observable = attrs.field()
 
-    @unfolded_spectral_histogram.default
-    def _default_unfolded_spectral_histogram(self) -> Histogram:
-        return Histogram(
-            file_name="unfolded_spectral_histogram",
-            support=self.unfolded_spectral_support,
-            scale=self.ensemble.dimension,
+    @spectral_avg_unfolded.default
+    def _default_spectral_avg_unfolded(self) -> Observable:
+        return Observable(
+            data=Histogram(
+                file_name="spectral_histogram_avg_unfolded",
+                scale=self.ensemble.spectral_radius,
+            ),
+            plot_cls=UnfoldedSpectralHistogramPlot,
+            finalize=lambda data: data.compute_histogram_density(),
         )
 
-    spacings_plot: SpacingsHistogramPlot | None = field(init=False, default=None)
-    spacings_support: tuple[float, float] = field(
-        default=(0.0, 4.0)
-    )  # units of global mean spacing
-    spacings_histogram: Histogram = field()
+    spectral_var_unfolded: Observable = attrs.field()
 
-    @spacings_histogram.default
-    def _default_spacings_histogram(self) -> Histogram:
+    @spectral_var_unfolded.default
+    def _default_spectral_var_unfolded(self) -> Observable:
+        return Observable(
+            data=Histogram(
+                file_name="spectral_histogram_var_unfolded",
+                scale=self.ensemble.spectral_radius,
+            ),
+            plot_cls=UnfoldedSpectralHistogramPlot,
+            finalize=lambda data: data.compute_histogram_density(),
+        )
+
+    spacings: Observable = attrs.field()
+
+    @spacings.default
+    def _default_spacings(self) -> Observable:
         global_mean_spacing: float = (
-            2 * self.ensemble.ground_state_energy / self.ensemble.dimension
+            2 * self.ensemble.spectral_radius / self.ensemble.dimension
         )
 
         spacings_histogram = Histogram(
             file_name="spacings_histogram",
-            support=self.spacings_support,
+            support=(0.0, 4.0),
             scale=global_mean_spacing,
         )
         spacings_histogram.metadata["global_mean_spacing"] = global_mean_spacing
-        return spacings_histogram
 
-    unfolded_spacings_plot: UnfoldedSpacingsHistogramPlot | None = field(
-        init=False, default=None
-    )
-    unfolded_spacings_support: tuple[float, float] = field(default=(0.0, 4.0))
-    unfolded_spacings_histogram: Histogram = field()
-
-    @unfolded_spacings_histogram.default
-    def _default_unfolded_spacings_histogram(self) -> Histogram:
-        return Histogram(
-            file_name="unfolded_spacings_histogram",
-            support=self.unfolded_spacings_support,
+        return Observable(
+            data=spacings_histogram,
+            plot_cls=SpacingsHistogramPlot,
+            finalize=lambda data: data.compute_histogram_density(),
         )
 
-    form_factors_plot: FormFactorsPlot | None = field(init=False, default=None)
-    form_factors_support: tuple[float, float] = field(
-        default=(-0.5, 1.5)
-    )  # log time base dimension
-    form_factors_data: FormFactorsData = field()
+    spacings_avg_unfolded: Observable = attrs.field()
 
-    @form_factors_data.default
-    def _default_form_factors_data(self) -> FormFactorsData:
+    @spacings_avg_unfolded.default
+    def _default_spacings_avg_unfolded(self) -> Observable:
+        return Observable(
+            data=Histogram(
+                file_name="spacings_histogram_avg_unfolded",
+                support=(0.0, 4.0),
+            ),
+            plot_cls=UnfoldedSpacingsHistogramPlot,
+            finalize=lambda data: data.compute_histogram_density(),
+        )
+
+    spacings_var_unfolded: Observable = attrs.field()
+
+    @spacings_var_unfolded.default
+    def _default_spacings_var_unfolded(self) -> Observable:
+        return Observable(
+            data=Histogram(
+                file_name="spacings_histogram_var_unfolded",
+                support=(0.0, 4.0),
+            ),
+            plot_cls=UnfoldedSpacingsHistogramPlot,
+            finalize=lambda data: data.compute_histogram_density(),
+        )
+
+    form_factors: Observable = attrs.field()
+
+    @form_factors.default
+    def _default_form_factors(self) -> Observable:
         j_1_1: float = float(jn_zeros(1, 1)[0])
-        return FormFactorsData(
-            file_name="spectral_form_factors",
-            dimension=self.ensemble.dimension,
-            log_D_time_support=self.form_factors_support,
-            scale=j_1_1 / self.ensemble.ground_state_energy,
+        return Observable(
+            data=FormFactorsData(
+                file_name="spectral_form_factors",
+                dimension=self.ensemble.dimension,
+                log_D_time_support=(-0.5, 1.5),
+                scale=j_1_1 / self.ensemble.spectral_radius,
+            ),
+            plot_cls=FormFactorsPlot,
+            finalize=lambda data: data.compute_form_factors(),
         )
 
-    unfolded_form_factors_plot: UnfoldedFormFactorsPlot | None = field(
-        init=False, default=None
-    )
-    unfolded_form_factors_support: tuple[float, float] = field(
-        default=(-1.5, 0.5)
-    )  # log time base dimension
-    unfolded_form_factors_data: FormFactorsData = field()
+    form_factors_avg_unfolded: Observable = attrs.field()
 
-    @unfolded_form_factors_data.default
-    def _default_unfolded_form_factors_data(self) -> FormFactorsData:
-        return FormFactorsData(
-            file_name="unfolded_spectral_form_factors",
-            dimension=self.ensemble.dimension,
-            log_D_time_support=self.unfolded_form_factors_support,
-            scale=2 * np.pi,
+    @form_factors_avg_unfolded.default
+    def _default_form_factors_avg_unfolded(self) -> Observable:
+        return Observable(
+            data=FormFactorsData(
+                file_name="spectral_form_factors_avg_unfolded",
+                dimension=self.ensemble.dimension,
+                log_D_time_support=(-1.5, 0.5),
+                scale=2 * np.pi,
+            ),
+            plot_cls=UnfoldedFormFactorsPlot,
+            finalize=lambda data: data.compute_form_factors(),
+        )
+
+    form_factors_var_unfolded: Observable = attrs.field()
+
+    @form_factors_var_unfolded.default
+    def _default_form_factors_var_unfolded(self) -> Observable:
+        return Observable(
+            data=FormFactorsData(
+                file_name="spectral_form_factors_var_unfolded",
+                dimension=self.ensemble.dimension,
+                log_D_time_support=(-1.5, 0.5),
+                scale=2 * np.pi,
+            ),
+            plot_cls=UnfoldedFormFactorsPlot,
+            finalize=lambda data: data.compute_form_factors(),
         )
 
     @property
     def to_path(self) -> Path:
-        self_asdict: dict[str, Any] = asdict(self)
-        path: Path = Path(self._path_name)
+        self_asdict: dict[str, Any] = attrs.asdict(self)
+        path: Path = Path(self.path_name)
         path /= self.ensemble.to_path
-        for name, attr in fields_dict(type(self)).items():
+        for name, attr in attrs.fields_dict(type(self)).items():
             if attr.metadata.get("dir_name", None) is not None:
                 val: str = re.sub(r"[^\w\-.]", "_", str(self_asdict[name]))
                 path /= f"{attr.metadata['dir_name']}_{val.replace('.', 'p')}"
         return path
 
-    def _populate_metadata(self) -> None:
-        super()._populate_metadata()
+    def populate_metadata(self) -> None:
+        super().populate_metadata()
         self.metadata["args"]["ensemble"] = rmtpy_converter.unstructure(self.ensemble)
         self.metadata["args"]["realizs"] = self.realizs
 
-    def initialize_plots(self) -> None:
-        object.__setattr__(
-            self,
-            "spectral_plot",
-            SpectralHistogramPlot(data=self.spectral_histogram),
-        )
-        object.__setattr__(
-            self,
-            "unfolded_spectral_plot",
-            UnfoldedSpectralHistogramPlot(data=self.unfolded_spectral_histogram),
-        )
-        object.__setattr__(
-            self,
-            "spacings_plot",
-            SpacingsHistogramPlot(data=self.spacings_histogram),
-        )
-        object.__setattr__(
-            self,
-            "unfolded_spacings_plot",
-            UnfoldedSpacingsHistogramPlot(data=self.unfolded_spacings_histogram),
-        )
-        object.__setattr__(
-            self,
-            "form_factors_plot",
-            FormFactorsPlot(data=self.form_factors_data),
-        )
-        object.__setattr__(
-            self,
-            "unfolded_form_factors_plot",
-            UnfoldedFormFactorsPlot(data=self.unfolded_form_factors_data),
-        )
-
-    def realize_monte_carlo(self) -> None:
+    def compute_nearest_neighbor_spacings(self, eigvals: np.ndarray) -> np.ndarray:
         degeneracy: int = self.ensemble.eigval_degeneracy
-        spectral_histogram: Histogram = self.spectral_histogram
-        spacings_histogram: Histogram = self.spacings_histogram
-        form_factors_data: FormFactorsData = self.form_factors_data
-        unfolded_spectral_histogram: Histogram = self.unfolded_spectral_histogram
-        unfolded_spacings_histogram: Histogram = self.unfolded_spacings_histogram
-        unfolded_form_factors_data: FormFactorsData = self.unfolded_form_factors_data
+        nn_spacings: np.ndarray = np.diff(np.sort(eigvals))
+        if degeneracy > 1:
+            nn_spacings = np.repeat(nn_spacings[1::degeneracy], degeneracy)
+        return nn_spacings
+
+    def realize_monte_carlo_simulation(self) -> None:
+        degeneracy: int = self.ensemble.eigval_degeneracy
+
+        spectral_histogram: Histogram = self.spectral.data
+        spectral_histogram_avg_unfolded: Histogram = self.spectral_avg_unfolded.data
+        spectral_histogram_var_unfolded: Histogram = self.spectral_var_unfolded.data
+
+        spacings_histogram: Histogram = self.spacings.data
+        spacings_histogram_avg_unfolded: Histogram = self.spacings_avg_unfolded.data
+        spacings_histogram_var_unfolded: Histogram = self.spacings_var_unfolded.data
+
+        form_factors: FormFactorsData = self.form_factors.data
+        form_factors_avg_unfolded: FormFactorsData = self.form_factors_avg_unfolded.data
+        form_factors_var_unfolded: FormFactorsData = self.form_factors_var_unfolded.data
 
         for eigvals in self.ensemble.eigvals_stream(self.realizs):
             spectral_histogram.add_histogram_contribution(eigvals)
-            neighbor_spacings = np.diff(np.sort(eigvals))
-            if degeneracy > 1:
-                neighbor_spacings = np.repeat(
-                    neighbor_spacings[1::degeneracy], degeneracy
-                )
-            spacings_histogram.add_histogram_contribution(neighbor_spacings)
-            form_factors_data.compute_moment_contributions(eigvals)
+            nn_spacings: np.ndarray = self.compute_nearest_neighbor_spacings(eigvals)
+            spacings_histogram.add_histogram_contribution(nn_spacings)
+            form_factors.compute_moment_contributions(eigvals)
 
-            unfolded_eigvals = self.ensemble.unfold(eigvals)
+            avg_unf_eigvals = self.ensemble.unfold_with_average_pdf(eigvals)
 
-            unfolded_spectral_histogram.add_histogram_contribution(unfolded_eigvals)
-            neighbor_spacings = np.diff(np.sort(unfolded_eigvals))
-            if degeneracy > 1:
-                neighbor_spacings = np.repeat(
-                    neighbor_spacings[1::degeneracy], degeneracy
-                )
-            unfolded_spacings_histogram.add_histogram_contribution(neighbor_spacings)
-            unfolded_form_factors_data.compute_moment_contributions(unfolded_eigvals)
+            spectral_histogram_avg_unfolded.add_histogram_contribution(avg_unf_eigvals)
+            nn_spacings = self.compute_nearest_neighbor_spacings(avg_unf_eigvals)
+            spacings_histogram_avg_unfolded.add_histogram_contribution(nn_spacings)
+            form_factors_avg_unfolded.compute_moment_contributions(avg_unf_eigvals)
 
-    def calculate_statistics(self) -> None:
-        self.spectral_histogram.compute_histogram_density()
-        self.spacings_histogram.compute_histogram_density()
-        self.form_factors_data.compute_form_factors()
+            var_unf_eigvals, _, _ = self.ensemble.unfold_with_variate_pdf(eigvals)
 
-        self.unfolded_spectral_histogram.compute_histogram_density()
-        self.unfolded_spacings_histogram.compute_histogram_density()
-        self.unfolded_form_factors_data.compute_form_factors()
-
-    def run(self, out_dir: str | Path = "output") -> None:
-        self.realize_monte_carlo()
-        self.calculate_statistics()
-
-        out_dir: Path = Path(out_dir)
-        base_dir: Path = out_dir / self.to_path
-        base_dir.mkdir(parents=True, exist_ok=True)
-
-        self.save_data(out_dir=base_dir)
-        self.save_plots(out_dir=base_dir)
+            spectral_histogram_var_unfolded.add_histogram_contribution(var_unf_eigvals)
+            nn_spacings = self.compute_nearest_neighbor_spacings(var_unf_eigvals)
+            spacings_histogram_var_unfolded.add_histogram_contribution(nn_spacings)
+            form_factors_var_unfolded.compute_moment_contributions(var_unf_eigvals)

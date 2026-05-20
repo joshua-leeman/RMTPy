@@ -7,11 +7,11 @@ import numpy as np
 from matplotlib.patches import Patch
 from matplotlib.ticker import NullFormatter
 
-from ..._histogram import Histogram
-from ..._plot import PlotAxes, PlotLegend, Plot
 from ....compounds import Compound
-from ....utils import rmtpy_converter
-
+from ....conversion import rmtpy_converter
+from ....density import compute_histogram_bin_centers
+from ...histogram import Histogram
+from ...plot import Plot, PlotAxes, PlotLegend
 
 @dataclass(repr=False, eq=False, kw_only=True)
 class TotalWidthHistogramLegend(PlotLegend):
@@ -96,7 +96,7 @@ class TotalWidthHistogramPlot(Plot):
         self.ax.xaxis.set_minor_formatter(NullFormatter())
         self.ax.yaxis.set_minor_formatter(NullFormatter())
 
-        centers = np.sqrt(self.data.bins[:-1] * self.data.bins[1:])
+        centers = compute_histogram_bin_centers(self.data.bins, bins_log_spaced=True)
 
         self.ax.hist(
             self.data.bins[:-1],
@@ -112,7 +112,7 @@ class TotalWidthHistogramPlot(Plot):
 
         self.ax.plot(
             centers,
-            ensemble.porter_thomas_distribution(centers, num_channels),
+            ensemble.porter_thomas_distribution(num_channels, centers),
             color="Black",
         )
 

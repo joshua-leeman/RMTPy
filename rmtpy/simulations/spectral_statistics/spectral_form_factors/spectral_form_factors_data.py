@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 import numpy as np
-from attrs import frozen, field
+from attrs import field, frozen
 from attrs.validators import gt
 
-from ..._data import Data
-
+from ...data import Data
 
 @frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
 class FormFactorsData(Data):
@@ -62,9 +61,9 @@ class FormFactorsData(Data):
         first_moment_contribution = np.sum(
             np.exp(-1j * np.outer(levels, self.times)), axis=0
         ) / len(levels)
-        self.first_moment[:] += first_moment_contribution
-
         second_moment_contribution = np.abs(first_moment_contribution) ** 2
+
+        self.first_moment[:] += first_moment_contribution
         self.second_moment[:] += second_moment_contribution
 
         self._realizs_count[0] += 1
