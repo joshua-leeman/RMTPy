@@ -133,18 +133,22 @@ def is_polynomial_expansion_completely_provided(
 
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
 class DensityModel:
-    sample_stream: Callable[[int], Iterator[np.ndarray]] = attrs.field(
-        validator=attrs.validators.is_callable,
-        repr=False,
-    )
     dimension: int = attrs.field(
         converter=int,
         validator=attrs.validators.gt(0),
     )
-
+    support: tuple[float, float] = attrs.field(
+        converter=tuple,
+        validator=lambda _, __, support: rmtpy.validators.validate_support(support),
+    )
     polynomials: Callable[[np.ndarray, int], np.ndarray] | None = attrs.field(
         default=None,
         validator=attrs.validators.optional(attrs.validators.is_callable),
+    )
+    max_polynomial_degree: int = attrs.field(
+        default=MAX_POLYNOMIAL_DEGREE_DEFAULT,
+        converter=int,
+        validator=attrs.validators.ge(0),
     )
     weight_function: Callable[[np.ndarray], np.ndarray] | None = attrs.field(
         default=None,
@@ -153,16 +157,11 @@ class DensityModel:
             is_polynomial_expansion_completely_provided,
         ],
     )
-    max_polynomial_degree: int = attrs.field(
-        default=MAX_POLYNOMIAL_DEGREE_DEFAULT,
-        converter=int,
-        validator=attrs.validators.ge(0),
+    sample_stream: Callable[[int], Iterator[np.ndarray]] = attrs.field(
+        validator=attrs.validators.is_callable,
+        repr=False,
     )
 
-    support: tuple[float, float] = attrs.field(
-        converter=tuple,
-        validator=lambda _, __, support: rmtpy.validators.validate_support(support),
-    )
     support_scale_factor: float = attrs.field(
         default=SUPPORT_SCALE_FACTOR_DEFAULT,
         converter=float,
@@ -245,10 +244,6 @@ class DensityModel:
 
         return self.weight_function(np.asarray(inputs))
 
-    def compute_variate_coeffs(self, sample: np.ndarray) -> np.ndarray:
-        polynomials: np.ndarray = self.compute_polynomials(np.asarray(sample))
-        return np.mean(polynomials, axis=1)
-
     def average_pdf(self, points: np.ndarray) -> np.ndarray:
         if self.has_polynomial_expansion:
             return self._average_pdf_from_polynomials(points)
@@ -261,18 +256,9 @@ class DensityModel:
 
         return self._average_cdf_from_samples(points)
 
-    def variate_pdf(
-        self,
-        points: np.ndarray,
-        coeffs: np.ndarray | None = None,
-        sample: np.ndarray | None = None,
-    ) -> np.ndarray:
-        if self.has_polynomial_expansion:
-            return self._variate_pdf_from_polynomials(
-                points, coeffs=coeffs, sample=sample
-            )
-
-        return self._variate_pdf_from_sample(points, sample)
+    def compute_variate_coeffs(self, sample: np.ndarray) -> np.ndarray:
+        polynomials: np.ndarray = self.compute_polynomials(np.asarray(sample))
+        return np.mean(polynomials, axis=1)
 
     def create_variate_cdf_interpolator(
         self,
@@ -300,16 +286,51 @@ class DensityModel:
             pdf, inputs, left_tail_mass=left_tail_mass
         )
 
+    def variate_pdf(
+        self,
+        points: np.ndarray,
+        coeffs: np.ndarray | None = None,
+        sample: np.ndarray | None = None,
+    ) -> np.ndarray:
+        if self.has_polynomial_expansion:
+            return self._variate_pdf_from_polynomials(
+                points, coeffs=coeffs, sample=sample
+            )
+
+        return self._variate_pdf_from_sample(points, sample)
+
     def variate_cdf(
         self,
         points: np.ndarray,
         coeffs: np.ndarray | None = None,
         sample: np.ndarray | None = None,
     ) -> np.ndarray:
-        cdf: PchipInterpolator = self.create_variate_cdf_interpolator(
+        cdf_interpolator: PchipInterpolator = self.create_variate_cdf_interpolator(
             coeffs=coeffs, sample=sample
         )
-        return cdf(points)
+        return cdf_interpolator(points)
+
+    def _average_pdf_from_polynomials(self, points: np.ndarray) -> np.ndarray:
+        return self._variate_pdf_from_polynomials(points, coeffs=self.average_coeffs)
+
+    def _average_pdf_from_samples(self, points: np.ndarray) -> np.ndarray:
+        if self._average_pdf_interpolator is None:
+            _average_pdf: PchipInterpolator = (
+                self._create_average_pdf_interpolator_from_samples()
+            )
+            object.__setattr__(self, "_average_pdf_interpolator", _average_pdf)
+
+        return self._average_pdf_interpolator(points)
+
+    def _average_cdf_from_polynomials(self, points: np.ndarray) -> np.ndarray:
+        return self.create_variate_cdf_interpolator(coeffs=self.average_coeffs)(points)
+
+    def _average_cdf_from_samples(self, points: np.ndarray) -> np.ndarray:
+        if self._average_cdf_interpolator is None:
+            _average_cdf: PchipInterpolator = self._create_average_cdf_interpolator()
+            object.__setattr__(self, "_average_cdf_interpolator", _average_cdf)
+
+        return self._average_cdf_interpolator(points)
 
     def _compute_average_coeffs(self) -> np.ndarray:
         average_coeffs: np.ndarray = np.zeros(self.max_polynomial_degree + 1)
@@ -333,28 +354,6 @@ class DensityModel:
     def _create_average_cdf_interpolator(self) -> PchipInterpolator:
         inputs: np.ndarray = np.linspace(*self.domain_range, self.num_pts)
         return create_cdf_interpolator_from_pdf(self.average_pdf, inputs)
-
-    def _average_pdf_from_polynomials(self, points: np.ndarray) -> np.ndarray:
-        return self._variate_pdf_from_polynomials(points, coeffs=self.average_coeffs)
-
-    def _average_pdf_from_samples(self, points: np.ndarray) -> np.ndarray:
-        if self._average_pdf_interpolator is None:
-            _average_pdf: PchipInterpolator = (
-                self._create_average_pdf_interpolator_from_samples()
-            )
-            object.__setattr__(self, "_average_pdf_interpolator", _average_pdf)
-
-        return self._average_pdf_interpolator(points)
-
-    def _average_cdf_from_polynomials(self, points: np.ndarray) -> np.ndarray:
-        return self.create_variate_cdf_interpolator(coeffs=self.average_coeffs)(points)
-
-    def _average_cdf_from_samples(self, points: np.ndarray) -> np.ndarray:
-        if self._average_cdf_interpolator is None:
-            _average_cdf: PchipInterpolator = self._create_average_cdf_interpolator()
-            object.__setattr__(self, "_average_cdf_interpolator", _average_cdf)
-
-        return self._average_cdf_interpolator(points)
 
     def _create_variate_pdf_interpolator_from_sample(
         self, sample: np.ndarray
@@ -388,4 +387,7 @@ class DensityModel:
         if sample is None:
             raise ValueError("`sample` must be provided for sample-based PDFs.")
 
-        return self._create_variate_pdf_interpolator_from_sample(sample)(points)
+        pdf_interpolator: PchipInterpolator = (
+            self._create_variate_pdf_interpolator_from_sample(sample)
+        )
+        return pdf_interpolator(points)
