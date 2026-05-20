@@ -3,21 +3,15 @@ from __future__ import annotations
 import attrs
 import numpy as np
 
+import rmtpy.density
 import rmtpy.validators
 from .data import Data
 
 NUM_BINS_DEFAULT: int = 100
-SUPPORT_SCALE_FACTOR_DEFAULT: float = 1.2
-
-
-def compute_histogram_domain_range(hist: Histogram) -> tuple[float, float]:
-    center: float = (hist.support[1] + hist.support[0]) / 2
-    radius: float = hist.support_scale_factor * (hist.support[1] - hist.support[0]) / 2
-    return tuple([center - radius, center + radius])
 
 
 def create_histogram_bins(hist: Histogram) -> np.ndarray:
-    return np.linspace(-hist.domain_range[0], hist.domain_range[1], hist.num_bins + 1)
+    return rmtpy.density.array_of_floats(hist.support, hist.num_bins + 1, hist.log_base)
 
 
 def create_zeroed_histogram_counts(hist: Histogram) -> np.ndarray:
@@ -32,24 +26,12 @@ def create_empty_histogram(hist: Histogram) -> np.ndarray:
 class Histogram(Data):
     support: tuple[float, float] = attrs.field(
         converter=tuple,
-        validator=rmtpy.validators.validate_support,
-    )
-    support_scale_factor: float = attrs.field(
-        default=SUPPORT_SCALE_FACTOR_DEFAULT,
-        converter=float,
-        validator=attrs.validators.gt(0.0),
-        repr=False,
+        validator=lambda _, __, support: rmtpy.validators.validate_support(support),
     )
     log_base: float | None = attrs.field(
         default=None,
         converter=attrs.converters.optional(float),
         validator=attrs.validators.optional(attrs.validators.gt(0.0)),
-    )
-
-    domain_range: tuple[float, float] = attrs.field(
-        default=attrs.Factory(compute_histogram_domain_range, takes_self=True),
-        init=False,
-        repr=False,
     )
     num_bins: int = attrs.field(
         default=NUM_BINS_DEFAULT,
@@ -59,18 +41,17 @@ class Histogram(Data):
         ],
         repr=False,
     )
+
     bins: np.ndarray = attrs.field(
         default=attrs.Factory(create_histogram_bins, takes_self=True),
         init=False,
         repr=False,
     )
-
     counts: np.ndarray = attrs.field(
         default=attrs.Factory(create_zeroed_histogram_counts, takes_self=True),
         init=False,
         repr=False,
     )
-
     histogram: np.ndarray = attrs.field(
         default=attrs.Factory(create_empty_histogram, takes_self=True),
         init=False,
@@ -95,46 +76,46 @@ class Histogram(Data):
         self._realizs[0] += 1
 
     def normalize_histogram(self) -> None:
-        self.histogram[:] = compute_normalized_histogram(self.bins, self.counts)
+        self.histogram[:] = rmtpy.density.normalize_histogram(self.bins, self.counts)
 
     def compute_histogram_as_probabilities(self) -> None:
         self.histogram[:] = self.counts / np.sum(self.counts)
+
+
+def create_histogram2D_bins(hist: Histogram2D, axis: str) -> np.ndarray:
+    if axis.strip().lower() == "x":
+        return rmtpy.density.array_of_floats(
+            hist.x_support, hist.x_num_bins + 1, hist.x_log_base
+        )
+
+    elif axis.strip().lower() == "y":
+        return rmtpy.density.array_of_floats(
+            hist.y_support, hist.y_num_bins + 1, hist.y_log_base
+        )
+
+    else:
+        raise ValueError("`axis` must be either 'x' and 'y'.")
+
+
+def create_zeroed_histogram2D_counts(hist: Histogram2D) -> np.ndarray:
+    return np.zeros((hist.x_num_bins, hist.y_num_bins), dtype=np.int64)
+
+
+def create_empty_histogram2D(hist: Histogram2D) -> np.ndarray:
+    return np.empty((hist.x_num_bins, hist.y_num_bins), dtype=np.float64)
 
 
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
 class Histogram2D(Data):
     x_support: tuple[float, float] = attrs.field(
         converter=tuple,
-        validator=rmtpy.validators.validate_support,
-    )
-    x_support_scale_factor: float = attrs.field(
-        default=SUPPORT_SCALE_FACTOR_DEFAULT,
-        converter=float,
-        validator=attrs.validators.gt(0.0),
-        repr=False,
+        validator=lambda _, __, x_support: rmtpy.validators.validate_support(x_support),
     )
     x_log_base: float | None = attrs.field(
         default=None,
         converter=attrs.converters.optional(float),
         validator=attrs.validators.optional(attrs.validators.gt(0.0)),
     )
-
-    y_support: tuple[float, float] = attrs.field(
-        converter=tuple,
-        validator=rmtpy.validators.validate_support,
-    )
-    y_support_scale_factor: float = attrs.field(
-        default=SUPPORT_SCALE_FACTOR_DEFAULT,
-        converter=float,
-        validator=attrs.validators.gt(0.0),
-        repr=False,
-    )
-    y_log_base: float | None = attrs.field(
-        default=None,
-        converter=attrs.converters.optional(float),
-        validator=attrs.validators.optional(attrs.validators.gt(0.0)),
-    )
-
     x_num_bins: int = attrs.field(
         default=NUM_BINS_DEFAULT,
         validator=[
@@ -142,6 +123,16 @@ class Histogram2D(Data):
             attrs.validators.gt(0),
         ],
         repr=False,
+    )
+
+    y_support: tuple[float, float] = attrs.field(
+        converter=tuple,
+        validator=lambda _, __, y_support: rmtpy.validators.validate_support(y_support),
+    )
+    y_log_base: float | None = attrs.field(
+        default=None,
+        converter=attrs.converters.optional(float),
+        validator=attrs.validators.optional(attrs.validators.gt(0.0)),
     )
     y_num_bins: int = attrs.field(
         default=NUM_BINS_DEFAULT,
@@ -152,29 +143,33 @@ class Histogram2D(Data):
         repr=False,
     )
 
-    x_bins: np.ndarray = attrs.field(init=False, repr=False)
+    x_bins: np.ndarray = attrs.field(
+        default=attrs.Factory(
+            lambda self: create_histogram2D_bins(self, axis="x"),
+            takes_self=True,
+        ),
+        init=False,
+        repr=False,
+    )
+    y_bins: np.ndarray = attrs.field(
+        default=attrs.Factory(
+            lambda self: create_histogram2D_bins(self, axis="y"),
+            takes_self=True,
+        ),
+        init=False,
+        repr=False,
+    )
+    counts: np.ndarray = attrs.field(
+        default=attrs.Factory(create_zeroed_histogram2D_counts),
+        init=False,
+        repr=False,
+    )
 
-    @x_bins.default
-    def _default_x_bins(self) -> np.ndarray:
-        return
-
-    y_bins: np.ndarray = attrs.field(init=False, repr=False)
-
-    @y_bins.default
-    def _default_y_bins(self) -> np.ndarray:
-        return
-
-    counts: np.ndarray = attrs.field(init=False, repr=False)
-
-    @counts.default
-    def _default_counts(self) -> np.ndarray:
-        return np.zeros((self.x_num_bins, self.y_num_bins), dtype=np.int32)
-
-    histogram: np.ndarray = attrs.field(init=False, repr=False)
-
-    @histogram.default
-    def _default_histogram(self) -> np.ndarray:
-        return np.empty((self.x_num_bins, self.y_num_bins))
+    histogram: np.ndarray = attrs.field(
+        default=attrs.Factory(create_empty_histogram2D),
+        init=False,
+        repr=False,
+    )
 
     _realizs: int = attrs.field(
         init=False,
@@ -222,14 +217,14 @@ class Histogram2D(Data):
             where=prob_x[:, None] > 0,
         )
 
-        y_vals: np.ndarray = compute_histogram_bin_centers(
+        y_vals: np.ndarray = rmtpy.density.compute_bin_centers(
             self.y_bins,
             bins_log_spaced=self.y_log_base is not None,
         )
 
         average_y_given_x: np.ndarray = np.sum(prob_y_given_x * y_vals[None, :], axis=1)
 
-        x_vals: np.ndarray = compute_histogram_bin_centers(
+        x_vals: np.ndarray = rmtpy.density.compute_bin_centers(
             self.x_bins,
             bins_log_spaced=self.x_log_base is not None,
         )
