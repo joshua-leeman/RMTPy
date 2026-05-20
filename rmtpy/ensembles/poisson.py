@@ -26,6 +26,14 @@ def compute_standard_deviation(poisson: PoissonEnsemble) -> float:
     return 2 * poisson.spectral_radius
 
 
+def create_spectral_weight(
+    poisson: PoissonEnsemble,
+) -> Callable[[np.ndarray], np.ndarray]:
+    return lambda energies: rmtpy.polynomials.constant_weight_pdf(
+        energies, poisson.spectral_radius
+    )
+
+
 @numba.njit(cache=True, fastmath=True)
 def mirror_upper_to_lower_triangle_complex(matrix: np.ndarray) -> np.ndarray:
     size: int = matrix.shape[0]

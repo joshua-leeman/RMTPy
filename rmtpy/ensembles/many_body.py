@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import abstractmethod
-from collections.abc import Callable, Iterator
+from collections.abc import Iterator
 from typing import ClassVar
 
 import attrs
@@ -43,17 +43,6 @@ def compute_spectral_radius(mbe: ManyBodyEnsemble) -> float:
     return mbe.num_majoranas * mbe.interaction_strength
 
 
-def create_spectral_model(mbe: ManyBodyEnsemble) -> rmtpy.density.DensityModel:
-    return rmtpy.density.DensityModel(
-        dimension=mbe.dimension,
-        support=tuple([-mbe.spectral_radius, mbe.spectral_radius]),
-        polynomials=mbe.spectral_polynomials,
-        max_polynomial_degree=mbe.max_spectral_polynomial_degree,
-        weight_function=mbe.spectral_weight,
-        sample_stream=mbe.eigvals_stream,
-    )
-
-
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
 class ManyBodyEnsemble(RandomMatrixEnsemble):
     initialism: ClassVar[str] = INITIALISM
@@ -63,7 +52,7 @@ class ManyBodyEnsemble(RandomMatrixEnsemble):
             attrs.validators.instance_of(int),
             attrs.validators.ge(NUM_MAJORANAS_MINIMUM),
             attrs.validators.le(NUM_MAJORANAS_MAXIMUM),
-            rmtpy.validators.validate_even_number,
+            lambda _, __, number: rmtpy.validators.validate_even_number(number),
         ],
         metadata=NUM_MAJORANAS_METADATA,
     )
@@ -76,7 +65,7 @@ class ManyBodyEnsemble(RandomMatrixEnsemble):
     max_spectral_polynomial_degree: int = attrs.field(
         default=rmtpy.density.MAX_POLYNOMIAL_DEGREE_DEFAULT,
         converter=int,
-        validator=attrs.validators.gt(0),
+        validator=attrs.validators.ge(0),
     )
 
     dimension: int = attrs.field(
@@ -94,21 +83,32 @@ class ManyBodyEnsemble(RandomMatrixEnsemble):
         repr=False,
     )
 
-    spectral_polynomials: Callable[[np.ndarray, int], np.ndarray] = attrs.field(
+    spectral_polynomials: None = attrs.field(
         default=None,
         init=False,
         repr=False,
     )
-    spectral_weight: Callable[[np.ndarray], np.ndarray] = attrs.field(
+    spectral_weight: None = attrs.field(
         default=None,
         init=False,
         repr=False,
     )
     spectral_density: rmtpy.density.DensityModel = attrs.field(
-        default=attrs.Factory(create_spectral_model, takes_self=True),
+        default=None,
         init=False,
         repr=False,
     )
+
+    def __attrs_post_init__(self) -> None:
+        spectral_density: rmtpy.density.DensityModel = rmtpy.density.DensityModel(
+            dimension=self.dimension,
+            support=tuple([-self.spectral_radius, self.spectral_radius]),
+            polynomials=self.spectral_polynomials,
+            max_polynomial_degree=self.max_spectral_polynomial_degree,
+            weight_function=self.spectral_weight,
+            sample_stream=self.eigvals_stream,
+        )
+        object.__setattr__(self, "spectral_density", spectral_density)
 
     @property
     def eigval_degeneracy(self) -> int:

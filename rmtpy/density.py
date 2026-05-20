@@ -143,7 +143,7 @@ class DensityModel:
     )
     polynomials: Callable[[np.ndarray, int], np.ndarray] | None = attrs.field(
         default=None,
-        validator=attrs.validators.optional(attrs.validators.is_callable),
+        validator=attrs.validators.optional(attrs.validators.is_callable()),
     )
     max_polynomial_degree: int = attrs.field(
         default=MAX_POLYNOMIAL_DEGREE_DEFAULT,
@@ -153,12 +153,12 @@ class DensityModel:
     weight_function: Callable[[np.ndarray], np.ndarray] | None = attrs.field(
         default=None,
         validator=[
-            attrs.validators.optional(attrs.validators.is_callable),
+            attrs.validators.optional(attrs.validators.is_callable()),
             is_polynomial_expansion_completely_provided,
         ],
     )
     sample_stream: Callable[[int], Iterator[np.ndarray]] = attrs.field(
-        validator=attrs.validators.is_callable,
+        validator=attrs.validators.is_callable(),
         repr=False,
     )
 
@@ -167,7 +167,6 @@ class DensityModel:
         converter=float,
         repr=False,
     )
-
     kernel_std_dev: float = attrs.field(
         default=GAUSSIAN_KERNEL_STANDARD_DEVIATION_DEFAULT,
         converter=float,

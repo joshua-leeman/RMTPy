@@ -13,15 +13,11 @@ from .many_body import ManyBodyEnsemble
 
 INITIALISM: str = "WDE"
 
-SPECTRAL_POLYNOMIALS: Callable[[np.ndarray, int], np.ndarray] = (
-    rmtpy.polynomials.chebyshev_polynomials_2
-)
-
 WIGNER_DYSON_ENSEMBLE_NAMES_BY_INITIALISM = {}
 WIGNER_DYSON_ENSEMBLE_INITIALISMS_BY_NAME = {}
 
 
-def create_spectral_polynomial_weight(
+def create_spectral_weight(
     wde: WignerDysonEnsemble,
 ) -> Callable[[np.ndarray], np.ndarray]:
     return lambda energies: rmtpy.polynomials.semicircle_weight_pdf(
@@ -34,12 +30,12 @@ class WignerDysonEnsemble(ManyBodyEnsemble):
     initialism: ClassVar[str] = INITIALISM
 
     spectral_polynomials: Callable[[np.ndarray, int], np.ndarray] = attrs.field(
-        default=SPECTRAL_POLYNOMIALS,
+        default=rmtpy.polynomials.chebyshev_polynomials_2,
         init=False,
         repr=False,
     )
-    spectral_polynomial_weight: Callable[[np.ndarray], np.ndarray] = attrs.field(
-        default=attrs.Factory(create_spectral_polynomial_weight, takes_self=True),
+    spectral_weight: Callable[[np.ndarray], np.ndarray] = attrs.field(
+        default=attrs.Factory(create_spectral_weight, takes_self=True),
         init=False,
         repr=False,
     )

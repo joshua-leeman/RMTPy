@@ -9,6 +9,7 @@ import numba
 import numpy as np
 
 import rmtpy.fermions
+import rmtpy.polynomials
 from .many_body import ManyBodyEnsemble
 
 INITIALISM: str = "SYK"
@@ -49,13 +50,20 @@ def choose_matrix_block_slice(syk: SachdevYeKitaevEnsemble) -> tuple[slice, slic
     )
 
 
-def create_q_body_term_decomps(syk: SachdevYeKitaevEnsemble) -> int:
-    return rmtpy.fermions.create_q_body_majorana_terms(
-        q=syk.q,
-        parity_block=syk.parity_block,
-        num_majoranas=syk.num_majoranas,
-        in_real_basis=syk.dyson_index == 1,
+def create_spectral_weight(
+    syk: SachdevYeKitaevEnsemble,
+) -> Callable[[np.ndarray], np.ndarray]:
+    return lambda energies: rmtpy.polynomials.q_hermite_polynomial_weight_pdf(
+        energies, syk.spectral_radius, syk.suppression
     )
+
+
+def is_num_majoranas_within_limit(syk: SachdevYeKitaevEnsemble, _, q: int) -> None:
+    if syk.num_majoranas > NUM_MAJORANAS_LIMIT_BY_Q[q]:
+        raise ValueError(
+            f"For the SYK q={q} model, `num_majoranas` cannot exceed "
+            "{NUM_MAJORANAS_LIMIT_BY_Q[q]} due to memory constraints."
+        )
 
 
 @numba.njit(cache=True, fastmath=True)
@@ -104,7 +112,7 @@ class SachdevYeKitaevEnsemble(ManyBodyEnsemble):
         converter=int,
         validator=[
             attrs.validators.in_(NUM_MAJORANAS_LIMIT_BY_Q),
-            lambda self, _, q: self.num_majoranas <= NUM_MAJORANAS_LIMIT_BY_Q[q],
+            is_num_majoranas_within_limit,
         ],
     )
     is_even_parity: bool = attrs.field(
@@ -117,13 +125,13 @@ class SachdevYeKitaevEnsemble(ManyBodyEnsemble):
         init=False,
         repr=False,
     )
-    spectral_radius: float = attrs.field(
-        default=attrs.Factory(compute_spectral_radius, takes_self=True),
+    std_dev: float = attrs.field(
+        default=attrs.Factory(compute_standard_deviation, takes_self=True),
         init=False,
         repr=False,
     )
-    std_dev: float = attrs.field(
-        default=attrs.Factory(compute_standard_deviation, takes_self=True),
+    spectral_radius: float = attrs.field(
+        default=attrs.Factory(compute_spectral_radius, takes_self=True),
         init=False,
         repr=False,
     )
@@ -133,13 +141,24 @@ class SachdevYeKitaevEnsemble(ManyBodyEnsemble):
         repr=False,
     )
 
+    spectral_polynomials: Callable[[np.ndarray], np.ndarray] = attrs.field(
+        default=rmtpy.polynomials.q_hermite_polynomials,
+        init=False,
+        repr=False,
+    )
+    spectral_weight: Callable[[np.ndarray], np.ndarray] = attrs.field(
+        default=attrs.Factory(create_spectral_weight, takes_self=True),
+        init=False,
+        repr=False,
+    )
+
     parity_block: tuple[slice, slice] = attrs.field(
         default=attrs.Factory(choose_matrix_block_slice, takes_self=True),
         init=False,
         repr=False,
     )
-    q_body_term_decomps: tuple[tuple[np.ndarray, ...], ...] = attrs.field(
-        default=attrs.Factory(create_q_body_term_decomps, takes_self=True),
+    _q_body_term_decomps: tuple[tuple[np.ndarray, ...], ...] | None = attrs.field(
+        default=None,
         init=False,
         repr=False,
     )
@@ -151,6 +170,21 @@ class SachdevYeKitaevEnsemble(ManyBodyEnsemble):
     @property
     def latex_name_FIX_THIS(self) -> str:
         return super().as_latex + f"_{self.q}"
+
+    @property
+    def q_body_term_decomps(self) -> tuple[tuple[np.ndarray, ...], ...]:
+        if self._q_body_term_decomps is None:
+            q_body_majorana_terms: tuple[tuple[np.ndarray, ...], ...] = (
+                rmtpy.fermions.create_q_body_majorana_terms(
+                    q=self.q,
+                    parity_block=self.parity_block,
+                    num_majoranas=self.num_majoranas,
+                    in_real_basis=self.dyson_index == 1,
+                )
+            )
+            object.__setattr__(self, "_q_body_term_decomps", q_body_majorana_terms)
+
+        return self._q_body_term_decomps
 
     def generate_matrix(self, use_complex_dtype: bool = False) -> np.ndarray:
         matrix = self._initialize_matrix(use_complex_dtype)

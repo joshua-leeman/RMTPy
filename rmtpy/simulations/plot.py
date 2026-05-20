@@ -46,27 +46,6 @@ def configure_matplotlib() -> None:
         )
 
 
-@rmtpy.conversion.CONVERTER.register_structure_hook
-def plot_structure_hook(src: str | Path | dict[str, Any] | NpzFile | Plot, _) -> Plot:
-    src_dict: dict[str, Any] = normalize_source(src)
-    metadata: dict[str, Any] = normalize_metadata(src_dict["metadata"])
-    src_dict["metadata"] = metadata
-
-    plot_key: str | None = metadata.get("name", None)
-    if plot_key in PLOT_REGISTRY:
-        plot_cls: type[Plot] = PLOT_REGISTRY[plot_key]
-    else:
-        raise ValueError(f"No registered Plot class found in {src}")
-
-    if plot_key in DATA_REGISTRY:
-        data_cls: type[Data] = DATA_REGISTRY[plot_key]
-    else:
-        raise ValueError(f"No registered Data class found for Plot in {src}")
-
-    data_inst: Data = rmtpy.conversion.CONVERTER.structure(src_dict, data_cls)
-    return plot_cls(data=data_inst)
-
-
 @dataclasses.dataclass(repr=False, eq=False, kw_only=True)
 class PlotAxes(ABC):
     axes_width: float = 1.0
@@ -204,3 +183,24 @@ class Plot(ABC):
     @abstractmethod
     def plot(self, path: str | Path) -> None:
         pass
+
+
+@rmtpy.conversion.CONVERTER.register_structure_hook
+def plot_structure_hook(src: str | Path | dict[str, Any] | NpzFile | Plot, _) -> Plot:
+    src_dict: dict[str, Any] = normalize_source(src)
+    metadata: dict[str, Any] = normalize_metadata(src_dict["metadata"])
+    src_dict["metadata"] = metadata
+
+    plot_key: str | None = metadata.get("name", None)
+    if plot_key in PLOT_REGISTRY:
+        plot_cls: type[Plot] = PLOT_REGISTRY[plot_key]
+    else:
+        raise ValueError(f"No registered Plot class found in {src}")
+
+    if plot_key in DATA_REGISTRY:
+        data_cls: type[Data] = DATA_REGISTRY[plot_key]
+    else:
+        raise ValueError(f"No registered Data class found for Plot in {src}")
+
+    data_inst: Data = rmtpy.conversion.CONVERTER.structure(src_dict, data_cls)
+    return plot_cls(data=data_inst)

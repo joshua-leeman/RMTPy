@@ -26,46 +26,6 @@ UNSTRUCTURE_HOOKS: dict[str, UnstructureHook] = {
 }
 
 
-@rmtpy.conversion.CONVERTER.register_structure_hook
-def simulation_structure_hook(
-    src: str | Path | dict[str, Any] | Simulation, _
-) -> Simulation:
-    if type(src) in REGISTRY.values():
-        return src
-    elif isinstance(src, (str, Path)):
-        path: Path = Path(src)
-        with open(path / "metadata.json", "r") as file:
-            metadata: dict[str, Any] = json.load(file)
-    elif isinstance(src, dict):
-        metadata: dict[str, Any] = src
-    else:
-        raise TypeError(f"Expected str, Path, dict, got {type(src).__name__}")
-
-    sim_dict: dict[str, Any] = rmtpy.conversion.normalize_dict(metadata, REGISTRY)
-    sim_name: str = sim_dict.pop("name")
-    if not isinstance(sim_name, str):
-        raise ValueError(f"Invalid simulation name type: {type(sim_name).__name__}")
-
-    key: str = re.sub(r"_", "", sim_name).lower()
-    sim_cls: type[Simulation] = REGISTRY[key]
-    sim_args: dict[str, Any] = sim_dict.pop("args")
-    if not isinstance(sim_args, dict):
-        raise ValueError(f"Invalid simulation args type: {type(sim_args).__name__}")
-
-    sim_inst: Simulation = STRUCTURE_HOOKS[key](sim_args, sim_cls)
-    if isinstance(src, (str, Path)):
-        data_dirs: tuple[Path, ...] = tuple(
-            folder for folder in path.iterdir() if folder.is_dir()
-        )
-        for folder in data_dirs:
-            data_cls: type[Data] | None = DATA_REGISTRY.get(folder.name, None)
-            if data_cls is None:
-                continue
-            data: Data = data_cls.load(folder / f"{folder.name}.npz")
-            object.__setattr__(sim_inst, folder.name + "_data", data)
-    return sim_inst
-
-
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
 class Simulation(ABC):
     metadata: dict[str, Any] = attrs.field(
@@ -146,3 +106,43 @@ class Simulation(ABC):
 
         self.save_data(out_dir=base_dir)
         self.save_plots(out_dir=base_dir)
+
+
+@rmtpy.conversion.CONVERTER.register_structure_hook
+def simulation_structure_hook(
+    src: str | Path | dict[str, Any] | Simulation, _
+) -> Simulation:
+    if type(src) in REGISTRY.values():
+        return src
+    elif isinstance(src, (str, Path)):
+        path: Path = Path(src)
+        with open(path / "metadata.json", "r") as file:
+            metadata: dict[str, Any] = json.load(file)
+    elif isinstance(src, dict):
+        metadata: dict[str, Any] = src
+    else:
+        raise TypeError(f"Expected str, Path, dict, got {type(src).__name__}")
+
+    sim_dict: dict[str, Any] = rmtpy.conversion.normalize_dict(metadata, REGISTRY)
+    sim_name: str = sim_dict.pop("name")
+    if not isinstance(sim_name, str):
+        raise ValueError(f"Invalid simulation name type: {type(sim_name).__name__}")
+
+    key: str = re.sub(r"_", "", sim_name).lower()
+    sim_cls: type[Simulation] = REGISTRY[key]
+    sim_args: dict[str, Any] = sim_dict.pop("args")
+    if not isinstance(sim_args, dict):
+        raise ValueError(f"Invalid simulation args type: {type(sim_args).__name__}")
+
+    sim_inst: Simulation = STRUCTURE_HOOKS[key](sim_args, sim_cls)
+    if isinstance(src, (str, Path)):
+        data_dirs: tuple[Path, ...] = tuple(
+            folder for folder in path.iterdir() if folder.is_dir()
+        )
+        for folder in data_dirs:
+            data_cls: type[Data] | None = DATA_REGISTRY.get(folder.name, None)
+            if data_cls is None:
+                continue
+            data: Data = data_cls.load(folder / f"{folder.name}.npz")
+            object.__setattr__(sim_inst, folder.name + "_data", data)
+    return sim_inst

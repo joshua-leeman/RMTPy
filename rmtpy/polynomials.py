@@ -2,6 +2,30 @@ import numba
 import numpy as np
 
 
+def constant_weight_pdf(energies: np.ndarray, spectral_radius: float) -> np.ndarray:
+    in_support: np.ndarray = np.abs(energies) < spectral_radius
+    x: np.ndarray = np.asarray(energies)[in_support] / spectral_radius
+
+    pdf: np.ndarray = np.zeros_like(x, dtype=np.result_type(x, np.float64))
+    pdf[in_support] = 1 / (2 * spectral_radius)
+    return pdf
+
+
+@numba.njit(cache=True, fastmath=True)
+def legendre_polynomials(x: np.ndarray, degree: int) -> np.ndarray:
+    polynomials: np.ndarray = np.empty((degree + 1, x.size), dtype=np.float64)
+
+    polynomials[0, :] = 1.0
+
+    if degree >= 1:
+        polynomials[1, :] = x
+
+    for n in range(2, degree + 1):
+        polynomials[n, :] = (
+            (2 * n - 1) * x * polynomials[n - 1] - (n - 1) * polynomials[n - 2]
+        ) / n
+
+
 def semicircle_weight_pdf(energies: np.ndarray, spectral_radius: float) -> np.ndarray:
     in_support: np.ndarray = np.abs(energies) < spectral_radius
     x: np.ndarray = np.asarray(energies)[in_support] / spectral_radius
@@ -20,10 +44,8 @@ def chebyshev_polynomials_2(x: np.ndarray, degree: int) -> np.ndarray:
     if degree >= 1:
         polynomials[1, :] = 2.0 * x
 
-    for order in range(2, degree + 1):
-        polynomials[order, :] = (
-            2.0 * x * polynomials[order - 1] - polynomials[order - 2]
-        )
+    for n in range(2, degree + 1):
+        polynomials[n, :] = 2.0 * x * polynomials[n - 1] - polynomials[n - 2]
 
     return polynomials
 
@@ -58,14 +80,12 @@ def q_hermite_polynomials(x: np.ndarray, eta: float, degree: int) -> np.ndarray:
     if degree >= 1:
         polynomials[1, :] = x
 
-    for order in range(2, degree + 1):
+    for n in range(2, degree + 1):
         if abs(eta - 1.0) < 1e-12:
-            coeff: float = float(order)
+            coeff: float = float(n)
         else:
-            coeff: float = (1.0 - eta**order) / (1.0 - eta)
+            coeff: float = (1.0 - eta**n) / (1.0 - eta)
 
-        polynomials[order, :] = (
-            x * polynomials[order - 1] - coeff * polynomials[order - 2]
-        )
+        polynomials[n, :] = x * polynomials[n - 1] - coeff * polynomials[n - 2]
 
     return polynomials
