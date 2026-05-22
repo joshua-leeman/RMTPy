@@ -104,18 +104,18 @@ class RandomMatrixEnsemble(ABC):
 
     @property
     def latex_name(self) -> str:
-        return f"\\textrm{{{self.initialism}}}"
+        return f"\\textrm{{{type(self).initialism}}}"
 
     @property
     def token_name(self) -> str:
         return type(self).initialism
 
     @property
-    def as_latex(self) -> str:
+    def to_latex(self) -> str:
         return rmtpy.conversion.to_latex(self, type(self).latex_name)
 
     @property
-    def as_path(self) -> Path:
+    def to_path(self) -> Path:
         return rmtpy.conversion.to_path(self, Path(type(self).token_name))
 
     @property

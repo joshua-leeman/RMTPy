@@ -8,6 +8,7 @@ import numba
 import numpy as np
 
 import rmtpy.conversion
+import rmtpy.polynomials
 import rmtpy.universal
 from .many_body import ManyBodyEnsemble
 from .wigner_dyson import (
@@ -29,9 +30,10 @@ def compute_standard_deviation(poisson: PoissonEnsemble) -> float:
 def create_spectral_weight(
     poisson: PoissonEnsemble,
 ) -> Callable[[np.ndarray], np.ndarray]:
-    return lambda energies: rmtpy.polynomials.constant_weight_pdf(
-        energies, poisson.spectral_radius
-    )
+    def poisson_spectral_weight(energies: np.ndarray) -> np.ndarray:
+        return rmtpy.polynomials.constant_weight_pdf(energies, poisson.spectral_radius)
+
+    return poisson_spectral_weight
 
 
 @numba.njit(cache=True, fastmath=True)
@@ -83,7 +85,7 @@ class PoissonEnsemble(ManyBodyEnsemble):
 
     @property
     def path_name(self) -> str:
-        return super().as_path + f"_{type(self.eigvecs_ensemble).initialism.lower()}"
+        return super().to_path + f"_{type(self.eigvecs_ensemble).initialism.lower()}"
 
     def generate_matrix(self, use_complex_dtype: bool = False) -> np.ndarray:
         matrix = self._initialize_matrix(use_complex_dtype)

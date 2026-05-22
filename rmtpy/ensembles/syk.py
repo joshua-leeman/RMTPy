@@ -53,9 +53,12 @@ def choose_matrix_block_slice(syk: SachdevYeKitaevEnsemble) -> tuple[slice, slic
 def create_spectral_weight(
     syk: SachdevYeKitaevEnsemble,
 ) -> Callable[[np.ndarray], np.ndarray]:
-    return lambda energies: rmtpy.polynomials.q_hermite_polynomial_weight_pdf(
-        energies, syk.spectral_radius, syk.suppression
-    )
+    def syk_spectral_weight(energies: np.ndarray) -> np.ndarray:
+        return rmtpy.polynomials.q_hermite_polynomial_weight_pdf(
+            energies, syk.spectral_radius, syk.suppression
+        )
+
+    return syk_spectral_weight
 
 
 def is_num_majoranas_within_limit(syk: SachdevYeKitaevEnsemble, _, q: int) -> None:
@@ -165,11 +168,11 @@ class SachdevYeKitaevEnsemble(ManyBodyEnsemble):
 
     @property
     def path_name(self) -> str:
-        return super().as_path + f"_{self.q}"
+        return super().latex_name + f"_{self.q}"
 
     @property
-    def latex_name_FIX_THIS(self) -> str:
-        return super().as_latex + f"_{self.q}"
+    def token_name(self) -> str:
+        return super().token_name + f"_{self.q}"
 
     @property
     def q_body_term_decomps(self) -> tuple[tuple[np.ndarray, ...], ...]:

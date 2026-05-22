@@ -20,9 +20,10 @@ WIGNER_DYSON_ENSEMBLE_INITIALISMS_BY_NAME = {}
 def create_spectral_weight(
     wde: WignerDysonEnsemble,
 ) -> Callable[[np.ndarray], np.ndarray]:
-    return lambda energies: rmtpy.polynomials.semicircle_weight_pdf(
-        energies, wde.spectral_radius
-    )
+    def wigner_dyson_spectral_weight(energies: np.ndarray) -> np.ndarray:
+        return rmtpy.polynomials.semicircle_weight_pdf(energies, wde.spectral_radius)
+
+    return wigner_dyson_spectral_weight
 
 
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
