@@ -109,7 +109,7 @@ class Simulation(ABC):
 
 
 @rmtpy.conversion.CONVERTER.register_structure_hook
-def simulation_structure_hook(
+def structure_hook_for_simulation(
     src: str | Path | dict[str, Any] | Simulation, _
 ) -> Simulation:
     if type(src) in REGISTRY.values():
@@ -136,8 +136,8 @@ def simulation_structure_hook(
 
     sim_inst: Simulation = STRUCTURE_HOOKS[key](sim_args, sim_cls)
     if isinstance(src, (str, Path)):
-        data_dirs: tuple[Path, ...] = tuple(
-            folder for folder in path.iterdir() if folder.is_dir()
+        data_dirs: tuple[Path, ...] = (
+            tuple(folder for folder in path.iterdir() if folder.is_dir()),
         )
         for folder in data_dirs:
             data_cls: type[Data] | None = DATA_REGISTRY.get(folder.name, None)

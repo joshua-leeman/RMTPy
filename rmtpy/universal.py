@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.special import gamma
 
+
 def eigval_degeneracy(dyson_index: int) -> int:
     return 2 if dyson_index == 4 else 1
 

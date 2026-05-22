@@ -90,8 +90,8 @@ def create_cdf_interpolator_from_pdf(
     if not np.isfinite(left_tail_mass) or left_tail_mass < 0.0:
         raise ValueError("`left_tail_mass` must be a finite non-negative number.")
 
-    cdf_values: np.ndarray = left_tail_mass + cumulative_trapezoid(
-        pdf(inputs), inputs, initial=0.0
+    cdf_values: np.ndarray = (
+        left_tail_mass + cumulative_trapezoid(pdf(inputs), inputs, initial=0.0),
     )
     return PchipInterpolator(inputs, cdf_values, extrapolate=True)
 
@@ -304,8 +304,8 @@ class DensityModel:
         coeffs: np.ndarray | None = None,
         sample: np.ndarray | None = None,
     ) -> np.ndarray:
-        cdf_interpolator: PchipInterpolator = self.create_variate_cdf_interpolator(
-            coeffs=coeffs, sample=sample
+        cdf_interpolator: PchipInterpolator = (
+            self.create_variate_cdf_interpolator(coeffs=coeffs, sample=sample),
         )
         return cdf_interpolator(points)
 
@@ -315,7 +315,7 @@ class DensityModel:
     def _average_pdf_from_samples(self, points: np.ndarray) -> np.ndarray:
         if self._average_pdf_interpolator is None:
             _average_pdf: PchipInterpolator = (
-                self._create_average_pdf_interpolator_from_samples()
+                self._create_average_pdf_interpolator_from_samples(),
             )
             object.__setattr__(self, "_average_pdf_interpolator", _average_pdf)
 
@@ -387,6 +387,6 @@ class DensityModel:
             raise ValueError("`sample` must be provided for sample-based PDFs.")
 
         pdf_interpolator: PchipInterpolator = (
-            self._create_variate_pdf_interpolator_from_sample(sample)
+            self._create_variate_pdf_interpolator_from_sample(sample),
         )
         return pdf_interpolator(points)

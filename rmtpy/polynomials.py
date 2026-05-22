@@ -22,8 +22,8 @@ def legendre_polynomials(x: np.ndarray, degree: int) -> np.ndarray:
 
     for n in range(2, degree + 1):
         polynomials[n, :] = (
-            (2 * n - 1) * x * polynomials[n - 1] - (n - 1) * polynomials[n - 2]
-        ) / n
+            ((2 * n - 1) * x * polynomials[n - 1] - (n - 1) * polynomials[n - 2]) / n,
+        )
 
 
 def semicircle_weight_pdf(energies: np.ndarray, spectral_radius: float) -> np.ndarray:

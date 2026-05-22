@@ -30,8 +30,8 @@ def create_bdgd_matrix(
     size: int = matrix.shape[0]
     for i in range(size):
         matrix[i, i] = 0.0
-        matrix[i + 1 :, i] = std_dev * (
-            1j * rng.standard_normal(size - i - 1, real_dtype)
+        matrix[i + 1 :, i] = (
+            std_dev * 1j * rng.standard_normal(size - i - 1, real_dtype),
         )
         matrix[i, i + 1 :] = np.conj(matrix[i + 1 :, i])
 
