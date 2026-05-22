@@ -160,20 +160,20 @@ class Histogram2D(Data):
         repr=False,
     )
     counts: np.ndarray = attrs.field(
-        default=attrs.Factory(create_zeroed_histogram2D_counts),
+        default=attrs.Factory(create_zeroed_histogram2D_counts, takes_self=True),
         init=False,
         repr=False,
     )
 
     histogram: np.ndarray = attrs.field(
-        default=attrs.Factory(create_empty_histogram2D),
+        default=attrs.Factory(create_empty_histogram2D, takes_self=True),
         init=False,
         repr=False,
     )
 
     _realizs: int = attrs.field(
-        init=False,
         factory=lambda: np.zeros((1,), dtype=np.int32),
+        init=False,
         repr=False,
     )
 
@@ -217,16 +217,8 @@ class Histogram2D(Data):
             where=prob_x[:, None] > 0,
         )
 
-        y_vals: np.ndarray = rmtpy.density.compute_bin_centers(
-            self.y_bins,
-            bins_log_spaced=self.y_log_base is not None,
-        )
-
+        y_vals: np.ndarray = rmtpy.density.compute_bin_centers(self.y_bins)
         average_y_given_x: np.ndarray = np.sum(prob_y_given_x * y_vals[None, :], axis=1)
 
-        x_vals: np.ndarray = rmtpy.density.compute_bin_centers(
-            self.x_bins,
-            bins_log_spaced=self.x_log_base is not None,
-        )
-
+        x_vals: np.ndarray = rmtpy.density.compute_bin_centers(self.x_bins)
         return x_vals, average_y_given_x
