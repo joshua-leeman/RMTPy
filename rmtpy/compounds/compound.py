@@ -3,7 +3,7 @@ from __future__ import annotations
 import inspect
 from collections.abc import Iterator
 from pathlib import Path
-from typing import Any, Sequence, TypeAlias, Union
+from typing import Any, Sequence
 
 import attrs
 import numpy as np
@@ -15,7 +15,7 @@ import rmtpy.conversion
 import rmtpy.ensembles
 
 NUM_FREE_COMPLEX_FERMIONS_DEFAULT: int = 1
-NUM_FREE_COMPLEX_FERMIONS_METADATA: dict[str, Any] = {
+NUM_FREE_COMPLEX_FERMIONS_METADATA: dict[str, str] = {
     "dir_name": "Nf",
     "latex_name": r"N_\textrm{\tiny f}",
 }
@@ -23,14 +23,6 @@ NUM_FREE_COMPLEX_FERMIONS_METADATA: dict[str, Any] = {
 REGISTRY: dict[str, type[Compound]] = {}
 STRUCTURE_HOOKS: dict[str, StructureHook] = {}
 UNSTRUCTURE_HOOKS: dict[str, UnstructureHook] = {}
-
-
-EnsembleLike: TypeAlias = Union[
-    rmtpy.ensembles.ManyBodyEnsemble,
-    rmtpy.ensembles.WignerDysonEnsemble,
-    rmtpy.ensembles.PoissonEnsemble,
-    rmtpy.ensembles.SachdevYeKitaevEnsemble,
-]
 
 
 def create_quantum_chaotic_compound(**kwargs: Any) -> Compound:
@@ -84,7 +76,7 @@ def is_num_free_fermions_valid(compound: Compound, _, num_free_fermions: int) ->
 
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
 class Compound:
-    ensemble: EnsembleLike = attrs.field(
+    ensemble: rmtpy.ensembles.EnsembleLike = attrs.field(
         converter=rmtpy.ensembles.RandomMatrixEnsemble.create,
     )
 
