@@ -224,7 +224,7 @@ class DensityModel:
         return (self.support[1] - self.support[0]) / 2
 
     @property
-    def domain_range(self) -> tuple[float, float]:
+    def plot_range(self) -> tuple[float, float]:
         center: float = sum(self.support) / 2
         radius: float = self.support_scale_factor * self.support_radius
         return center - radius, center + radius
@@ -266,15 +266,15 @@ class DensityModel:
         sample: np.ndarray | None = None,
     ) -> PchipInterpolator:
         if interval is None:
-            interval = self.domain_range
+            interval = self.plot_range
         else:
             rmtpy.validators.validate_support(interval)
 
         def pdf(points: np.ndarray) -> np.ndarray:
             return self.variate_pdf(points, coeffs=coeffs, sample=sample)
 
-        if interval[0] > self.domain_range[0]:
-            left_tail_range: tuple[float, float] = (self.domain_range[0], interval[0])
+        if interval[0] > self.plot_range[0]:
+            left_tail_range: tuple[float, float] = (self.plot_range[0], interval[0])
             left_tail: np.ndarray = array_of_floats(left_tail_range, self.num_pts)
             left_tail_mass: float = cumulative_trapezoid(pdf(left_tail), left_tail)[-1]
         else:
@@ -340,7 +340,7 @@ class DensityModel:
         return average_coeffs
 
     def _create_average_pdf_interpolator_from_samples(self) -> PchipInterpolator:
-        bins: np.ndarray = np.linspace(*self.domain_range, self.num_bins + 1)
+        bins: np.ndarray = np.linspace(*self.plot_range, self.num_bins + 1)
         counts: np.ndarray = np.zeros(self.num_bins)
         for sample in self.sample_stream(self.optimal_realizs):
             counts += np.histogram(sample, bins=bins)[0]
@@ -351,13 +351,13 @@ class DensityModel:
         )
 
     def _create_average_cdf_interpolator(self) -> PchipInterpolator:
-        inputs: np.ndarray = np.linspace(*self.domain_range, self.num_pts)
+        inputs: np.ndarray = np.linspace(*self.plot_range, self.num_pts)
         return create_cdf_interpolator_from_pdf(self.average_pdf, inputs)
 
     def _create_variate_pdf_interpolator_from_sample(
         self, sample: np.ndarray
     ) -> PchipInterpolator:
-        bins: np.ndarray = np.linspace(*self.domain_range, self.num_bins + 1)
+        bins: np.ndarray = np.linspace(*self.plot_range, self.num_bins + 1)
         counts: np.ndarray = np.histogram(np.asarray(sample), bins=bins)[0]
         histogram: np.ndarray = normalize_histogram(counts, bins)
         return create_pdf_interpolator_from_histogram(
