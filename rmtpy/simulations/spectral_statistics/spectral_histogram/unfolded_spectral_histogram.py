@@ -7,10 +7,11 @@ import numpy as np
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 
-from ....conversion import rmtpy_converter
-from ....ensembles import ManyBodyEnsemble
+import rmtpy.conversion
+import rmtpy.ensembles
 from ...histogram import Histogram
 from ...plot import Plot, PlotAxes, PlotLegend
+
 
 @dataclass(repr=False, eq=False, kw_only=True)
 class UnfoldedSpectralHistogramLegend(PlotLegend):
@@ -76,8 +77,10 @@ class UnfoldedSpectralHistogramPlot(Plot):
         except TypeError:
             raise ValueError("Metadata is not properly structured.")
 
-        self.ensemble: ManyBodyEnsemble = rmtpy_converter.structure(
-            ensemble_meta, ManyBodyEnsemble
+        self.ensemble: rmtpy.ensembles.ManyBodyEnsemble = (
+            rmtpy.conversion.CONVERTER.structure(
+                ensemble_meta, rmtpy.ensembles.ManyBodyEnsemble
+            )
         )
         dimension: int = self.ensemble.dimension
 

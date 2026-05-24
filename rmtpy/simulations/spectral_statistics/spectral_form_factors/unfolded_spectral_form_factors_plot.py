@@ -8,10 +8,11 @@ from matplotlib import rcParams
 from matplotlib.lines import Line2D
 from matplotlib.ticker import LogLocator, NullLocator
 
-from ....conversion import rmtpy_converter
-from ....ensembles import ManyBodyEnsemble
+import rmtpy.conversion
+import rmtpy.ensembles
 from ...plot import Plot, PlotAxes, PlotLegend
 from .spectral_form_factors_data import FormFactorsData
+
 
 @dataclass(repr=False, eq=False, kw_only=True)
 class UnfoldedFormFactorsLegend(PlotLegend):
@@ -103,8 +104,11 @@ class UnfoldedFormFactorsPlot(Plot):
             raise ValueError("Ensemble metadata not found.")
         except TypeError:
             raise ValueError("Metadata is not properly structured.")
-        self.ensemble: ManyBodyEnsemble = rmtpy_converter.structure(
-            ensemble_meta, ManyBodyEnsemble
+
+        self.ensemble: rmtpy.ensembles.ManyBodyEnsemble = (
+            rmtpy.conversion.CONVERTER.structure(
+                ensemble_meta, rmtpy.ensembles.ManyBodyEnsemble
+            )
         )
         dimension: int = self.ensemble.dimension
 

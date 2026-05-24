@@ -7,10 +7,11 @@ import numpy as np
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 
-from ....conversion import rmtpy_converter
-from ....ensembles import ManyBodyEnsemble, PoissonEnsemble, SachdevYeKitaevEnsemble
+import rmtpy.conversion
+import rmtpy.ensembles
 from ...histogram import Histogram
 from ...plot import Plot, PlotAxes, PlotLegend
+
 
 @dataclass(repr=False, eq=False, kw_only=True)
 class SpectralHistogramLegend(PlotLegend):
@@ -114,8 +115,11 @@ class SpectralHistogramPlot(Plot):
             raise ValueError("Ensemble metadata not found.")
         except TypeError:
             raise ValueError("Metadata is not properly structured.")
-        self.ensemble: ManyBodyEnsemble = rmtpy_converter.structure(
-            ensemble_meta, ManyBodyEnsemble
+
+        self.ensemble: rmtpy.ensembles.ManyBodyEnsemble = (
+            rmtpy.conversion.CONVERTER.structure(
+                ensemble_meta, rmtpy.ensembles.ManyBodyEnsemble
+            )
         )
         energy_0: float = self.ensemble.spectral_radius
 
@@ -126,14 +130,14 @@ class SpectralHistogramPlot(Plot):
             self.legend.title = self.ensemble.to_latex
 
         axes: SpectralHistogramAxes = self.axes
-        if type(self.ensemble) == PoissonEnsemble:
+        if isinstance(self.ensemble, rmtpy.ensembles.PoissonEnsemble):
             self.ylim = self.poisson_ylim
 
             axes.ytick_labels = axes.poisson_ytick_labels
             axes.yticks = axes.poisson_yticks
             axes.yticks_minor = axes.poisson_yticks_minor
 
-        elif type(self.ensemble) == SachdevYeKitaevEnsemble:
+        elif isinstance(self.ensemble, rmtpy.ensembles.SachdevYeKitaevEnsemble):
             if self.ensemble.q == 2:
                 self.ylim = self.syk2_ylim
 

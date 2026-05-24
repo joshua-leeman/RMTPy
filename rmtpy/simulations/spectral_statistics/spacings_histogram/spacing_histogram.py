@@ -7,10 +7,11 @@ import numpy as np
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 
-from ....conversion import rmtpy_converter
-from ....ensembles import ManyBodyEnsemble
+import rmtpy.conversion
+import rmtpy.ensembles
 from ...histogram import Histogram
 from ...plot import Plot, PlotAxes, PlotLegend
+
 
 @dataclass(repr=False, eq=False, kw_only=True)
 class SpacingsHistogramLegend(PlotLegend):
@@ -73,8 +74,11 @@ class SpacingsHistogramPlot(Plot):
             raise ValueError("Ensemble metadata not found.")
         except TypeError:
             raise ValueError("Metadata is not properly structured.")
-        self.ensemble: ManyBodyEnsemble = rmtpy_converter.structure(
-            ensemble_meta, ManyBodyEnsemble
+
+        self.ensemble: rmtpy.ensembles.ManyBodyEnsemble = (
+            rmtpy.conversion.CONVERTER.structure(
+                ensemble_meta, rmtpy.ensembles.ManyBodyEnsemble
+            )
         )
 
         self.legend: SpacingsHistogramLegend = SpacingsHistogramLegend(
@@ -112,7 +116,7 @@ class SpacingsHistogramPlot(Plot):
             zorder=self.histogram_zorder,
         )
 
-        spacings: np.ndarray = np.linspace(0, self.xlim[1], self.num_points)
+        spacings: np.ndarray = np.linspace(*self.xlim, self.num_points)
         mean_spacing: float = self.data.metadata["global_mean_spacing"]
         surmise: np.ndarray = self.ensemble.wigner_surmise(spacings / mean_spacing)
         surmise /= mean_spacing
