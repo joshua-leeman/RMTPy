@@ -37,8 +37,8 @@ class PoissonCompound(Compound):
             overwrite_c=True,
         )
 
-        eigvals: np.ndarray = (
-            self.ensemble.rng.random(self.ensemble.dimension, self.ensemble.real_dtype),
+        eigvals: np.ndarray = self.ensemble.rng.random(
+            self.ensemble.dimension, self.ensemble.real_dtype
         )
         eigvals -= 0.5
         eigvals *= self.ensemble.std_dev

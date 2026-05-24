@@ -115,9 +115,7 @@ class Compound:
     def __attrs_post_init__(self) -> None:
         resonance_density: rmtpy.density.DensityModel = rmtpy.density.DensityModel(
             dimension=self.ensemble.dimension,
-            support=(
-                tuple([-self.ensemble.spectral_radius, self.ensemble.spectral_radius]),
-            ),
+            support=(-self.ensemble.spectral_radius, self.ensemble.spectral_radius),
             polynomials=self.ensemble.spectral_polynomials,
             max_polynomial_degree=self.ensemble.max_spectral_polynomial_degree,
             weight_function=self.ensemble.spectral_weight,
@@ -231,8 +229,8 @@ class Compound:
             if np.isrealobj(coupling_matrix):
                 coupling_matrix_conj: np.ndarray = coupling_matrix
             else:
-                coupling_matrix_conj: np.ndarray = (
-                    np.conjugate(coupling_matrix, out=eigvecs[:, -self.num_channels :]),
+                coupling_matrix_conj: np.ndarray = np.conjugate(
+                    coupling_matrix, out=eigvecs[:, -self.num_channels :]
                 )
 
             np.subtract(energies[:, None], eigvals[None, :], out=resolvent)
@@ -277,8 +275,8 @@ class Compound:
             if np.isrealobj(coupling_matrix):
                 coupling_matrix_conj: np.ndarray = coupling_matrix
             else:
-                coupling_matrix_conj: np.ndarray = (
-                    np.conjugate(coupling_matrix, out=eigvecs[:, -self.num_channels :]),
+                coupling_matrix_conj: np.ndarray = np.conjugate(
+                    coupling_matrix, out=eigvecs[:, -self.num_channels :]
                 )
 
             np.subtract(energies[:, None], eigvals[None, :], out=resolvent)

@@ -143,8 +143,8 @@ def create_q_body_majorana_terms(
         majoranas = majoranas_to_real_basis(majoranas)
         q_bodys_data: np.ndarray = np.empty((num_terms, nonzeros), np.int8, order="C")
     else:
-        q_bodys_data: np.ndarray = (
-            np.empty((num_terms, nonzeros), np.complex64, order="C"),
+        q_bodys_data: np.ndarray = np.empty(
+            (num_terms, nonzeros), np.complex64, order="C"
         )
 
     for term_num, idx_tuple in enumerate(combinations(range(num_majoranas), q)):
@@ -153,6 +153,7 @@ def create_q_body_majorana_terms(
             q_body_term = q_body_term.dot(majoranas[idx_tuple[k]])
         if in_real_basis:
             q_body_term = q_body_term.real.astype(np.int8)
+
         q_body_term: coo_matrix = q_body_term[parity_block].tocoo()
 
         q_bodys_idxs[term_num, 0, :] = q_body_term.row

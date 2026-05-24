@@ -136,8 +136,8 @@ def structure_hook_for_simulation(
 
     sim_inst: Simulation = STRUCTURE_HOOKS[key](sim_args, sim_cls)
     if isinstance(src, (str, Path)):
-        data_dirs: tuple[Path, ...] = (
-            tuple(folder for folder in path.iterdir() if folder.is_dir()),
+        data_dirs: tuple[Path, ...] = tuple(
+            folder for folder in path.iterdir() if folder.is_dir()
         )
         for folder in data_dirs:
             data_cls: type[Data] | None = DATA_REGISTRY.get(folder.name, None)
