@@ -74,6 +74,17 @@ class PoissonEnsemble(ManyBodyEnsemble):
         repr=False,
     )
 
+    spectral_polynomials: Callable[[np.ndarray], np.ndarray] = attrs.field(
+        default=rmtpy.polynomials.legendre_polynomials,
+        init=False,
+        repr=False,
+    )
+    spectral_weight: Callable[[np.ndarray], np.ndarray] = attrs.field(
+        default=attrs.Factory(create_spectral_weight, takes_self=True),
+        init=False,
+        repr=False,
+    )
+
     eigvecs_ensemble: WignerDysonEnsemble = attrs.field(init=False, repr=False)
 
     @eigvecs_ensemble.default
