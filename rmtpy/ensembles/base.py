@@ -112,11 +112,11 @@ class RandomMatrixEnsemble(ABC):
 
     @property
     def to_latex(self) -> str:
-        return rmtpy.conversion.to_latex(self, type(self).latex_name)
+        return rmtpy.conversion.to_latex(self, self.latex_name)
 
     @property
     def to_path(self) -> Path:
-        return rmtpy.conversion.to_path(self, Path(type(self).token_name))
+        return rmtpy.conversion.to_path(self, Path(self.token_name))
 
     @property
     def rng_state(self) -> dict[str, Any]:

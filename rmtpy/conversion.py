@@ -62,14 +62,14 @@ def normalize_dict(src: dict[str, Any], registry: dict[str, type]) -> dict[str, 
 
 def to_latex(instance: attrs.AttrsInstance, latex_name: str = "") -> str:
     latex_str: str = "$" + latex_name
-    for label, attr in attrs.fields_dict(instance).items():
+    for label, attr in attrs.fields_dict(type(instance)).items():
         if attr.metadata.get("latex_name") is not None:
             latex_str += rf"\ {attr.metadata['latex_name']}={getattr(instance, label)}"
     return latex_str + "$"
 
 
 def to_path(instance: attrs.AttrsInstance, root: Path) -> Path:
-    for name, attr in attrs.fields_dict(instance).items():
+    for name, attr in attrs.fields_dict(type(instance)).items():
         if attr.metadata.get("dir_name") is not None:
             value: str = re.sub(r"[^\w\-.]", "_", str(getattr(instance, name)))
             root /= f"{attr.metadata['dir_name']}_{value.replace('.', 'p')}"
