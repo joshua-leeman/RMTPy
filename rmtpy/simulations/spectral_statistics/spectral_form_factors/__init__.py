@@ -1,4 +1,3 @@
-from .spectral_form_factors_data import FormFactorsData
+from .spectral_form_factors_data import finalize_form_factors, FormFactorsData
 from .spectral_form_factors_plot import FormFactorsPlot
 from .unfolded_spectral_form_factors_plot import UnfoldedFormFactorsPlot
-
