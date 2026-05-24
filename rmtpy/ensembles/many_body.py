@@ -102,7 +102,7 @@ class ManyBodyEnsemble(RandomMatrixEnsemble):
     def __attrs_post_init__(self) -> None:
         spectral_density: rmtpy.density.DensityModel = rmtpy.density.DensityModel(
             dimension=self.dimension,
-            support=tuple([-self.spectral_radius, self.spectral_radius]),
+            support=(-self.spectral_radius, self.spectral_radius),
             polynomials=self.spectral_polynomials,
             max_polynomial_degree=self.max_spectral_polynomial_degree,
             weight_function=self.spectral_weight,
