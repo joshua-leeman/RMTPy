@@ -50,6 +50,15 @@ def choose_matrix_block_slice(syk: SachdevYeKitaevEnsemble) -> tuple[slice, slic
     )
 
 
+def create_spectral_polynomials(
+    syk: SachdevYeKitaevEnsemble,
+) -> Callable[[np.ndarray, int], np.ndarray]:
+    def syk_spectral_polynomials(x: np.ndarray, degree: int) -> np.ndarray:
+        return rmtpy.polynomials.q_hermite_polynomials(x, syk.suppression, degree)
+
+    return syk_spectral_polynomials
+
+
 def create_spectral_weight(
     syk: SachdevYeKitaevEnsemble,
 ) -> Callable[[np.ndarray], np.ndarray]:
@@ -70,7 +79,7 @@ def is_num_majoranas_within_limit(syk: SachdevYeKitaevEnsemble, _, q: int) -> No
 
 
 @numba.njit(cache=True, fastmath=True)
-def create_syk_matrix_with_complex_entries(
+def create_syk_matrix_with_imaginary_prefactor(
     matrix: np.ndarray,
     rng: np.random.Generator,
     real_dtype: type[np.floating],
@@ -89,7 +98,7 @@ def create_syk_matrix_with_complex_entries(
 
 
 @numba.njit(cache=True, fastmath=True)
-def create_syk_matrix_with_real_entries(
+def create_syk_matrix_without_imaginary_prefactor(
     matrix: np.ndarray,
     rng: np.random.Generator,
     real_dtype: type[np.floating],
@@ -145,7 +154,7 @@ class SachdevYeKitaevEnsemble(ManyBodyEnsemble):
     )
 
     spectral_polynomials: Callable[[np.ndarray], np.ndarray] = attrs.field(
-        default=rmtpy.polynomials.q_hermite_polynomials,
+        default=attrs.Factory(create_spectral_polynomials, takes_self=True),
         init=False,
         repr=False,
     )
@@ -191,7 +200,7 @@ class SachdevYeKitaevEnsemble(ManyBodyEnsemble):
 
     def generate_matrix(self, use_complex_dtype: bool = False) -> np.ndarray:
         matrix = self._initialize_matrix(use_complex_dtype)
-        create_syk_matrix = self._pick_syk_matrix_builder(use_complex_dtype)
+        create_syk_matrix = self._pick_syk_matrix_builder()
         create_syk_matrix(
             matrix,
             self.rng,
@@ -206,7 +215,7 @@ class SachdevYeKitaevEnsemble(ManyBodyEnsemble):
         self, realizs: int, use_complex_dtype: bool = False
     ) -> Iterator[np.ndarray]:
         matrix = self._initialize_matrix(use_complex_dtype)
-        create_syk_matrix = self._pick_syk_matrix_builder(use_complex_dtype)
+        create_syk_matrix = self._pick_syk_matrix_builder()
         for _ in range(realizs):
             create_syk_matrix(
                 matrix,
@@ -225,10 +234,9 @@ class SachdevYeKitaevEnsemble(ManyBodyEnsemble):
         else:
             return np.empty((size, size), self.real_dtype.type, order="F")
 
-    def _pick_syk_matrix_builder(
-        self, use_complex_dtype: bool = False
-    ) -> Callable[[np.ndarray], np.ndarray]:
-        if use_complex_dtype or self.dyson_index != 1:
-            return create_syk_matrix_with_complex_entries
+    def _pick_syk_matrix_builder(self) -> Callable[[np.ndarray], np.ndarray]:
+        # Majorana products need an imaginary phase only for q = 2 mod 4.
+        if self.q % 4 == 2:
+            return create_syk_matrix_with_imaginary_prefactor
         else:
-            return create_syk_matrix_with_real_entries
+            return create_syk_matrix_without_imaginary_prefactor
