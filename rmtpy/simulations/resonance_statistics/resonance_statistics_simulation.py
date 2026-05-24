@@ -204,7 +204,7 @@ class ResonanceStatisticsSimulation(Simulation):
         return FormFactorsData(
             file_name="resonance_form_factors",
             dimension=self.compound.ensemble.dimension,
-            log_D_time_support=self.form_factors_support,
+            logD_time_support=self.form_factors_support,
             scale=j_1_1 / self.compound.ensemble.spectral_radius,
         )
 
@@ -221,7 +221,7 @@ class ResonanceStatisticsSimulation(Simulation):
         return FormFactorsData(
             file_name="unfolded_resonance_form_factors",
             dimension=self.compound.ensemble.dimension,
-            log_D_time_support=self.unfolded_form_factors_support,
+            logD_time_support=self.unfolded_form_factors_support,
             scale=2 * np.pi,
         )
 
