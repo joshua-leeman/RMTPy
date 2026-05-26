@@ -235,7 +235,6 @@ class SachdevYeKitaevEnsemble(ManyBodyEnsemble):
             return np.empty((size, size), self.real_dtype.type, order="F")
 
     def _pick_syk_matrix_builder(self) -> Callable[[np.ndarray], np.ndarray]:
-        # Majorana products need an imaginary phase only for q = 2 mod 4.
         if self.q % 4 == 2:
             return create_syk_matrix_with_imaginary_prefactor
         else:
