@@ -6,7 +6,6 @@ from typing import ClassVar
 
 import attrs
 import numpy as np
-from scipy.interpolate import PchipInterpolator
 
 # BLAS/LAPACK routines by dtype: s=float32, d=float64, c=complex64, z=complex128
 from scipy.linalg.blas import ccopy, dcopy, scopy, zcopy
@@ -26,9 +25,12 @@ INTERACTION_STRENGTH_DEFAULT: float = 1.0
 INTERACTION_STRENGTH_METADATA: dict[str, str] = {
     "dir_name": "J",
 }
+MAX_SPECTRAL_POLYNOMIAL_DEGREE_METADATA: dict[str, str] = {
+    "dir_name": "polydeg",
+}
 DYSON_INDEX: int = 0
-NUM_MAJORANAS_MINIMUM: int = 4
-NUM_MAJORANAS_MAXIMUM: int = 32
+NUM_MAJORANAS_MIN: int = 4
+NUM_MAJORANAS_MAX: int = 32
 NUM_MAJORANAS_METADATA: dict[str, str] = {
     "dir_name": "Nm",
     "latex_name": r"N_\textrm{\tiny m}",
@@ -50,8 +52,8 @@ class ManyBodyEnsemble(RandomMatrixEnsemble):
     num_majoranas: int = attrs.field(
         validator=[
             attrs.validators.instance_of(int),
-            attrs.validators.ge(NUM_MAJORANAS_MINIMUM),
-            attrs.validators.le(NUM_MAJORANAS_MAXIMUM),
+            attrs.validators.ge(NUM_MAJORANAS_MIN),
+            attrs.validators.le(NUM_MAJORANAS_MAX),
             lambda _, __, number: rmtpy.validators.validate_even_number(number),
         ],
         metadata=NUM_MAJORANAS_METADATA,
@@ -66,6 +68,7 @@ class ManyBodyEnsemble(RandomMatrixEnsemble):
         default=rmtpy.density.MAX_POLYNOMIAL_DEGREE_DEFAULT,
         converter=int,
         validator=attrs.validators.ge(0),
+        metadata=MAX_SPECTRAL_POLYNOMIAL_DEGREE_METADATA,
     )
 
     dimension: int = attrs.field(
@@ -125,45 +128,6 @@ class ManyBodyEnsemble(RandomMatrixEnsemble):
     @abstractmethod
     def matrix_stream(self, realizs: int, use_complex_dtype: bool = False) -> None:
         raise NotImplementedError()
-
-    def average_spectral_pdf(self, energies: np.ndarray) -> np.ndarray:
-        return self.spectral_density.average_pdf(energies)
-
-    def average_spectral_cdf(self, energies: np.ndarray) -> np.ndarray:
-        return self.spectral_density.average_cdf(energies)
-
-    def compute_variate_spectral_coeffs(self, eigvals: np.ndarray) -> np.ndarray:
-        return self.spectral_density.compute_variate_coeffs(eigvals)
-
-    def create_variate_spectral_cdf_interpolator(
-        self,
-        interval: tuple[float, float] | None = None,
-        spectral_coeffs: np.ndarray | None = None,
-        eigvals: np.ndarray | None = None,
-    ) -> PchipInterpolator:
-        return self.spectral_density.create_variate_cdf_interpolator(
-            interval=interval, coeffs=spectral_coeffs, sample=eigvals
-        )
-
-    def variate_spectral_pdf(
-        self,
-        energies: np.ndarray,
-        spectral_coeffs: np.ndarray | None = None,
-        eigvals: np.ndarray | None = None,
-    ) -> np.ndarray:
-        return self.spectral_density.variate_pdf(
-            energies, coeffs=spectral_coeffs, sample=eigvals
-        )
-
-    def variate_spectral_cdf(
-        self,
-        energies: np.ndarray,
-        spectral_coeffs: np.ndarray | None = None,
-        eigvals: np.ndarray | None = None,
-    ) -> np.ndarray:
-        return self.spectral_density.variate_cdf(
-            energies, coeffs=spectral_coeffs, sample=eigvals
-        )
 
     def eigsys_stream(
         self, realizs: int, use_complex_dtype: bool = False
