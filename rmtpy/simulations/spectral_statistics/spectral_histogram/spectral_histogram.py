@@ -177,7 +177,7 @@ class SpectralHistogramPlot(Plot):
         )
 
         energies: np.ndarray = np.linspace(self.xlim[0], self.xlim[1], self.num_points)
-        spectral_pdf: np.ndarray = self.ensemble.average_spectral_pdf(energies)
+        spectral_pdf: np.ndarray = self.ensemble.spectral_density.average_pdf(energies)
 
         self.ax.plot(
             energies,
