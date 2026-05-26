@@ -11,10 +11,10 @@ from scipy.ndimage import gaussian_filter1d
 import rmtpy.validators
 
 GAUSSIAN_KERNEL_STANDARD_DEVIATION_DEFAULT: float = 2.0
-MAX_POLYNOMIAL_DEGREE_DEFAULT: int = 0
+MAX_POLYNOMIAL_DEGREE_DEFAULT: int = 20
 NUM_HISTOGRAM_COUNTS_DEFAULT: int = 2**13
 NUM_POINTS_DEFAULT: int = 1000
-NUM_REALIZATIONS_MINIMUM: int = 10
+NUM_REALIZATIONS_MIN: int = 10
 SUPPORT_SCALE_FACTOR_DEFAULT: float = 1.2
 
 
@@ -118,7 +118,7 @@ def compute_default_number_of_bins(dist: DensityModel) -> int:
 
 
 def compute_optimal_realizations(dist: DensityModel) -> int:
-    return max(NUM_HISTOGRAM_COUNTS_DEFAULT // dist.dimension, NUM_REALIZATIONS_MINIMUM)
+    return max(NUM_HISTOGRAM_COUNTS_DEFAULT // dist.dimension, NUM_REALIZATIONS_MIN)
 
 
 def is_polynomial_expansion_completely_provided(
@@ -206,6 +206,11 @@ class DensityModel:
         init=False,
         repr=False,
     )
+    _weight_cdf_interpolator: PchipInterpolator | None = attrs.field(
+        default=None,
+        init=False,
+        repr=False,
+    )
 
     @property
     def has_polynomial_expansion(self) -> bool:
@@ -243,23 +248,37 @@ class DensityModel:
 
         return self.weight_function(np.asarray(inputs))
 
-    def average_pdf(self, points: np.ndarray) -> np.ndarray:
-        if self.has_polynomial_expansion:
-            return self._average_pdf_from_polynomials(points)
+    def weight_pdf(self, points: np.ndarray) -> np.ndarray:
+        if not self.has_polynomial_expansion:
+            return self._average_pdf_from_samples(points)
 
-        return self._average_pdf_from_samples(points)
+        return self.compute_weight_function(points)
+
+    def weight_cdf(self, points: np.ndarray) -> np.ndarray:
+        if not self.has_polynomial_expansion:
+            return self._average_cdf_from_samples(points)
+
+        if self._weight_cdf_interpolator is None:
+            _weight_cdf: PchipInterpolator = self._create_weight_cdf_interpolator()
+            object.__setattr__(self, "_weight_cdf_interpolator", _weight_cdf)
+
+        return self._weight_cdf_interpolator(points)
+
+    def average_pdf(self, points: np.ndarray) -> np.ndarray:
+        if not self.has_polynomial_expansion:
+            return self._average_pdf_from_samples(points)
+
+        return self._average_pdf_from_polynomials(points)
 
     def average_cdf(self, points: np.ndarray) -> np.ndarray:
-        if self.has_polynomial_expansion:
-            return self._average_cdf_from_polynomials(points)
+        if not self.has_polynomial_expansion:
+            return self._average_cdf_from_samples(points)
 
-        return self._average_cdf_from_samples(points)
+        return self._average_cdf_from_polynomials(points)
 
     def compute_variate_coeffs(self, sample: np.ndarray) -> np.ndarray:
         polynomials: np.ndarray = self.compute_polynomials(np.asarray(sample))
-        coeffs: np.ndarray = np.mean(polynomials, axis=1)
-        coeffs[1::2] = 0.0
-        return coeffs
+        return np.mean(polynomials, axis=1)
 
     def create_variate_cdf_interpolator(
         self,
@@ -341,6 +360,14 @@ class DensityModel:
         average_coeffs /= self.optimal_realizs
         return average_coeffs
 
+    def _create_weight_cdf_interpolator(self) -> PchipInterpolator:
+        inputs: np.ndarray = np.linspace(*self.plot_range, self.num_pts)
+        return create_cdf_interpolator_from_pdf(self.weight_pdf, inputs)
+
+    def _create_average_cdf_interpolator(self) -> PchipInterpolator:
+        inputs: np.ndarray = np.linspace(*self.plot_range, self.num_pts)
+        return create_cdf_interpolator_from_pdf(self.average_pdf, inputs)
+
     def _create_average_pdf_interpolator_from_samples(self) -> PchipInterpolator:
         bins: np.ndarray = np.linspace(*self.plot_range, self.num_bins + 1)
         counts: np.ndarray = np.zeros(self.num_bins)
@@ -351,10 +378,6 @@ class DensityModel:
         return create_pdf_interpolator_from_histogram(
             histogram, bins, kernel_std_dev=self.kernel_std_dev
         )
-
-    def _create_average_cdf_interpolator(self) -> PchipInterpolator:
-        inputs: np.ndarray = np.linspace(*self.plot_range, self.num_pts)
-        return create_cdf_interpolator_from_pdf(self.average_pdf, inputs)
 
     def _create_variate_pdf_interpolator_from_sample(
         self, sample: np.ndarray
