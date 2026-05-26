@@ -21,6 +21,7 @@ def run_partial_widths_statistics(compound: Compound, realizs: int) -> None:
         raise TypeError("compound must be a instance of Compound.")
     elif not isinstance(realizs, int) or realizs <= 0:
         raise ValueError("Number of realizations must be a positive integer.")
+
     PartialWidthsStatisticsSimulation(compound=compound, realizs=realizs).run()
 
 
@@ -41,7 +42,7 @@ class PartialWidthsStatisticsSimulation(Simulation):
     @compound.validator
     def _compound_validator(self, _, value: Compound) -> None:
         if inspect.isabstract(value):
-            raise ValueError(f"Compound must be concrete.")
+            raise ValueError("Compound must be concrete.")
 
     partial_width_support: tuple[float, float] = field(
         default=(-5.0, 2.0)
