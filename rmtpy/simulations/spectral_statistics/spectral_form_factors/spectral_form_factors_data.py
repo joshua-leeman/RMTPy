@@ -7,7 +7,7 @@ import rmtpy.density
 import rmtpy.validators
 from ...data import Data
 
-DEFAULT_NUM_TIMES: int = 3000
+NUM_TIMES_DEFAULT: int = 6000
 
 
 def create_array_of_logtimes(form_factors: FormFactorsData) -> None:
@@ -47,7 +47,7 @@ class FormFactorsData(Data):
         validator=attrs.validators.gt(0.0),
     )
     num_times: int = attrs.field(
-        default=DEFAULT_NUM_TIMES,
+        default=NUM_TIMES_DEFAULT,
         converter=int,
         validator=attrs.validators.gt(0),
     )
