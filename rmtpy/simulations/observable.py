@@ -8,7 +8,9 @@ from .data import Data
 from .plot import Plot
 
 
-def validate_plot_cls(plot_cls: type[Plot]) -> None:
+def validate_plot_cls(
+    plot_cls: type[Plot],
+) -> None:
     if not issubclass(plot_cls, Plot):
         raise ValueError("`plot_cls` must be a subclass of `Plot`")
 

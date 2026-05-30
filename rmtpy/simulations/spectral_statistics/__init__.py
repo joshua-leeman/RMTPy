@@ -1,5 +1,9 @@
 from .spectral_statistics_simulation import (
-    run_spectral_statistics,
     SpectralStatisticsSimulation,
+    run_spectral_statistics,
 )
 
+__all__ = [
+    "SpectralStatisticsSimulation",
+    "run_spectral_statistics",
+]

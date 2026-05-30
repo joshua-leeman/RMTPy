@@ -9,6 +9,7 @@ import numpy as np
 
 import rmtpy.conversion
 import rmtpy.polynomials
+
 from .many_body import ManyBodyEnsemble
 
 INITIALISM: str = "WDE"

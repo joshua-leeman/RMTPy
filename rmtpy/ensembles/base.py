@@ -2,15 +2,16 @@ from __future__ import annotations
 
 import ast
 import inspect
-from abc import ABC
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, ClassVar, Sequence, TypeAlias, Union
+from typing import Any, ClassVar, TypeAlias
 
 import attrs
 import numpy as np
 from cattrs.dispatch import StructureHook, UnstructureHook
 
 import rmtpy.conversion
+from rmtpy.conversion import RMT_CONVERTER
 
 INITIALISM: str = "RME"
 
@@ -24,16 +25,16 @@ REGISTRY: dict[str, type[RandomMatrixEnsemble]] = {}
 STRUCTURE_HOOKS: dict[str, StructureHook] = {}
 UNSTRUCTURE_HOOKS: dict[str, UnstructureHook] = {}
 
-SeedLike: TypeAlias = Union[
-    None,
-    bytes,
-    int,
-    np.random.SeedSequence,
-    np.random.BitGenerator,
-    np.random.Generator,
-    Sequence[int],
-    str,
-]
+SeedLike: TypeAlias = (
+    None
+    | bytes
+    | int
+    | np.random.SeedSequence
+    | np.random.BitGenerator
+    | np.random.Generator
+    | Sequence[int]
+    | str
+)
 
 
 def compute_complex_dtype(ens: RandomMatrixEnsemble) -> np.dtype:
@@ -53,7 +54,7 @@ def create_random_matrix_ensemble(**kwargs: Any) -> RandomMatrixEnsemble:
 
 
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
-class RandomMatrixEnsemble(ABC):
+class RandomMatrixEnsemble:
     initialism: ClassVar[str] = INITIALISM
 
     dtype: np.dtype[Any] = attrs.field(
@@ -95,12 +96,12 @@ class RandomMatrixEnsemble(ABC):
 
         key: str = rmtpy.conversion.to_registry_key(cls.__name__)
         REGISTRY[key] = cls
-        STRUCTURE_HOOKS[key] = rmtpy.conversion.CONVERTER.get_structure_hook(cls)
-        UNSTRUCTURE_HOOKS[key] = rmtpy.conversion.CONVERTER.get_unstructure_hook(cls)
+        STRUCTURE_HOOKS[key] = RMT_CONVERTER.get_structure_hook(cls)
+        UNSTRUCTURE_HOOKS[key] = RMT_CONVERTER.get_unstructure_hook(cls)
 
     @classmethod
     def create(cls, src: dict[str, Any] | RandomMatrixEnsemble) -> RandomMatrixEnsemble:
-        return rmtpy.conversion.CONVERTER.structure(src, cls)
+        return RMT_CONVERTER.structure(src, cls)
 
     @property
     def latex_name(self) -> str:
@@ -127,10 +128,10 @@ class RandomMatrixEnsemble(ABC):
             self.rng.bit_generator.state = rng_state
 
     def unstructure(self) -> dict[str, Any]:
-        return rmtpy.conversion.CONVERTER.unstructure(self)
+        return RMT_CONVERTER.unstructure(self)
 
 
-@rmtpy.conversion.CONVERTER.register_structure_hook
+@RMT_CONVERTER.register_structure_hook
 def structure_hook_for_ensemble(src: dict | Any, _) -> RandomMatrixEnsemble:
     if type(src) in REGISTRY.values():
         return src
@@ -144,12 +145,12 @@ def structure_hook_for_ensemble(src: dict | Any, _) -> RandomMatrixEnsemble:
     return ens_inst
 
 
-@rmtpy.conversion.CONVERTER.register_unstructure_hook
+@RMT_CONVERTER.register_unstructure_hook
 def unstructure_hook_for_ensemble(ens: RandomMatrixEnsemble) -> dict[str, Any]:
     args: dict[str, Any] = {}
     for name, attr in attrs.fields_dict(type(ens)).items():
         if attr.init:
-            args[name] = rmtpy.conversion.CONVERTER.unstructure(getattr(ens, name))
+            args[name] = RMT_CONVERTER.unstructure(getattr(ens, name))
 
     return {
         "name": rmtpy.conversion.to_registry_key(type(ens).__name__),

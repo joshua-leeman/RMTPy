@@ -5,6 +5,7 @@ import numpy as np
 
 import rmtpy.density
 import rmtpy.validators
+
 from ...data import Data
 
 NUM_TIMES_DEFAULT: int = 6000

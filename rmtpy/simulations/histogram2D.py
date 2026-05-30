@@ -5,6 +5,7 @@ import numpy as np
 
 import rmtpy.density
 import rmtpy.validators
+
 from .data import Data
 
 NUM_BINS_DEFAULT: int = 100
@@ -31,6 +32,10 @@ def create_zeroed_histogram2D_counts(hist: Histogram2D) -> np.ndarray:
 
 def create_empty_histogram2D(hist: Histogram2D) -> np.ndarray:
     return np.empty((hist.x_num_bins, hist.y_num_bins), dtype=np.float64)
+
+
+def finalize_histogram2D(hist: Histogram2D) -> None:
+    hist.compute_histogram_probabilities()
 
 
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
@@ -99,7 +104,7 @@ class Histogram2D(Data):
         repr=False,
     )
 
-    _realizs: int = attrs.field(
+    _realizs_count: int = attrs.field(
         factory=lambda: np.zeros((1,), dtype=np.int32),
         init=False,
         repr=False,
@@ -107,7 +112,7 @@ class Histogram2D(Data):
 
     @property
     def realizs(self) -> int:
-        return self._realizs[0]
+        return self._realizs_count[0]
 
     def add_histogram_contribution(
         self, x_data: np.ndarray, y_data: np.ndarray
@@ -123,7 +128,7 @@ class Histogram2D(Data):
         )
 
         np.add.at(self.counts, (x_indices[valid], y_indices[valid]), 1)
-        self._realizs[0] += 1
+        self._realizs_count[0] += 1
 
     def normalize_histogram(self) -> None:
         bin_areas: np.ndarray = np.outer(np.diff(self.x_bins), np.diff(self.y_bins))

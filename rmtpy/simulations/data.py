@@ -3,7 +3,6 @@ from __future__ import annotations
 import inspect
 import os
 import shutil
-from abc import ABC
 from pathlib import Path
 from typing import Any
 
@@ -12,6 +11,7 @@ import numpy as np
 from numpy.lib.npyio import NpzFile
 
 import rmtpy.conversion
+from rmtpy.conversion import RMT_CONVERTER
 
 REGISTRY: dict[str, type[Data]] = {}
 
@@ -37,8 +37,23 @@ def normalize_source(src: str | Path | dict[str, Any]) -> dict[str, Any]:
     raise TypeError(f"Expected path, dict, npz file, got {type(src).__name__}")
 
 
+def normalize_saved_value(value: Any) -> Any:
+    if isinstance(value, np.ndarray) and value.shape == ():
+        return value.item()
+    return value
+
+
+def file_name_for_init(value: Any) -> str:
+    file_name = str(normalize_saved_value(value))
+    if file_name.endswith(".npz"):
+        file_name = Path(file_name).stem
+    if file_name.endswith("_data"):
+        file_name = file_name[: -len("_data")]
+    return file_name
+
+
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
-class Data(ABC):
+class Data:
     file_name: str = attrs.field(
         default="simulation",
         converter=lambda name: str(name) + "_data",
@@ -64,7 +79,7 @@ class Data(ABC):
     @classmethod
     def load(cls, path: str | Path) -> Data:
         path: Path = Path(path)
-        return rmtpy.conversion.CONVERTER.structure(path, cls)
+        return RMT_CONVERTER.structure(path, cls)
 
     def save(self, path: str | Path) -> None:
         path: Path = Path(path)
@@ -76,7 +91,7 @@ class Data(ABC):
         shutil.move(tmp_path, path)
 
 
-@rmtpy.conversion.CONVERTER.register_structure_hook
+@RMT_CONVERTER.register_structure_hook
 def data_structure_hook(src: str | Path | dict[str, Any] | NpzFile | Data, _) -> Data:
     if isinstance(src, (str, Path)):
         file_name = Path(src).name
@@ -87,13 +102,22 @@ def data_structure_hook(src: str | Path | dict[str, Any] | NpzFile | Data, _) ->
     metadata: dict[str, Any] = normalize_metadata(src_dict["metadata"])
     src_dict["metadata"] = metadata
 
-    key: str | None = metadata.get("name", None)
+    key: str | None = metadata.get("name")
     if key in REGISTRY:
         data_cls: type[Data] = REGISTRY[key]
     else:
         raise ValueError(f"No registered Data class found in {src}")
 
-    data_instance: Data = data_cls(file_name=file_name)
-    for key in src_dict:
-        object.__setattr__(data_instance, key, src_dict[key])
+    init_kwargs: dict[str, Any] = {}
+    for name, attr in attrs.fields_dict(data_cls).items():
+        if not attr.init:
+            continue
+        if name == "file_name":
+            init_kwargs[name] = file_name_for_init(src_dict.get(name, file_name))
+        elif name in src_dict:
+            init_kwargs[name] = normalize_saved_value(src_dict[name])
+
+    data_instance: Data = data_cls(**init_kwargs)
+    for key, value in src_dict.items():
+        object.__setattr__(data_instance, key, normalize_saved_value(value))
     return data_instance

@@ -1,3 +1,6 @@
-from .spectral_histogram import SpectralHistogramPlot
-from .unfolded_spectral_histogram import UnfoldedSpectralHistogramPlot
+from .spectral_histogram import SpectralHistogramPlot, UnfoldedSpectralHistogramPlot
 
+__all__ = [
+    "SpectralHistogramPlot",
+    "UnfoldedSpectralHistogramPlot",
+]

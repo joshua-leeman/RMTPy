@@ -1,3 +1,6 @@
-from .resonance_histogram import ResonanceHistogramPlot
-from .unfolded_resonance_histogram import UnfoldedResonanceHistogramPlot
+from .resonance_histogram import ResonanceHistogramPlot, UnfoldedResonanceHistogramPlot
 
+__all__ = [
+    "ResonanceHistogramPlot",
+    "UnfoldedResonanceHistogramPlot",
+]

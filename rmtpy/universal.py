@@ -55,7 +55,7 @@ def universality_class(dyson_index: int) -> str | None:
         2: "GUE",
         4: "GSE",
     }
-    return dyson_indices.get(dyson_index, None)
+    return dyson_indices.get(dyson_index)
 
 
 def wigner_surmise(dyson_index: float, spacings: np.ndarray) -> np.ndarray:

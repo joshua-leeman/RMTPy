@@ -10,6 +10,7 @@ import numpy as np
 
 import rmtpy.fermions
 import rmtpy.polynomials
+
 from .many_body import ManyBodyEnsemble
 
 INITIALISM: str = "SYK"

@@ -3,15 +3,18 @@ from collections.abc import Iterator
 import attrs
 import numpy as np
 
-import rmtpy.ensembles
+from rmtpy.ensembles import PoissonEnsemble
+
 from .compound import Compound
 
 
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
 class PoissonCompound(Compound):
     def __attrs_post_init__(self) -> None:
-        if not isinstance(self.ensemble, rmtpy.ensembles.PoissonEnsemble):
+        if not isinstance(self.ensemble, PoissonEnsemble):
             raise TypeError("`ensemble` must be an instance of PoissonEnsemble.")
+
+        super().__attrs_post_init__()
 
     def generate_effective_hamiltonian(self) -> np.ndarray:
         lapack_heev: type = self.ensemble._pick_lapack_heev(use_complex_dtype=True)

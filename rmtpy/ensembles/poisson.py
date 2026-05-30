@@ -7,9 +7,10 @@ import attrs
 import numba
 import numpy as np
 
-import rmtpy.conversion
 import rmtpy.polynomials
 import rmtpy.universal
+from rmtpy.conversion import RMT_CONVERTER
+
 from .many_body import ManyBodyEnsemble
 from .wigner_dyson import (
     WIGNER_DYSON_ENSEMBLE_INITIALISMS_BY_NAME,
@@ -90,9 +91,9 @@ class PoissonEnsemble(ManyBodyEnsemble):
     @eigvecs_ensemble.default
     def create_eigvecs_ensemble_instance(self) -> WignerDysonEnsemble:
         flag: str = self.eigvecs_ensemble_flag
-        ens_dict: dict[str, Any] = rmtpy.conversion.CONVERTER.unstructure(self)
+        ens_dict: dict[str, Any] = RMT_CONVERTER.unstructure(self)
         ens_dict["name"] = WIGNER_DYSON_ENSEMBLE_NAMES_BY_INITIALISM[flag]
-        return rmtpy.conversion.CONVERTER.structure(ens_dict, WignerDysonEnsemble)
+        return RMT_CONVERTER.structure(ens_dict, WignerDysonEnsemble)
 
     @property
     def path_name(self) -> str:

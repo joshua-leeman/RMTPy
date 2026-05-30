@@ -3,7 +3,6 @@ from __future__ import annotations
 import inspect
 import json
 import re
-from abc import ABC
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
@@ -12,22 +11,23 @@ import attrs
 from cattrs.dispatch import StructureHook, UnstructureHook
 
 import rmtpy.conversion
-from .data import Data, REGISTRY as DATA_REGISTRY
+from rmtpy.conversion import RMT_CONVERTER
+
+from .data import REGISTRY as DATA_REGISTRY
+from .data import Data
 from .observable import Observable
 
 REGISTRY: dict[str, type[Simulation]] = {}
 STRUCTURE_HOOKS: dict[str, StructureHook] = {
-    key: rmtpy.conversion.CONVERTER.get_structure_hook(val)
-    for key, val in REGISTRY.items()
+    key: RMT_CONVERTER.get_structure_hook(val) for key, val in REGISTRY.items()
 }
 UNSTRUCTURE_HOOKS: dict[str, UnstructureHook] = {
-    key: rmtpy.conversion.CONVERTER.get_unstructure_hook(val)
-    for key, val in REGISTRY.items()
+    key: RMT_CONVERTER.get_unstructure_hook(val) for key, val in REGISTRY.items()
 }
 
 
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
-class Simulation(ABC):
+class Simulation:
     metadata: dict[str, Any] = attrs.field(
         factory=dict,
         init=False,
@@ -45,6 +45,8 @@ class Simulation(ABC):
         if not inspect.isabstract(cls):
             sim_key: str = re.sub(r"_", "", cls.__name__).lower()
             REGISTRY[sim_key] = cls
+            STRUCTURE_HOOKS[sim_key] = RMT_CONVERTER.get_structure_hook(cls)
+            UNSTRUCTURE_HOOKS[sim_key] = RMT_CONVERTER.get_unstructure_hook(cls)
 
     @property
     def path_name(self) -> str:
@@ -108,7 +110,7 @@ class Simulation(ABC):
         self.save_plots(out_dir=base_dir)
 
 
-@rmtpy.conversion.CONVERTER.register_structure_hook
+@RMT_CONVERTER.register_structure_hook
 def structure_hook_for_simulation(
     src: str | Path | dict[str, Any] | Simulation, _
 ) -> Simulation:
@@ -116,7 +118,7 @@ def structure_hook_for_simulation(
         return src
     elif isinstance(src, (str, Path)):
         path: Path = Path(src)
-        with open(path / "metadata.json", "r") as file:
+        with open(path / "metadata.json") as file:
             metadata: dict[str, Any] = json.load(file)
     elif isinstance(src, dict):
         metadata: dict[str, Any] = src

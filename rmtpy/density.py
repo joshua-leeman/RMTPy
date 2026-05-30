@@ -43,34 +43,12 @@ def compute_bin_centers(bins: np.ndarray) -> np.ndarray:
     return (bins[:-1] + bins[1:]) / 2
 
 
-def normalize_histogram(counts: np.ndarray, bins: np.ndarray) -> np.ndarray:
-    counts, bins = np.asarray(counts), np.asarray(bins)
-    if bins.ndim != 1 or counts.ndim != 1:
-        raise ValueError("`bins` and `counts` must be one-dimensional.")
-    if len(bins) != len(counts) + 1:
-        raise ValueError("`bins` must have exactly one more entry than `counts`.")
-    if np.any(np.diff(bins) <= 0):
-        raise ValueError("`bins` must be strictly increasing.")
-    if np.any(counts < 0):
-        raise ValueError("`counts` must be non-negative.")
-
-    total_counts: int = np.sum(counts)
-    if total_counts == 0:
-        raise ValueError("Cannot normalize histogram with zero total counts.")
-
-    return counts / (total_counts * np.diff(bins))
+def compute_default_number_of_bins(dist: DensityModel) -> int:
+    return int(np.ceil(np.sqrt(dist.dimension)))
 
 
-def create_pdf_interpolator_from_histogram(
-    histogram: np.ndarray,
-    bins: np.ndarray,
-    kernel_std_dev: float = GAUSSIAN_KERNEL_STANDARD_DEVIATION_DEFAULT,
-) -> PchipInterpolator:
-    histogram, bins = np.asarray(histogram), np.asarray(bins)
-
-    centers: np.ndarray = compute_bin_centers(bins)
-    pdf_values: np.ndarray = gaussian_filter1d(histogram, kernel_std_dev)
-    return PchipInterpolator(centers, pdf_values, extrapolate=True)
+def compute_optimal_realizations(dist: DensityModel) -> int:
+    return max(NUM_HISTOGRAM_COUNTS_DEFAULT // dist.dimension, NUM_REALIZATIONS_MIN)
 
 
 def create_cdf_interpolator_from_pdf(
@@ -96,29 +74,16 @@ def create_cdf_interpolator_from_pdf(
     return PchipInterpolator(inputs, cdf_values, extrapolate=True)
 
 
-def unfold_with_cdf(
-    values: np.ndarray, cdf: Callable[[np.ndarray], np.ndarray], dimension: int
-) -> np.ndarray:
-    values = np.asarray(values)
-    return dimension * (cdf(values) - cdf(np.array([0.0])))
+def create_pdf_interpolator_from_histogram(
+    histogram: np.ndarray,
+    bins: np.ndarray,
+    kernel_std_dev: float = GAUSSIAN_KERNEL_STANDARD_DEVIATION_DEFAULT,
+) -> PchipInterpolator:
+    histogram, bins = np.asarray(histogram), np.asarray(bins)
 
-
-def unfold_widths_with_cdf(
-    widths: np.ndarray,
-    centers: np.ndarray,
-    cdf: Callable[[np.ndarray], np.ndarray],
-    dimension: int,
-) -> np.ndarray:
-    centers, widths = np.asarray(centers), np.asarray(widths)
-    return dimension * (cdf(centers + widths / 2) - cdf(centers - widths / 2))
-
-
-def compute_default_number_of_bins(dist: DensityModel) -> int:
-    return int(np.ceil(np.sqrt(dist.dimension)))
-
-
-def compute_optimal_realizations(dist: DensityModel) -> int:
-    return max(NUM_HISTOGRAM_COUNTS_DEFAULT // dist.dimension, NUM_REALIZATIONS_MIN)
+    centers: np.ndarray = compute_bin_centers(bins)
+    pdf_values: np.ndarray = gaussian_filter1d(histogram, kernel_std_dev)
+    return PchipInterpolator(centers, pdf_values, extrapolate=True)
 
 
 def is_polynomial_expansion_completely_provided(
@@ -129,6 +94,51 @@ def is_polynomial_expansion_completely_provided(
             "A polynomial expansion requires both a set of orthogonal "
             "polynomials and its associated weight function."
         )
+
+
+def normalize_histogram(counts: np.ndarray, bins: np.ndarray) -> np.ndarray:
+    counts, bins = np.asarray(counts), np.asarray(bins)
+    if bins.ndim != 1 or counts.ndim != 1:
+        raise ValueError("`bins` and `counts` must be one-dimensional.")
+    if len(bins) != len(counts) + 1:
+        raise ValueError("`bins` must have exactly one more entry than `counts`.")
+    if np.any(np.diff(bins) <= 0):
+        raise ValueError("`bins` must be strictly increasing.")
+    if np.any(counts < 0):
+        raise ValueError("`counts` must be non-negative.")
+
+    total_counts: int = np.sum(counts)
+    if total_counts == 0:
+        raise ValueError("Cannot normalize histogram with zero total counts.")
+
+    return counts / (total_counts * np.diff(bins))
+
+
+def unfold_with_cdf(
+    values: np.ndarray,
+    *,
+    cdf: Callable[[np.ndarray], np.ndarray] | None = None,
+    dimension: int | None = None,
+) -> np.ndarray:
+    values = np.asarray(values)
+    if cdf is None:
+        return values
+
+    return dimension * (cdf(values) - cdf(np.array([0.0])))
+
+
+def unfold_widths_with_cdf(
+    *,
+    widths: np.ndarray,
+    centers: np.ndarray,
+    cdf: Callable[[np.ndarray], np.ndarray] | None,
+    dimension: int,
+) -> np.ndarray:
+    centers, widths = np.asarray(centers), np.asarray(widths)
+    if cdf is None:
+        return widths
+
+    return dimension * (cdf(centers + widths / 2) - cdf(centers - widths / 2))
 
 
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
@@ -234,6 +244,18 @@ class DensityModel:
         radius: float = self.support_scale_factor * self.support_radius
         return center - radius, center + radius
 
+    def average_cdf(self, points: np.ndarray) -> np.ndarray:
+        if not self.has_polynomial_expansion:
+            return self._average_cdf_from_samples(points)
+
+        return self._average_cdf_from_polynomials(points)
+
+    def average_pdf(self, points: np.ndarray) -> np.ndarray:
+        if not self.has_polynomial_expansion:
+            return self._average_pdf_from_samples(points)
+
+        return self._average_pdf_from_polynomials(points)
+
     def compute_polynomials(self, inputs: np.ndarray) -> np.ndarray:
         if not self.has_polynomial_expansion:
             raise NotImplementedError()
@@ -242,43 +264,15 @@ class DensityModel:
         x: np.ndarray = (np.asarray(inputs) - center) / self.support_radius
         return self.polynomials(x, self.max_polynomial_degree)
 
+    def compute_variate_coeffs(self, sample: np.ndarray) -> np.ndarray:
+        polynomials: np.ndarray = self.compute_polynomials(np.asarray(sample))
+        return np.mean(polynomials, axis=1)
+
     def compute_weight_function(self, inputs: np.ndarray) -> np.ndarray:
         if not self.has_polynomial_expansion:
             raise NotImplementedError()
 
         return self.weight_function(np.asarray(inputs))
-
-    def weight_pdf(self, points: np.ndarray) -> np.ndarray:
-        if not self.has_polynomial_expansion:
-            return self._average_pdf_from_samples(points)
-
-        return self.compute_weight_function(points)
-
-    def weight_cdf(self, points: np.ndarray) -> np.ndarray:
-        if not self.has_polynomial_expansion:
-            return self._average_cdf_from_samples(points)
-
-        if self._weight_cdf_interpolator is None:
-            _weight_cdf: PchipInterpolator = self._create_weight_cdf_interpolator()
-            object.__setattr__(self, "_weight_cdf_interpolator", _weight_cdf)
-
-        return self._weight_cdf_interpolator(points)
-
-    def average_pdf(self, points: np.ndarray) -> np.ndarray:
-        if not self.has_polynomial_expansion:
-            return self._average_pdf_from_samples(points)
-
-        return self._average_pdf_from_polynomials(points)
-
-    def average_cdf(self, points: np.ndarray) -> np.ndarray:
-        if not self.has_polynomial_expansion:
-            return self._average_cdf_from_samples(points)
-
-        return self._average_cdf_from_polynomials(points)
-
-    def compute_variate_coeffs(self, sample: np.ndarray) -> np.ndarray:
-        polynomials: np.ndarray = self.compute_polynomials(np.asarray(sample))
-        return np.mean(polynomials, axis=1)
 
     def create_variate_cdf_interpolator(
         self,
@@ -330,6 +324,32 @@ class DensityModel:
         )
         return cdf_interpolator(points)
 
+    def weight_pdf(self, points: np.ndarray) -> np.ndarray:
+        if not self.has_polynomial_expansion:
+            return self._average_pdf_from_samples(points)
+
+        return self.compute_weight_function(points)
+
+    def weight_cdf(self, points: np.ndarray) -> np.ndarray:
+        if not self.has_polynomial_expansion:
+            return self._average_cdf_from_samples(points)
+
+        if self._weight_cdf_interpolator is None:
+            _weight_cdf: PchipInterpolator = self._create_weight_cdf_interpolator()
+            object.__setattr__(self, "_weight_cdf_interpolator", _weight_cdf)
+
+        return self._weight_cdf_interpolator(points)
+
+    def _average_cdf_from_polynomials(self, points: np.ndarray) -> np.ndarray:
+        return self.create_variate_cdf_interpolator(coeffs=self.average_coeffs)(points)
+
+    def _average_cdf_from_samples(self, points: np.ndarray) -> np.ndarray:
+        if self._average_cdf_interpolator is None:
+            _average_cdf: PchipInterpolator = self._create_average_cdf_interpolator()
+            object.__setattr__(self, "_average_cdf_interpolator", _average_cdf)
+
+        return self._average_cdf_interpolator(points)
+
     def _average_pdf_from_polynomials(self, points: np.ndarray) -> np.ndarray:
         return self._variate_pdf_from_polynomials(points, coeffs=self.average_coeffs)
 
@@ -341,16 +361,6 @@ class DensityModel:
             object.__setattr__(self, "_average_pdf_interpolator", _average_pdf)
 
         return self._average_pdf_interpolator(points)
-
-    def _average_cdf_from_polynomials(self, points: np.ndarray) -> np.ndarray:
-        return self.create_variate_cdf_interpolator(coeffs=self.average_coeffs)(points)
-
-    def _average_cdf_from_samples(self, points: np.ndarray) -> np.ndarray:
-        if self._average_cdf_interpolator is None:
-            _average_cdf: PchipInterpolator = self._create_average_cdf_interpolator()
-            object.__setattr__(self, "_average_cdf_interpolator", _average_cdf)
-
-        return self._average_cdf_interpolator(points)
 
     def _compute_average_coeffs(self) -> np.ndarray:
         average_coeffs: np.ndarray = np.zeros(self.max_polynomial_degree + 1)

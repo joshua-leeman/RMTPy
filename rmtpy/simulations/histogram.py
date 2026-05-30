@@ -5,6 +5,7 @@ import numpy as np
 
 import rmtpy.density
 import rmtpy.validators
+
 from .data import Data
 
 NUM_BINS_DEFAULT: int = 100
@@ -22,8 +23,8 @@ def create_empty_histogram(hist: Histogram) -> np.ndarray:
     return np.empty(hist.num_bins, dtype=np.float64)
 
 
-def finalize_histogram(histogram: Histogram) -> None:
-    histogram.normalize_histogram()
+def finalize_histogram(hist: Histogram) -> None:
+    hist.normalize_histogram()
 
 
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
@@ -62,13 +63,13 @@ class Histogram(Data):
         repr=False,
     )
 
-    _realizs: int = attrs.field(
+    _realizs_count: int = attrs.field(
         init=False, factory=lambda: np.zeros((1,), dtype=np.int64)
     )
 
     @property
     def realizs(self) -> int:
-        return self._realizs[0]
+        return self._realizs_count[0]
 
     def add_histogram_contribution(self, data: np.ndarray) -> None:
         if isinstance(data, (int, float)):
@@ -77,7 +78,7 @@ class Histogram(Data):
         indices = np.searchsorted(self.bins, data, side="right") - 1
         valid = (indices >= 0) & (indices < len(self.counts))
         np.add.at(self.counts, indices[valid], 1)
-        self._realizs[0] += 1
+        self._realizs_count[0] += 1
 
     def normalize_histogram(self) -> None:
         self.histogram[:] = rmtpy.density.normalize_histogram(self.counts, self.bins)

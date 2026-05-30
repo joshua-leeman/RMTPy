@@ -1,3 +1,6 @@
-from .spacing_histogram import SpacingsHistogramPlot
-from .unfolded_spacing_histogram import UnfoldedSpacingsHistogramPlot
+from .spacing_histogram import SpacingsHistogramPlot, UnfoldedSpacingsHistogramPlot
 
+__all__ = [
+    "SpacingsHistogramPlot",
+    "UnfoldedSpacingsHistogramPlot",
+]

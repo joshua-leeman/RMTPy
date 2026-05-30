@@ -7,9 +7,9 @@ import attrs
 import cattrs
 import numpy as np
 
-CONVERTER: cattrs.Converter = cattrs.Converter()
-CONVERTER.register_unstructure_hook(np.dtype, lambda dtype: np.dtype(dtype).name)
-CONVERTER.register_structure_hook(np.dtype, lambda dtype, _: np.dtype(dtype))
+RMT_CONVERTER: cattrs.Converter = cattrs.Converter()
+RMT_CONVERTER.register_unstructure_hook(np.dtype, lambda dtype: np.dtype(dtype).name)
+RMT_CONVERTER.register_structure_hook(np.dtype, lambda dtype, _: np.dtype(dtype))
 
 
 def create_hashed_id(array: np.ndarray, num_hex: int = 16) -> str:
@@ -49,7 +49,7 @@ def normalize_dict(src: dict[str, Any], registry: dict[str, type]) -> dict[str, 
     for val in src.values():
         if not isinstance(val, dict):
             continue
-        for key in val.keys():
+        for key in val:
             if key in cls_args:
                 arg_dict[key] = val[key]
 

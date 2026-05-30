@@ -1,3 +1,6 @@
-from .unfolded_width_histogram import UnfoldedWidthHistogramPlot
-from .width_histogram import WidthHistogramPlot
+from .width_histogram import UnfoldedWidthHistogramPlot, WidthHistogramPlot
 
+__all__ = [
+    "UnfoldedWidthHistogramPlot",
+    "WidthHistogramPlot",
+]

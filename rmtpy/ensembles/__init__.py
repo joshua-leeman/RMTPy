@@ -1,4 +1,4 @@
-from typing import TypeAlias, Union
+from typing import TypeAlias
 
 from .base import RandomMatrixEnsemble
 from .bdgc import BogoliubovDeGennesCEnsemble
@@ -22,12 +22,9 @@ Poisson = PoissonEnsemble
 SYK = SachdevYeKitaevEnsemble
 WDE = WignerDysonEnsemble
 
-EnsembleLike: TypeAlias = Union[
-    ManyBodyEnsemble,
-    WignerDysonEnsemble,
-    PoissonEnsemble,
-    SachdevYeKitaevEnsemble,
-]
+EnsembleLike: TypeAlias = (
+    ManyBodyEnsemble | WignerDysonEnsemble | PoissonEnsemble | SachdevYeKitaevEnsemble
+)
 
 __all__ = [
     "RandomMatrixEnsemble",

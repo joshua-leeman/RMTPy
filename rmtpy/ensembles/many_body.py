@@ -8,15 +8,26 @@ import attrs
 import numpy as np
 
 # BLAS/LAPACK routines by dtype: s=float32, d=float64, c=complex64, z=complex128
-from scipy.linalg.blas import ccopy, dcopy, scopy, zcopy
-from scipy.linalg.blas import cgemm, dgemm, sgemm, zgemm
-from scipy.linalg.blas import cher, dsyr, ssyr, zher
-from scipy.linalg.lapack import cgeev, dgeev, sgeev, zgeev
-from scipy.linalg.lapack import cheev, dsyev, ssyev, zheev
+from scipy.linalg.blas import (
+    ccopy,
+    cgemm,
+    cher,
+    dcopy,
+    dgemm,
+    dsyr,
+    scopy,
+    sgemm,
+    ssyr,
+    zcopy,
+    zgemm,
+    zher,
+)
+from scipy.linalg.lapack import cgeev, cheev, dgeev, dsyev, sgeev, ssyev, zgeev, zheev
 
 import rmtpy.density
 import rmtpy.universal
 import rmtpy.validators
+
 from .base import RandomMatrixEnsemble
 
 INITIALISM: str = "MBE"

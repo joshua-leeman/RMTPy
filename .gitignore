@@ -1,6 +1,7 @@
 # Project-specific files and directories
-rmtpy.code-workspace
 .filelist
+rmtpy.code-workspace
+.ruff_cache/
 output/
 scratch/
 archive/

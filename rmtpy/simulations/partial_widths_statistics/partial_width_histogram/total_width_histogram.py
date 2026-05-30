@@ -1,25 +1,23 @@
-from __future__ import annotations
-
-from dataclasses import dataclass, field
+import dataclasses
 from pathlib import Path
 
-import numpy as np
 from matplotlib.patches import Patch
 from matplotlib.ticker import NullFormatter
 
-from ....compounds import Compound
-from ....conversion import rmtpy_converter
-from ....density import compute_histogram_bin_centers
+import rmtpy.density
+from rmtpy.compounds import Compound
+
 from ...histogram import Histogram
 from ...plot import Plot, PlotAxes, PlotLegend
 
-@dataclass(repr=False, eq=False, kw_only=True)
+
+@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
 class TotalWidthHistogramLegend(PlotLegend):
     loc: str = "upper right"
     bbox: tuple[float, float] = (0.94, 0.95)
 
 
-@dataclass(repr=False, eq=False, kw_only=True)
+@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
 class TotalWidthHistogramAxes(PlotAxes):
     xticks: tuple[float, ...] = tuple(range(-1, 2))  # log scale base 10
     xticks_minor: tuple[float, ...] = tuple()
@@ -42,10 +40,12 @@ class TotalWidthHistogramAxes(PlotAxes):
     )
 
 
-@dataclass(repr=False, eq=False, kw_only=True)
+@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
 class TotalWidthHistogramPlot(Plot):
     data: Histogram
-    axes: TotalWidthHistogramAxes = field(default_factory=TotalWidthHistogramAxes)
+    axes: TotalWidthHistogramAxes = dataclasses.field(
+        default_factory=TotalWidthHistogramAxes
+    )
 
     xlim: tuple[float, float] = (-1.2, 1.2)  # log scale base 10
     ylim: tuple[float, float] = (-3.2, 1.2)  # log scale base 10
@@ -61,14 +61,7 @@ class TotalWidthHistogramPlot(Plot):
     )
 
     def set_derived_attributes(self) -> None:
-        try:
-            compound_meta: dict = self.data.metadata["simulation"]["args"]["compound"]
-        except KeyError:
-            raise ValueError("Compound metadata not found.")
-        except TypeError:
-            raise ValueError("Metadata is not properly structured.")
-
-        self.compound: Compound = rmtpy_converter.structure(compound_meta, Compound)
+        self.compound: Compound = self.structure_simulation_arg("compound", Compound)
 
         self.legend: TotalWidthHistogramLegend = TotalWidthHistogramLegend(
             handles=self.legend_handles, labels=self.legend_labels
@@ -76,14 +69,10 @@ class TotalWidthHistogramPlot(Plot):
         if self.legend.title is None:
             self.legend.title = self.compound.to_latex
 
-        axes: TotalWidthHistogramAxes = self.axes
-        self.xlim = tuple(10**x for x in self.xlim)
-        self.ylim = tuple(10**y for y in self.ylim)
-
-        axes.xticks = tuple(10**xtick for xtick in axes.xticks)
-        axes.yticks = tuple(10**ytick for ytick in axes.yticks)
-        axes.xticks_minor = tuple(10**xtick for xtick in axes.xticks_minor)
-        axes.yticks_minor = tuple(10**ytick for ytick in axes.yticks_minor)
+        self.scale_limits_and_ticks(
+            x=lambda value: 10**value,
+            y=lambda value: 10**value,
+        )
 
     def plot(self, path: str | Path) -> None:
         self.set_derived_attributes()
@@ -96,12 +85,9 @@ class TotalWidthHistogramPlot(Plot):
         self.ax.xaxis.set_minor_formatter(NullFormatter())
         self.ax.yaxis.set_minor_formatter(NullFormatter())
 
-        centers = compute_histogram_bin_centers(self.data.bins, bins_log_spaced=True)
+        centers = rmtpy.density.compute_bin_centers(self.data.bins)
 
-        self.ax.hist(
-            self.data.bins[:-1],
-            bins=self.data.bins,
-            weights=self.data.histogram,
+        self.draw_histogram(
             color=self.histogram_color,
             alpha=self.histogram_alpha,
             zorder=self.histogram_zorder,

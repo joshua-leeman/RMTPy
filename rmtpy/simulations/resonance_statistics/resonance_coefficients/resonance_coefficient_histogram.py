@@ -3,21 +3,20 @@ from pathlib import Path
 
 from matplotlib.patches import Patch
 
-from rmtpy.ensembles import ManyBodyEnsemble
-
+from ....compounds import Compound
 from ...histogram import Histogram
 from ...plot import Plot, PlotAxes, PlotLegend
 
 
 @dataclasses.dataclass(repr=False, eq=False, kw_only=True)
-class SpectralCoefficientHistogramLegend(PlotLegend):
+class ResonanceCoefficientHistogramLegend(PlotLegend):
     loc: str = "upper right"
     bbox: tuple[float, float] = (0.94, 0.95)
 
 
 @dataclasses.dataclass(repr=False, eq=False, kw_only=True)
-class SpectralCoefficientHistogramAxes(PlotAxes):
-    xticks: tuple[float, ...] = (-0.2, -0.1, 0.0, 0.1, 0.2)  # units of energy_0
+class ResonanceCoefficientHistogramAxes(PlotAxes):
+    xticks: tuple[float, ...] = (-0.2, -0.1, 0.0, 0.1, 0.2)
     xticks_minor: tuple[float, ...] = (-0.15, -0.05, 0.05, 0.15)
     xlabel: str = r"$c$"
     xtick_labels: tuple[str, ...] = (
@@ -28,7 +27,7 @@ class SpectralCoefficientHistogramAxes(PlotAxes):
         r"$+0.2$",
     )
 
-    yticks: tuple[float, ...] = tuple(range(0, 24, 4))  # units of 1 / (pi * energy_0)
+    yticks: tuple[float, ...] = tuple(range(0, 24, 4))
     yticks_minor: tuple[float, ...] = tuple(range(2, 22, 4))
     ylabel: str = r"$\ensavg{\rho(c)}$"
     ytick_labels: tuple[str, ...] = (
@@ -42,37 +41,35 @@ class SpectralCoefficientHistogramAxes(PlotAxes):
 
 
 @dataclasses.dataclass(repr=False, eq=False, kw_only=True)
-class SpectralCoefficientHistogramPlot(Plot):
+class ResonanceCoefficientHistogramPlot(Plot):
     data: Histogram
-    axes: SpectralCoefficientHistogramAxes = dataclasses.field(
-        default_factory=SpectralCoefficientHistogramAxes
+    axes: ResonanceCoefficientHistogramAxes = dataclasses.field(
+        default_factory=ResonanceCoefficientHistogramAxes
     )
 
-    xlim: tuple[float, float] = (-0.2, 0.2)  # units of energy_0
-    ylim: tuple[float, float] = (0.0, 20)  # units of 1 / (pi * energy_0)
+    xlim: tuple[float, float] = (-0.2, 0.2)
+    ylim: tuple[float, float] = (0.0, 20.0)
 
     histogram_zorder: int = 1
     histogram_alpha: float = 0.5
-    histogram_color: str = "RoyalBlue"
+    histogram_color: str = "OrangeRed"
     histogram_legend: str = "simulation"
 
-    legend_labels: tuple[str] = (histogram_legend,)
-    legend_handles: tuple[Patch] = (
+    legend_labels: tuple[str, ...] = (histogram_legend,)
+    legend_handles: tuple[Patch, ...] = (
         Patch(color=histogram_color, alpha=histogram_alpha),
     )
 
     def set_derived_attributes(self) -> None:
-        self.ensemble: ManyBodyEnsemble = self.structure_simulation_arg(
-            "ensemble", ManyBodyEnsemble
-        )
+        self.compound: Compound = self.structure_simulation_arg("compound", Compound)
 
-        self.legend: SpectralCoefficientHistogramLegend = (
-            SpectralCoefficientHistogramLegend(
+        self.legend: ResonanceCoefficientHistogramLegend = (
+            ResonanceCoefficientHistogramLegend(
                 handles=self.legend_handles, labels=self.legend_labels
             )
         )
         if self.legend.title is None:
-            self.legend.title = self.ensemble.to_latex
+            self.legend.title = self.compound.to_latex
 
     def plot(self, path: str | Path) -> None:
         self.set_derived_attributes()
