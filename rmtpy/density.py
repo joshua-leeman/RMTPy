@@ -11,15 +11,20 @@ from scipy.ndimage import gaussian_filter1d
 import rmtpy.validators
 
 GAUSSIAN_KERNEL_STANDARD_DEVIATION_DEFAULT: float = 2.0
+
 MAX_POLYNOMIAL_DEGREE_DEFAULT: int = 20
+
 NUM_HISTOGRAM_COUNTS_DEFAULT: int = 2**13
+
 NUM_POINTS_DEFAULT: int = 1000
+
 NUM_REALIZATIONS_MIN: int = 10
+
 SUPPORT_SCALE_FACTOR_DEFAULT: float = 1.2
 
 
 def array_of_floats(
-    support: tuple[float, float], num_pts: int, log_base: float | None = None
+    *, support: tuple[float, float], num_pts: int, log_base: float | None = None
 ) -> np.ndarray:
     rmtpy.validators.validate_support(support)
     if log_base is None:
@@ -53,6 +58,7 @@ def compute_optimal_realizations(dist: DensityModel) -> int:
 
 def create_cdf_interpolator_from_pdf(
     pdf: Callable[[np.ndarray], np.ndarray],
+    *,
     inputs: np.ndarray,
     left_tail_mass: float = 0.0,
 ) -> PchipInterpolator:
@@ -75,6 +81,7 @@ def create_cdf_interpolator_from_pdf(
 
 
 def create_pdf_interpolator_from_histogram(
+    *,
     histogram: np.ndarray,
     bins: np.ndarray,
     kernel_std_dev: float = GAUSSIAN_KERNEL_STANDARD_DEVIATION_DEFAULT,
@@ -114,7 +121,7 @@ def normalize_histogram(counts: np.ndarray, bins: np.ndarray) -> np.ndarray:
     return counts / (total_counts * np.diff(bins))
 
 
-def unfold_with_cdf(
+def unfold_values_with_cdf(
     values: np.ndarray,
     *,
     cdf: Callable[[np.ndarray], np.ndarray] | None = None,
@@ -256,6 +263,12 @@ class DensityModel:
 
         return self._average_pdf_from_polynomials(points)
 
+    def compute_polynomial_weight(self, inputs: np.ndarray) -> np.ndarray:
+        if not self.has_polynomial_expansion:
+            raise NotImplementedError()
+
+        return self.weight_function(np.asarray(inputs))
+
     def compute_polynomials(self, inputs: np.ndarray) -> np.ndarray:
         if not self.has_polynomial_expansion:
             raise NotImplementedError()
@@ -268,14 +281,9 @@ class DensityModel:
         polynomials: np.ndarray = self.compute_polynomials(np.asarray(sample))
         return np.mean(polynomials, axis=1)
 
-    def compute_weight_function(self, inputs: np.ndarray) -> np.ndarray:
-        if not self.has_polynomial_expansion:
-            raise NotImplementedError()
-
-        return self.weight_function(np.asarray(inputs))
-
     def create_variate_cdf_interpolator(
         self,
+        *,
         interval: tuple[float, float] | None = None,
         coeffs: np.ndarray | None = None,
         sample: np.ndarray | None = None,
@@ -290,19 +298,28 @@ class DensityModel:
 
         if interval[0] > self.plot_range[0]:
             left_tail_range: tuple[float, float] = (self.plot_range[0], interval[0])
-            left_tail: np.ndarray = array_of_floats(left_tail_range, self.num_pts)
+            left_tail: np.ndarray = array_of_floats(
+                support=left_tail_range,
+                num_pts=self.num_pts,
+            )
             left_tail_mass: float = cumulative_trapezoid(pdf(left_tail), left_tail)[-1]
         else:
             left_tail_mass: float = 0.0
 
-        inputs: np.ndarray = array_of_floats(interval, self.num_pts)
+        inputs: np.ndarray = array_of_floats(
+            support=interval,
+            num_pts=self.num_pts,
+        )
         return create_cdf_interpolator_from_pdf(
-            pdf, inputs, left_tail_mass=left_tail_mass
+            pdf,
+            inputs=inputs,
+            left_tail_mass=left_tail_mass,
         )
 
     def variate_pdf(
         self,
         points: np.ndarray,
+        *,
         coeffs: np.ndarray | None = None,
         sample: np.ndarray | None = None,
     ) -> np.ndarray:
@@ -311,11 +328,12 @@ class DensityModel:
                 points, coeffs=coeffs, sample=sample
             )
 
-        return self._variate_pdf_from_sample(points, sample)
+        return self._variate_pdf_from_sample(points, sample=sample)
 
     def variate_cdf(
         self,
         points: np.ndarray,
+        *,
         coeffs: np.ndarray | None = None,
         sample: np.ndarray | None = None,
     ) -> np.ndarray:
@@ -328,7 +346,7 @@ class DensityModel:
         if not self.has_polynomial_expansion:
             return self._average_pdf_from_samples(points)
 
-        return self.compute_weight_function(points)
+        return self.compute_polynomial_weight(points)
 
     def weight_cdf(self, points: np.ndarray) -> np.ndarray:
         if not self.has_polynomial_expansion:
@@ -372,11 +390,11 @@ class DensityModel:
 
     def _create_weight_cdf_interpolator(self) -> PchipInterpolator:
         inputs: np.ndarray = np.linspace(*self.plot_range, self.num_pts)
-        return create_cdf_interpolator_from_pdf(self.weight_pdf, inputs)
+        return create_cdf_interpolator_from_pdf(self.weight_pdf, inputs=inputs)
 
     def _create_average_cdf_interpolator(self) -> PchipInterpolator:
         inputs: np.ndarray = np.linspace(*self.plot_range, self.num_pts)
-        return create_cdf_interpolator_from_pdf(self.average_pdf, inputs)
+        return create_cdf_interpolator_from_pdf(self.average_pdf, inputs=inputs)
 
     def _create_average_pdf_interpolator_from_samples(self) -> PchipInterpolator:
         bins: np.ndarray = np.linspace(*self.plot_range, self.num_bins + 1)
@@ -386,7 +404,9 @@ class DensityModel:
 
         histogram: np.ndarray = normalize_histogram(counts, bins)
         return create_pdf_interpolator_from_histogram(
-            histogram, bins, kernel_std_dev=self.kernel_std_dev
+            histogram=histogram,
+            bins=bins,
+            kernel_std_dev=self.kernel_std_dev,
         )
 
     def _create_variate_pdf_interpolator_from_sample(
@@ -396,12 +416,15 @@ class DensityModel:
         counts: np.ndarray = np.histogram(np.asarray(sample), bins=bins)[0]
         histogram: np.ndarray = normalize_histogram(counts, bins)
         return create_pdf_interpolator_from_histogram(
-            histogram, bins, kernel_std_dev=self.kernel_std_dev
+            histogram=histogram,
+            bins=bins,
+            kernel_std_dev=self.kernel_std_dev,
         )
 
     def _variate_pdf_from_polynomials(
         self,
         points: np.ndarray,
+        *,
         coeffs: np.ndarray | None = None,
         sample: np.ndarray | None = None,
     ) -> np.ndarray:
@@ -411,12 +434,12 @@ class DensityModel:
         if sample is not None:
             coeffs: np.ndarray = self.compute_variate_coeffs(sample)
 
-        weight_function: np.ndarray = self.compute_weight_function(points)
+        weight_function: np.ndarray = self.compute_polynomial_weight(points)
         polynomials: np.ndarray = self.compute_polynomials(points)
         return weight_function * np.sum(coeffs[:, None] * polynomials, axis=0)
 
     def _variate_pdf_from_sample(
-        self, points: np.ndarray, sample: np.ndarray | None
+        self, points: np.ndarray, *, sample: np.ndarray | None
     ) -> np.ndarray:
         if sample is None:
             raise ValueError("`sample` must be provided for sample-based PDFs.")

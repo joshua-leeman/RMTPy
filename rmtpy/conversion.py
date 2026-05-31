@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import hashlib
 import re
 from pathlib import Path
@@ -8,11 +10,11 @@ import cattrs
 import numpy as np
 
 RMT_CONVERTER: cattrs.Converter = cattrs.Converter()
-RMT_CONVERTER.register_unstructure_hook(np.dtype, lambda dtype: np.dtype(dtype).name)
 RMT_CONVERTER.register_structure_hook(np.dtype, lambda dtype, _: np.dtype(dtype))
+RMT_CONVERTER.register_unstructure_hook(np.dtype, lambda dtype: np.dtype(dtype).name)
 
 
-def create_hashed_id(array: np.ndarray, num_hex: int = 16) -> str:
+def create_hashed_id(array: np.ndarray, *, num_hex: int = 16) -> str:
     hash_object: hashlib._Hash = hashlib.sha256()
     hash_object.update(str(array.dtype).encode())
     hash_object.update(str(array.shape).encode())

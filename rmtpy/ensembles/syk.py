@@ -18,6 +18,12 @@ INITIALISM: str = "SYK"
 NUM_MAJORANAS_LIMIT_BY_Q: dict[int, int] = {2: 32, 4: 32, 6: 26, 8: 24, 10: 22}
 
 
+def choose_matrix_block_slice(syk: SachdevYeKitaevEnsemble) -> tuple[slice, slice]:
+    return rmtpy.fermions.choose_block_slice_from_parity(
+        syk.num_majoranas, syk.is_even_parity
+    )
+
+
 def compute_dyson_index(syk: SachdevYeKitaevEnsemble) -> int:
     if syk.q == 2:
         return 0
@@ -45,12 +51,6 @@ def compute_suppression_factor(syk: SachdevYeKitaevEnsemble) -> float:
     )
 
 
-def choose_matrix_block_slice(syk: SachdevYeKitaevEnsemble) -> tuple[slice, slice]:
-    return rmtpy.fermions.choose_block_slice_from_parity(
-        syk.num_majoranas, syk.is_even_parity
-    )
-
-
 def create_spectral_polynomials(
     syk: SachdevYeKitaevEnsemble,
 ) -> Callable[[np.ndarray, int], np.ndarray]:
@@ -71,15 +71,7 @@ def create_spectral_weight(
     return syk_spectral_weight
 
 
-def is_num_majoranas_within_limit(syk: SachdevYeKitaevEnsemble, _, q: int) -> None:
-    if syk.num_majoranas > NUM_MAJORANAS_LIMIT_BY_Q[q]:
-        raise ValueError(
-            f"For the SYK q={q} model, `num_majoranas` cannot exceed "
-            "{NUM_MAJORANAS_LIMIT_BY_Q[q]} due to memory constraints."
-        )
-
-
-@numba.njit(cache=True, fastmath=True)
+@numba.njit(boundscheck=False, cache=True, fastmath=True)
 def create_syk_matrix_with_imaginary_prefactor(
     matrix: np.ndarray,
     rng: np.random.Generator,
@@ -98,7 +90,7 @@ def create_syk_matrix_with_imaginary_prefactor(
             )
 
 
-@numba.njit(cache=True, fastmath=True)
+@numba.njit(boundscheck=False, cache=True, fastmath=True)
 def create_syk_matrix_without_imaginary_prefactor(
     matrix: np.ndarray,
     rng: np.random.Generator,
@@ -115,6 +107,14 @@ def create_syk_matrix_without_imaginary_prefactor(
             matrix[term_idxs[term_num, 0, entry], term_idxs[term_num, 1, entry]] += (
                 coeffs[term_num] * term_data[term_num, entry]
             )
+
+
+def is_num_majoranas_within_limit(syk: SachdevYeKitaevEnsemble, _, q: int) -> None:
+    if syk.num_majoranas > NUM_MAJORANAS_LIMIT_BY_Q[q]:
+        raise ValueError(
+            f"For the SYK q={q} model, `num_majoranas` cannot exceed "
+            "{NUM_MAJORANAS_LIMIT_BY_Q[q]} due to memory constraints."
+        )
 
 
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
@@ -199,8 +199,8 @@ class SachdevYeKitaevEnsemble(ManyBodyEnsemble):
 
         return self._q_body_term_decomps
 
-    def generate_matrix(self, use_complex_dtype: bool = False) -> np.ndarray:
-        matrix = self._initialize_matrix(use_complex_dtype)
+    def generate_matrix(self, *, use_complex_dtype: bool = False) -> np.ndarray:
+        matrix = self._initialize_matrix(use_complex_dtype=use_complex_dtype)
         create_syk_matrix = self._pick_syk_matrix_builder()
         create_syk_matrix(
             matrix,
@@ -213,9 +213,9 @@ class SachdevYeKitaevEnsemble(ManyBodyEnsemble):
         return matrix
 
     def matrix_stream(
-        self, realizs: int, use_complex_dtype: bool = False
+        self, *, realizs: int, use_complex_dtype: bool = False
     ) -> Iterator[np.ndarray]:
-        matrix = self._initialize_matrix(use_complex_dtype)
+        matrix = self._initialize_matrix(use_complex_dtype=use_complex_dtype)
         create_syk_matrix = self._pick_syk_matrix_builder()
         for _ in range(realizs):
             create_syk_matrix(
@@ -228,7 +228,7 @@ class SachdevYeKitaevEnsemble(ManyBodyEnsemble):
             )
             yield matrix
 
-    def _initialize_matrix(self, use_complex_dtype: bool = False) -> np.ndarray:
+    def _initialize_matrix(self, *, use_complex_dtype: bool = False) -> np.ndarray:
         size: int = self.dimension
         if use_complex_dtype or self.dyson_index != 1:
             return np.empty((size, size), self.complex_dtype.type, order="F")

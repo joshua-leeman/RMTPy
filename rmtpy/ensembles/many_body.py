@@ -6,23 +6,8 @@ from typing import ClassVar
 
 import attrs
 import numpy as np
-
-# BLAS/LAPACK routines by dtype: s=float32, d=float64, c=complex64, z=complex128
-from scipy.linalg.blas import (
-    ccopy,
-    cgemm,
-    cher,
-    dcopy,
-    dgemm,
-    dsyr,
-    scopy,
-    sgemm,
-    ssyr,
-    zcopy,
-    zgemm,
-    zher,
-)
-from scipy.linalg.lapack import cgeev, cheev, dgeev, dsyev, sgeev, ssyev, zgeev, zheev
+import scipy.linalg.blas
+import scipy.linalg.lapack
 
 import rmtpy.density
 import rmtpy.universal
@@ -30,22 +15,25 @@ import rmtpy.validators
 
 from .base import RandomMatrixEnsemble
 
-INITIALISM: str = "MBE"
+DYSON_INDEX: int = 0
 
 INTERACTION_STRENGTH_DEFAULT: float = 1.0
 INTERACTION_STRENGTH_METADATA: dict[str, str] = {
     "dir_name": "J",
 }
+
 MAX_SPECTRAL_POLYNOMIAL_DEGREE_METADATA: dict[str, str] = {
     "dir_name": "polydeg",
 }
-DYSON_INDEX: int = 0
+
 NUM_MAJORANAS_MIN: int = 4
 NUM_MAJORANAS_MAX: int = 32
 NUM_MAJORANAS_METADATA: dict[str, str] = {
     "dir_name": "Nm",
     "latex_name": r"N_\textrm{\tiny m}",
 }
+
+INITIALISM: str = "MBE"
 
 
 def compute_dimension(mbe: ManyBodyEnsemble) -> int:
@@ -133,31 +121,41 @@ class ManyBodyEnsemble(RandomMatrixEnsemble):
         return rmtpy.universal.universality_class(self.dyson_index)
 
     @abstractmethod
-    def generate_matrix(self, use_complex_dtype: bool = False) -> None:
+    def generate_matrix(self, *, use_complex_dtype: bool = False) -> None:
         raise NotImplementedError()
 
     @abstractmethod
-    def matrix_stream(self, realizs: int, use_complex_dtype: bool = False) -> None:
+    def matrix_stream(self, *, realizs: int, use_complex_dtype: bool = False) -> None:
         raise NotImplementedError()
 
     def eigsys_stream(
-        self, realizs: int, use_complex_dtype: bool = False
+        self, *, realizs: int, use_complex_dtype: bool = False
     ) -> Iterator[tuple[np.ndarray, np.ndarray]]:
-        lapack_heev: type = self._pick_lapack_heev(use_complex_dtype)
-        for matrix in self.matrix_stream(realizs, use_complex_dtype):
+        lapack_heev: type = self._pick_lapack_heev(
+            use_complex_dtype=use_complex_dtype,
+        )
+        for matrix in self.matrix_stream(
+            realizs=realizs,
+            use_complex_dtype=use_complex_dtype,
+        ):
             eigvals, eigvecs, _ = lapack_heev(matrix, compute_v=1, overwrite_a=True)
             yield eigvals, eigvecs
 
     def eigvals_stream(
-        self, realizs: int, use_complex_dtype: bool = False
+        self, *, realizs: int, use_complex_dtype: bool = False
     ) -> Iterator[np.ndarray]:
-        lapack_heev: type = self._pick_lapack_heev(use_complex_dtype)
-        for matrix in self.matrix_stream(realizs, use_complex_dtype):
+        lapack_heev: type = self._pick_lapack_heev(
+            use_complex_dtype=use_complex_dtype,
+        )
+        for matrix in self.matrix_stream(
+            realizs=realizs,
+            use_complex_dtype=use_complex_dtype,
+        ):
             eigvals = lapack_heev(matrix, compute_v=0, overwrite_a=True)[0]
             yield eigvals
 
     def porter_thomas_distribution(
-        self, num_channels: int, widths: np.ndarray
+        self, widths: np.ndarray, *, num_channels: int = 1
     ) -> np.ndarray:
         return rmtpy.universal.porter_thomas_distribution(
             self.dyson_index, num_channels, widths
@@ -169,69 +167,69 @@ class ManyBodyEnsemble(RandomMatrixEnsemble):
     def universal_csff(self, times: np.ndarray) -> np.ndarray:
         return rmtpy.universal.universal_csff(self.dyson_index, self.dimension, times)
 
-    def _initialize_matrix(self, use_complex_dtype: bool = False) -> np.ndarray:
+    def _initialize_matrix(self, *, use_complex_dtype: bool = False) -> np.ndarray:
         size: int = self.dimension
         if use_complex_dtype or self.dyson_index != 1:
             return np.empty((size, size), self.complex_dtype.type, order="F")
         else:
             return np.empty((size, size), self.real_dtype.type, order="F")
 
-    def _pick_blas_copy(self, use_complex_dtype: bool) -> type:
+    def _pick_blas_copy(self, *, use_complex_dtype: bool) -> type:
         if use_complex_dtype or self.dyson_index != 1:
             if self.complex_dtype.type == np.complex64:
-                return ccopy
+                return scipy.linalg.blas.ccopy
             else:
-                return zcopy
+                return scipy.linalg.blas.zcopy
         else:
             if self.real_dtype.type == np.float32:
-                return scopy
+                return scipy.linalg.blas.scopy
             else:
-                return dcopy
+                return scipy.linalg.blas.dcopy
 
-    def _pick_blas_gemm(self, use_complex_dtype: bool) -> type:
+    def _pick_blas_gemm(self, *, use_complex_dtype: bool) -> type:
         if use_complex_dtype or self.dyson_index != 1:
             if self.complex_dtype.type == np.complex64:
-                return cgemm
+                return scipy.linalg.blas.cgemm
             else:
-                return zgemm
+                return scipy.linalg.blas.zgemm
         else:
             if self.real_dtype.type == np.float32:
-                return sgemm
+                return scipy.linalg.blas.sgemm
             else:
-                return dgemm
+                return scipy.linalg.blas.dgemm
 
-    def _pick_blas_her(self, use_complex_dtype: bool) -> type:
+    def _pick_blas_her(self, *, use_complex_dtype: bool) -> type:
         if use_complex_dtype or self.dyson_index != 1:
             if self.complex_dtype.type == np.complex64:
-                return cher
+                return scipy.linalg.blas.cher
             else:
-                return zher
+                return scipy.linalg.blas.zher
         else:
             if self.real_dtype.type == np.float32:
-                return ssyr
+                return scipy.linalg.blas.ssyr
             else:
-                return dsyr
+                return scipy.linalg.blas.dsyr
 
-    def _pick_lapack_geev(self, use_complex_dtype: bool) -> type:
+    def _pick_lapack_geev(self, *, use_complex_dtype: bool) -> type:
         if use_complex_dtype or self.dyson_index != 1:
             if self.complex_dtype.type == np.complex64:
-                return cgeev
+                return scipy.linalg.lapack.cgeev
             else:
-                return zgeev
+                return scipy.linalg.lapack.zgeev
         else:
             if self.real_dtype.type == np.float32:
-                return sgeev
+                return scipy.linalg.lapack.sgeev
             else:
-                return dgeev
+                return scipy.linalg.lapack.dgeev
 
-    def _pick_lapack_heev(self, use_complex_dtype: bool) -> type:
+    def _pick_lapack_heev(self, *, use_complex_dtype: bool) -> type:
         if use_complex_dtype or self.dyson_index != 1:
             if self.complex_dtype.type == np.complex64:
-                return cheev
+                return scipy.linalg.lapack.cheev
             else:
-                return zheev
+                return scipy.linalg.lapack.zheev
         else:
             if self.real_dtype.type == np.float32:
-                return ssyev
+                return scipy.linalg.lapack.ssyev
             else:
-                return dsyev
+                return scipy.linalg.lapack.dsyev

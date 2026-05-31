@@ -9,18 +9,20 @@ import numpy as np
 
 from .wigner_dyson import WignerDysonEnsemble
 
+DYSON_INDEX: int = 2
+
 INITIALISM: str = "BdGD"
-TOKEN_NAME: str = "BdG_D"
+
 LATEX_NAME: str = "\\textrm{{BdG(D)}}"
 
-DYSON_INDEX: int = 2
+TOKEN_NAME: str = "BdG_D"
 
 
 def compute_standard_deviation(bdgd: BogoliubovDeGennesDEnsemble) -> float:
     return bdgd.spectral_radius / 2 / np.sqrt(bdgd.dimension)
 
 
-@numba.njit(cache=True, fastmath=True)
+@numba.njit(boundscheck=False, cache=True, fastmath=True)
 def create_bdgd_matrix(
     matrix: np.ndarray,
     rng: np.random.Generator,
@@ -59,15 +61,19 @@ class BogoliubovDeGennesDEnsemble(WignerDysonEnsemble):
     def token_name(self) -> str:
         return TOKEN_NAME
 
-    def generate_matrix(self, use_complex_dtype: bool = False) -> np.ndarray:
-        matrix: np.ndarray = self._initialize_matrix(use_complex_dtype)
+    def generate_matrix(self, *, use_complex_dtype: bool = False) -> np.ndarray:
+        matrix: np.ndarray = self._initialize_matrix(
+            use_complex_dtype=use_complex_dtype,
+        )
         create_bdgd_matrix(matrix, self.rng, self.real_dtype.type, self.std_dev)
         return matrix
 
     def matrix_stream(
-        self, realizs: int, use_complex_dtype: bool = False
+        self, *, realizs: int, use_complex_dtype: bool = False
     ) -> Iterator[np.ndarray]:
-        matrix: np.ndarray = self._initialize_matrix(use_complex_dtype)
+        matrix: np.ndarray = self._initialize_matrix(
+            use_complex_dtype=use_complex_dtype,
+        )
         for _ in range(realizs):
             create_bdgd_matrix(matrix, self.rng, self.real_dtype.type, self.std_dev)
             yield matrix

@@ -10,32 +10,17 @@ import numpy as np
 from .gue import create_gue_matrix
 from .wigner_dyson import WignerDysonEnsemble
 
+DYSON_INDEX: int = 2
+
 INITIALISM: str = "BdGC"
-TOKEN_NAME: str = "BdG_C"
+
 LATEX_NAME: str = "\\textrm{{BdG(C)}}"
 
-DYSON_INDEX: int = 2
+TOKEN_NAME: str = "BdG_C"
 
 
 def compute_standard_deviation(bdgc: BogoliubovDeGennesCEnsemble) -> float:
     return bdgc.spectral_radius / 2 / np.sqrt(2 * bdgc.dimension)
-
-
-@numba.njit(cache=True, fastmath=True)
-def create_symm_matrix(
-    matrix: np.ndarray,
-    rng: np.random.Generator,
-    real_dtype: type[np.floating],
-    std_dev: float,
-) -> np.ndarray:
-    size: int = matrix.shape[0]
-    for i in range(size):
-        matrix[i, i] = 2 * std_dev * rng.standard_normal(None, real_dtype)
-        matrix[i + 1 :, i] = std_dev * (
-            rng.standard_normal(size - 1 - i, real_dtype)
-            + 1j * rng.standard_normal(size - 1 - i, real_dtype)
-        )
-        matrix[i, i + 1 :] = matrix[i + 1 :, i]
 
 
 def create_bdgc_matrix(
@@ -56,6 +41,23 @@ def create_bdgc_matrix(
 
     create_symm_matrix(top_right_block, rng, real_dtype, std_dev)
     np.conj(top_right_block, out=bottom_left_block)
+
+
+@numba.njit(boundscheck=False, cache=True, fastmath=True)
+def create_symm_matrix(
+    matrix: np.ndarray,
+    rng: np.random.Generator,
+    real_dtype: type[np.floating],
+    std_dev: float,
+) -> np.ndarray:
+    size: int = matrix.shape[0]
+    for i in range(size):
+        matrix[i, i] = 2 * std_dev * rng.standard_normal(None, real_dtype)
+        matrix[i + 1 :, i] = std_dev * (
+            rng.standard_normal(size - 1 - i, real_dtype)
+            + 1j * rng.standard_normal(size - 1 - i, real_dtype)
+        )
+        matrix[i, i + 1 :] = matrix[i + 1 :, i]
 
 
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
@@ -81,15 +83,19 @@ class BogoliubovDeGennesCEnsemble(WignerDysonEnsemble):
     def token_name(self) -> str:
         return TOKEN_NAME
 
-    def generate_matrix(self, use_complex_dtype: bool = False) -> np.ndarray:
-        matrix: np.ndarray = self._initialize_matrix(use_complex_dtype)
+    def generate_matrix(self, *, use_complex_dtype: bool = False) -> np.ndarray:
+        matrix: np.ndarray = self._initialize_matrix(
+            use_complex_dtype=use_complex_dtype,
+        )
         create_bdgc_matrix(matrix, self.rng, self.real_dtype.type, self.std_dev)
         return matrix
 
     def matrix_stream(
-        self, realizs: int, use_complex_dtype: bool = False
+        self, *, realizs: int, use_complex_dtype: bool = False
     ) -> Iterator[np.ndarray]:
-        matrix: np.ndarray = self._initialize_matrix(use_complex_dtype)
+        matrix: np.ndarray = self._initialize_matrix(
+            use_complex_dtype=use_complex_dtype,
+        )
         for _ in range(realizs):
             create_bdgc_matrix(matrix, self.rng, self.real_dtype.type, self.std_dev)
             yield matrix

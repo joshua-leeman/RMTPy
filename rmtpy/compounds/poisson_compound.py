@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from collections.abc import Iterator
 
 import attrs
@@ -5,7 +7,7 @@ import numpy as np
 
 from rmtpy.ensembles import PoissonEnsemble
 
-from .compound import Compound
+from .base import Compound
 
 
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
@@ -60,7 +62,8 @@ class PoissonCompound(Compound):
         )
 
         for eigvals, eigvecs in self.ensemble.eigsys_stream(
-            realizs, use_complex_dtype=True
+            realizs=realizs,
+            use_complex_dtype=True,
         ):
             blas_copy(eigvecs[:, : self.num_channels], coupling_matrix)
             coupling_matrix *= self.channel_coupling_strengths[None, :]

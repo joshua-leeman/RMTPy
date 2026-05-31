@@ -9,16 +9,16 @@ import numpy as np
 
 from .wigner_dyson import WignerDysonEnsemble
 
-INITIALISM: str = "GOE"
-
 DYSON_INDEX: int = 1
+
+INITIALISM: str = "GOE"
 
 
 def compute_standard_deviation(goe: GaussianOrthogonalEnsemble) -> float:
     return goe.spectral_radius / 2 / np.sqrt(goe.dimension)
 
 
-@numba.njit(cache=True, fastmath=True)
+@numba.njit(boundscheck=False, cache=True, fastmath=True)
 def create_goe_matrix(
     matrix: np.ndarray,
     rng: np.random.Generator,
@@ -47,15 +47,19 @@ class GaussianOrthogonalEnsemble(WignerDysonEnsemble):
         repr=False,
     )
 
-    def generate_matrix(self, use_complex_dtype: bool = False) -> np.ndarray:
-        matrix: np.ndarray = self._initialize_matrix(use_complex_dtype)
+    def generate_matrix(self, *, use_complex_dtype: bool = False) -> np.ndarray:
+        matrix: np.ndarray = self._initialize_matrix(
+            use_complex_dtype=use_complex_dtype,
+        )
         create_goe_matrix(matrix, self.rng, self.real_dtype.type, self.std_dev)
         return matrix
 
     def matrix_stream(
-        self, realizs: int, use_complex_dtype: bool = False
+        self, *, realizs: int, use_complex_dtype: bool = False
     ) -> Iterator[np.ndarray]:
-        matrix: np.ndarray = self._initialize_matrix(use_complex_dtype)
+        matrix: np.ndarray = self._initialize_matrix(
+            use_complex_dtype=use_complex_dtype,
+        )
         for _ in range(realizs):
             create_goe_matrix(matrix, self.rng, self.real_dtype.type, self.std_dev)
             yield matrix

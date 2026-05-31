@@ -11,6 +11,10 @@ from .poisson import PoissonEnsemble
 from .syk import SachdevYeKitaevEnsemble
 from .wigner_dyson import WignerDysonEnsemble
 
+EnsembleLike: TypeAlias = (
+    ManyBodyEnsemble | WignerDysonEnsemble | PoissonEnsemble | SachdevYeKitaevEnsemble
+)
+
 RME = RandomMatrixEnsemble
 BdGC = BogoliubovDeGennesCEnsemble
 BdGD = BogoliubovDeGennesDEnsemble
@@ -21,10 +25,6 @@ MBE = ManyBodyEnsemble
 Poisson = PoissonEnsemble
 SYK = SachdevYeKitaevEnsemble
 WDE = WignerDysonEnsemble
-
-EnsembleLike: TypeAlias = (
-    ManyBodyEnsemble | WignerDysonEnsemble | PoissonEnsemble | SachdevYeKitaevEnsemble
-)
 
 __all__ = [
     "RandomMatrixEnsemble",

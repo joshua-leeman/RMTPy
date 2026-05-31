@@ -14,8 +14,8 @@ from .many_body import ManyBodyEnsemble
 
 INITIALISM: str = "WDE"
 
-WIGNER_DYSON_ENSEMBLE_NAMES_BY_INITIALISM = {}
 WIGNER_DYSON_ENSEMBLE_INITIALISMS_BY_NAME = {}
+WIGNER_DYSON_ENSEMBLE_NAMES_BY_INITIALISM = {}
 
 
 def create_spectral_weight(

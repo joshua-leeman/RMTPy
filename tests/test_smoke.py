@@ -47,8 +47,14 @@ class SmokeTests(unittest.TestCase):
         )
         compound = Compound(ensemble=ensemble)
 
-        spectral = SpectralStatisticsSimulation(ensemble=ensemble, realizs=1)
-        resonance = ResonanceStatisticsSimulation(compound=compound, realizs=1)
+        spectral = SpectralStatisticsSimulation(
+            ensemble=ensemble,
+            realizs=1,
+        )
+        resonance = ResonanceStatisticsSimulation(
+            compound=compound,
+            realizs=1,
+        )
         partial_widths = PartialWidthsStatisticsSimulation(
             compound=compound,
             realizs=1,
@@ -63,55 +69,84 @@ class SmokeTests(unittest.TestCase):
             realizs=1,
         )
 
+        np.testing.assert_allclose(default_time_delay.energies, np.array([0.0]))
+
         self.assertGreater(len(tuple(spectral.iter_observables())), 0)
         self.assertGreater(len(tuple(resonance.iter_observables())), 0)
         self.assertGreater(len(tuple(partial_widths.iter_observables())), 0)
         self.assertGreater(len(tuple(time_delay.iter_observables())), 0)
+
+        spe_out = spectral.outputs
+        res_out = resonance.outputs
+        wid_out = partial_widths.outputs
+        tim_out = time_delay.outputs
+
         self.assertEqual(
-            spectral.spectral_coeff_histograms[0].metadata["unfolding"], "raw"
+            spe_out.coefficients.by_degree[0].metadata["unfolding"],
+            "raw",
         )
-        self.assertEqual(spectral.spectral_histogram.metadata["unfolding"], "raw")
         self.assertEqual(
-            spectral.spectral_histogram_wgt_unfolded.metadata["unfolding"],
+            spe_out.raw.levels.metadata["unfolding"],
+            "raw",
+        )
+        self.assertEqual(
+            spe_out.weight_unfolded.levels.metadata["unfolding"],
             "weight",
         )
         self.assertEqual(
-            spectral.spectral_histograms_avg_unfolded[0].metadata["unfolding"],
+            spe_out.avg_unfolded_by_degree[0].levels.metadata["unfolding"],
             "avg",
         )
         self.assertEqual(
-            spectral.spectral_histograms_var_unfolded[0].metadata["unfolding"],
+            spe_out.var_unfolded_by_degree[0].levels.metadata["unfolding"],
             "var",
         )
+
         self.assertEqual(
-            resonance.resonance_coeff_histograms[0].metadata["unfolding"], "raw"
+            res_out.coefficients.by_degree[0].metadata["unfolding"],
+            "raw",
         )
-        self.assertEqual(resonance.width_histogram.metadata["unfolding"], "raw")
         self.assertEqual(
-            resonance.width_histogram_wgt_unfolded.metadata["unfolding"],
+            res_out.raw.widths.metadata["unfolding"],
+            "raw",
+        )
+        self.assertEqual(
+            res_out.weight_unfolded.widths.metadata["unfolding"],
             "weight",
         )
         self.assertEqual(
-            resonance.complex_energy_histograms_avg_unfolded[0].metadata["unfolding"],
+            res_out.avg_unfolded_by_degree[0].complex_energies.metadata["unfolding"],
             "avg",
         )
+
         self.assertEqual(
-            partial_widths.width_histograms[0].metadata["unfolding"], "raw"
+            wid_out.histograms[0].metadata["unfolding"],
+            "raw",
         )
+
         self.assertEqual(
-            time_delay.time_delay_histograms[0].metadata["unfolding"], "raw"
-        )
-        self.assertEqual(len(time_delay.time_delay_histograms), 2)
-        self.assertIsInstance(time_delay.energies, np.ndarray)
-        np.testing.assert_allclose(default_time_delay.energies, np.array([0.0]))
-        self.assertNotIn("energies_", str(time_delay.to_path))
-        self.assertEqual(
-            time_delay.time_delay_histograms[0].data.file_name,
+            tim_out.raw[0].data.file_name,
             "time_delay_histogram_data",
         )
         self.assertEqual(
-            time_delay.observable_output_path(time_delay.time_delay_histograms[1]),
+            time_delay.observable_output_path(tim_out.raw[1]),
             Path("energy_0p1"),
+        )
+        self.assertEqual(
+            tim_out.raw[0].metadata["unfolding"],
+            "raw",
+        )
+        self.assertEqual(
+            len(tim_out.raw),
+            2,
+        )
+        self.assertIsInstance(
+            time_delay.energies,
+            np.ndarray,
+        )
+        self.assertNotIn(
+            "energies_",
+            str(time_delay.to_path),
         )
 
 

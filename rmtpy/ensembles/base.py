@@ -13,13 +13,14 @@ from cattrs.dispatch import StructureHook, UnstructureHook
 import rmtpy.conversion
 from rmtpy.conversion import RMT_CONVERTER
 
-INITIALISM: str = "RME"
-
 DTYPE_DEFAULT: np.dtype[np.complex128] = np.dtype("complex128")
+
 DIMENSION_METADATA: dict[str, str] = {
     "dir_name": "dim",
     "latex_name": "D",
 }
+
+INITIALISM: str = "RME"
 
 REGISTRY: dict[str, type[RandomMatrixEnsemble]] = {}
 STRUCTURE_HOOKS: dict[str, StructureHook] = {}
@@ -45,14 +46,49 @@ def compute_real_dtype(ens: RandomMatrixEnsemble) -> np.dtype:
     return np.dtype(ens.dtype.char.lower())
 
 
-def create_random_number_generator(ens: RandomMatrixEnsemble) -> np.random.Generator:
-    return np.random.default_rng(ens.seed)
-
-
 def create_random_matrix_ensemble(**kwargs: Any) -> RandomMatrixEnsemble:
     return RandomMatrixEnsemble.create(kwargs)
 
 
+def create_random_number_generator(ens: RandomMatrixEnsemble) -> np.random.Generator:
+    return np.random.default_rng(ens.seed)
+
+
+def register_ensemble_hooks(
+    ens_cls: type[RandomMatrixEnsemble],
+) -> type[RandomMatrixEnsemble]:
+    RMT_CONVERTER.register_structure_hook(ens_cls, structure_hook_for_ensemble)
+    RMT_CONVERTER.register_unstructure_hook(ens_cls, unstructure_hook_for_ensemble)
+    return ens_cls
+
+
+def structure_hook_for_ensemble(src: dict | Any, _) -> RandomMatrixEnsemble:
+    if type(src) in REGISTRY.values():
+        return src
+
+    ens_dict: dict[str, Any] = rmtpy.conversion.normalize_dict(src, REGISTRY)
+    ens_args: dict[str, Any] = ens_dict.pop("args")
+    key: str = rmtpy.conversion.to_registry_key(ens_dict.pop("name"))
+    ens_cls: type[RandomMatrixEnsemble] = REGISTRY[key]
+    ens_inst: RandomMatrixEnsemble = ens_cls(**ens_args)
+    ens_inst.set_rng_state(src.get("rng_state"))
+    return ens_inst
+
+
+def unstructure_hook_for_ensemble(ens: RandomMatrixEnsemble) -> dict[str, Any]:
+    args: dict[str, Any] = {}
+    for name, attr in attrs.fields_dict(type(ens)).items():
+        if attr.init:
+            args[name] = RMT_CONVERTER.unstructure(getattr(ens, name))
+
+    return {
+        "name": rmtpy.conversion.to_registry_key(type(ens).__name__),
+        "args": args,
+        "rng_state": ens.rng_state,
+    }
+
+
+@register_ensemble_hooks
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
 class RandomMatrixEnsemble:
     initialism: ClassVar[str] = INITIALISM
@@ -129,31 +165,3 @@ class RandomMatrixEnsemble:
 
     def unstructure(self) -> dict[str, Any]:
         return RMT_CONVERTER.unstructure(self)
-
-
-@RMT_CONVERTER.register_structure_hook
-def structure_hook_for_ensemble(src: dict | Any, _) -> RandomMatrixEnsemble:
-    if type(src) in REGISTRY.values():
-        return src
-
-    ens_dict: dict[str, Any] = rmtpy.conversion.normalize_dict(src, REGISTRY)
-    ens_args: dict[str, Any] = ens_dict.pop("args")
-    key: str = rmtpy.conversion.to_registry_key(ens_dict.pop("name"))
-    ens_cls: type[RandomMatrixEnsemble] = REGISTRY[key]
-    ens_inst: RandomMatrixEnsemble = ens_cls(**ens_args)
-    ens_inst.set_rng_state(src.get("rng_state"))
-    return ens_inst
-
-
-@RMT_CONVERTER.register_unstructure_hook
-def unstructure_hook_for_ensemble(ens: RandomMatrixEnsemble) -> dict[str, Any]:
-    args: dict[str, Any] = {}
-    for name, attr in attrs.fields_dict(type(ens)).items():
-        if attr.init:
-            args[name] = RMT_CONVERTER.unstructure(getattr(ens, name))
-
-    return {
-        "name": rmtpy.conversion.to_registry_key(type(ens).__name__),
-        "args": args,
-        "rng_state": ens.rng_state,
-    }

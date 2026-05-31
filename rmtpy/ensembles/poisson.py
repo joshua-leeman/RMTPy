@@ -18,10 +18,11 @@ from .wigner_dyson import (
     WignerDysonEnsemble,
 )
 
-INITIALISM: str = "Poisson"
+DYSON_INDEX: int = 0
 
 EIGVECS_ENSEMBLE_FLAG_DEFAULT: str = "GUE"
-DYSON_INDEX: int = 0
+
+INITIALISM: str = "Poisson"
 
 
 def compute_standard_deviation(poisson: PoissonEnsemble) -> float:
@@ -32,19 +33,21 @@ def create_spectral_weight(
     poisson: PoissonEnsemble,
 ) -> Callable[[np.ndarray], np.ndarray]:
     def poisson_spectral_weight(energies: np.ndarray) -> np.ndarray:
-        return rmtpy.polynomials.constant_weight_pdf(energies, poisson.spectral_radius)
+        return rmtpy.polynomials.legendre_polynomial_weight_pdf(
+            energies, poisson.spectral_radius
+        )
 
     return poisson_spectral_weight
 
 
-@numba.njit(cache=True, fastmath=True)
+@numba.njit(boundscheck=False, cache=True, fastmath=True)
 def mirror_upper_to_lower_triangle_complex(matrix: np.ndarray) -> np.ndarray:
     size: int = matrix.shape[0]
     for i in range(size):
         matrix[i + 1 :, i] = matrix[i, i + 1 :].conj()
 
 
-@numba.njit(cache=True, fastmath=True)
+@numba.njit(boundscheck=False, cache=True, fastmath=True)
 def mirror_upper_to_lower_triangle_real(matrix: np.ndarray) -> np.ndarray:
     size: int = matrix.shape[0]
     for i in range(size):
@@ -99,50 +102,64 @@ class PoissonEnsemble(ManyBodyEnsemble):
     def path_name(self) -> str:
         return super().to_path + f"_{type(self.eigvecs_ensemble).initialism.lower()}"
 
-    def generate_matrix(self, use_complex_dtype: bool = False) -> np.ndarray:
-        matrix = self._initialize_matrix(use_complex_dtype)
-        mirror_upper_triangle = self._pick_mirror_triangle_method(use_complex_dtype)
+    def generate_matrix(self, *, use_complex_dtype: bool = False) -> np.ndarray:
+        matrix = self._initialize_matrix(use_complex_dtype=use_complex_dtype)
+        mirror_upper_triangle = self._pick_mirror_triangle_method(
+            use_complex_dtype=use_complex_dtype,
+        )
 
         eigvals: np.ndarray = self.rng.random(self.dimension, self.real_dtype.type)
         eigvals -= 0.5
         eigvals *= self.std_dev
 
-        lapack_heev: type = self._pick_lapack_heev(use_complex_dtype)
+        lapack_heev: type = self._pick_lapack_heev(
+            use_complex_dtype=use_complex_dtype,
+        )
         eigvecs: np.ndarray = lapack_heev(
-            self.eigvecs_ensemble.generate_matrix(use_complex_dtype),
+            self.eigvecs_ensemble.generate_matrix(
+                use_complex_dtype=use_complex_dtype,
+            ),
             compute_v=1,
             overwrite_a=True,
         )[1]
 
-        blas_her: type = self._pick_blas_her(use_complex_dtype)
+        blas_her: type = self._pick_blas_her(use_complex_dtype=use_complex_dtype)
         for mu in range(self.dimension):
             blas_her(float(eigvals[mu]), x=eigvecs[:, mu], a=matrix, overwrite_a=1)
         mirror_upper_triangle(matrix)
         return matrix
 
     def matrix_stream(
-        self, realizs: int, use_complex_dtype: bool = False
+        self, *, realizs: int, use_complex_dtype: bool = False
     ) -> Iterator[np.ndarray]:
-        matrix = self._initialize_matrix(use_complex_dtype)
-        mirror_upper_triangle = self._pick_mirror_triangle_method(use_complex_dtype)
-        blas_her: type = self._pick_blas_her(use_complex_dtype)
-        for eigvals, eigvecs in self.eigsys_stream(realizs, use_complex_dtype):
+        matrix = self._initialize_matrix(use_complex_dtype=use_complex_dtype)
+        mirror_upper_triangle = self._pick_mirror_triangle_method(
+            use_complex_dtype=use_complex_dtype,
+        )
+        blas_her: type = self._pick_blas_her(use_complex_dtype=use_complex_dtype)
+        for eigvals, eigvecs in self.eigsys_stream(
+            realizs=realizs,
+            use_complex_dtype=use_complex_dtype,
+        ):
             for mu in range(self.dimension):
                 blas_her(float(eigvals[mu]), x=eigvecs[:, mu], a=matrix, overwrite_a=1)
             mirror_upper_triangle(matrix)
             yield matrix
 
     def eigsys_stream(
-        self, realizs: int, use_complex_dtype: bool = False
+        self, *, realizs: int, use_complex_dtype: bool = False
     ) -> Iterator[tuple[np.ndarray, np.ndarray]]:
-        for _, vecs in self.eigvecs_ensemble.eigsys_stream(realizs, use_complex_dtype):
+        for _, vecs in self.eigvecs_ensemble.eigsys_stream(
+            realizs=realizs,
+            use_complex_dtype=use_complex_dtype,
+        ):
             eigvals: np.ndarray = self.rng.random(self.dimension, self.real_dtype.type)
             eigvals -= 0.5
             eigvals *= self.std_dev
             yield np.sort(eigvals), vecs
 
     def eigvals_stream(
-        self, realizs: int, use_complex_dtype: bool = False
+        self, *, realizs: int, use_complex_dtype: bool = False
     ) -> Iterator[np.ndarray]:
         for _ in range(realizs):
             eigvals: np.ndarray = self.rng.random(self.dimension, self.real_dtype.type)
@@ -165,36 +182,46 @@ class PoissonEnsemble(ManyBodyEnsemble):
         return cdf
 
     def porter_thomas_distribution(
-        self, num_channels: int, widths: np.ndarray
+        self, widths: np.ndarray, *, num_channels: int = 1
     ) -> np.ndarray:
         return rmtpy.universal.porter_thomas_distribution(
             self.eigvecs_ensemble.dyson_index, num_channels, widths
         )
 
-    def _initialize_matrix(self, use_complex_dtype: bool = False) -> np.ndarray:
+    def _initialize_matrix(self, *, use_complex_dtype: bool = False) -> np.ndarray:
         size: int = self.dimension
         if use_complex_dtype or self.eigvecs_ensemble.dyson_index != 1:
             return np.empty((size, size), self.complex_dtype.type, order="F")
         else:
             return np.empty((size, size), self.real_dtype.type, order="F")
 
-    def _pick_blas_copy(self, use_complex_dtype: bool) -> type:
-        return self.eigvecs_ensemble._pick_blas_copy(use_complex_dtype)
+    def _pick_blas_copy(self, *, use_complex_dtype: bool) -> type:
+        return self.eigvecs_ensemble._pick_blas_copy(
+            use_complex_dtype=use_complex_dtype,
+        )
 
-    def _pick_blas_gemm(self, use_complex_dtype: bool) -> type:
-        return self.eigvecs_ensemble._pick_blas_gemm(use_complex_dtype)
+    def _pick_blas_gemm(self, *, use_complex_dtype: bool) -> type:
+        return self.eigvecs_ensemble._pick_blas_gemm(
+            use_complex_dtype=use_complex_dtype,
+        )
 
-    def _pick_blas_her(self, use_complex_dtype: bool) -> type:
-        return self.eigvecs_ensemble._pick_blas_her(use_complex_dtype)
+    def _pick_blas_her(self, *, use_complex_dtype: bool) -> type:
+        return self.eigvecs_ensemble._pick_blas_her(
+            use_complex_dtype=use_complex_dtype,
+        )
 
-    def _pick_lapack_geev(self, use_complex_dtype: bool) -> type:
-        return self.eigvecs_ensemble._pick_lapack_geev(use_complex_dtype)
+    def _pick_lapack_geev(self, *, use_complex_dtype: bool) -> type:
+        return self.eigvecs_ensemble._pick_lapack_geev(
+            use_complex_dtype=use_complex_dtype,
+        )
 
-    def _pick_lapack_heev(self, use_complex_dtype: bool) -> type:
-        return self.eigvecs_ensemble._pick_lapack_heev(use_complex_dtype)
+    def _pick_lapack_heev(self, *, use_complex_dtype: bool) -> type:
+        return self.eigvecs_ensemble._pick_lapack_heev(
+            use_complex_dtype=use_complex_dtype,
+        )
 
     def _pick_mirror_triangle_method(
-        self, use_complex_dtype: bool = False
+        self, *, use_complex_dtype: bool = False
     ) -> Callable[[np.ndarray], np.ndarray]:
         if use_complex_dtype or self.eigvecs_ensemble.dyson_index != 1:
             return mirror_upper_to_lower_triangle_complex

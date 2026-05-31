@@ -9,16 +9,16 @@ import numpy as np
 
 from .wigner_dyson import WignerDysonEnsemble
 
-INITIALISM: str = "GUE"
-
 DYSON_INDEX: int = 2
+
+INITIALISM: str = "GUE"
 
 
 def compute_standard_deviation(gue: GaussianUnitaryEnsemble) -> float:
     return gue.spectral_radius / 2 / np.sqrt(2 * gue.dimension)
 
 
-@numba.njit(cache=True, fastmath=True)
+@numba.njit(boundscheck=False, cache=True, fastmath=True)
 def create_gue_matrix(
     matrix: np.ndarray,
     rng: np.random.Generator,
@@ -50,15 +50,19 @@ class GaussianUnitaryEnsemble(WignerDysonEnsemble):
         repr=False,
     )
 
-    def generate_matrix(self, use_complex_dtype: bool = False) -> np.ndarray:
-        matrix: np.ndarray = self._initialize_matrix(use_complex_dtype)
+    def generate_matrix(self, *, use_complex_dtype: bool = False) -> np.ndarray:
+        matrix: np.ndarray = self._initialize_matrix(
+            use_complex_dtype=use_complex_dtype,
+        )
         create_gue_matrix(matrix, self.rng, self.real_dtype.type, self.std_dev)
         return matrix
 
     def matrix_stream(
-        self, realizs: int, use_complex_dtype: bool = False
+        self, *, realizs: int, use_complex_dtype: bool = False
     ) -> Iterator[np.ndarray]:
-        matrix: np.ndarray = self._initialize_matrix(use_complex_dtype)
+        matrix: np.ndarray = self._initialize_matrix(
+            use_complex_dtype=use_complex_dtype,
+        )
         for _ in range(realizs):
             create_gue_matrix(matrix, self.rng, self.real_dtype.type, self.std_dev)
             yield matrix

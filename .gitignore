@@ -1,6 +1,8 @@
 # Project-specific files and directories
 .filelist
 rmtpy.code-workspace
+README.md
+pyproject.toml
 .ruff_cache/
 output/
 scratch/

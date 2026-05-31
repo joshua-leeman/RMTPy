@@ -16,26 +16,19 @@ import rmtpy.density
 from rmtpy.conversion import RMT_CONVERTER
 from rmtpy.ensembles import EnsembleLike, RandomMatrixEnsemble
 
+MAX_SPECTRAL_POLYNOMIAL_DEGREE_METADATA: dict[str, str] = {
+    "dir_name": "polydeg",
+}
+
 NUM_FREE_COMPLEX_FERMIONS_DEFAULT: int = 1
 NUM_FREE_COMPLEX_FERMIONS_METADATA: dict[str, str] = {
     "dir_name": "Nf",
     "latex_name": r"N_\textrm{\tiny f}",
 }
-MAX_SPECTRAL_POLYNOMIAL_DEGREE_METADATA: dict[str, str] = {
-    "dir_name": "polydeg",
-}
 
 REGISTRY: dict[str, type[Compound]] = {}
 STRUCTURE_HOOKS: dict[str, StructureHook] = {}
 UNSTRUCTURE_HOOKS: dict[str, UnstructureHook] = {}
-
-
-def create_quantum_chaotic_compound(**kwargs: Any) -> Compound:
-    return Compound.create(kwargs)
-
-
-def create_coupling_strengths_id(compound: Compound) -> str:
-    return rmtpy.conversion.create_hashed_id(compound.channel_coupling_strengths)
 
 
 def compute_default_coupling_strengths(compound: Compound) -> float:
@@ -46,6 +39,23 @@ def compute_number_of_open_channels(compound: Compound) -> int:
     return math.comb(
         compound.ensemble.num_majoranas // 2, compound.num_free_complex_fermions
     )
+
+
+def create_coupling_strengths_id(compound: Compound) -> str:
+    return rmtpy.conversion.create_hashed_id(compound.channel_coupling_strengths)
+
+
+def create_quantum_chaotic_compound(**kwargs: Any) -> Compound:
+    return Compound.create(kwargs)
+
+
+def is_num_free_fermions_valid(compound: Compound, _, num_free_fermions: int) -> None:
+    if num_free_fermions > compound.ensemble.num_majoranas // 2:
+        raise ValueError(
+            f"Number of free complex fermions must be less than the implied number of complex "
+            f"fermions in the quasi-stable space {compound.ensemble.num_majoranas // 2}, got "
+            f"{num_free_fermions} instead."
+        )
 
 
 def normalize_coupling_strengths(strengths: Any, compound: Compound) -> np.ndarray:
@@ -72,19 +82,48 @@ def normalize_coupling_strengths(strengths: Any, compound: Compound) -> np.ndarr
     return strengths
 
 
-def is_num_free_fermions_valid(compound: Compound, _, num_free_fermions: int) -> None:
-    if num_free_fermions > compound.ensemble.num_majoranas // 2:
-        raise ValueError(
-            f"Number of free complex fermions must be less than the implied number of complex "
-            f"fermions in the quasi-stable space {compound.ensemble.num_majoranas // 2}, got "
-            f"{num_free_fermions} instead."
-        )
+def register_compound_class(comp_cls: type[Compound]) -> type[Compound]:
+    RMT_CONVERTER.register_structure_hook(comp_cls, structure_hook_for_compound)
+    RMT_CONVERTER.register_unstructure_hook(comp_cls, unstructure_hook_for_compound)
+
+    key: str = rmtpy.conversion.to_registry_key(comp_cls.__name__)
+    REGISTRY[key] = comp_cls
+    STRUCTURE_HOOKS[key] = RMT_CONVERTER.get_structure_hook(comp_cls)
+    UNSTRUCTURE_HOOKS[key] = RMT_CONVERTER.get_unstructure_hook(comp_cls)
+
+    return comp_cls
 
 
+def structure_hook_for_compound(src: dict[str, Any] | Compound, _) -> Compound:
+    if type(src) in REGISTRY.values():
+        return src
+
+    comp_dict: dict[str, Any] = rmtpy.conversion.normalize_dict(src, REGISTRY)
+    comp_args: dict[str, Any] = comp_dict.pop("args")
+    key: str = rmtpy.conversion.to_registry_key(comp_dict.pop("name"))
+    comp_cls: type[Compound] = REGISTRY[key]
+    comp_inst: Compound = comp_cls(**comp_args)
+    return comp_inst
+
+
+def unstructure_hook_for_compound(comp: Compound) -> dict[str, Any]:
+    args: dict[str, Any] = {}
+    for name, attr in attrs.fields_dict(type(comp)).items():
+        if attr.init:
+            args[name] = RMT_CONVERTER.unstructure(getattr(comp, name))
+
+    return {
+        "name": rmtpy.conversion.to_registry_key(type(comp).__name__),
+        "args": args,
+    }
+
+
+@register_compound_class
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
 class Compound:
-    ensemble: EnsembleLike = attrs.field(converter=RandomMatrixEnsemble.create)
-
+    ensemble: EnsembleLike = attrs.field(
+        converter=RandomMatrixEnsemble.create,
+    )
     num_free_complex_fermions: int = attrs.field(
         default=NUM_FREE_COMPLEX_FERMIONS_DEFAULT,
         converter=int,
@@ -98,7 +137,6 @@ class Compound:
         default=attrs.Factory(compute_number_of_open_channels, takes_self=True),
         init=False,
     )
-
     channel_coupling_strengths: np.ndarray = attrs.field(
         default=attrs.Factory(compute_default_coupling_strengths, takes_self=True),
         converter=attrs.Converter(normalize_coupling_strengths, takes_self=True),
@@ -192,7 +230,10 @@ class Compound:
 
     def effective_hamiltonian_stream(self, realizs: int) -> Iterator[np.ndarray]:
         diag_indices: np.ndarray = np.diag_indices(self.num_channels)
-        for hamiltonian in self.ensemble.matrix_stream(realizs, use_complex_dtype=True):
+        for hamiltonian in self.ensemble.matrix_stream(
+            realizs=realizs,
+            use_complex_dtype=True,
+        ):
             hamiltonian[diag_indices] -= 0.5j * (self.channel_coupling_strengths**2)
             yield hamiltonian
 
@@ -208,7 +249,7 @@ class Compound:
             yield resonances.real
 
     def partial_widths_stream(self, realizs: int) -> Iterator[np.ndarray]:
-        for _, eigvecs in self.ensemble.eigsys_stream(realizs):
+        for _, eigvecs in self.ensemble.eigsys_stream(realizs=realizs):
             coupling_matrix: np.ndarray = eigvecs[:, : self.num_channels]
             coupling_matrix *= self.channel_coupling_strengths[None, :]
             coupling_matrix *= coupling_matrix.conj()
@@ -231,7 +272,7 @@ class Compound:
             order="C",
         )
 
-        for eigvals, eigvecs in self.ensemble.eigsys_stream(realizs):
+        for eigvals, eigvecs in self.ensemble.eigsys_stream(realizs=realizs):
             coupling_matrix: np.ndarray = eigvecs[:, : self.num_channels]
             coupling_matrix *= self.channel_coupling_strengths[None, :] / np.sqrt(2)
 
@@ -257,7 +298,7 @@ class Compound:
             yield reaction_matrix
 
     def reaction_matrix_pair_stream(
-        self, energies: float | np.ndarray, realizs: int
+        self, energies: np.ndarray, realizs: int
     ) -> Iterator[tuple[np.ndarray, np.ndarray]]:
         energies = np.asarray(energies)
 
@@ -277,7 +318,7 @@ class Compound:
             order="C",
         )
 
-        for eigvals, eigvecs in self.ensemble.eigsys_stream(realizs):
+        for eigvals, eigvecs in self.ensemble.eigsys_stream(realizs=realizs):
             coupling_matrix: np.ndarray = eigvecs[:, : self.num_channels]
             coupling_matrix *= self.channel_coupling_strengths[None, :] / np.sqrt(2)
 
@@ -314,7 +355,7 @@ class Compound:
             yield reaction_matrix, reaction_matrix_2
 
     def scattering_matrix_stream(
-        self, energies: float | np.ndarray, realizs: int
+        self, energies: np.ndarray, realizs: int
     ) -> Iterator[np.ndarray]:
         energies = np.asarray(energies)
 
@@ -340,7 +381,7 @@ class Compound:
             )
 
     def wigner_smith_matrix_stream(
-        self, energies: float | np.ndarray, realizs: int
+        self, energies: np.ndarray, realizs: int
     ) -> Iterator[np.ndarray]:
         energies = np.asarray(energies)
 
@@ -360,39 +401,7 @@ class Compound:
             yield wigner_smith_matrix
 
     def time_delays_stream(
-        self, energies: float | np.ndarray, realizs: int
+        self, energies: np.ndarray, realizs: int
     ) -> Iterator[np.ndarray]:
         for wigner_smith_matrix in self.wigner_smith_matrix_stream(energies, realizs):
             yield np.linalg.eigvalsh(wigner_smith_matrix)
-
-
-@RMT_CONVERTER.register_structure_hook
-def structure_hook_for_compound(src: dict[str, Any] | Compound, _) -> Compound:
-    if type(src) in REGISTRY.values():
-        return src
-
-    comp_dict: dict[str, Any] = rmtpy.conversion.normalize_dict(src, REGISTRY)
-    comp_args: dict[str, Any] = comp_dict.pop("args")
-    key: str = rmtpy.conversion.to_registry_key(comp_dict.pop("name"))
-    comp_cls: type[Compound] = REGISTRY[key]
-    comp_inst: Compound = comp_cls(**comp_args)
-    return comp_inst
-
-
-@RMT_CONVERTER.register_unstructure_hook
-def unstructure_hook_for_compound(comp: Compound) -> dict[str, Any]:
-    args: dict[str, Any] = {}
-    for name, attr in attrs.fields_dict(type(comp)).items():
-        if attr.init:
-            args[name] = RMT_CONVERTER.unstructure(getattr(comp, name))
-
-    return {
-        "name": rmtpy.conversion.to_registry_key(type(comp).__name__),
-        "args": args,
-    }
-
-
-key: str = rmtpy.conversion.to_registry_key(Compound.__name__)
-REGISTRY[key] = Compound
-STRUCTURE_HOOKS[key] = RMT_CONVERTER.get_structure_hook(Compound)
-UNSTRUCTURE_HOOKS[key] = RMT_CONVERTER.get_unstructure_hook(Compound)

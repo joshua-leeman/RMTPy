@@ -1,4 +1,4 @@
-from .compound import Compound
+from .base import Compound
 from .poisson_compound import PoissonCompound
 
 __all__ = [
