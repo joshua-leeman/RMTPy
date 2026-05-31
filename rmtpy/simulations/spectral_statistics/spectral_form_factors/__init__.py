@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from .spectral_form_factors_data import FormFactorsData, finalize_form_factors
 from .spectral_form_factors_plot import FormFactorsPlot, UnfoldedFormFactorsPlot
 

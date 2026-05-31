@@ -174,7 +174,7 @@ class DensityModel:
             is_polynomial_expansion_completely_provided,
         ],
     )
-    sample_stream: Callable[[int], Iterator[np.ndarray]] = attrs.field(
+    sample_stream: Callable[[int, bool], Iterator[np.ndarray]] = attrs.field(
         validator=attrs.validators.is_callable(),
         repr=False,
     )
@@ -382,7 +382,7 @@ class DensityModel:
 
     def _compute_average_coeffs(self) -> np.ndarray:
         average_coeffs: np.ndarray = np.zeros(self.max_polynomial_degree + 1)
-        for sample in self.sample_stream(self.optimal_realizs):
+        for sample in self.sample_stream(realizs=self.optimal_realizs):
             average_coeffs += self.compute_variate_coeffs(sample)
 
         average_coeffs /= self.optimal_realizs

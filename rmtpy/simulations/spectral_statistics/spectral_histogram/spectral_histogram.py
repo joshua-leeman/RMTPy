@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import dataclasses
 from pathlib import Path
 
@@ -13,12 +15,6 @@ from rmtpy.ensembles import (
 
 from ...histogram import Histogram
 from ...plot import Plot, PlotAxes, PlotLegend
-
-
-@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
-class SpectralHistogramLegend(PlotLegend):
-    loc: str = "upper right"
-    bbox: tuple[float, float] = (0.94, 0.95)
 
 
 @dataclasses.dataclass(repr=False, eq=False, kw_only=True)
@@ -78,6 +74,12 @@ class SpectralHistogramAxes(PlotAxes):
         r"$\frac{1}{\pi E_0}$",
         r"$\frac{2}{\pi E_0}$",
     )
+
+
+@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
+class SpectralHistogramLegend(PlotLegend):
+    loc: str = "upper right"
+    bbox: tuple[float, float] = (0.94, 0.95)
 
 
 @dataclasses.dataclass(repr=False, eq=False, kw_only=True)
@@ -179,12 +181,6 @@ class SpectralHistogramPlot(Plot):
 
 
 @dataclasses.dataclass(repr=False, eq=False, kw_only=True)
-class UnfoldedSpectralHistogramLegend(PlotLegend):
-    loc: str = "upper right"
-    bbox: tuple[float, float] = (0.94, 0.95)
-
-
-@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
 class UnfoldedSpectralHistogramAxes(PlotAxes):
     xticks: tuple[float, ...] = (-0.5, 0.0, 0.5)  # units of dimension
     xticks_minor: tuple[float, ...] = (-0.25, 0.25)
@@ -204,6 +200,12 @@ class UnfoldedSpectralHistogramAxes(PlotAxes):
         r"$\frac{1}{D}$",
         r"$\frac{3}{2 D}$",
     )
+
+
+@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
+class UnfoldedSpectralHistogramLegend(PlotLegend):
+    loc: str = "upper right"
+    bbox: tuple[float, float] = (0.94, 0.95)
 
 
 @dataclasses.dataclass(repr=False, eq=False, kw_only=True)

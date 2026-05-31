@@ -16,25 +16,37 @@ from .time_delay_histograms import (
 if TYPE_CHECKING:
     from .time_delay_statistics_simulation import TimeDelayStatisticsSimulation
 
+
 RAW_TIME_DELAY_LOGD_SUPPORT_DEFAULT: tuple[float, float] = (-0.5, 1.5)
-UNFOLDED_TIME_DELAY_LOGD_SUPPORT_DEFAULT: tuple[float, float] = (-1.5, 0.5)
+
 TIME_DELAY_NUM_BINS_DEFAULT: int = 100
 
-
-def finalize_time_delay_histogram(histogram: Histogram) -> None:
-    if np.sum(histogram.counts) == 0:
-        histogram.histogram[:] = 0.0
-        return
-
-    histogram.normalize_histogram()
+UNFOLDED_TIME_DELAY_LOGD_SUPPORT_DEFAULT: tuple[float, float] = (-1.5, 0.5)
 
 
 def compute_scaled_log_support(
     support: tuple[float, float],
-    log_base: float,
-    scale: float,
+    *,
+    log_base: float = 10.0,
+    scale: float = 1.0,
 ) -> tuple[float, float]:
     return tuple(endpoint + np.log(scale) / np.log(log_base) for endpoint in support)
+
+
+def create_avg_unfolded_time_delay_histograms(
+    simulation: TimeDelayStatisticsSimulation,
+) -> list[Observable]:
+    histograms: list[Observable] = []
+    for degree in simulation.truncated_degrees:
+        histograms.extend(
+            create_unfolded_time_delay_histograms(
+                simulation=simulation,
+                file_name_prefix="time_delay_histogram_avg_unfolded",
+                unfolding="avg",
+                degree=degree,
+            )
+        )
+    return histograms
 
 
 def create_raw_time_delay_histogram_support(
@@ -45,28 +57,9 @@ def create_raw_time_delay_histogram_support(
     scale: float = float(jn_zeros(1, 1)[0]) / energy_0
     return compute_scaled_log_support(
         RAW_TIME_DELAY_LOGD_SUPPORT_DEFAULT,
-        dimension,
-        scale,
+        log_base=dimension,
+        scale=scale,
     )
-
-
-def create_unfolded_time_delay_histogram_support(
-    simulation: TimeDelayStatisticsSimulation,
-) -> tuple[float, float]:
-    dimension: int = simulation.compound.ensemble.dimension
-    return compute_scaled_log_support(
-        UNFOLDED_TIME_DELAY_LOGD_SUPPORT_DEFAULT,
-        dimension,
-        2 * np.pi,
-    )
-
-
-def raw_time_delay_scale(simulation: TimeDelayStatisticsSimulation) -> float:
-    return float(jn_zeros(1, 1)[0]) / simulation.compound.ensemble.spectral_radius
-
-
-def unfolded_time_delay_scale(_: TimeDelayStatisticsSimulation) -> float:
-    return 2 * np.pi
 
 
 def create_time_delay_histogram_file_name(
@@ -133,6 +126,17 @@ def create_time_delay_histograms(
     ]
 
 
+def create_unfolded_time_delay_histogram_support(
+    simulation: TimeDelayStatisticsSimulation,
+) -> tuple[float, float]:
+    dimension: int = simulation.compound.ensemble.dimension
+    return compute_scaled_log_support(
+        UNFOLDED_TIME_DELAY_LOGD_SUPPORT_DEFAULT,
+        log_base=dimension,
+        scale=2 * np.pi,
+    )
+
+
 def create_unfolded_time_delay_histograms(
     *,
     simulation: TimeDelayStatisticsSimulation,
@@ -160,32 +164,6 @@ def create_unfolded_time_delay_histograms(
     ]
 
 
-def create_weight_unfolded_time_delay_histograms(
-    simulation: TimeDelayStatisticsSimulation,
-) -> list[Observable]:
-    return create_unfolded_time_delay_histograms(
-        simulation=simulation,
-        file_name_prefix="time_delay_histogram_weight_unfolded",
-        unfolding="weight",
-    )
-
-
-def create_avg_unfolded_time_delay_histograms(
-    simulation: TimeDelayStatisticsSimulation,
-) -> list[Observable]:
-    histograms: list[Observable] = []
-    for degree in simulation.truncated_degrees:
-        histograms.extend(
-            create_unfolded_time_delay_histograms(
-                simulation=simulation,
-                file_name_prefix="time_delay_histogram_avg_unfolded",
-                unfolding="avg",
-                degree=degree,
-            )
-        )
-    return histograms
-
-
 def create_var_unfolded_time_delay_histograms(
     simulation: TimeDelayStatisticsSimulation,
 ) -> list[Observable]:
@@ -200,3 +178,29 @@ def create_var_unfolded_time_delay_histograms(
             )
         )
     return histograms
+
+
+def create_weight_unfolded_time_delay_histograms(
+    simulation: TimeDelayStatisticsSimulation,
+) -> list[Observable]:
+    return create_unfolded_time_delay_histograms(
+        simulation=simulation,
+        file_name_prefix="time_delay_histogram_weight_unfolded",
+        unfolding="weight",
+    )
+
+
+def finalize_time_delay_histogram(histogram: Histogram) -> None:
+    if np.sum(histogram.counts) == 0:
+        histogram.histogram[:] = 0.0
+        return
+
+    histogram.normalize_histogram()
+
+
+def raw_time_delay_scale(simulation: TimeDelayStatisticsSimulation) -> float:
+    return float(jn_zeros(1, 1)[0]) / simulation.compound.ensemble.spectral_radius
+
+
+def unfolded_time_delay_scale(_: TimeDelayStatisticsSimulation) -> float:
+    return 2 * np.pi

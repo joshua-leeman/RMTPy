@@ -18,16 +18,9 @@ from rmtpy.conversion import RMT_CONVERTER
 
 from .data import REGISTRY as DATA_REGISTRY
 from .data import Data, normalize_metadata, normalize_source
+from .histogram import Histogram
 
 PLOT_REGISTRY: dict[str, type[Plot]] = {}
-
-
-def plot_data(data_path: str | Path) -> None:
-    data_path: Path = Path(data_path)
-    out_dir: Path = data_path.parent
-
-    plot: Plot = RMT_CONVERTER.structure(data_path, Plot)
-    plot.plot(path=out_dir)
 
 
 def configure_matplotlib() -> None:
@@ -51,6 +44,154 @@ def configure_matplotlib() -> None:
         logging.getLogger(__name__).warning(
             "Could not configure LaTeX rendering for Matplotlib: %s", exc
         )
+
+
+def plot_data(data_path: str | Path) -> None:
+    data_path: Path = Path(data_path)
+    out_dir: Path = data_path.parent
+
+    plot: Plot = RMT_CONVERTER.structure(data_path, Plot)
+    plot.plot(path=out_dir)
+
+
+def plot_structure_hook(src: str | Path | dict[str, Any] | NpzFile | Plot, _) -> Plot:
+    src_dict: dict[str, Any] = normalize_source(src)
+    metadata: dict[str, Any] = normalize_metadata(src_dict["metadata"])
+    src_dict["metadata"] = metadata
+
+    plot_key: str | None = metadata.get("name")
+    if plot_key in PLOT_REGISTRY:
+        plot_cls: type[Plot] = PLOT_REGISTRY[plot_key]
+    else:
+        raise ValueError(f"No registered Plot class found in {src}")
+
+    if plot_key in DATA_REGISTRY:
+        data_cls: type[Data] = DATA_REGISTRY[plot_key]
+    else:
+        raise ValueError(f"No registered Data class found for Plot in {src}")
+
+    data_inst: Data = RMT_CONVERTER.structure(src_dict, data_cls)
+    return plot_cls(data=data_inst)
+
+
+def register_plot_hooks(plot_cls: type[Plot]) -> type[Plot]:
+    RMT_CONVERTER.register_structure_hook(plot_cls, plot_structure_hook)
+    return plot_cls
+
+
+@register_plot_hooks
+@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
+class Plot(ABC):
+    data: Data
+
+    xlim: tuple[float, float] | None = None
+    ylim: tuple[float, float] | None = None
+
+    axes: PlotAxes = dataclasses.field(default_factory=lambda: PlotAxes())
+    legend: PlotLegend = dataclasses.field(default_factory=lambda: PlotLegend())
+
+    dpi: int = 300
+
+    def __post_init__(self) -> None:
+        configure_matplotlib()
+
+    def __init_subclass__(cls) -> None:
+        if not inspect.isabstract(cls):
+            plot_key: str = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", cls.__name__)
+            plot_key = plot_key.lower()
+            plot_key = plot_key.replace("_plot", "_data")
+            PLOT_REGISTRY[plot_key] = cls
+
+    @property
+    def file_name(self) -> str:
+        return self.data.file_name.replace("_data", "_plot")
+
+    @property
+    def simulation_args(self) -> dict[str, Any]:
+        try:
+            args = self.data.metadata["simulation"]["args"]
+        except KeyError as exc:
+            raise ValueError("Simulation metadata not found.") from exc
+        except TypeError as exc:
+            raise ValueError("Metadata is not properly structured.") from exc
+
+        if not isinstance(args, dict):
+            raise ValueError("Simulation args metadata is not properly structured.")
+        return args
+
+    def simulation_arg(self, key: str) -> Any:
+        try:
+            return self.simulation_args[key]
+        except KeyError as exc:
+            raise ValueError(f"Simulation arg metadata not found: {key}.") from exc
+
+    def structure_simulation_arg(self, key: str, cls: type) -> Any:
+        return RMT_CONVERTER.structure(self.simulation_arg(key), cls)
+
+    def create_figure(self) -> None:
+        self.fig, self.ax = plt.subplots()
+        plt.close(self.fig)
+
+    def draw_histogram(self, *, color: str, alpha: float, zorder: int) -> None:
+        if not isinstance(self.data, Histogram):
+            raise ValueError("Data must be a `Histogram` instance")
+
+        self.ax.hist(
+            self.data.bins[:-1],
+            bins=self.data.bins,
+            weights=self.data.histogram,
+            color=color,
+            alpha=alpha,
+            zorder=zorder,
+        )
+
+    def scale_limits_and_ticks(
+        self,
+        *,
+        x: Callable[[float], float] | None = None,
+        y: Callable[[float], float] | None = None,
+    ) -> None:
+        if x is not None:
+            if self.xlim is not None:
+                self.xlim = tuple(x(value) for value in self.xlim)
+            if self.axes.xticks is not None:
+                self.axes.xticks = tuple(x(value) for value in self.axes.xticks)
+            if self.axes.xticks_minor is not None:
+                self.axes.xticks_minor = tuple(
+                    x(value) for value in self.axes.xticks_minor
+                )
+
+        if y is not None:
+            if self.ylim is not None:
+                self.ylim = tuple(y(value) for value in self.ylim)
+            if self.axes.yticks is not None:
+                self.axes.yticks = tuple(y(value) for value in self.axes.yticks)
+            if self.axes.yticks_minor is not None:
+                self.axes.yticks_minor = tuple(
+                    y(value) for value in self.axes.yticks_minor
+                )
+
+    def finish_plot(self, path: str | Path) -> None:
+        if not hasattr(self, "fig") or not hasattr(self, "ax"):
+            raise AttributeError(
+                "Figure and axis not created. Call create_figure() first."
+            )
+
+        if self.xlim is not None:
+            self.ax.set_xlim(self.xlim)
+        if self.ylim is not None:
+            self.ax.set_ylim(self.ylim)
+
+        self.axes.configure(ax=self.ax)
+        self.legend.configure(ax=self.ax)
+
+        path: Path = Path(path)
+        path.mkdir(parents=True, exist_ok=True)
+        self.fig.savefig(path / self.file_name, dpi=self.dpi, bbox_inches="tight")
+
+    @abstractmethod
+    def plot(self, path: str | Path) -> None:
+        pass
 
 
 @dataclasses.dataclass(repr=False, eq=False, kw_only=True)
@@ -137,135 +278,3 @@ class PlotLegend:
                 title_fontsize=self.title_fontsize,
                 alignment=self.textalignment,
             )
-
-
-@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
-class Plot(ABC):
-    data: Data
-
-    xlim: tuple[float, float] | None = None
-    ylim: tuple[float, float] | None = None
-
-    axes: PlotAxes = dataclasses.field(default_factory=PlotAxes)
-    legend: PlotLegend = dataclasses.field(default_factory=PlotLegend)
-
-    dpi: int = 300
-
-    def __post_init__(self) -> None:
-        configure_matplotlib()
-
-    def __init_subclass__(cls) -> None:
-        if not inspect.isabstract(cls):
-            plot_key: str = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", cls.__name__)
-            plot_key = plot_key.lower()
-            plot_key = plot_key.replace("_plot", "_data")
-            PLOT_REGISTRY[plot_key] = cls
-
-    @property
-    def file_name(self) -> str:
-        return self.data.file_name.replace("_data", "_plot")
-
-    @property
-    def simulation_args(self) -> dict[str, Any]:
-        try:
-            args = self.data.metadata["simulation"]["args"]
-        except KeyError as exc:
-            raise ValueError("Simulation metadata not found.") from exc
-        except TypeError as exc:
-            raise ValueError("Metadata is not properly structured.") from exc
-
-        if not isinstance(args, dict):
-            raise ValueError("Simulation args metadata is not properly structured.")
-        return args
-
-    def simulation_arg(self, key: str) -> Any:
-        try:
-            return self.simulation_args[key]
-        except KeyError as exc:
-            raise ValueError(f"Simulation arg metadata not found: {key}.") from exc
-
-    def structure_simulation_arg(self, key: str, cls: type) -> Any:
-        return RMT_CONVERTER.structure(self.simulation_arg(key), cls)
-
-    def create_figure(self) -> None:
-        self.fig, self.ax = plt.subplots()
-        plt.close(self.fig)
-
-    def draw_histogram(self, *, color: str, alpha: float, zorder: int) -> None:
-        self.ax.hist(
-            self.data.bins[:-1],
-            bins=self.data.bins,
-            weights=self.data.histogram,
-            color=color,
-            alpha=alpha,
-            zorder=zorder,
-        )
-
-    def scale_limits_and_ticks(
-        self,
-        *,
-        x: Callable[[float], float] | None = None,
-        y: Callable[[float], float] | None = None,
-    ) -> None:
-        if x is not None:
-            if self.xlim is not None:
-                self.xlim = tuple(x(value) for value in self.xlim)
-            if self.axes.xticks is not None:
-                self.axes.xticks = tuple(x(value) for value in self.axes.xticks)
-            if self.axes.xticks_minor is not None:
-                self.axes.xticks_minor = tuple(
-                    x(value) for value in self.axes.xticks_minor
-                )
-
-        if y is not None:
-            if self.ylim is not None:
-                self.ylim = tuple(y(value) for value in self.ylim)
-            if self.axes.yticks is not None:
-                self.axes.yticks = tuple(y(value) for value in self.axes.yticks)
-            if self.axes.yticks_minor is not None:
-                self.axes.yticks_minor = tuple(
-                    y(value) for value in self.axes.yticks_minor
-                )
-
-    def finish_plot(self, path: str | Path) -> None:
-        if not hasattr(self, "fig") or not hasattr(self, "ax"):
-            raise AttributeError(
-                "Figure and axis not created. Call create_figure() first."
-            )
-
-        if self.xlim is not None:
-            self.ax.set_xlim(self.xlim)
-        if self.ylim is not None:
-            self.ax.set_ylim(self.ylim)
-
-        self.axes.configure(ax=self.ax)
-        self.legend.configure(ax=self.ax)
-
-        path: Path = Path(path)
-        path.mkdir(parents=True, exist_ok=True)
-        self.fig.savefig(path / self.file_name, dpi=self.dpi, bbox_inches="tight")
-
-    @abstractmethod
-    def plot(self, path: str | Path) -> None:
-        pass
-
-
-@RMT_CONVERTER.register_structure_hook
-def plot_structure_hook(src: str | Path | dict[str, Any] | NpzFile | Plot, _) -> Plot:
-    src_dict: dict[str, Any] = normalize_source(src)
-    metadata: dict[str, Any] = normalize_metadata(src_dict["metadata"])
-    src_dict["metadata"] = metadata
-
-    plot_key: str | None = metadata.get("name")
-    if plot_key in PLOT_REGISTRY:
-        plot_cls: type[Plot] = PLOT_REGISTRY[plot_key]
-    else:
-        raise ValueError(f"No registered Plot class found in {src}")
-
-    if plot_key in DATA_REGISTRY:
-        data_cls: type[Data] = DATA_REGISTRY[plot_key]
-    else:
-        raise ValueError(f"No registered Data class found for Plot in {src}")
-
-    data_inst: Data = RMT_CONVERTER.structure(src_dict, data_cls)
-    return plot_cls(data=data_inst)

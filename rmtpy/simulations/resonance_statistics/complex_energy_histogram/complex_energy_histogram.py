@@ -14,12 +14,6 @@ from ...plot import Plot, PlotAxes, PlotLegend
 
 
 @dataclasses.dataclass(repr=False, eq=False, kw_only=True)
-class ComplexEnergyHistogramLegend(PlotLegend):
-    loc: str = "upper right"
-    bbox: tuple[float, float] = (0.94, 0.95)
-
-
-@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
 class ComplexEnergyHistogramAxes(PlotAxes):
     xticks: tuple[float, ...] = (-1.0, 0.0, 1.0)  # units of energy_0
     xticks_minor: tuple[float, ...] = (-0.5, 0.5)
@@ -40,6 +34,12 @@ class ComplexEnergyHistogramAxes(PlotAxes):
         r"$10^{2}$",
         r"$10^{4}$",
     )
+
+
+@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
+class ComplexEnergyHistogramLegend(PlotLegend):
+    loc: str = "upper right"
+    bbox: tuple[float, float] = (0.94, 0.95)
 
 
 @dataclasses.dataclass(repr=False, eq=False, kw_only=True)
@@ -121,12 +121,6 @@ class ComplexEnergyHistogramPlot(Plot):
 
 
 @dataclasses.dataclass(repr=False, eq=False, kw_only=True)
-class UnfoldedComplexEnergyHistogramLegend(PlotLegend):
-    loc: str = "upper right"
-    bbox: tuple[float, float] = (0.94, 0.95)
-
-
-@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
 class UnfoldedComplexEnergyHistogramAxes(PlotAxes):
     xticks: tuple[float, ...] = (-1.0, 0.0, 1.0)  # units of energy_0
     xticks_minor: tuple[float, ...] = (-0.5, 0.5)
@@ -147,6 +141,12 @@ class UnfoldedComplexEnergyHistogramAxes(PlotAxes):
         r"$10^{2}$",
         r"$10^{4}$",
     )
+
+
+@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
+class UnfoldedComplexEnergyHistogramLegend(PlotLegend):
+    loc: str = "upper right"
+    bbox: tuple[float, float] = (0.94, 0.95)
 
 
 @dataclasses.dataclass(repr=False, eq=False, kw_only=True)

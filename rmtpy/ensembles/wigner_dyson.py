@@ -22,7 +22,9 @@ def create_spectral_weight(
     wde: WignerDysonEnsemble,
 ) -> Callable[[np.ndarray], np.ndarray]:
     def wigner_dyson_spectral_weight(energies: np.ndarray) -> np.ndarray:
-        return rmtpy.polynomials.semicircle_weight_pdf(energies, wde.spectral_radius)
+        return rmtpy.polynomials.chebyshev_polynomial_2_weight_pdf(
+            energies, wde.spectral_radius
+        )
 
     return wigner_dyson_spectral_weight
 

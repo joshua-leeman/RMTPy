@@ -1,23 +1,25 @@
+from __future__ import annotations
+
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, Generic, TypeVar
 
 import attrs
 
 from .data import Data
 from .plot import Plot
 
+DataT = TypeVar("DataT", bound=Data)
 
-def validate_plot_cls(
-    plot_cls: type[Plot],
-) -> None:
+
+def validate_plot_cls(plot_cls: type[Plot]) -> None:
     if not issubclass(plot_cls, Plot):
         raise ValueError("`plot_cls` must be a subclass of `Plot`")
 
 
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
-class Observable:
-    data: Data = attrs.field(
+class Observable(Generic[DataT]):
+    data: DataT = attrs.field(
         validator=attrs.validators.instance_of(Data),
         repr=False,
     )

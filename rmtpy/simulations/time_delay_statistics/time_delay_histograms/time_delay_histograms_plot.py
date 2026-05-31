@@ -25,12 +25,6 @@ def format_energy_label(energy: float, energy_0: float) -> str:
 
 
 @dataclasses.dataclass(repr=False, eq=False, kw_only=True)
-class TimeDelayHistogramLegend(PlotLegend):
-    loc: str = "upper right"
-    bbox: tuple[float, float] = (0.94, 0.95)
-
-
-@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
 class TimeDelayHistogramAxes(PlotAxes):
     xticks: tuple[float, ...] = (0.0, 0.5, 1.0)  # log scale base dimension
     xlabel: str = r"$N_\textrm{\tiny m} Jt / j_\textrm{\tiny 1,1}$"
@@ -44,16 +38,9 @@ class TimeDelayHistogramAxes(PlotAxes):
 
 
 @dataclasses.dataclass(repr=False, eq=False, kw_only=True)
-class UnfoldedTimeDelayHistogramAxes(PlotAxes):
-    xticks: tuple[float, ...] = (-1.0, -0.5, 0.0)  # log scale base dimension
-    xlabel: str = r"$\tau / \tau_\textrm{\tiny H}$"
-    xtick_labels: tuple[str, ...] = (
-        r"$D^{-1}$",
-        r"$D^{-1/2}$",
-        r"$1$",
-    )
-
-    ylabel: str = r"$\diff P / \diff \tau$"
+class TimeDelayHistogramLegend(PlotLegend):
+    loc: str = "upper right"
+    bbox: tuple[float, float] = (0.94, 0.95)
 
 
 @dataclasses.dataclass(repr=False, eq=False, kw_only=True)
@@ -123,6 +110,19 @@ class TimeDelayHistogramPlot(Plot):
         )
 
         self.finish_plot(path=path)
+
+
+@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
+class UnfoldedTimeDelayHistogramAxes(PlotAxes):
+    xticks: tuple[float, ...] = (-1.0, -0.5, 0.0)  # log scale base dimension
+    xlabel: str = r"$\tau / \tau_\textrm{\tiny H}$"
+    xtick_labels: tuple[str, ...] = (
+        r"$D^{-1}$",
+        r"$D^{-1/2}$",
+        r"$1$",
+    )
+
+    ylabel: str = r"$\diff P / \diff \tau$"
 
 
 @dataclasses.dataclass(repr=False, eq=False, kw_only=True)

@@ -14,12 +14,6 @@ from ...plot import Plot, PlotAxes, PlotLegend
 
 
 @dataclasses.dataclass(repr=False, eq=False, kw_only=True)
-class ResonanceHistogramLegend(PlotLegend):
-    loc: str = "upper right"
-    bbox: tuple[float, float] = (0.94, 0.95)
-
-
-@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
 class ResonanceHistogramAxes(PlotAxes):
     xticks: tuple[float, ...] = (-1.0, 0.0, 1.0)  # units of energy_0
     xticks_minor: tuple[float, ...] = (-0.5, 0.5)
@@ -76,6 +70,12 @@ class ResonanceHistogramAxes(PlotAxes):
         r"$\frac{1}{\pi E_0}$",
         r"$\frac{2}{\pi E_0}$",
     )
+
+
+@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
+class ResonanceHistogramLegend(PlotLegend):
+    loc: str = "upper right"
+    bbox: tuple[float, float] = (0.94, 0.95)
 
 
 @dataclasses.dataclass(repr=False, eq=False, kw_only=True)
@@ -178,12 +178,6 @@ class ResonanceHistogramPlot(Plot):
 
 
 @dataclasses.dataclass(repr=False, eq=False, kw_only=True)
-class UnfoldedResonanceHistogramLegend(PlotLegend):
-    loc: str = "upper right"
-    bbox: tuple[float, float] = (0.94, 0.95)
-
-
-@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
 class UnfoldedResonanceHistogramAxes(PlotAxes):
     xticks: tuple[float, ...] = (-0.5, 0.0, 0.5)  # units of dimension
     xticks_minor: tuple[float, ...] = (-0.25, 0.25)
@@ -203,6 +197,12 @@ class UnfoldedResonanceHistogramAxes(PlotAxes):
         r"$\frac{1}{D}$",
         r"$\frac{3}{2 D}$",
     )
+
+
+@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
+class UnfoldedResonanceHistogramLegend(PlotLegend):
+    loc: str = "upper right"
+    bbox: tuple[float, float] = (0.94, 0.95)
 
 
 @dataclasses.dataclass(repr=False, eq=False, kw_only=True)

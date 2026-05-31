@@ -10,13 +10,7 @@ from ...data import Data
 
 NUM_TIMES_DEFAULT: int = 6000
 
-
-def create_array_of_logtimes(form_factors: FormFactorsData) -> None:
-    return form_factors.scale * rmtpy.density.array_of_floats(
-        support=form_factors.logD_time_support,
-        num_pts=form_factors.num_times,
-        log_base=form_factors.dimension,
-    )
+TIME_CHUNK_SIZE_DEFAULT: int = 1024
 
 
 def create_array_of_complex_zeros(form_factors: FormFactorsData) -> None:
@@ -25,6 +19,14 @@ def create_array_of_complex_zeros(form_factors: FormFactorsData) -> None:
 
 def create_array_of_float_zeros(form_factors: FormFactorsData) -> None:
     return np.zeros(form_factors.num_times, dtype=np.float64)
+
+
+def create_array_of_logtimes(form_factors: FormFactorsData) -> None:
+    return form_factors.scale * rmtpy.density.array_of_floats(
+        support=form_factors.logD_time_support,
+        num_pts=form_factors.num_times,
+        log_base=form_factors.dimension,
+    )
 
 
 def finalize_form_factors(form_factors: FormFactorsData) -> None:
@@ -49,6 +51,11 @@ class FormFactorsData(Data):
     )
     num_times: int = attrs.field(
         default=NUM_TIMES_DEFAULT,
+        converter=int,
+        validator=attrs.validators.gt(0),
+    )
+    time_chunk_size: int = attrs.field(
+        default=TIME_CHUNK_SIZE_DEFAULT,
         converter=int,
         validator=attrs.validators.gt(0),
     )
@@ -90,13 +97,17 @@ class FormFactorsData(Data):
         return self._realizs_count[0]
 
     def compute_moment_contributions(self, levels: np.ndarray) -> None:
-        first_moment_contribution: np.ndarray = np.sum(
-            np.exp(-1j * np.outer(levels, self.times)), axis=0
-        ) / len(levels)
-        second_moment_contribution: np.ndarray = np.abs(first_moment_contribution) ** 2
+        levels = np.asarray(levels)
 
-        self.first_moment[:] += first_moment_contribution
-        self.second_moment[:] += second_moment_contribution
+        for start in range(0, len(self.times), self.time_chunk_size):
+            stop = min(start + self.time_chunk_size, len(self.times))
+            first_moment_contribution = np.sum(
+                np.exp(-1j * np.outer(levels, self.times[start:stop])),
+                axis=0,
+            ) / len(levels)
+
+            self.first_moment[start:stop] += first_moment_contribution
+            self.second_moment[start:stop] += np.abs(first_moment_contribution) ** 2
 
         self._realizs_count[0] += 1
 

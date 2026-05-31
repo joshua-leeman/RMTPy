@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import dataclasses
 from pathlib import Path
 
@@ -11,12 +13,6 @@ from rmtpy.ensembles import ManyBodyEnsemble
 
 from ...plot import Plot, PlotAxes, PlotLegend
 from .spectral_form_factors_data import FormFactorsData
-
-
-@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
-class FormFactorsLegend(PlotLegend):
-    loc: str = "upper right"
-    bbox: tuple[float, float] = (0.735, 0.9)
 
 
 @dataclasses.dataclass(repr=False, eq=False, kw_only=True)
@@ -37,6 +33,12 @@ class FormFactorsAxes(PlotAxes):
         r"$D^{-1}$",
         r"$1$",
     )
+
+
+@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
+class FormFactorsLegend(PlotLegend):
+    loc: str = "upper right"
+    bbox: tuple[float, float] = (0.735, 0.9)
 
 
 @dataclasses.dataclass(repr=False, eq=False, kw_only=True)
@@ -159,12 +161,6 @@ class FormFactorsPlot(Plot):
 
 
 @dataclasses.dataclass(repr=False, eq=False, kw_only=True)
-class UnfoldedFormFactorsLegend(PlotLegend):
-    loc: str = "upper right"
-    bbox: tuple[float, float] = (0.76, 0.96)
-
-
-@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
 class UnfoldedFormFactorsAxes(PlotAxes):
     xticks: tuple[float, ...] = (-1.0, -0.5, 0.0)  # log scale base dimension
     xlabel: str = r"$\tau / \tau_\textrm{\tiny H}$"
@@ -182,6 +178,12 @@ class UnfoldedFormFactorsAxes(PlotAxes):
         r"$D^{-1}$",
         r"$1$",
     )
+
+
+@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
+class UnfoldedFormFactorsLegend(PlotLegend):
+    loc: str = "upper right"
+    bbox: tuple[float, float] = (0.76, 0.96)
 
 
 @dataclasses.dataclass(repr=False, eq=False, kw_only=True)

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import dataclasses
 from pathlib import Path
 
@@ -7,12 +9,6 @@ from rmtpy.ensembles import ManyBodyEnsemble
 
 from ...histogram import Histogram
 from ...plot import Plot, PlotAxes, PlotLegend
-
-
-@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
-class SpectralCoefficientHistogramLegend(PlotLegend):
-    loc: str = "upper right"
-    bbox: tuple[float, float] = (0.94, 0.95)
 
 
 @dataclasses.dataclass(repr=False, eq=False, kw_only=True)
@@ -39,6 +35,12 @@ class SpectralCoefficientHistogramAxes(PlotAxes):
         r"$16$",
         r"$20$",
     )
+
+
+@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
+class SpectralCoefficientHistogramLegend(PlotLegend):
+    loc: str = "upper right"
+    bbox: tuple[float, float] = (0.94, 0.95)
 
 
 @dataclasses.dataclass(repr=False, eq=False, kw_only=True)

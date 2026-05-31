@@ -16,12 +16,6 @@ from ...spectral_statistics.spectral_form_factors import FormFactorsData
 
 
 @dataclasses.dataclass(repr=False, eq=False, kw_only=True)
-class ResonanceFormFactorsLegend(PlotLegend):
-    loc: str = "upper right"
-    bbox: tuple[float, float] = (0.735, 0.9)
-
-
-@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
 class ResonanceFormFactorsAxes(PlotAxes):
     xticks: tuple[float, ...] = (0.0, 0.5, 1.0)  # log scale base dimension
     xlabel: str = r"$N_\textrm{\tiny m} Jt / j_\textrm{\tiny 1,1}$"
@@ -38,6 +32,12 @@ class ResonanceFormFactorsAxes(PlotAxes):
         r"$D^{-1}$",
         r"$1$",
     )
+
+
+@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
+class ResonanceFormFactorsLegend(PlotLegend):
+    loc: str = "upper right"
+    bbox: tuple[float, float] = (0.735, 0.9)
 
 
 @dataclasses.dataclass(repr=False, eq=False, kw_only=True)
@@ -162,12 +162,6 @@ class ResonanceFormFactorsPlot(Plot):
 
 
 @dataclasses.dataclass(repr=False, eq=False, kw_only=True)
-class UnfoldedResonanceFormFactorsLegend(PlotLegend):
-    loc: str = "upper right"
-    bbox: tuple[float, float] = (0.76, 0.96)
-
-
-@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
 class UnfoldedResonanceFormFactorsAxes(PlotAxes):
     xticks: tuple[float, ...] = (-1.0, -0.5, 0.0)  # log scale base dimension
     xlabel: str = r"$\tau / \tau_\textrm{\tiny H}$"
@@ -184,6 +178,12 @@ class UnfoldedResonanceFormFactorsAxes(PlotAxes):
         r"$D^{-1}$",
         r"$1$",
     )
+
+
+@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
+class UnfoldedResonanceFormFactorsLegend(PlotLegend):
+    loc: str = "upper right"
+    bbox: tuple[float, float] = (0.76, 0.96)
 
 
 @dataclasses.dataclass(repr=False, eq=False, kw_only=True)

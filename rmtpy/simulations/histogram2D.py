@@ -11,15 +11,23 @@ from .data import Data
 NUM_BINS_DEFAULT: int = 100
 
 
+def create_empty_histogram2D(hist: Histogram2D) -> np.ndarray:
+    return np.empty((hist.x_num_bins, hist.y_num_bins), dtype=np.float64)
+
+
 def create_histogram2D_bins(hist: Histogram2D, axis: str) -> np.ndarray:
     if axis.strip().lower() == "x":
         return rmtpy.density.array_of_floats(
-            hist.x_support, hist.x_num_bins + 1, hist.x_log_base
+            support=hist.x_support,
+            num_pts=hist.x_num_bins + 1,
+            log_base=hist.x_log_base,
         )
 
     elif axis.strip().lower() == "y":
         return rmtpy.density.array_of_floats(
-            hist.y_support, hist.y_num_bins + 1, hist.y_log_base
+            support=hist.y_support,
+            num_pts=hist.y_num_bins + 1,
+            log_base=hist.y_log_base,
         )
 
     else:
@@ -30,15 +38,11 @@ def create_zeroed_histogram2D_counts(hist: Histogram2D) -> np.ndarray:
     return np.zeros((hist.x_num_bins, hist.y_num_bins), dtype=np.int64)
 
 
-def create_empty_histogram2D(hist: Histogram2D) -> np.ndarray:
-    return np.empty((hist.x_num_bins, hist.y_num_bins), dtype=np.float64)
-
-
 def finalize_histogram2D(hist: Histogram2D) -> None:
     hist.compute_histogram_probabilities()
 
 
-@attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
+@attrs.frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
 class Histogram2D(Data):
     x_support: tuple[float, float] = attrs.field(
         converter=tuple,

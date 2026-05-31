@@ -11,16 +11,20 @@ from .data import Data
 NUM_BINS_DEFAULT: int = 100
 
 
+def create_empty_histogram(hist: Histogram) -> np.ndarray:
+    return np.empty(hist.num_bins, dtype=np.float64)
+
+
 def create_histogram_bins(hist: Histogram) -> np.ndarray:
-    return rmtpy.density.array_of_floats(hist.support, hist.num_bins + 1, hist.log_base)
+    return rmtpy.density.array_of_floats(
+        support=hist.support,
+        num_pts=hist.num_bins + 1,
+        log_base=hist.log_base,
+    )
 
 
 def create_zeroed_histogram_counts(hist: Histogram) -> np.ndarray:
     return np.zeros(hist.num_bins, dtype=np.int64)
-
-
-def create_empty_histogram(hist: Histogram) -> np.ndarray:
-    return np.empty(hist.num_bins, dtype=np.float64)
 
 
 def finalize_histogram(hist: Histogram) -> None:

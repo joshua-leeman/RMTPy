@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from ...spectral_statistics.spectral_form_factors import FormFactorsData
 from .resonance_form_factor_plot import (
     ResonanceFormFactorsPlot,

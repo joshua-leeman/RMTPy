@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from .partial_widths_statistics import run_partial_widths_statistics
 from .resonance_statistics import run_resonance_statistics
 from .spectral_statistics import run_spectral_statistics

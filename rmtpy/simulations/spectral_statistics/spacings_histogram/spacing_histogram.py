@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import dataclasses
 from pathlib import Path
 
@@ -9,12 +11,6 @@ from rmtpy.ensembles import ManyBodyEnsemble
 
 from ...histogram import Histogram
 from ...plot import Plot, PlotAxes, PlotLegend
-
-
-@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
-class SpacingsHistogramLegend(PlotLegend):
-    loc: str = "upper right"
-    bbox: tuple[float, float] = (0.94, 0.95)
 
 
 @dataclasses.dataclass(repr=False, eq=False, kw_only=True)
@@ -37,6 +33,12 @@ class SpacingsHistogramAxes(PlotAxes):
         r"$\frac{1}{2}d^{-1}$",
         r"$d^{-1}$",
     )
+
+
+@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
+class SpacingsHistogramLegend(PlotLegend):
+    loc: str = "upper right"
+    bbox: tuple[float, float] = (0.94, 0.95)
 
 
 @dataclasses.dataclass(repr=False, eq=False, kw_only=True)
@@ -118,12 +120,6 @@ class SpacingsHistogramPlot(Plot):
 
 
 @dataclasses.dataclass(repr=False, eq=False, kw_only=True)
-class UnfoldedSpacingsHistogramLegend(PlotLegend):
-    loc: str = "upper right"
-    bbox: tuple[float, float] = (0.94, 0.95)
-
-
-@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
 class UnfoldedSpacingsHistogramAxes(PlotAxes):
     xticks: tuple[float, ...] = (0.0, 1.0, 2.0, 3.0, 4.0)
     xticks_minor: tuple[float, ...] = (0.5, 1.5, 2.5, 3.5)
@@ -143,6 +139,12 @@ class UnfoldedSpacingsHistogramAxes(PlotAxes):
         r"$0.5$",
         r"$1.0$",
     )
+
+
+@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
+class UnfoldedSpacingsHistogramLegend(PlotLegend):
+    loc: str = "upper right"
+    bbox: tuple[float, float] = (0.94, 0.95)
 
 
 @dataclasses.dataclass(repr=False, eq=False, kw_only=True)

@@ -10,11 +10,16 @@ from .partial_width_histogram import PartialWidthHistogramPlot, TotalWidthHistog
 if TYPE_CHECKING:
     from .partial_widths_statistics_simulation import PartialWidthsStatisticsSimulation
 
-WIDTH_LOG_BASE_DEFAULT: float = 10.0
+
 PARTIAL_WIDTH_LOG10_SUPPORT_DEFAULT: tuple[float, float] = (-5.0, 2.0)
-TOTAL_WIDTH_LOG10_SUPPORT_DEFAULT: tuple[float, float] = (-2.0, 3.0)
+
 PARTIAL_WIDTH_NUM_BINS_DEFAULT: int = 60
+
+TOTAL_WIDTH_LOG10_SUPPORT_DEFAULT: tuple[float, float] = (-2.0, 3.0)
+
 TOTAL_WIDTH_NUM_BINS_DEFAULT: int = 100
+
+WIDTH_LOG_BASE_DEFAULT: float = 10.0
 
 
 def create_width_histogram_observable(

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from .time_delay_statistics_simulation import (
     TimeDelayStatisticsSimulation,
     run_time_delay_statistics,

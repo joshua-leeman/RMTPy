@@ -14,12 +14,6 @@ from ...plot import Plot, PlotAxes, PlotLegend
 
 
 @dataclasses.dataclass(repr=False, eq=False, kw_only=True)
-class ResonanceSpacingHistogramLegend(PlotLegend):
-    loc: str = "upper right"
-    bbox: tuple[float, float] = (0.94, 0.95)
-
-
-@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
 class ResonanceSpacingHistogramAxes(PlotAxes):
     xticks: tuple[float, ...] = (0.0, 1.0, 2.0, 3.0, 4.0)  # units of mean spacing
     xticks_minor: tuple[float, ...] = (0.5, 1.5, 2.5, 3.5)
@@ -39,6 +33,12 @@ class ResonanceSpacingHistogramAxes(PlotAxes):
         r"$\frac{1}{2}d^{-1}$",
         r"$d^{-1}$",
     )
+
+
+@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
+class ResonanceSpacingHistogramLegend(PlotLegend):
+    loc: str = "upper right"
+    bbox: tuple[float, float] = (0.94, 0.95)
 
 
 @dataclasses.dataclass(repr=False, eq=False, kw_only=True)
@@ -120,12 +120,6 @@ class ResonanceSpacingHistogramPlot(Plot):
 
 
 @dataclasses.dataclass(repr=False, eq=False, kw_only=True)
-class UnfoldedResonanceSpacingHistogramLegend(PlotLegend):
-    loc: str = "upper right"
-    bbox: tuple[float, float] = (0.94, 0.95)
-
-
-@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
 class UnfoldedResonanceSpacingHistogramAxes(PlotAxes):
     xticks: tuple[float, ...] = (0.0, 1.0, 2.0, 3.0, 4.0)
     xticks_minor: tuple[float, ...] = (0.5, 1.5, 2.5, 3.5)
@@ -145,6 +139,12 @@ class UnfoldedResonanceSpacingHistogramAxes(PlotAxes):
         r"$0.5$",
         r"$1.0$",
     )
+
+
+@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
+class UnfoldedResonanceSpacingHistogramLegend(PlotLegend):
+    loc: str = "upper right"
+    bbox: tuple[float, float] = (0.94, 0.95)
 
 
 @dataclasses.dataclass(repr=False, eq=False, kw_only=True)

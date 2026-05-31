@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import dataclasses
 from pathlib import Path
 
@@ -9,12 +11,6 @@ from rmtpy.compounds import Compound
 
 from ...histogram import Histogram
 from ...plot import Plot, PlotAxes, PlotLegend
-
-
-@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
-class TotalWidthHistogramLegend(PlotLegend):
-    loc: str = "upper right"
-    bbox: tuple[float, float] = (0.94, 0.95)
 
 
 @dataclasses.dataclass(repr=False, eq=False, kw_only=True)
@@ -38,6 +34,12 @@ class TotalWidthHistogramAxes(PlotAxes):
         r"$10^{0}$",
         r"$10^{1}$",
     )
+
+
+@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
+class TotalWidthHistogramLegend(PlotLegend):
+    loc: str = "upper right"
+    bbox: tuple[float, float] = (0.94, 0.95)
 
 
 @dataclasses.dataclass(repr=False, eq=False, kw_only=True)
@@ -98,7 +100,10 @@ class TotalWidthHistogramPlot(Plot):
 
         self.ax.plot(
             centers,
-            ensemble.porter_thomas_distribution(num_channels, centers),
+            ensemble.porter_thomas_distribution(
+                centers,
+                num_channels=num_channels,
+            ),
             color="Black",
         )
 

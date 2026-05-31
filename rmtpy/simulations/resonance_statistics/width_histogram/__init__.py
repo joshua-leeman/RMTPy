@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from .width_histogram import UnfoldedWidthHistogramPlot, WidthHistogramPlot
 
 __all__ = [
