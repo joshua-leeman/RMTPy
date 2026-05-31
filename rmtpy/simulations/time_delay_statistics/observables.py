@@ -16,12 +16,11 @@ from .time_delay_histograms import (
 if TYPE_CHECKING:
     from .time_delay_statistics_simulation import TimeDelayStatisticsSimulation
 
+NUM_BINS: int = 100
 
-RAW_TIME_DELAY_LOGD_SUPPORT_DEFAULT: tuple[float, float] = (-0.5, 1.5)
+RAW_LOG_D_TIME_DELAY_SUPPORT: tuple[float, float] = (-0.5, 1.5)
 
-TIME_DELAY_NUM_BINS_DEFAULT: int = 100
-
-UNFOLDED_TIME_DELAY_LOGD_SUPPORT_DEFAULT: tuple[float, float] = (-1.5, 0.5)
+UNFOLDED_LOG_D_TIME_DELAY_SUPPORT: tuple[float, float] = (-1.5, 0.5)
 
 
 def compute_scaled_log_support(
@@ -56,7 +55,7 @@ def create_raw_time_delay_histogram_support(
     dimension: int = simulation.compound.ensemble.dimension
     scale: float = float(jn_zeros(1, 1)[0]) / energy_0
     return compute_scaled_log_support(
-        RAW_TIME_DELAY_LOGD_SUPPORT_DEFAULT,
+        RAW_LOG_D_TIME_DELAY_SUPPORT,
         log_base=dimension,
         scale=scale,
     )
@@ -99,7 +98,7 @@ def create_time_delay_histogram_observable(
         ),
         support=support,
         log_base=simulation.compound.ensemble.dimension,
-        num_bins=TIME_DELAY_NUM_BINS_DEFAULT,
+        num_bins=NUM_BINS,
         plot_cls=plot_cls,
         metadata=metadata,
         finalize=finalize_time_delay_histogram,
@@ -131,7 +130,7 @@ def create_unfolded_time_delay_histogram_support(
 ) -> tuple[float, float]:
     dimension: int = simulation.compound.ensemble.dimension
     return compute_scaled_log_support(
-        UNFOLDED_TIME_DELAY_LOGD_SUPPORT_DEFAULT,
+        UNFOLDED_LOG_D_TIME_DELAY_SUPPORT,
         log_base=dimension,
         scale=2 * np.pi,
     )

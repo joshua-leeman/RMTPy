@@ -8,9 +8,9 @@ import rmtpy.validators
 
 from ...data import Data
 
-NUM_TIMES_DEFAULT: int = 6000
+NUM_TIMES: int = 6000
 
-TIME_CHUNK_SIZE_DEFAULT: int = 1024
+TIME_CHUNK_SIZE: int = 1024
 
 
 def create_array_of_complex_zeros(form_factors: FormFactorsData) -> None:
@@ -50,12 +50,12 @@ class FormFactorsData(Data):
         validator=attrs.validators.gt(0.0),
     )
     num_times: int = attrs.field(
-        default=NUM_TIMES_DEFAULT,
+        default=NUM_TIMES,
         converter=int,
         validator=attrs.validators.gt(0),
     )
     time_chunk_size: int = attrs.field(
-        default=TIME_CHUNK_SIZE_DEFAULT,
+        default=TIME_CHUNK_SIZE,
         converter=int,
         validator=attrs.validators.gt(0),
     )

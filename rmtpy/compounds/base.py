@@ -20,7 +20,7 @@ MAX_SPECTRAL_POLYNOMIAL_DEGREE_METADATA: dict[str, str] = {
     "dir_name": "polydeg",
 }
 
-NUM_FREE_COMPLEX_FERMIONS_DEFAULT: int = 1
+NUM_FREE_COMPLEX_FERMIONS: int = 1
 NUM_FREE_COMPLEX_FERMIONS_METADATA: dict[str, str] = {
     "dir_name": "Nf",
     "latex_name": r"N_\textrm{\tiny f}",
@@ -125,7 +125,7 @@ class Compound:
         converter=RandomMatrixEnsemble.create,
     )
     num_free_complex_fermions: int = attrs.field(
-        default=NUM_FREE_COMPLEX_FERMIONS_DEFAULT,
+        default=NUM_FREE_COMPLEX_FERMIONS,
         converter=int,
         validator=[
             attrs.validators.ge(0),
@@ -228,7 +228,7 @@ class Compound:
         hamiltonian[diag_indices] -= 0.5j * (self.channel_coupling_strengths**2)
         return hamiltonian
 
-    def effective_hamiltonian_stream(self, realizs: int) -> Iterator[np.ndarray]:
+    def effective_hamiltonian_stream(self, *, realizs: int) -> Iterator[np.ndarray]:
         diag_indices: np.ndarray = np.diag_indices(self.num_channels)
         for hamiltonian in self.ensemble.matrix_stream(
             realizs=realizs,
@@ -237,18 +237,14 @@ class Compound:
             hamiltonian[diag_indices] -= 0.5j * (self.channel_coupling_strengths**2)
             yield hamiltonian
 
-    def resonances_stream(self, realizs: int) -> Iterator[np.ndarray]:
+    def resonances_stream(self, *, realizs: int) -> Iterator[np.ndarray]:
         lapack_geev: type = self.ensemble._pick_lapack_geev(use_complex_dtype=True)
         for hamiltonian_eff in self.effective_hamiltonian_stream(realizs):
             yield lapack_geev(
                 hamiltonian_eff, compute_vl=0, compute_vr=0, overwrite_a=True
             )[0]
 
-    def resonance_real_parts_stream(self, realizs: int) -> Iterator[np.ndarray]:
-        for resonances in self.resonances_stream(realizs):
-            yield resonances.real
-
-    def partial_widths_stream(self, realizs: int) -> Iterator[np.ndarray]:
+    def partial_widths_stream(self, *, realizs: int) -> Iterator[np.ndarray]:
         for _, eigvecs in self.ensemble.eigsys_stream(realizs=realizs):
             coupling_matrix: np.ndarray = eigvecs[:, : self.num_channels]
             coupling_matrix *= self.channel_coupling_strengths[None, :]
@@ -257,8 +253,8 @@ class Compound:
             yield coupling_matrix.real
 
     def reaction_matrix_stream(
-        self, energies: np.ndarray, realizs: int
-    ) -> Iterator[np.ndarray]:
+        self, *, energies: np.ndarray, realizs: int
+    ) -> Iterator[tuple[np.ndarray, np.ndarray]]:
         energies = np.asarray(energies)
 
         resolvent: np.ndarray = np.empty(
@@ -295,11 +291,11 @@ class Compound:
                 optimize=True,
             )
 
-            yield reaction_matrix
+            yield reaction_matrix, eigvals
 
     def reaction_matrix_pair_stream(
-        self, energies: np.ndarray, realizs: int
-    ) -> Iterator[tuple[np.ndarray, np.ndarray]]:
+        self, *, energies: np.ndarray, realizs: int
+    ) -> Iterator[tuple[np.ndarray, np.ndarray, np.ndarray]]:
         energies = np.asarray(energies)
 
         resolvent: np.ndarray = np.empty(
@@ -352,11 +348,11 @@ class Compound:
                 optimize=True,
             )
 
-            yield reaction_matrix, reaction_matrix_2
+            yield reaction_matrix, reaction_matrix_2, eigvals
 
     def scattering_matrix_stream(
-        self, energies: np.ndarray, realizs: int
-    ) -> Iterator[np.ndarray]:
+        self, *, energies: np.ndarray, realizs: int
+    ) -> Iterator[tuple[np.ndarray, np.ndarray]]:
         energies = np.asarray(energies)
 
         numerator: np.ndarray = np.empty(
@@ -364,7 +360,7 @@ class Compound:
             self.ensemble.complex_dtype,
             order="C",
         )
-        for reaction_matrix in self.reaction_matrix_stream(energies, realizs):
+        for reaction_matrix, eigvals in self.reaction_matrix_stream(energies, realizs):
             diag_indices: np.ndarray = np.arange(self.num_channels)
             reaction_matrix *= 1j
             reaction_matrix[:, diag_indices, diag_indices] += 1
@@ -372,7 +368,7 @@ class Compound:
             np.conjugate(reaction_matrix.swapaxes(-1, -2), out=numerator)
             denominator: np.ndarray = reaction_matrix
 
-            yield solve(
+            s_matrix: np.ndarray = solve(
                 denominator,
                 numerator,
                 overwrite_a=True,
@@ -380,28 +376,30 @@ class Compound:
                 check_finite=False,
             )
 
+            return s_matrix, eigvals
+
     def wigner_smith_matrix_stream(
-        self, energies: np.ndarray, realizs: int
-    ) -> Iterator[np.ndarray]:
+        self, *, energies: np.ndarray, realizs: int
+    ) -> Iterator[tuple[np.ndarray, np.ndarray]]:
         energies = np.asarray(energies)
 
-        for matrix, matrix_2 in self.reaction_matrix_pair_stream(energies, realizs):
+        for mat, mat_2, eigvals in self.reaction_matrix_pair_stream(energies, realizs):
             diag_indices: np.ndarray = np.arange(self.num_channels)
-            matrix *= -1j
-            matrix[:, diag_indices, diag_indices] += 1
+            mat *= -1j
+            mat[:, diag_indices, diag_indices] += 1
 
             wigner_smith_matrix: np.ndarray = solve(
-                matrix,
-                matrix_2,
+                mat,
+                mat_2,
                 overwrite_a=True,
                 overwrite_b=True,
                 check_finite=False,
             )
             wigner_smith_matrix += wigner_smith_matrix.swapaxes(-1, -2).conj()
-            yield wigner_smith_matrix
+            yield wigner_smith_matrix, eigvals
 
     def time_delays_stream(
-        self, energies: np.ndarray, realizs: int
+        self, *, energies: np.ndarray, realizs: int
     ) -> Iterator[np.ndarray]:
-        for wigner_smith_matrix in self.wigner_smith_matrix_stream(energies, realizs):
-            yield np.linalg.eigvalsh(wigner_smith_matrix)
+        for w_s_matrix, eigvals in self.wigner_smith_matrix_stream(energies, realizs):
+            yield np.linalg.eigvalsh(w_s_matrix), eigvals

@@ -8,7 +8,7 @@ import rmtpy.validators
 
 from .data import Data
 
-NUM_BINS_DEFAULT: int = 100
+NUM_BINS: int = 100
 
 
 def create_empty_histogram(hist: Histogram) -> np.ndarray:
@@ -43,7 +43,7 @@ class Histogram(Data):
         validator=attrs.validators.optional(attrs.validators.gt(0.0)),
     )
     num_bins: int = attrs.field(
-        default=NUM_BINS_DEFAULT,
+        default=NUM_BINS,
         validator=[
             attrs.validators.instance_of(int),
             attrs.validators.gt(0),

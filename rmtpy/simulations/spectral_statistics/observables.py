@@ -29,15 +29,15 @@ from .spectral_histogram import (
     UnfoldedSpectralHistogramPlot,
 )
 
-SFF_LOG_D_TIME_SUPPORT_DEFAULT: tuple[float, float] = (-0.5, 1.5)
+SFF_LOG_D_TIME_SUPPORT: tuple[float, float] = (-0.5, 1.5)
 
-SPACING_SUPPORT_UNITS_MEAN_DEFAULT: tuple[float, float] = (0.0, 4.0)
+SPACING_SUPPORT_UNITS_MEAN: tuple[float, float] = (0.0, 4.0)
 
-SPECTRAL_COEFFICIENT_SUPPORT_DEFAULT: tuple[float, float] = (-0.2, 0.2)
+SPECTRAL_COEFFICIENT_SUPPORT: tuple[float, float] = (-0.2, 0.2)
 
-UNFOLDED_LEVEL_SUPPORT_UNITS_DIMENSION_DEFAULT: tuple[float, float] = (-1.2, 1.2)
+UNFOLDED_LEVEL_SUPPORT_UNITS_DIMENSION: tuple[float, float] = (-1.2, 1.2)
 
-UNFOLDED_SFF_LOG_D_TIME_SUPPORT_DEFAULT: tuple[float, float] = (-1.5, 0.5)
+UNFOLDED_SFF_LOG_D_TIME_SUPPORT: tuple[float, float] = (-1.5, 0.5)
 
 
 def create_raw_spacings_histogram_observable(
@@ -49,7 +49,7 @@ def create_raw_spacings_histogram_observable(
     return create_histogram_observable(
         file_name="spacings_histogram",
         support=scale_support(
-            SPACING_SUPPORT_UNITS_MEAN_DEFAULT,
+            SPACING_SUPPORT_UNITS_MEAN,
             global_mean_spacing,
         ),
         plot_cls=SpacingsHistogramPlot,
@@ -70,7 +70,7 @@ def create_raw_spectral_form_factors_observable(
         data=FormFactorsData(
             file_name="spectral_form_factors",
             dimension=ensemble.dimension,
-            logD_time_support=SFF_LOG_D_TIME_SUPPORT_DEFAULT,
+            logD_time_support=SFF_LOG_D_TIME_SUPPORT,
             scale=j_1_1 / ensemble.spectral_radius,
         ),
         plot_cls=FormFactorsPlot,
@@ -101,7 +101,7 @@ def create_spectral_coeff_histograms(
         create_coefficient_histograms(
             prefix="spectral",
             max_degree=max_degree,
-            support=SPECTRAL_COEFFICIENT_SUPPORT_DEFAULT,
+            support=SPECTRAL_COEFFICIENT_SUPPORT,
             plot_cls=SpectralCoefficientHistogramPlot,
             unfolding=unfolding,
         )
@@ -120,7 +120,7 @@ def create_unfolded_spacings_histogram_observable(
 
     return create_histogram_observable(
         file_name=file_name,
-        support=SPACING_SUPPORT_UNITS_MEAN_DEFAULT,
+        support=SPACING_SUPPORT_UNITS_MEAN,
         plot_cls=UnfoldedSpacingsHistogramPlot,
         metadata=metadata,
     )
@@ -141,7 +141,7 @@ def create_unfolded_spectral_form_factors_observable(
         data=FormFactorsData(
             file_name=file_name,
             dimension=dimension,
-            logD_time_support=UNFOLDED_SFF_LOG_D_TIME_SUPPORT_DEFAULT,
+            logD_time_support=UNFOLDED_SFF_LOG_D_TIME_SUPPORT,
             scale=2 * np.pi,
         ),
         plot_cls=UnfoldedFormFactorsPlot,
@@ -164,7 +164,7 @@ def create_unfolded_spectral_histogram_observable(
     return create_histogram_observable(
         file_name=file_name,
         support=scale_support(
-            UNFOLDED_LEVEL_SUPPORT_UNITS_DIMENSION_DEFAULT,
+            UNFOLDED_LEVEL_SUPPORT_UNITS_DIMENSION,
             dimension,
         ),
         plot_cls=UnfoldedSpectralHistogramPlot,

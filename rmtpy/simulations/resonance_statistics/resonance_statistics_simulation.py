@@ -81,7 +81,7 @@ class ResonanceStatisticsSimulation(Simulation):
         avg_cdf_interpolators: tuple[PchipInterpolator, ...] | None = None
         ensemble = self.compound.ensemble
 
-        for complex_energies in self.compound.resonances_stream(self.realizs):
+        for complex_energies in self.compound.resonances_stream(realizs=self.realizs):
             resonances = complex_energies.real
             widths = -2 * complex_energies.imag
 

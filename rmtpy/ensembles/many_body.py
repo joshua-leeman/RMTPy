@@ -17,7 +17,7 @@ from .base import RandomMatrixEnsemble
 
 DYSON_INDEX: int = 0
 
-INTERACTION_STRENGTH_DEFAULT: float = 1.0
+INTERACTION_STRENGTH: float = 1.0
 INTERACTION_STRENGTH_METADATA: dict[str, str] = {
     "dir_name": "J",
 }
@@ -58,13 +58,13 @@ class ManyBodyEnsemble(RandomMatrixEnsemble):
         metadata=NUM_MAJORANAS_METADATA,
     )
     interaction_strength: float = attrs.field(
-        default=INTERACTION_STRENGTH_DEFAULT,
+        default=INTERACTION_STRENGTH,
         converter=float,
         validator=attrs.validators.gt(0.0),
         metadata=INTERACTION_STRENGTH_METADATA,
     )
     max_spectral_polynomial_degree: int = attrs.field(
-        default=rmtpy.density.MAX_POLYNOMIAL_DEGREE_DEFAULT,
+        default=rmtpy.density.MAX_POLYNOMIAL_DEGREE,
         converter=int,
         validator=attrs.validators.ge(0),
         metadata=MAX_SPECTRAL_POLYNOMIAL_DEGREE_METADATA,

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import attrs
 import numpy as np
 
@@ -13,8 +15,13 @@ from .observables import (
     create_weight_unfolded_time_delay_histograms,
 )
 
+if TYPE_CHECKING:
+    from .time_delay_statistics_simulation import TimeDelayStatisticsSimulation
 
-def create_time_delay_outputs(simulation) -> TimeDelayOutputs:
+
+def create_time_delay_outputs(
+    simulation: TimeDelayStatisticsSimulation,
+) -> TimeDelayOutputs:
     num_energies = simulation.energies.size
     avg_unfolded = tuple(create_avg_unfolded_time_delay_histograms(simulation))
     var_unfolded = tuple(create_var_unfolded_time_delay_histograms(simulation))

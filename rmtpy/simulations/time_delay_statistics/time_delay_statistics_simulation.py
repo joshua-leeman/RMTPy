@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import copy
-from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
@@ -27,14 +25,32 @@ ENERGIES_METADATA: dict[str, str] = {
 }
 
 
+def create_cdf_factory(
+    sim: TimeDelayStatisticsSimulation,
+) -> TruncatedPolynomialCdfFactory:
+    return TruncatedPolynomialCdfFactory(
+        density=sim.compound.ensemble.spectral_density,
+        degrees=sim.truncated_degrees,
+        density_name="spectral",
+    )
+
+
 def create_outputs(
-    simulation: TimeDelayStatisticsSimulation,
+    sim: TimeDelayStatisticsSimulation,
 ) -> TimeDelayOutputs:
-    return create_time_delay_outputs(simulation)
+    return create_time_delay_outputs(sim)
+
+
+def create_truncated_degrees(
+    sim: TimeDelayStatisticsSimulation,
+) -> range:
+    return truncated_polynomial_degrees(
+        sim.compound.ensemble.max_spectral_polynomial_degree
+    )
 
 
 def format_energy_path_value(energy: float) -> str:
-    return f"{energy:.5g}".replace("-", "m").replace(".", "p")
+    return f"{energy:.5g}".replace("-", "n").replace(".", "p")
 
 
 def normalize_energies(energies: Any) -> np.ndarray:
@@ -81,6 +97,17 @@ class TimeDelayStatisticsSimulation(Simulation):
         repr=False,
     )
 
+    truncated_degrees: tuple[int, ...] = attrs.field(
+        default=attrs.Factory(),
+        converter=tuple,
+        init=False,
+        repr=False,
+    )
+    cdf_factory: TruncatedPolynomialCdfFactory = attrs.field(
+        default=attrs.Factory(create_cdf_factory, takes_self=True),
+        init=False,
+        repr=False,
+    )
     outputs: TimeDelayOutputs = attrs.field(
         default=attrs.Factory(create_outputs, takes_self=True),
         init=False,
@@ -92,14 +119,6 @@ class TimeDelayStatisticsSimulation(Simulation):
         return simulation_output_path(
             self,
             Path(self.path_name) / self.compound.to_path,
-        )
-
-    @property
-    def truncated_degrees(self) -> tuple[int, ...]:
-        return tuple(
-            truncated_polynomial_degrees(
-                self.compound.ensemble.max_spectral_polynomial_degree
-            )
         )
 
     def energy_path(self, energy: float) -> Path:
@@ -127,38 +146,14 @@ class TimeDelayStatisticsSimulation(Simulation):
             observable.initialize_plot()
             observable.save_plot(out_dir / self.observable_output_path(observable))
 
-    def create_cdf_factory(self) -> TruncatedPolynomialCdfFactory:
-        return TruncatedPolynomialCdfFactory(
-            density=self.compound.resonance_density,
-            degrees=self.truncated_degrees,
-            density_name="resonance",
-        )
-
-    def time_delays_and_resonances_stream(
-        self,
-    ) -> Iterator[tuple[np.ndarray, np.ndarray]]:
-        compound = self.compound
-
-        for _ in range(self.realizs):
-            rng_state = copy.deepcopy(compound.rng_state)
-            time_delays = next(compound.time_delays_stream(self.energies, 1))
-            next_rng_state = copy.deepcopy(compound.rng_state)
-
-            compound.set_rng_state(rng_state)
-            try:
-                resonances = next(compound.resonance_real_parts_stream(1))
-            finally:
-                compound.set_rng_state(next_rng_state)
-
-            yield time_delays, resonances
-
     def realize_monte_carlo_simulation(self) -> None:
         resonance_density = self.compound.resonance_density
-        cdf_factory = self.create_cdf_factory()
         avg_cdf_interpolators: tuple[PchipInterpolator, ...] | None = None
         dimension = self.compound.ensemble.dimension
 
-        for time_delays, resonances in self.time_delays_and_resonances_stream():
+        for time_delays, eigvals in self.compound.time_delays_stream(
+            energies=self.energies, realizs=self.realizs
+        ):
             self.outputs.add_raw(time_delays)
             self.outputs.add_weight_unfolded(
                 time_delays,
@@ -168,7 +163,7 @@ class TimeDelayStatisticsSimulation(Simulation):
             )
 
             if avg_cdf_interpolators is None:
-                avg_cdf_interpolators = cdf_factory.average_interpolators()
+                avg_cdf_interpolators = self.cdf_factory.average_interpolators()
 
             self.outputs.add_average_unfolded(
                 time_delays,
@@ -180,10 +175,10 @@ class TimeDelayStatisticsSimulation(Simulation):
             if not self.outputs.var_unfolded_by_degree:
                 continue
 
-            coeffs = resonance_density.compute_variate_coeffs(resonances)
+            coeffs = resonance_density.compute_variate_coeffs(eigvals)
             self.outputs.add_variate_unfolded(
                 time_delays,
                 energies=self.energies,
-                cdfs=cdf_factory.interpolators_from_coeffs(coeffs),
+                cdfs=self.cdf_factory.interpolators_from_coeffs(coeffs),
                 dimension=dimension,
             )

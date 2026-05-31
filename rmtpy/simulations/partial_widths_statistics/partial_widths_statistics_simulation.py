@@ -12,7 +12,7 @@ from ..base import Simulation
 from ..statistics import REALIZATIONS_METADATA, simulation_output_path
 from .outputs import PartialWidthOutputs, create_partial_width_outputs
 
-WIDTH_INDICES_DEFAULT: tuple[tuple[int, ...], ...] = (
+WIDTH_INDICES: tuple[tuple[int, ...], ...] = (
     (0, 0),
     (1, 0),
     (1, 1),
@@ -43,7 +43,7 @@ class PartialWidthsStatisticsSimulation(Simulation):
         converter=Compound.create,
     )
     width_indices: tuple[tuple[int, ...], ...] = attrs.field(
-        default=WIDTH_INDICES_DEFAULT,
+        default=WIDTH_INDICES,
         converter=normalize_width_indices,
     )
     realizs: int = attrs.field(

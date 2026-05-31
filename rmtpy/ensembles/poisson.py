@@ -20,7 +20,7 @@ from .wigner_dyson import (
 
 DYSON_INDEX: int = 0
 
-EIGVECS_ENSEMBLE_FLAG_DEFAULT: str = "GUE"
+EIGVECS_ENSEMBLE_FLAG: str = "GUE"
 
 INITIALISM: str = "Poisson"
 
@@ -59,7 +59,7 @@ class PoissonEnsemble(ManyBodyEnsemble):
     initialism: ClassVar[str] = INITIALISM
 
     eigvecs_ensemble_flag: str = attrs.field(
-        default=EIGVECS_ENSEMBLE_FLAG_DEFAULT,
+        default=EIGVECS_ENSEMBLE_FLAG,
         converter=[
             str.lower,
             lambda value: WIGNER_DYSON_ENSEMBLE_INITIALISMS_BY_NAME.get(value, value),

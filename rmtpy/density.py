@@ -10,17 +10,17 @@ from scipy.ndimage import gaussian_filter1d
 
 import rmtpy.validators
 
-GAUSSIAN_KERNEL_STANDARD_DEVIATION_DEFAULT: float = 2.0
+GAUSSIAN_KERNEL_STANDARD_DEVIATION: float = 2.0
 
-MAX_POLYNOMIAL_DEGREE_DEFAULT: int = 20
+MAX_POLYNOMIAL_DEGREE: int = 10
 
-NUM_HISTOGRAM_COUNTS_DEFAULT: int = 2**13
+NUM_HISTOGRAM_COUNTS: int = 2**13
 
-NUM_POINTS_DEFAULT: int = 1000
+NUM_POINTS: int = 1000
 
 NUM_REALIZATIONS_MIN: int = 10
 
-SUPPORT_SCALE_FACTOR_DEFAULT: float = 1.2
+SUPPORT_SCALE_FACTOR: float = 1.2
 
 
 def array_of_floats(
@@ -53,7 +53,7 @@ def compute_default_number_of_bins(dist: DensityModel) -> int:
 
 
 def compute_optimal_realizations(dist: DensityModel) -> int:
-    return max(NUM_HISTOGRAM_COUNTS_DEFAULT // dist.dimension, NUM_REALIZATIONS_MIN)
+    return max(NUM_HISTOGRAM_COUNTS // dist.dimension, NUM_REALIZATIONS_MIN)
 
 
 def create_cdf_interpolator_from_pdf(
@@ -84,7 +84,7 @@ def create_pdf_interpolator_from_histogram(
     *,
     histogram: np.ndarray,
     bins: np.ndarray,
-    kernel_std_dev: float = GAUSSIAN_KERNEL_STANDARD_DEVIATION_DEFAULT,
+    kernel_std_dev: float = GAUSSIAN_KERNEL_STANDARD_DEVIATION,
 ) -> PchipInterpolator:
     histogram, bins = np.asarray(histogram), np.asarray(bins)
 
@@ -163,7 +163,7 @@ class DensityModel:
         validator=attrs.validators.optional(attrs.validators.is_callable()),
     )
     max_polynomial_degree: int = attrs.field(
-        default=MAX_POLYNOMIAL_DEGREE_DEFAULT,
+        default=MAX_POLYNOMIAL_DEGREE,
         converter=int,
         validator=attrs.validators.ge(0),
     )
@@ -180,18 +180,18 @@ class DensityModel:
     )
 
     support_scale_factor: float = attrs.field(
-        default=SUPPORT_SCALE_FACTOR_DEFAULT,
+        default=SUPPORT_SCALE_FACTOR,
         converter=float,
         repr=False,
     )
     kernel_std_dev: float = attrs.field(
-        default=GAUSSIAN_KERNEL_STANDARD_DEVIATION_DEFAULT,
+        default=GAUSSIAN_KERNEL_STANDARD_DEVIATION,
         converter=float,
         validator=attrs.validators.gt(0.0),
         repr=False,
     )
     num_pts: int = attrs.field(
-        default=NUM_POINTS_DEFAULT,
+        default=NUM_POINTS,
         converter=int,
         validator=attrs.validators.gt(0),
         repr=False,

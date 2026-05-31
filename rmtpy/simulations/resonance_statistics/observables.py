@@ -39,57 +39,57 @@ if TYPE_CHECKING:
     from .resonance_statistics_simulation import ResonanceStatisticsSimulation
 
 
-COMPLEX_ENERGY_NUM_BINS_DEFAULT: int = 400
+COMPLEX_ENERGY_NUM_BINS: int = 400
 
-COMPLEX_ENERGY_REAL_SUPPORT_UNITS_SPECTRAL_RADIUS_DEFAULT: tuple[float, float] = (
+COMPLEX_ENERGY_REAL_SUPPORT_UNITS_SPECTRAL_RADIUS: tuple[float, float] = (
     -1.2,
     1.2,
 )
 
-COMPLEX_ENERGY_WIDTH_LOG10_SUPPORT_DEFAULT: tuple[float, float] = (-8.0, 8.0)
+COMPLEX_ENERGY_WIDTH_LOG10_SUPPORT: tuple[float, float] = (-8.0, 8.0)
 
-RESONANCE_COEFFICIENT_SUPPORT_DEFAULT: tuple[float, float] = (-0.2, 0.2)
+RESONANCE_COEFFICIENT_SUPPORT: tuple[float, float] = (-0.2, 0.2)
 
-RESONANCE_FORM_FACTOR_LOG_D_TIME_SUPPORT_DEFAULT: tuple[float, float] = (-0.5, 1.5)
+RESONANCE_FORM_FACTOR_LOG_D_TIME_SUPPORT: tuple[float, float] = (-0.5, 1.5)
 
-RESONANCE_SPACING_SUPPORT_UNITS_MEAN_SPACING_DEFAULT: tuple[float, float] = (0.0, 4.0)
+RESONANCE_SPACING_SUPPORT_UNITS_MEAN_SPACING: tuple[float, float] = (0.0, 4.0)
 
-RESONANCE_SUPPORT_UNITS_SPECTRAL_RADIUS_DEFAULT: tuple[float, float] = (
+RESONANCE_SUPPORT_UNITS_SPECTRAL_RADIUS: tuple[float, float] = (
     -1.2,
     1.2,
 )
 
-RESONANCE_WIDTH_LOG10_SUPPORT_DEFAULT: tuple[float, float] = (-4.0, 4.0)
+RESONANCE_WIDTH_LOG10_SUPPORT: tuple[float, float] = (-4.0, 4.0)
 
-RESONANCE_WIDTH_LOG_BASE_DEFAULT: float = 10.0
+RESONANCE_WIDTH_LOG_BASE: float = 10.0
 
-SUPPORT_SCALE_FACTOR_DEFAULT: float = 1.2
+SUPPORT_SCALE_FACTOR: float = 1.2
 
-UNFOLDED_COMPLEX_ENERGY_REAL_SUPPORT_UNITS_SPECTRAL_RADIUS_DEFAULT = (
-    RESONANCE_SUPPORT_UNITS_SPECTRAL_RADIUS_DEFAULT
+UNFOLDED_COMPLEX_ENERGY_REAL_SUPPORT_UNITS_SPECTRAL_RADIUS = (
+    RESONANCE_SUPPORT_UNITS_SPECTRAL_RADIUS
 )
 
-UNFOLDED_COMPLEX_ENERGY_WIDTH_LOG10_SUPPORT_DEFAULT: tuple[float, float] = (
+UNFOLDED_COMPLEX_ENERGY_WIDTH_LOG10_SUPPORT: tuple[float, float] = (
     -8.0,
     8.0,
 )
 
-UNFOLDED_RESONANCE_FORM_FACTOR_LOG_D_TIME_SUPPORT_DEFAULT: tuple[float, float] = (
+UNFOLDED_RESONANCE_FORM_FACTOR_LOG_D_TIME_SUPPORT: tuple[float, float] = (
     -1.5,
     0.5,
 )
 
-UNFOLDED_RESONANCE_SPACING_SUPPORT_UNITS_MEAN_SPACING_DEFAULT: tuple[float, float] = (
+UNFOLDED_RESONANCE_SPACING_SUPPORT_UNITS_MEAN_SPACING: tuple[float, float] = (
     0.0,
     4.0,
 )
 
-UNFOLDED_RESONANCE_SUPPORT_UNITS_DIMENSION_DEFAULT: tuple[float, float] = (
-    -SUPPORT_SCALE_FACTOR_DEFAULT,
-    SUPPORT_SCALE_FACTOR_DEFAULT,
+UNFOLDED_RESONANCE_SUPPORT_UNITS_DIMENSION: tuple[float, float] = (
+    -SUPPORT_SCALE_FACTOR,
+    SUPPORT_SCALE_FACTOR,
 )
 
-UNFOLDED_RESONANCE_WIDTH_LOG10_SUPPORT_DEFAULT: tuple[float, float] = (-4.0, 4.0)
+UNFOLDED_RESONANCE_WIDTH_LOG10_SUPPORT: tuple[float, float] = (-4.0, 4.0)
 
 
 def create_avg_unfolded_complex_energy_histograms(
@@ -166,11 +166,11 @@ def create_complex_energy_histogram_observable(
 ) -> Observable:
     return create_histogram2d_observable(
         file_name="complex_energy_histogram",
-        x_support=COMPLEX_ENERGY_REAL_SUPPORT_UNITS_SPECTRAL_RADIUS_DEFAULT,
-        x_num_bins=COMPLEX_ENERGY_NUM_BINS_DEFAULT,
-        y_log_base=RESONANCE_WIDTH_LOG_BASE_DEFAULT,
-        y_support=COMPLEX_ENERGY_WIDTH_LOG10_SUPPORT_DEFAULT,
-        y_num_bins=COMPLEX_ENERGY_NUM_BINS_DEFAULT,
+        x_support=COMPLEX_ENERGY_REAL_SUPPORT_UNITS_SPECTRAL_RADIUS,
+        x_num_bins=COMPLEX_ENERGY_NUM_BINS,
+        y_log_base=RESONANCE_WIDTH_LOG_BASE,
+        y_support=COMPLEX_ENERGY_WIDTH_LOG10_SUPPORT,
+        y_num_bins=COMPLEX_ENERGY_NUM_BINS,
         plot_cls=ComplexEnergyHistogramPlot,
         metadata={"unfolding": unfolding},
     )
@@ -184,7 +184,7 @@ def create_resonance_coeff_histograms(
     return create_coefficient_histograms(
         prefix="resonance",
         max_degree=simulation.compound.ensemble.max_spectral_polynomial_degree,
-        support=RESONANCE_COEFFICIENT_SUPPORT_DEFAULT,
+        support=RESONANCE_COEFFICIENT_SUPPORT,
         plot_cls=ResonanceCoefficientHistogramPlot,
         unfolding=unfolding,
     )
@@ -200,7 +200,7 @@ def create_resonance_form_factors_observable(
         data=FormFactorsData(
             file_name="resonance_form_factors",
             dimension=simulation.compound.ensemble.dimension,
-            logD_time_support=RESONANCE_FORM_FACTOR_LOG_D_TIME_SUPPORT_DEFAULT,
+            logD_time_support=RESONANCE_FORM_FACTOR_LOG_D_TIME_SUPPORT,
             scale=j_1_1 / simulation.compound.ensemble.spectral_radius,
         ),
         plot_cls=ResonanceFormFactorsPlot,
@@ -217,7 +217,7 @@ def create_resonance_histogram_observable(
     return create_histogram_observable(
         file_name="resonance_histogram",
         support=scale_support(
-            RESONANCE_SUPPORT_UNITS_SPECTRAL_RADIUS_DEFAULT,
+            RESONANCE_SUPPORT_UNITS_SPECTRAL_RADIUS,
             simulation.compound.ensemble.spectral_radius,
         ),
         plot_cls=ResonanceHistogramPlot,
@@ -237,7 +237,7 @@ def create_resonance_spacing_histogram_observable(
     return create_histogram_observable(
         file_name="resonance_spacing_histogram",
         support=scale_support(
-            RESONANCE_SPACING_SUPPORT_UNITS_MEAN_SPACING_DEFAULT,
+            RESONANCE_SPACING_SUPPORT_UNITS_MEAN_SPACING,
             global_mean_spacing,
         ),
         plot_cls=ResonanceSpacingHistogramPlot,
@@ -260,11 +260,11 @@ def create_unfolded_complex_energy_histogram_observable(
 
     return create_histogram2d_observable(
         file_name=file_name,
-        x_support=UNFOLDED_COMPLEX_ENERGY_REAL_SUPPORT_UNITS_SPECTRAL_RADIUS_DEFAULT,
-        x_num_bins=COMPLEX_ENERGY_NUM_BINS_DEFAULT,
-        y_log_base=RESONANCE_WIDTH_LOG_BASE_DEFAULT,
-        y_support=UNFOLDED_COMPLEX_ENERGY_WIDTH_LOG10_SUPPORT_DEFAULT,
-        y_num_bins=COMPLEX_ENERGY_NUM_BINS_DEFAULT,
+        x_support=UNFOLDED_COMPLEX_ENERGY_REAL_SUPPORT_UNITS_SPECTRAL_RADIUS,
+        x_num_bins=COMPLEX_ENERGY_NUM_BINS,
+        y_log_base=RESONANCE_WIDTH_LOG_BASE,
+        y_support=UNFOLDED_COMPLEX_ENERGY_WIDTH_LOG10_SUPPORT,
+        y_num_bins=COMPLEX_ENERGY_NUM_BINS,
         plot_cls=UnfoldedComplexEnergyHistogramPlot,
         metadata=metadata,
     )
@@ -285,7 +285,7 @@ def create_unfolded_resonance_form_factors_observable(
         data=FormFactorsData(
             file_name=file_name,
             dimension=simulation.compound.ensemble.dimension,
-            logD_time_support=UNFOLDED_RESONANCE_FORM_FACTOR_LOG_D_TIME_SUPPORT_DEFAULT,
+            logD_time_support=UNFOLDED_RESONANCE_FORM_FACTOR_LOG_D_TIME_SUPPORT,
             scale=2 * np.pi,
         ),
         plot_cls=UnfoldedResonanceFormFactorsPlot,
@@ -308,7 +308,7 @@ def create_unfolded_resonance_histogram_observable(
     return create_histogram_observable(
         file_name=file_name,
         support=scale_support(
-            UNFOLDED_RESONANCE_SUPPORT_UNITS_DIMENSION_DEFAULT,
+            UNFOLDED_RESONANCE_SUPPORT_UNITS_DIMENSION,
             simulation.compound.ensemble.dimension,
         ),
         plot_cls=UnfoldedResonanceHistogramPlot,
@@ -328,7 +328,7 @@ def create_unfolded_resonance_spacing_histogram_observable(
 
     return create_histogram_observable(
         file_name=file_name,
-        support=UNFOLDED_RESONANCE_SPACING_SUPPORT_UNITS_MEAN_SPACING_DEFAULT,
+        support=UNFOLDED_RESONANCE_SPACING_SUPPORT_UNITS_MEAN_SPACING,
         plot_cls=UnfoldedResonanceSpacingHistogramPlot,
         metadata=metadata,
     )
@@ -346,8 +346,8 @@ def create_unfolded_width_histogram_observable(
 
     return create_histogram_observable(
         file_name=file_name,
-        log_base=RESONANCE_WIDTH_LOG_BASE_DEFAULT,
-        support=UNFOLDED_RESONANCE_WIDTH_LOG10_SUPPORT_DEFAULT,
+        log_base=RESONANCE_WIDTH_LOG_BASE,
+        support=UNFOLDED_RESONANCE_WIDTH_LOG10_SUPPORT,
         plot_cls=UnfoldedWidthHistogramPlot,
         metadata=metadata,
     )
@@ -474,8 +474,8 @@ def create_width_histogram_observable(
 ) -> Observable:
     return create_histogram_observable(
         file_name="width_histogram",
-        log_base=RESONANCE_WIDTH_LOG_BASE_DEFAULT,
-        support=RESONANCE_WIDTH_LOG10_SUPPORT_DEFAULT,
+        log_base=RESONANCE_WIDTH_LOG_BASE,
+        support=RESONANCE_WIDTH_LOG10_SUPPORT,
         plot_cls=WidthHistogramPlot,
         metadata={"unfolding": unfolding},
     )

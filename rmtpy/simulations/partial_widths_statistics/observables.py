@@ -11,15 +11,15 @@ if TYPE_CHECKING:
     from .partial_widths_statistics_simulation import PartialWidthsStatisticsSimulation
 
 
-PARTIAL_WIDTH_LOG10_SUPPORT_DEFAULT: tuple[float, float] = (-5.0, 2.0)
+PARTIAL_WIDTH_LOG10_SUPPORT: tuple[float, float] = (-5.0, 2.0)
 
-PARTIAL_WIDTH_NUM_BINS_DEFAULT: int = 60
+PARTIAL_WIDTH_NUM_BINS: int = 60
 
-TOTAL_WIDTH_LOG10_SUPPORT_DEFAULT: tuple[float, float] = (-2.0, 3.0)
+TOTAL_WIDTH_LOG10_SUPPORT: tuple[float, float] = (-2.0, 3.0)
 
-TOTAL_WIDTH_NUM_BINS_DEFAULT: int = 100
+TOTAL_WIDTH_NUM_BINS: int = 100
 
-WIDTH_LOG_BASE_DEFAULT: float = 10.0
+WIDTH_LOG_BASE: float = 10.0
 
 
 def create_width_histogram_observable(
@@ -30,17 +30,17 @@ def create_width_histogram_observable(
     if len(width_index) == 2:
         histogram: Histogram = Histogram(
             file_name=f"partial_width_{width_index[0]}{width_index[1]}_histogram",
-            log_base=WIDTH_LOG_BASE_DEFAULT,
-            support=PARTIAL_WIDTH_LOG10_SUPPORT_DEFAULT,
-            num_bins=PARTIAL_WIDTH_NUM_BINS_DEFAULT,
+            log_base=WIDTH_LOG_BASE,
+            support=PARTIAL_WIDTH_LOG10_SUPPORT,
+            num_bins=PARTIAL_WIDTH_NUM_BINS,
         )
         plot_cls: type = PartialWidthHistogramPlot
     elif len(width_index) == 1:
         histogram = Histogram(
             file_name=f"total_width_{width_index[0]}_histogram",
-            log_base=WIDTH_LOG_BASE_DEFAULT,
-            support=TOTAL_WIDTH_LOG10_SUPPORT_DEFAULT,
-            num_bins=TOTAL_WIDTH_NUM_BINS_DEFAULT,
+            log_base=WIDTH_LOG_BASE,
+            support=TOTAL_WIDTH_LOG10_SUPPORT,
+            num_bins=TOTAL_WIDTH_NUM_BINS,
         )
         plot_cls = TotalWidthHistogramPlot
     else:

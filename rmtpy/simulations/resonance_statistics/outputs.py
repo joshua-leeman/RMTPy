@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import attrs
 import numpy as np
 
@@ -36,6 +38,9 @@ from .observables import (
 )
 from .resonance_form_factors import FormFactorsData
 
+if TYPE_CHECKING:
+    from .resonance_statistics_simulation import ResonanceStatisticsSimulation
+
 
 def _create_degree_outputs(
     resonances: list[Observable],
@@ -63,7 +68,9 @@ def _create_degree_outputs(
     )
 
 
-def create_resonance_statistics_outputs(simulation) -> ResonanceStatisticsOutputs:
+def create_resonance_statistics_outputs(
+    simulation: ResonanceStatisticsSimulation,
+) -> ResonanceStatisticsOutputs:
     return ResonanceStatisticsOutputs(
         coefficients=CoefficientHistogramOutputs(
             by_degree=tuple(create_resonance_coeff_histograms(simulation))

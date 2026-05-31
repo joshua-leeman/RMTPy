@@ -13,7 +13,7 @@ from cattrs.dispatch import StructureHook, UnstructureHook
 import rmtpy.conversion
 from rmtpy.conversion import RMT_CONVERTER
 
-DTYPE_DEFAULT: np.dtype[np.complex128] = np.dtype("complex128")
+DTYPE: np.dtype[np.complex128] = np.dtype("complex128")
 
 DIMENSION_METADATA: dict[str, str] = {
     "dir_name": "dim",
@@ -94,7 +94,7 @@ class RandomMatrixEnsemble:
     initialism: ClassVar[str] = INITIALISM
 
     dtype: np.dtype[Any] = attrs.field(
-        default=DTYPE_DEFAULT,
+        default=DTYPE,
         converter=np.dtype,
     )
     dimension: int = attrs.field(
