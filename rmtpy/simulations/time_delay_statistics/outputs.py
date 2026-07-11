@@ -54,7 +54,7 @@ def group_observables_by_degree(
     )
 
 
-@attrs.frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
+@attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
 class TimeDelayOutputs:
     raw: tuple[Observable[Histogram], ...]
     weight_unfolded: tuple[Observable[Histogram], ...]

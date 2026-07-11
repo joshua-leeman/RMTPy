@@ -85,10 +85,7 @@ class SpectralHistogramLegend(PlotLegend):
 @dataclasses.dataclass(repr=False, eq=False, kw_only=True)
 class SpectralHistogramPlot(Plot):
     data: Histogram
-    axes: SpectralHistogramAxes = dataclasses.field(
-        default_factory=SpectralHistogramAxes
-    )
-    num_points: int = 1000
+    axes: SpectralHistogramAxes = dataclasses.field(default_factory=SpectralHistogramAxes)
 
     xlim: tuple[float, float] = (-1.2, 1.2)  # units of energy_0
     ylim: tuple[float, float] = (0.0, 2.6)  # units of 1 / (pi * energy_0)
@@ -108,6 +105,8 @@ class SpectralHistogramPlot(Plot):
     pdf_color: str = "Black"
     pdf_legend: str = "theory"
 
+    num_points: int = 1000
+
     legend_labels: tuple[str, str] = (histogram_legend, pdf_legend)
     legend_handles: tuple[Patch, Line2D] = (
         Patch(color=histogram_color, alpha=histogram_alpha),
@@ -115,18 +114,18 @@ class SpectralHistogramPlot(Plot):
     )
 
     def set_derived_attributes(self) -> None:
-        self.ensemble: ManyBodyEnsemble = self.structure_simulation_arg(
+        self.ensemble = self.structure_simulation_arg(
             "ensemble", ManyBodyEnsemble
         )
-        energy_0: float = self.ensemble.spectral_radius
+        energy_0 = self.ensemble.spectral_radius
 
-        self.legend: SpectralHistogramLegend = SpectralHistogramLegend(
+        self.legend = SpectralHistogramLegend(
             handles=self.legend_handles, labels=self.legend_labels
         )
         if self.legend.title is None:
             self.legend.title = self.ensemble.to_latex
 
-        axes: SpectralHistogramAxes = self.axes
+        axes = self.axes
         if isinstance(self.ensemble, PoissonEnsemble):
             self.ylim = self.poisson_ylim
 
@@ -165,8 +164,8 @@ class SpectralHistogramPlot(Plot):
             zorder=self.histogram_zorder,
         )
 
-        energies: np.ndarray = np.linspace(*self.xlim, self.num_points)
-        spectral_pdf: np.ndarray = self.ensemble.spectral_density.average_pdf(energies)
+        energies = np.linspace(*self.xlim, self.num_points)
+        spectral_pdf = self.ensemble.spectral_density.average_pdf(energies)
 
         self.ax.plot(
             energies,
@@ -237,12 +236,12 @@ class UnfoldedSpectralHistogramPlot(Plot):
     )
 
     def set_derived_attributes(self) -> None:
-        self.ensemble: ManyBodyEnsemble = self.structure_simulation_arg(
+        self.ensemble = self.structure_simulation_arg(
             "ensemble", ManyBodyEnsemble
         )
-        dimension: int = self.ensemble.dimension
+        dimension = self.ensemble.dimension
 
-        self.legend: UnfoldedSpectralHistogramLegend = UnfoldedSpectralHistogramLegend(
+        self.legend = UnfoldedSpectralHistogramLegend(
             handles=self.legend_handles, labels=self.legend_labels
         )
         if self.legend.title is None:
@@ -266,7 +265,7 @@ class UnfoldedSpectralHistogramPlot(Plot):
 
         energies = np.linspace(self.xlim[0], self.xlim[1], self.num_points)
 
-        dimension: int = self.ensemble.dimension
+        dimension = self.ensemble.dimension
         unfolded_spectral_pdf = np.zeros(self.num_points)
         unfolded_spectral_pdf[np.abs(energies) < dimension / 2] = 1 / dimension
 

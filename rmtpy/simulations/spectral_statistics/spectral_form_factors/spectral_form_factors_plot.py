@@ -9,7 +9,7 @@ from matplotlib.lines import Line2D
 from matplotlib.ticker import LogLocator, NullLocator
 from scipy.special import jn_zeros
 
-from rmtpy.ensembles import ManyBodyEnsemble
+import rmtpy.ensembles
 
 from ...plot import Plot, PlotAxes, PlotLegend
 from .spectral_form_factors_data import FormFactorsData
@@ -48,7 +48,7 @@ class FormFactorsPlot(Plot):
     num_points: int = 1000
 
     xlim: tuple[float, float] = (-0.5, 1.5)  # log scale base dimension
-    ylim: tuple[float, float] = (-3.1, 0.1)
+    ylim: tuple[float, float] = (-3.2, 0.2)
 
     # thouless_marker: str = "*"
     # thouless_size: int = 12
@@ -90,23 +90,23 @@ class FormFactorsPlot(Plot):
     )
 
     def set_derived_attributes(self) -> None:
-        self.ensemble: ManyBodyEnsemble = self.structure_simulation_arg(
-            "ensemble", ManyBodyEnsemble
+        self.ensemble: rmtpy.ensembles.ManyBodyEnsemble = self.structure_simulation_arg(
+            "ensemble", rmtpy.ensembles.ManyBodyEnsemble
         )
-        energy_0: float = self.ensemble.spectral_radius
-        dimension: int = self.ensemble.dimension
 
-        self.legend: FormFactorsLegend = FormFactorsLegend(
+        self.legend = FormFactorsLegend(
             handles=self.legend_handles, labels=self.legend_labels
         )
 
         if self.legend.title is None:
             self.legend.title = self.ensemble.to_latex
 
-        j_1_1: float = float(jn_zeros(1, 1)[0])
+        j_1_1 = float(jn_zeros(1, 1)[0])
         self.scale_limits_and_ticks(
-            x=lambda value: dimension**value * j_1_1 / energy_0,
-            y=lambda value: dimension**value,
+            x=lambda value: (
+                self.ensemble.dimension**value * j_1_1 / self.ensemble.spectral_radius
+            ),
+            y=lambda value: self.ensemble.dimension**value,
         )
 
     def plot(self, path: str | Path) -> None:
@@ -125,17 +125,6 @@ class FormFactorsPlot(Plot):
             LogLocator(base=self.ensemble.dimension, numticks=len(self.axes.yticks))
         )
         self.ax.yaxis.set_minor_locator(NullLocator())
-
-        self.ax.vlines(
-            self.axes.xticks,
-            ymin=self.ylim[0],
-            ymax=self.ylim[1],
-            colors=self.grid_color,
-            linestyles=self.grid_linestyle,
-            linewidth=self.grid_width,
-            alpha=self.grid_alpha,
-            zorder=self.grid_zorder,
-        )
 
         self.ax.plot(
             self.data.times,
@@ -195,7 +184,7 @@ class UnfoldedFormFactorsPlot(Plot):
     num_points: int = 1000
 
     xlim: tuple[float, float] = (-1.5, 0.5)  # log scale base dimension
-    ylim: tuple[float, float] = (-3.1, 0.1)
+    ylim: tuple[float, float] = (-3.2, 0.2)
 
     grid_zorder: int = 0
     grid_width: float = rcParams["grid.linewidth"]
@@ -223,16 +212,16 @@ class UnfoldedFormFactorsPlot(Plot):
     csff_color: str = "Red"
     csff_legend: str = "cSFF"
 
-    universal_csff_zorder: int = 2
-    universal_csff_width: float = 0.5
-    universal_csff_alpha: float = 1.0
-    universal_csff_color: str = "Black"
-    universal_csff_legend: str = "universal"
+    connected_sff_zorder: int = 2
+    connected_sff_width: float = 0.5
+    connected_sff_alpha: float = 1.0
+    connected_sff_color: str = "Black"
+    connected_sff_legend: str = "universal"
 
     legend_labels: tuple[str, str, str] = (
         sff_legend,
         csff_legend,
-        universal_csff_legend,
+        connected_sff_legend,
     )
     legend_handles: tuple[Line2D, Line2D, Line2D] = (
         Line2D([0], [0], color=sff_color, alpha=sff_alpha, linewidth=sff_width),
@@ -240,35 +229,34 @@ class UnfoldedFormFactorsPlot(Plot):
         Line2D(
             [0],
             [0],
-            color=universal_csff_color,
-            alpha=universal_csff_alpha,
-            linewidth=universal_csff_width,
+            color=connected_sff_color,
+            alpha=connected_sff_alpha,
+            linewidth=connected_sff_width,
         ),
     )
 
     def set_derived_attributes(self) -> None:
-        self.ensemble: ManyBodyEnsemble = self.structure_simulation_arg(
-            "ensemble", ManyBodyEnsemble
+        self.ensemble: rmtpy.ensembles.ManyBodyEnsemble = self.structure_simulation_arg(
+            "ensemble", rmtpy.ensembles.ManyBodyEnsemble
         )
-        dimension: int = self.ensemble.dimension
 
         if self.ensemble.universality_class is not None:
-            self.universal_csff_legend = f"{self.ensemble.universality_class} limit"
+            self.connected_sff_legend = f"{self.ensemble.universality_class} limit"
             self.legend_labels = (
                 self.sff_legend,
                 self.csff_legend,
-                self.universal_csff_legend,
+                self.connected_sff_legend,
             )
 
-        self.legend: UnfoldedFormFactorsLegend = UnfoldedFormFactorsLegend(
+        self.legend = UnfoldedFormFactorsLegend(
             handles=self.legend_handles, labels=self.legend_labels
         )
         if self.legend.title is None:
             self.legend.title = self.ensemble.to_latex
 
         self.scale_limits_and_ticks(
-            x=lambda value: dimension**value * 2 * np.pi,
-            y=lambda value: dimension**value,
+            x=lambda value: self.ensemble.dimension**value * 2 * np.pi,
+            y=lambda value: self.ensemble.dimension**value,
         )
 
     def plot(self, path: str | Path) -> None:
@@ -287,17 +275,6 @@ class UnfoldedFormFactorsPlot(Plot):
             LogLocator(base=self.ensemble.dimension, numticks=len(self.axes.yticks))
         )
         self.ax.yaxis.set_minor_locator(NullLocator())
-
-        self.ax.vlines(
-            self.axes.xticks,
-            ymin=self.ylim[0],
-            ymax=self.ylim[1],
-            colors=self.grid_color,
-            linestyles=self.grid_linestyle,
-            linewidth=self.grid_width,
-            alpha=self.grid_alpha,
-            zorder=self.grid_zorder,
-        )
 
         self.ax.plot(
             self.data.times,
@@ -319,16 +296,16 @@ class UnfoldedFormFactorsPlot(Plot):
             label=self.csff_legend,
         )
 
-        universal_csff = self.ensemble.universal_csff(self.data.times)
+        connected_sff = self.ensemble.connected_sff(self.data.times)
 
         self.ax.plot(
             self.data.times,
-            universal_csff,
-            color=self.universal_csff_color,
-            alpha=self.universal_csff_alpha,
-            linewidth=self.universal_csff_width,
-            zorder=self.universal_csff_zorder,
-            label=self.universal_csff_legend,
+            connected_sff,
+            color=self.connected_sff_color,
+            alpha=self.connected_sff_alpha,
+            linewidth=self.connected_sff_width,
+            zorder=self.connected_sff_zorder,
+            label=self.connected_sff_legend,
         )
 
         self.finish_plot(path=path)

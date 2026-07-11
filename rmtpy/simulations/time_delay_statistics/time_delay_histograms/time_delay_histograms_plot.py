@@ -17,7 +17,7 @@ TIME_DELAY_HISTOGRAM_COLOR: str = "#7b2d26"
 
 
 def format_energy_label(energy: float, energy_0: float) -> str:
-    scaled_energy: float = energy / energy_0
+    scaled_energy = energy / energy_0
     if np.isclose(scaled_energy, 0.0):
         return r"$E = 0$"
 
@@ -62,12 +62,20 @@ class TimeDelayHistogramPlot(Plot):
     grid_color: str = rcParams["grid.color"]
     grid_linestyle: str = "dotted"
 
-    def set_derived_attributes(self) -> None:
-        self.compound: Compound = self.structure_simulation_arg("compound", Compound)
+    pdf_zorder: int = 2
+    pdf_width: float = 2.0
+    pdf_alpha: float = 1.0
+    pdf_color: str = "Black"
+    pdf_legend: str = "theory"
 
-        energy_0: float = self.compound.ensemble.spectral_radius
-        dimension: int = self.compound.ensemble.dimension
-        energy: float = self.data.metadata["energy"]
+    num_points: int = 1000
+
+    def set_derived_attributes(self) -> None:
+        self.compound = self.structure_simulation_arg("compound", Compound)
+
+        energy_0 = self.compound.ensemble.spectral_radius
+        dimension = self.compound.ensemble.dimension
+        energy = self.data.metadata["energy"]
 
         self.legend = TimeDelayHistogramLegend(
             handles=(Patch(color=self.histogram_color, alpha=self.histogram_alpha),),
@@ -85,10 +93,12 @@ class TimeDelayHistogramPlot(Plot):
 
         self.create_figure()
 
-        dimension: int = self.compound.ensemble.dimension
-        self.ax.set_xscale("log", base=dimension)
+        self.ax.set_xscale("log", base=self.compound.ensemble.dimension)
         self.ax.xaxis.set_major_locator(
-            LogLocator(base=dimension, numticks=len(self.axes.xticks))
+            LogLocator(
+                base=self.compound.ensemble.dimension,
+                numticks=len(self.axes.xticks),
+            )
         )
         self.ax.xaxis.set_minor_locator(NullLocator())
 
@@ -107,6 +117,18 @@ class TimeDelayHistogramPlot(Plot):
             color=self.histogram_color,
             alpha=self.histogram_alpha,
             zorder=self.histogram_zorder,
+        )
+
+        times = np.geomspace(*self.xlim, self.num_points)
+        time_delay_pdf = self.compound.time_delay_pdf(times=times)
+
+        self.ax.plot(
+            times,
+            time_delay_pdf,
+            color=self.pdf_color,
+            alpha=self.pdf_alpha,
+            linewidth=self.pdf_width,
+            zorder=self.pdf_zorder,
         )
 
         self.finish_plot(path=path)

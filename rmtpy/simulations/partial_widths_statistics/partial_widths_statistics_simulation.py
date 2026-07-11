@@ -12,13 +12,7 @@ from ..base import Simulation
 from ..statistics import REALIZATIONS_METADATA, simulation_output_path
 from .outputs import PartialWidthOutputs, create_partial_width_outputs
 
-WIDTH_INDICES: tuple[tuple[int, ...], ...] = (
-    (0, 0),
-    (1, 0),
-    (1, 1),
-    (0,),
-    (1,),
-)
+WIDTH_INDICES: tuple[tuple[int, ...], ...] = ((0, 0), (1, 0), (1, 1), (0,), (1,))
 
 
 def create_outputs(
@@ -37,7 +31,7 @@ def run_partial_widths_statistics(compound: Compound, realizs: int) -> None:
     PartialWidthsStatisticsSimulation(compound=compound, realizs=realizs).run()
 
 
-@attrs.frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
+@attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
 class PartialWidthsStatisticsSimulation(Simulation):
     compound: Compound = attrs.field(
         converter=Compound.create,
@@ -60,13 +54,11 @@ class PartialWidthsStatisticsSimulation(Simulation):
 
     @property
     def to_path(self) -> Path:
-        return simulation_output_path(
-            self,
-            Path(self.path_name) / self.compound.to_path,
-        )
+        return simulation_output_path(self, Path(self.path_name) / self.compound.to_path)
 
     def populate_metadata(self) -> None:
         super().populate_metadata()
+
         self.metadata["args"]["realizs"] = self.realizs
         self.metadata["args"]["compound"] = RMT_CONVERTER.unstructure(self.compound)
         self.metadata["args"]["width_indices"] = self.width_indices

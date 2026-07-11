@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import rmtpy.density
+
 from ..histogram import Histogram, finalize_histogram
 from ..observable import Observable
 from ..statistics import create_observable
@@ -11,11 +13,11 @@ if TYPE_CHECKING:
     from .partial_widths_statistics_simulation import PartialWidthsStatisticsSimulation
 
 
-PARTIAL_WIDTH_LOG10_SUPPORT: tuple[float, float] = (-5.0, 2.0)
+PARTIAL_WIDTH_LOG10_SUPPORT: rmtpy.density.Support = (-5.0, 2.0)
 
 PARTIAL_WIDTH_NUM_BINS: int = 60
 
-TOTAL_WIDTH_LOG10_SUPPORT: tuple[float, float] = (-2.0, 3.0)
+TOTAL_WIDTH_LOG10_SUPPORT: rmtpy.density.Support = (-2.0, 3.0)
 
 TOTAL_WIDTH_NUM_BINS: int = 100
 
@@ -28,13 +30,13 @@ def create_width_histogram_observable(
     unfolding: str = "raw",
 ) -> Observable:
     if len(width_index) == 2:
-        histogram: Histogram = Histogram(
+        histogram = Histogram(
             file_name=f"partial_width_{width_index[0]}{width_index[1]}_histogram",
             log_base=WIDTH_LOG_BASE,
             support=PARTIAL_WIDTH_LOG10_SUPPORT,
             num_bins=PARTIAL_WIDTH_NUM_BINS,
         )
-        plot_cls: type = PartialWidthHistogramPlot
+        plot_cls = PartialWidthHistogramPlot
     elif len(width_index) == 1:
         histogram = Histogram(
             file_name=f"total_width_{width_index[0]}_histogram",

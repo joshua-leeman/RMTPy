@@ -2,30 +2,46 @@ import numpy as np
 from scipy.special import gamma
 
 
-def eigval_degeneracy(dyson_index: int) -> int:
+def eigval_degeneracy(*, dyson_index: int) -> int:
     return 2 if dyson_index == 4 else 1
 
 
+def universality_class(*, dyson_index: int) -> str | None:
+    return {0: "Poisson", 1: "GOE", 2: "GUE", 4: "GSE"}.get(dyson_index)
+
+
+def wigner_surmise(spacings: np.ndarray, *, dyson_index: int) -> np.ndarray:
+    if dyson_index == 0:
+        return np.exp(-np.asarray(spacings))
+
+    degeneracy = eigval_degeneracy(dyson_index=dyson_index)
+    adjusted_spacings = np.asarray(spacings) / degeneracy
+
+    idx = dyson_index
+    a = 2 * gamma((idx + 2) / 2) ** (idx + 1) / gamma((idx + 1) / 2) ** (idx + 2)
+    b = ((gamma((idx + 2) / 2)) / gamma((idx + 1) / 2)) ** 2
+
+    return a * adjusted_spacings**idx * np.exp(-b * adjusted_spacings**2) / degeneracy
+
+
 def porter_thomas_distribution(
-    dyson_index: float, num_channels: int, widths: np.ndarray
+    widths: np.ndarray, *, dyson_index: int, num_channels: int
 ) -> np.ndarray:
-    if dyson_index == 1:
-        real_dof: int = num_channels
-    else:
-        real_dof: int = 2 * num_channels
+    real_dof = num_channels if dyson_index == 1 else 2 * num_channels
 
     widths = np.asarray(widths)
-    coeff: float = (real_dof / 2) ** (real_dof / 2) / gamma(real_dof / 2)
+    coeff = (real_dof / 2) ** (real_dof / 2) / gamma(real_dof / 2)
+
     return coeff * widths ** (real_dof / 2 - 1) * np.exp(-real_dof * widths / 2)
 
 
-def universal_csff(dyson_index: float, dimension: int, times: np.ndarray) -> np.ndarray:
-    tau: np.ndarray = np.asarray(times) / (2 * np.pi)
+def connected_sff(times: np.ndarray, *, dyson_index: int, dimension: int) -> np.ndarray:
+    tau = np.asarray(times) / (2 * np.pi)
 
     if dyson_index == 1:
-        csff: np.ndarray = np.empty_like(tau)
+        csff = np.empty_like(tau)
 
-        mask: np.ndarray = tau <= 1
+        mask = tau <= 1
         csff[mask] = tau[mask] * (2 - np.log(2 * tau[mask] + 1)) / dimension
         csff[~mask] = (
             2 - tau[~mask] * np.log((2 * tau[~mask] + 1) / (2 * tau[~mask] - 1))
@@ -37,38 +53,29 @@ def universal_csff(dyson_index: float, dimension: int, times: np.ndarray) -> np.
         return np.where(tau <= 1, tau / dimension, 1 / dimension)
 
     elif dyson_index == 4:
-        csff: np.ndarray = np.full_like(tau, 2 / dimension)
+        csff = np.full_like(tau, 2 / dimension)
         csff[2 * tau == 1] = np.nan
 
-        mask: np.ndarray = (tau < 1) & (2 * tau != 1)
+        mask = (tau < 1) & (2 * tau != 1)
         csff[mask] = tau[mask] * (2 - np.log(np.abs(2 * tau[mask] - 1))) / dimension
+
         return csff
 
     else:
         return np.full_like(tau, 1 / dimension)
 
 
-def universality_class(dyson_index: int) -> str | None:
-    dyson_indices: dict[int, str] = {
-        0: "Poisson",
-        1: "GOE",
-        2: "GUE",
-        4: "GSE",
-    }
-    return dyson_indices.get(dyson_index)
+def time_delay_pdf(
+    times: np.ndarray, *, num_channels: int, heisenberg_time: float
+) -> np.ndarray:
+    taus = times / heisenberg_time
+    tau_plus = (3 + np.sqrt(8)) / num_channels
+    tau_minus = (3 - np.sqrt(8)) / num_channels
 
+    pdf = np.zeros_like(times)
+    in_support = (tau_minus < taus) & (taus < tau_plus)
+    pdf[in_support] = np.sqrt(
+        (tau_plus - taus[in_support]) * (taus[in_support] - tau_minus)
+    ) / (2 * np.pi * taus[in_support] ** 2 * heisenberg_time)
 
-def wigner_surmise(dyson_index: float, spacings: np.ndarray) -> np.ndarray:
-    spacings = np.asarray(spacings)
-
-    if dyson_index == 0:
-        return np.exp(-spacings)
-
-    degeneracy: int = eigval_degeneracy(dyson_index)
-    adj_spacings: np.ndarray = spacings / degeneracy
-
-    idx: float = dyson_index
-    a: float = 2 * gamma((idx + 2) / 2) ** (idx + 1) / gamma((idx + 1) / 2) ** (idx + 2)
-    b: float = ((gamma((idx + 2) / 2)) / gamma((idx + 1) / 2)) ** 2
-
-    return a * adj_spacings**idx * np.exp(-b * adj_spacings**2) / degeneracy
+    return pdf

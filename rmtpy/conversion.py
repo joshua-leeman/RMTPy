@@ -14,12 +14,26 @@ RMT_CONVERTER.register_structure_hook(np.dtype, lambda dtype, _: np.dtype(dtype)
 RMT_CONVERTER.register_unstructure_hook(np.dtype, lambda dtype: np.dtype(dtype).name)
 
 
-def create_hashed_id(array: np.ndarray, *, num_hex: int = 16) -> str:
-    hash_object: hashlib._Hash = hashlib.sha256()
-    hash_object.update(str(array.dtype).encode())
-    hash_object.update(str(array.shape).encode())
-    hash_object.update(array.tobytes())
-    return hash_object.hexdigest()[:num_hex]
+def to_latex(instance: attrs.AttrsInstance, *, latex_name: str = "") -> str:
+    latex_str = "$" + latex_name
+    for label, attr in attrs.fields_dict(type(instance)).items():
+        if attr.metadata.get("latex_name") is not None:
+            latex_str += rf"\ {attr.metadata['latex_name']}={getattr(instance, label)}"
+
+    return latex_str + "$"
+
+
+def to_path(instance: attrs.AttrsInstance, *, root: Path) -> Path:
+    for name, attr in attrs.fields_dict(type(instance)).items():
+        if attr.metadata.get("dir_name") is not None:
+            value = re.sub(r"[^\w\-.]", "_", str(getattr(instance, name)))
+            root /= f"{attr.metadata['dir_name']}_{value.replace('.', 'p')}"
+
+    return root
+
+
+def to_registry_key(string: str) -> str:
+    return re.sub(r"[_ ]", "", string).lower()
 
 
 def insert_underscores(string: str) -> str:
@@ -27,7 +41,16 @@ def insert_underscores(string: str) -> str:
     return re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", string)
 
 
-def normalize_dict(src: dict[str, Any], registry: dict[str, type]) -> dict[str, Any]:
+def create_hashed_id(array: np.ndarray, *, num_hex: int = 16) -> str:
+    hash_object = hashlib.sha256()
+    hash_object.update(str(array.dtype).encode())
+    hash_object.update(str(array.shape).encode())
+    hash_object.update(array.tobytes())
+
+    return hash_object.hexdigest()[:num_hex]
+
+
+def normalize_dict(src: dict[str, Any], *, registry: dict[str, type]) -> dict[str, Any]:
     if not isinstance(src, dict):
         raise TypeError(f"Expected a dictionary, got {type(src).__name__}.")
 
@@ -35,19 +58,19 @@ def normalize_dict(src: dict[str, Any], registry: dict[str, type]) -> dict[str, 
     for val in src.values():
         if not isinstance(val, str):
             continue
-        key: str = to_registry_key(val)
+        key = to_registry_key(val)
         if key in registry:
-            registered_cls: type = registry[key]
+            registered_cls = registry[key]
             normalized_dict["name"] = registered_cls.__name__
             break
 
     if normalized_dict.get("name") is None:
         raise KeyError("Registered class name not found in dictionary as value.")
 
-    cls_attrs: dict[str, attrs.Attribute] = attrs.fields_dict(registered_cls)
-    cls_args: set[str] = {arg for arg, attr in cls_attrs.items() if attr.init}
-    arg_dict: dict[str, Any] = {}
+    cls_attrs = attrs.fields_dict(registered_cls)
+    cls_args = {arg for arg, attr in cls_attrs.items() if attr.init}
 
+    arg_dict: dict[str, Any] = {}
     for val in src.values():
         if not isinstance(val, dict):
             continue
@@ -59,24 +82,5 @@ def normalize_dict(src: dict[str, Any], registry: dict[str, type]) -> dict[str, 
         arg_dict = {arg: src[arg] for arg in src if arg in cls_args}
 
     normalized_dict.update({"args": arg_dict})
+
     return normalized_dict
-
-
-def to_latex(instance: attrs.AttrsInstance, latex_name: str = "") -> str:
-    latex_str: str = "$" + latex_name
-    for label, attr in attrs.fields_dict(type(instance)).items():
-        if attr.metadata.get("latex_name") is not None:
-            latex_str += rf"\ {attr.metadata['latex_name']}={getattr(instance, label)}"
-    return latex_str + "$"
-
-
-def to_path(instance: attrs.AttrsInstance, root: Path) -> Path:
-    for name, attr in attrs.fields_dict(type(instance)).items():
-        if attr.metadata.get("dir_name") is not None:
-            value: str = re.sub(r"[^\w\-.]", "_", str(getattr(instance, name)))
-            root /= f"{attr.metadata['dir_name']}_{value.replace('.', 'p')}"
-    return root
-
-
-def to_registry_key(string: str) -> str:
-    return re.sub(r"[_ ]", "", string).lower()

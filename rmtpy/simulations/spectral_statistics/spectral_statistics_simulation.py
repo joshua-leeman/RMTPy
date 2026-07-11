@@ -3,7 +3,6 @@ from __future__ import annotations
 from pathlib import Path
 
 import attrs
-from scipy.interpolate import PchipInterpolator
 
 from rmtpy.conversion import RMT_CONVERTER
 from rmtpy.ensembles import ManyBodyEnsemble
@@ -31,7 +30,7 @@ def run_spectral_statistics(ensemble: ManyBodyEnsemble, realizs: int) -> None:
     SpectralStatisticsSimulation(ensemble=ensemble, realizs=realizs).run()
 
 
-@attrs.frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
+@attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
 class SpectralStatisticsSimulation(Simulation):
     ensemble: ManyBodyEnsemble = attrs.field(
         converter=ManyBodyEnsemble.create,
@@ -75,8 +74,7 @@ class SpectralStatisticsSimulation(Simulation):
 
     def realize_monte_carlo_simulation(self) -> None:
         cdf_factory = self.create_cdf_factory()
-        avg_cdf_interpolators: tuple[PchipInterpolator, ...] | None = None
-        dimension = self.ensemble.dimension
+        avg_cdf_interpolators = cdf_factory.average_interpolators()
 
         for eigvals in self.ensemble.eigvals_stream(realizs=self.realizs):
             self.outputs.raw.add_levels(
@@ -91,22 +89,27 @@ class SpectralStatisticsSimulation(Simulation):
             self.outputs.weight_unfolded.add_unfolded_levels(
                 eigvals,
                 cdf=self.ensemble.spectral_density.weight_cdf,
-                dimension=dimension,
+                dimension=self.ensemble.dimension,
             )
-
-            if avg_cdf_interpolators is None:
-                avg_cdf_interpolators = cdf_factory.average_interpolators()
 
             for cdf, outputs in zip(
                 avg_cdf_interpolators,
                 self.outputs.avg_unfolded_by_degree,
                 strict=True,
             ):
-                outputs.add_unfolded_levels(eigvals, cdf=cdf, dimension=dimension)
+                outputs.add_unfolded_levels(
+                    eigvals,
+                    cdf=cdf,
+                    dimension=self.ensemble.dimension,
+                )
 
             for cdf, outputs in zip(
                 cdf_factory.interpolators_from_coeffs(coeffs),
                 self.outputs.var_unfolded_by_degree,
                 strict=True,
             ):
-                outputs.add_unfolded_levels(eigvals, cdf=cdf, dimension=dimension)
+                outputs.add_unfolded_levels(
+                    eigvals,
+                    cdf=cdf,
+                    dimension=self.ensemble.dimension,
+                )

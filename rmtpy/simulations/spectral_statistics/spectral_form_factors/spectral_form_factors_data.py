@@ -33,13 +33,13 @@ def finalize_form_factors(form_factors: FormFactorsData) -> None:
     form_factors.compute_form_factors()
 
 
-@attrs.frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
+@attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
 class FormFactorsData(Data):
     dimension: int = attrs.field(
         converter=int,
         validator=attrs.validators.gt(0),
     )
-    logD_time_support: tuple[float, float] = attrs.field(
+    logD_time_support: rmtpy.density.Support = attrs.field(
         default=(-1.5, 0.5),
         converter=tuple,
         validator=lambda _, __, support: rmtpy.validators.validate_support(support),

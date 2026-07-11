@@ -17,7 +17,7 @@ def validate_plot_cls(plot_cls: type[Plot]) -> None:
         raise ValueError("`plot_cls` must be a subclass of `Plot`")
 
 
-@attrs.frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
+@attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
 class Observable(Generic[DataT]):
     data: DataT = attrs.field(
         validator=attrs.validators.instance_of(Data),

@@ -28,12 +28,12 @@ def create_zeroed_histogram_counts(hist: Histogram) -> np.ndarray:
 
 
 def finalize_histogram(hist: Histogram) -> None:
-    hist.normalize_histogram()
+    hist.compute_histogram()
 
 
-@attrs.frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
+@attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
 class Histogram(Data):
-    support: tuple[float, float] = attrs.field(
+    support: rmtpy.density.Support = attrs.field(
         converter=tuple,
         validator=lambda _, __, support: rmtpy.validators.validate_support(support),
     )
@@ -84,8 +84,8 @@ class Histogram(Data):
         np.add.at(self.counts, indices[valid], 1)
         self._realizs_count[0] += 1
 
-    def normalize_histogram(self) -> None:
-        self.histogram[:] = rmtpy.density.normalize_histogram(self.counts, self.bins)
+    def compute_histogram(self) -> None:
+        self.histogram[:] = rmtpy.density.compute_histogram(self.counts, bins=self.bins)
 
     def compute_histogram_as_probabilities(self) -> None:
         self.histogram[:] = self.counts / np.sum(self.counts)

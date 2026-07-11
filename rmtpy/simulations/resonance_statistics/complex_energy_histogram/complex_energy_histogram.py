@@ -68,9 +68,9 @@ class ComplexEnergyHistogramPlot(Plot):
     legend_handles: tuple[Patch] = None
 
     def set_derived_attributes(self) -> None:
-        self.compound: Compound = self.structure_simulation_arg("compound", Compound)
+        self.compound = self.structure_simulation_arg("compound", Compound)
 
-        self.legend: ComplexEnergyHistogramLegend = ComplexEnergyHistogramLegend(
+        self.legend = ComplexEnergyHistogramLegend(
             handles=self.legend_handles, labels=self.legend_labels
         )
         if self.legend.title is None:
@@ -175,12 +175,10 @@ class UnfoldedComplexEnergyHistogramPlot(Plot):
     legend_handles: tuple[Patch] = None
 
     def set_derived_attributes(self) -> None:
-        self.compound: Compound = self.structure_simulation_arg("compound", Compound)
+        self.compound = self.structure_simulation_arg("compound", Compound)
 
-        self.legend: UnfoldedComplexEnergyHistogramLegend = (
-            UnfoldedComplexEnergyHistogramLegend(
-                handles=self.legend_handles, labels=self.legend_labels
-            )
+        self.legend = UnfoldedComplexEnergyHistogramLegend(
+            handles=self.legend_handles, labels=self.legend_labels
         )
         if self.legend.title is None:
             self.legend.title = self.compound.to_latex

@@ -5,6 +5,8 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 from scipy.special import jn_zeros
 
+import rmtpy.density
+
 from ..histogram import Histogram
 from ..observable import Observable
 from ..statistics import create_histogram_observable
@@ -18,17 +20,17 @@ if TYPE_CHECKING:
 
 NUM_BINS: int = 100
 
-RAW_LOG_D_TIME_DELAY_SUPPORT: tuple[float, float] = (-0.5, 1.5)
+RAW_LOG_D_TIME_DELAY_SUPPORT: rmtpy.density.Support = (-0.5, 1.5)
 
-UNFOLDED_LOG_D_TIME_DELAY_SUPPORT: tuple[float, float] = (-1.5, 0.5)
+UNFOLDED_LOG_D_TIME_DELAY_SUPPORT: rmtpy.density.Support = (-1.5, 0.5)
 
 
 def compute_scaled_log_support(
-    support: tuple[float, float],
+    support: rmtpy.density.Support,
     *,
     log_base: float = 10.0,
     scale: float = 1.0,
-) -> tuple[float, float]:
+) -> rmtpy.density.Support:
     return tuple(endpoint + np.log(scale) / np.log(log_base) for endpoint in support)
 
 
@@ -50,10 +52,10 @@ def create_avg_unfolded_time_delay_histograms(
 
 def create_raw_time_delay_histogram_support(
     simulation: TimeDelayStatisticsSimulation,
-) -> tuple[float, float]:
-    energy_0: float = simulation.compound.ensemble.spectral_radius
-    dimension: int = simulation.compound.ensemble.dimension
-    scale: float = float(jn_zeros(1, 1)[0]) / energy_0
+) -> rmtpy.density.Support:
+    energy_0 = simulation.compound.ensemble.spectral_radius
+    dimension = simulation.compound.ensemble.dimension
+    scale = float(jn_zeros(1, 1)[0]) / energy_0
     return compute_scaled_log_support(
         RAW_LOG_D_TIME_DELAY_SUPPORT,
         log_base=dimension,
@@ -76,7 +78,7 @@ def create_time_delay_histogram_observable(
     simulation: TimeDelayStatisticsSimulation,
     energy_index: int,
     energy: float,
-    support: tuple[float, float],
+    support: rmtpy.density.Support,
     scale: float,
     plot_cls: type[TimeDelayHistogramPlot],
     unfolding: str,
@@ -108,8 +110,8 @@ def create_time_delay_histogram_observable(
 def create_time_delay_histograms(
     simulation: TimeDelayStatisticsSimulation,
 ) -> list[Observable]:
-    support: tuple[float, float] = create_raw_time_delay_histogram_support(simulation)
-    scale: float = raw_time_delay_scale(simulation)
+    support = create_raw_time_delay_histogram_support(simulation)
+    scale = raw_time_delay_scale(simulation)
     return [
         create_time_delay_histogram_observable(
             file_name_prefix="time_delay_histogram",
@@ -127,8 +129,8 @@ def create_time_delay_histograms(
 
 def create_unfolded_time_delay_histogram_support(
     simulation: TimeDelayStatisticsSimulation,
-) -> tuple[float, float]:
-    dimension: int = simulation.compound.ensemble.dimension
+) -> rmtpy.density.Support:
+    dimension = simulation.compound.ensemble.dimension
     return compute_scaled_log_support(
         UNFOLDED_LOG_D_TIME_DELAY_SUPPORT,
         log_base=dimension,
@@ -143,10 +145,8 @@ def create_unfolded_time_delay_histograms(
     unfolding: str,
     degree: int | None = None,
 ) -> list[Observable]:
-    support: tuple[float, float] = create_unfolded_time_delay_histogram_support(
-        simulation
-    )
-    scale: float = unfolded_time_delay_scale(simulation)
+    support = create_unfolded_time_delay_histogram_support(simulation)
+    scale = unfolded_time_delay_scale(simulation)
     return [
         create_time_delay_histogram_observable(
             file_name_prefix=file_name_prefix,
@@ -194,7 +194,7 @@ def finalize_time_delay_histogram(histogram: Histogram) -> None:
         histogram.histogram[:] = 0.0
         return
 
-    histogram.normalize_histogram()
+    histogram.compute_histogram()
 
 
 def raw_time_delay_scale(simulation: TimeDelayStatisticsSimulation) -> float:

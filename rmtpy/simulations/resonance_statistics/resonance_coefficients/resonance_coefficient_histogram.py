@@ -49,8 +49,8 @@ class ResonanceCoefficientHistogramPlot(Plot):
         default_factory=ResonanceCoefficientHistogramAxes
     )
 
-    xlim: tuple[float, float] = (-0.2, 0.2)
-    ylim: tuple[float, float] = (0.0, 20.0)
+    xlim: tuple[float, float] = (-0.5, 0.5)
+    ylim: tuple[float, float] = (0.0, 50.0)
 
     histogram_zorder: int = 1
     histogram_alpha: float = 0.5
@@ -63,12 +63,10 @@ class ResonanceCoefficientHistogramPlot(Plot):
     )
 
     def set_derived_attributes(self) -> None:
-        self.compound: Compound = self.structure_simulation_arg("compound", Compound)
+        self.compound = self.structure_simulation_arg("compound", Compound)
 
-        self.legend: ResonanceCoefficientHistogramLegend = (
-            ResonanceCoefficientHistogramLegend(
-                handles=self.legend_handles, labels=self.legend_labels
-            )
+        self.legend = ResonanceCoefficientHistogramLegend(
+            handles=self.legend_handles, labels=self.legend_labels
         )
         if self.legend.title is None:
             self.legend.title = self.compound.to_latex

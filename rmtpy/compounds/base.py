@@ -10,9 +10,11 @@ import attrs
 import numpy as np
 from cattrs.dispatch import StructureHook, UnstructureHook
 from scipy.linalg import solve
+from scipy.special import jn_zeros
 
 import rmtpy.conversion
 import rmtpy.density
+import rmtpy.universal
 from rmtpy.conversion import RMT_CONVERTER
 from rmtpy.ensembles import EnsembleLike, RandomMatrixEnsemble
 
@@ -42,7 +44,7 @@ def compute_number_of_open_channels(compound: Compound) -> int:
 
 
 def create_coupling_strengths_id(compound: Compound) -> str:
-    return rmtpy.conversion.create_hashed_id(compound.channel_coupling_strengths)
+    return rmtpy.conversion.create_hashed_id(compound.coupling_strengths)
 
 
 def create_quantum_chaotic_compound(**kwargs: Any) -> Compound:
@@ -52,41 +54,44 @@ def create_quantum_chaotic_compound(**kwargs: Any) -> Compound:
 def is_num_free_fermions_valid(compound: Compound, _, num_free_fermions: int) -> None:
     if num_free_fermions > compound.ensemble.num_majoranas // 2:
         raise ValueError(
-            f"Number of free complex fermions must be less than the implied number of complex "
-            f"fermions in the quasi-stable space {compound.ensemble.num_majoranas // 2}, got "
-            f"{num_free_fermions} instead."
+            "Number of free complex fermions must be less than the implied number "
+            "of complex fermions in the quasi-stable space "
+            f"{compound.ensemble.num_majoranas // 2}, got {num_free_fermions} "
+            "instead."
         )
 
 
-def normalize_coupling_strengths(strengths: Any, compound: Compound) -> np.ndarray:
-    if not isinstance(strengths, (int, float, Sequence, np.ndarray)):
+def normalize_coupling_strengths(
+    coupling_strengths: Any, compound: Compound
+) -> np.ndarray:
+    if not isinstance(coupling_strengths, (int, float, Sequence, np.ndarray)):
         raise TypeError(
             f"Coupling strengths must be a scalar or a Sequence, "
-            f"got {type(strengths).__name__}."
+            f"got {type(coupling_strengths).__name__}."
         )
 
-    if isinstance(strengths, (int, float)):
-        if strengths <= 0 or not np.isfinite(strengths):
+    if isinstance(coupling_strengths, (int, float)):
+        if coupling_strengths <= 0 or not np.isfinite(coupling_strengths):
             raise ValueError("Coupling strength must be a positive, finite scalar.")
-        return np.full(compound.num_channels, strengths)
+        return np.full(compound.num_channels, coupling_strengths)
 
-    strengths: np.ndarray = np.ascontiguousarray(strengths)
-    if strengths.shape != (compound.num_channels,):
+    coupling_strengths_array = np.ascontiguousarray(coupling_strengths)
+    if coupling_strengths_array.shape != (compound.num_channels,):
         raise ValueError(
             f"Coupling strengths array must have shape ({compound.num_channels},), "
-            f"got {strengths.shape}."
+            f"got {coupling_strengths_array.shape}."
         )
-    if not np.isrealobj(strengths) or np.any(strengths < 0):
+    if not np.isrealobj(coupling_strengths_array) or np.any(coupling_strengths_array < 0):
         raise ValueError("Coupling strengths array must have real, nonnegative values.")
 
-    return strengths
+    return coupling_strengths_array
 
 
 def register_compound_class(comp_cls: type[Compound]) -> type[Compound]:
     RMT_CONVERTER.register_structure_hook(comp_cls, structure_hook_for_compound)
     RMT_CONVERTER.register_unstructure_hook(comp_cls, unstructure_hook_for_compound)
 
-    key: str = rmtpy.conversion.to_registry_key(comp_cls.__name__)
+    key = rmtpy.conversion.to_registry_key(comp_cls.__name__)
     REGISTRY[key] = comp_cls
     STRUCTURE_HOOKS[key] = RMT_CONVERTER.get_structure_hook(comp_cls)
     UNSTRUCTURE_HOOKS[key] = RMT_CONVERTER.get_unstructure_hook(comp_cls)
@@ -98,28 +103,30 @@ def structure_hook_for_compound(src: dict[str, Any] | Compound, _) -> Compound:
     if type(src) in REGISTRY.values():
         return src
 
-    comp_dict: dict[str, Any] = rmtpy.conversion.normalize_dict(src, REGISTRY)
-    comp_args: dict[str, Any] = comp_dict.pop("args")
-    key: str = rmtpy.conversion.to_registry_key(comp_dict.pop("name"))
-    comp_cls: type[Compound] = REGISTRY[key]
-    comp_inst: Compound = comp_cls(**comp_args)
-    return comp_inst
+    comp_dict = rmtpy.conversion.normalize_dict(src, registry=REGISTRY)
+    comp_args = comp_dict.pop("args")
+
+    key = rmtpy.conversion.to_registry_key(comp_dict.pop("name"))
+    comp_cls = REGISTRY[key]
+
+    return comp_cls(**comp_args)
 
 
 def unstructure_hook_for_compound(comp: Compound) -> dict[str, Any]:
-    args: dict[str, Any] = {}
-    for name, attr in attrs.fields_dict(type(comp)).items():
-        if attr.init:
-            args[name] = RMT_CONVERTER.unstructure(getattr(comp, name))
+    arguments = {
+        name: RMT_CONVERTER.unstructure(getattr(comp, name))
+        for name, attr in attrs.fields_dict(type(comp)).items()
+        if attr.init
+    }
 
     return {
         "name": rmtpy.conversion.to_registry_key(type(comp).__name__),
-        "args": args,
+        "args": arguments,
     }
 
 
 @register_compound_class
-@attrs.frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
+@attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
 class Compound:
     ensemble: EnsembleLike = attrs.field(
         converter=RandomMatrixEnsemble.create,
@@ -137,7 +144,7 @@ class Compound:
         default=attrs.Factory(compute_number_of_open_channels, takes_self=True),
         init=False,
     )
-    channel_coupling_strengths: np.ndarray = attrs.field(
+    coupling_strengths: np.ndarray = attrs.field(
         default=attrs.Factory(compute_default_coupling_strengths, takes_self=True),
         converter=attrs.Converter(normalize_coupling_strengths, takes_self=True),
         repr=False,
@@ -156,7 +163,7 @@ class Compound:
     )
 
     def __attrs_post_init__(self) -> None:
-        resonance_density: rmtpy.density.DensityModel = rmtpy.density.DensityModel(
+        resonance_density = rmtpy.density.DensityModel(
             dimension=self.ensemble.dimension,
             support=(-self.ensemble.spectral_radius, self.ensemble.spectral_radius),
             polynomials=self.ensemble.spectral_polynomials,
@@ -171,7 +178,7 @@ class Compound:
         if inspect.isabstract(cls):
             return
 
-        key: str = rmtpy.conversion.to_registry_key(cls.__name__)
+        key = rmtpy.conversion.to_registry_key(cls.__name__)
         REGISTRY[key] = cls
         STRUCTURE_HOOKS[key] = RMT_CONVERTER.get_structure_hook(cls)
         UNSTRUCTURE_HOOKS[key] = RMT_CONVERTER.get_unstructure_hook(cls)
@@ -190,26 +197,24 @@ class Compound:
 
     @property
     def to_latex(self) -> str:
-        ensemble_as_latex: str = self.ensemble.to_latex.replace(
+        ensemble_as_latex = self.ensemble.to_latex.replace(
             self.ensemble.latex_name, self.latex_name
         ).strip("$")
-
-        return rmtpy.conversion.to_latex(self, ensemble_as_latex)
+        return rmtpy.conversion.to_latex(self, latex_name=ensemble_as_latex)
 
     @property
     def to_path(self) -> Path:
-        ensemble_path: Path = self.ensemble.to_path
-        root: Path = Path(self.token_name) / Path(*ensemble_path.parts[1:])
-        path: Path = rmtpy.conversion.to_path(self, root)
-
-        coupling_strengths_is_constant_array: bool = np.all(
-            self.channel_coupling_strengths == self.channel_coupling_strengths[0]
+        ensemble_path = self.ensemble.to_path
+        root = Path(self.token_name) / Path(*ensemble_path.parts[1:])
+        path = rmtpy.conversion.to_path(self, root=root)
+        coupling_strengths_is_constant_array = np.all(
+            self.coupling_strengths == self.coupling_strengths[0]
         )
 
         if not coupling_strengths_is_constant_array:
             return path / f"v_{self._coupling_strengths_id}"
 
-        return path / f"v_{self.channel_coupling_strengths[0]:.5g}".replace(".", "p")
+        return path / f"v_{self.coupling_strengths[0]:.5g}".replace(".", "p")
 
     @property
     def rng_state(self) -> dict[str, Any]:
@@ -222,153 +227,166 @@ class Compound:
     def unstructure(self) -> dict[str, Any]:
         return RMT_CONVERTER.unstructure(self)
 
+    def add_width_matrix_to_hamiltonian(self, hamiltonian: np.ndarray) -> None:
+        diag_indices = np.diag_indices(self.num_channels)
+        hamiltonian[diag_indices] -= 0.5j * (self.coupling_strengths**2)
+
     def generate_effective_hamiltonian(self) -> np.ndarray:
-        diag_indices: np.ndarray = np.diag_indices(self.num_channels)
-        hamiltonian: np.ndarray = self.ensemble.generate_matrix(use_complex_dtype=True)
-        hamiltonian[diag_indices] -= 0.5j * (self.channel_coupling_strengths**2)
+        hamiltonian = self.ensemble.generate_matrix(use_complex_dtype=True)
+        self.add_width_matrix_to_hamiltonian(hamiltonian)
         return hamiltonian
 
-    def effective_hamiltonian_stream(self, *, realizs: int) -> Iterator[np.ndarray]:
-        diag_indices: np.ndarray = np.diag_indices(self.num_channels)
-        for hamiltonian in self.ensemble.matrix_stream(
-            realizs=realizs,
-            use_complex_dtype=True,
-        ):
-            hamiltonian[diag_indices] -= 0.5j * (self.channel_coupling_strengths**2)
+    def effective_hamiltonian_stream(self, realizs: int) -> Iterator[np.ndarray]:
+        for hamiltonian in self.ensemble.matrix_stream(realizs, use_complex_dtype=True):
+            self.add_width_matrix_to_hamiltonian(hamiltonian)
+
             yield hamiltonian
 
-    def resonances_stream(self, *, realizs: int) -> Iterator[np.ndarray]:
-        lapack_geev: type = self.ensemble._pick_lapack_geev(use_complex_dtype=True)
-        for hamiltonian_eff in self.effective_hamiltonian_stream(realizs):
+    def resonances_stream(self, realizs: int) -> Iterator[np.ndarray]:
+        lapack_geev = self.ensemble._pick_lapack_geev(use_complex_dtype=True)
+
+        for effective_hamiltonian in self.effective_hamiltonian_stream(realizs):
             yield lapack_geev(
-                hamiltonian_eff, compute_vl=0, compute_vr=0, overwrite_a=True
+                effective_hamiltonian, compute_vl=0, compute_vr=0, overwrite_a=True
             )[0]
 
-    def partial_widths_stream(self, *, realizs: int) -> Iterator[np.ndarray]:
-        for _, eigvecs in self.ensemble.eigsys_stream(realizs=realizs):
-            coupling_matrix: np.ndarray = eigvecs[:, : self.num_channels]
-            coupling_matrix *= self.channel_coupling_strengths[None, :]
-            coupling_matrix *= coupling_matrix.conj()
+    def resonance_real_parts_stream(self, realizs: int) -> Iterator[np.ndarray]:
+        for resonances in self.resonances_stream(realizs=realizs):
+            yield resonances.real
 
-            yield coupling_matrix.real
+    def rotate_coupling_matrix_by_eigvecs(
+        self, eigvecs: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray]:
+        rotated_coupling_matrix = eigvecs[:, : self.num_channels]
+        rotated_coupling_matrix *= self.coupling_strengths[None, :]
+
+        if np.isrealobj(rotated_coupling_matrix):
+            rotated_coupling_matrix_conj = rotated_coupling_matrix
+        else:
+            rotated_coupling_matrix_conj = np.conjugate(
+                rotated_coupling_matrix, out=eigvecs[:, -self.num_channels :]
+            )
+
+        return rotated_coupling_matrix, rotated_coupling_matrix_conj
+
+    def partial_widths_stream(self, realizs: int) -> Iterator[np.ndarray]:
+        for _, eigvecs in self.ensemble.eigsys_stream(realizs=realizs):
+            rotated_coupling_matrix, rotated_coupling_matrix_conj = (
+                self.rotate_coupling_matrix_by_eigvecs(eigvecs)
+            )
+            rotated_coupling_matrix *= rotated_coupling_matrix_conj
+
+            yield rotated_coupling_matrix.real
 
     def reaction_matrix_stream(
-        self, *, energies: np.ndarray, realizs: int
+        self, realizs: int, *, energies: np.ndarray
     ) -> Iterator[tuple[np.ndarray, np.ndarray]]:
         energies = np.asarray(energies)
 
-        resolvent: np.ndarray = np.empty(
+        resolvent = np.empty(
             (energies.size, self.ensemble.dimension),
-            self.ensemble.real_dtype,
+            self.ensemble.real_dtype.type,
             order="C",
         )
-        reaction_matrix: np.ndarray = np.empty(
+        reaction_matrix = np.empty(
             (energies.size, self.num_channels, self.num_channels),
-            self.ensemble.complex_dtype,
+            self.ensemble.complex_dtype.type,
             order="C",
         )
 
         for eigvals, eigvecs in self.ensemble.eigsys_stream(realizs=realizs):
-            coupling_matrix: np.ndarray = eigvecs[:, : self.num_channels]
-            coupling_matrix *= self.channel_coupling_strengths[None, :] / np.sqrt(2)
-
-            if np.isrealobj(coupling_matrix):
-                coupling_matrix_conj: np.ndarray = coupling_matrix
-            else:
-                coupling_matrix_conj: np.ndarray = np.conjugate(
-                    coupling_matrix, out=eigvecs[:, -self.num_channels :]
-                )
+            rotated_coupling_matrix, rotated_coupling_matrix_conj = (
+                self.rotate_coupling_matrix_by_eigvecs(eigvecs)
+            )
 
             np.subtract(energies[:, None], eigvals[None, :], out=resolvent)
             np.reciprocal(resolvent, out=resolvent)
 
             np.einsum(
-                "ad, nd, db -> nab",
-                coupling_matrix_conj.T,
+                "da, nd, db -> nab",
+                rotated_coupling_matrix_conj,
                 resolvent,
-                coupling_matrix,
+                rotated_coupling_matrix,
                 out=reaction_matrix,
                 optimize=True,
             )
+            reaction_matrix /= 2
 
             yield reaction_matrix, eigvals
 
     def reaction_matrix_pair_stream(
-        self, *, energies: np.ndarray, realizs: int
+        self, realizs: int, *, energies: np.ndarray
     ) -> Iterator[tuple[np.ndarray, np.ndarray, np.ndarray]]:
         energies = np.asarray(energies)
 
-        resolvent: np.ndarray = np.empty(
+        resolvent = np.empty(
             (energies.size, self.ensemble.dimension),
-            self.ensemble.real_dtype,
+            self.ensemble.real_dtype.type,
             order="C",
         )
-        reaction_matrix: np.ndarray = np.empty(
+        reaction_matrix = np.empty(
             (energies.size, self.num_channels, self.num_channels),
-            self.ensemble.complex_dtype,
+            self.ensemble.complex_dtype.type,
             order="C",
         )
-        reaction_matrix_2: np.ndarray = np.empty(
+        reaction_matrix_2 = np.empty(
             (energies.size, self.num_channels, self.num_channels),
-            self.ensemble.complex_dtype,
+            self.ensemble.complex_dtype.type,
             order="C",
         )
 
         for eigvals, eigvecs in self.ensemble.eigsys_stream(realizs=realizs):
-            coupling_matrix: np.ndarray = eigvecs[:, : self.num_channels]
-            coupling_matrix *= self.channel_coupling_strengths[None, :] / np.sqrt(2)
-
-            if np.isrealobj(coupling_matrix):
-                coupling_matrix_conj: np.ndarray = coupling_matrix
-            else:
-                coupling_matrix_conj: np.ndarray = np.conjugate(
-                    coupling_matrix, out=eigvecs[:, -self.num_channels :]
-                )
+            rotated_coupling_matrix, rotated_coupling_matrix_conj = (
+                self.rotate_coupling_matrix_by_eigvecs(eigvecs)
+            )
 
             np.subtract(energies[:, None], eigvals[None, :], out=resolvent)
             np.reciprocal(resolvent, out=resolvent)
 
             np.einsum(
-                "ad, nd, db -> nab",
-                coupling_matrix_conj.T,
+                "da, nd, db -> nab",
+                rotated_coupling_matrix_conj,
                 resolvent,
-                coupling_matrix,
+                rotated_coupling_matrix,
                 out=reaction_matrix,
                 optimize=True,
             )
+            reaction_matrix /= 2
 
             np.square(resolvent, out=resolvent)
 
             np.einsum(
-                "ad, nd, db -> nab",
-                coupling_matrix_conj.T,
+                "da, nd, db -> nab",
+                rotated_coupling_matrix_conj,
                 resolvent,
-                coupling_matrix,
+                rotated_coupling_matrix,
                 out=reaction_matrix_2,
                 optimize=True,
             )
+            reaction_matrix_2 /= 2
 
             yield reaction_matrix, reaction_matrix_2, eigvals
 
     def scattering_matrix_stream(
-        self, *, energies: np.ndarray, realizs: int
+        self, realizs: int, *, energies: np.ndarray
     ) -> Iterator[tuple[np.ndarray, np.ndarray]]:
-        energies = np.asarray(energies)
-
-        numerator: np.ndarray = np.empty(
+        numerator = np.empty(
             (energies.size, self.num_channels, self.num_channels),
-            self.ensemble.complex_dtype,
+            self.ensemble.complex_dtype.type,
             order="C",
         )
-        for reaction_matrix, eigvals in self.reaction_matrix_stream(energies, realizs):
-            diag_indices: np.ndarray = np.arange(self.num_channels)
+
+        for reaction_matrix, eigvals in self.reaction_matrix_stream(
+            realizs, energies=np.asarray(energies)
+        ):
+            diag_indices = np.arange(self.num_channels)
             reaction_matrix *= 1j
             reaction_matrix[:, diag_indices, diag_indices] += 1
 
             np.conjugate(reaction_matrix.swapaxes(-1, -2), out=numerator)
-            denominator: np.ndarray = reaction_matrix
 
-            s_matrix: np.ndarray = solve(
+            denominator = reaction_matrix
+            s_matrix = solve(
                 denominator,
                 numerator,
                 overwrite_a=True,
@@ -379,27 +397,52 @@ class Compound:
             return s_matrix, eigvals
 
     def wigner_smith_matrix_stream(
-        self, *, energies: np.ndarray, realizs: int
+        self, realizs: int, *, energies: np.ndarray
     ) -> Iterator[tuple[np.ndarray, np.ndarray]]:
-        energies = np.asarray(energies)
+        for matrix, matrix_2, eigvals in self.reaction_matrix_pair_stream(
+            realizs, energies=np.asarray(energies)
+        ):
+            diag_indices = np.arange(self.num_channels)
+            matrix *= -1j
+            matrix[:, diag_indices, diag_indices] += 1
 
-        for mat, mat_2, eigvals in self.reaction_matrix_pair_stream(energies, realizs):
-            diag_indices: np.ndarray = np.arange(self.num_channels)
-            mat *= -1j
-            mat[:, diag_indices, diag_indices] += 1
-
-            wigner_smith_matrix: np.ndarray = solve(
-                mat,
-                mat_2,
+            adjoint_matrix = matrix.swapaxes(-1, -2).conj()
+            left_factor = solve(
+                matrix,
+                matrix_2,
                 overwrite_a=True,
                 overwrite_b=True,
                 check_finite=False,
             )
-            wigner_smith_matrix += wigner_smith_matrix.swapaxes(-1, -2).conj()
+
+            wigner_smith_matrix = solve(
+                adjoint_matrix.swapaxes(-1, -2),
+                left_factor.swapaxes(-1, -2),
+                overwrite_a=True,
+                overwrite_b=True,
+                check_finite=False,
+            )
+            wigner_smith_matrix = (
+                wigner_smith_matrix.swapaxes(-1, -2) + wigner_smith_matrix.conj()
+            )
+
             yield wigner_smith_matrix, eigvals
 
     def time_delays_stream(
-        self, *, energies: np.ndarray, realizs: int
+        self, realizs: int, *, energies: np.ndarray
     ) -> Iterator[np.ndarray]:
-        for w_s_matrix, eigvals in self.wigner_smith_matrix_stream(energies, realizs):
-            yield np.linalg.eigvalsh(w_s_matrix), eigvals
+        for delay_matrix, eigvals in self.wigner_smith_matrix_stream(
+            realizs, energies=np.asarray(energies)
+        ):
+            yield np.linalg.eigvalsh(delay_matrix), eigvals
+
+    def time_delay_pdf(self, times: np.ndarray) -> np.ndarray:
+        global_mean_spacing = 2 * self.ensemble.spectral_radius / self.ensemble.dimension
+        j_1_1 = float(jn_zeros(1, 1)[0])
+        heisenberg_time = 2 * j_1_1 / global_mean_spacing
+
+        return rmtpy.universal.time_delay_pdf(
+            np.asarray(times),
+            num_channels=self.num_channels,
+            heisenberg_time=heisenberg_time,
+        )

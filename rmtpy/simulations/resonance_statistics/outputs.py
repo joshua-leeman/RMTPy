@@ -83,9 +83,7 @@ def create_resonance_statistics_outputs(
             form_factors=create_resonance_form_factors_observable(simulation),
         ),
         weight_unfolded=ResonanceStatisticOutputs(
-            resonances=create_weight_unfolded_resonance_histogram_observable(
-                simulation
-            ),
+            resonances=create_weight_unfolded_resonance_histogram_observable(simulation),
             widths=create_weight_unfolded_width_histogram_observable(simulation),
             spacings=create_weight_unfolded_resonance_spacing_histogram_observable(
                 simulation
@@ -114,7 +112,7 @@ def create_resonance_statistics_outputs(
     )
 
 
-@attrs.frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
+@attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
 class ResonanceStatisticOutputs:
     resonances: Observable[Histogram]
     widths: Observable[Histogram]
@@ -129,9 +127,8 @@ class ResonanceStatisticOutputs:
         *,
         ensemble: ManyBodyEnsemble,
     ) -> None:
-        energy_0 = ensemble.spectral_radius
         self.resonances.data.add_histogram_contribution(resonances)
-        self.widths.data.add_histogram_contribution(widths / energy_0)
+        self.widths.data.add_histogram_contribution(widths / ensemble.spectral_radius)
         self.spacings.data.add_histogram_contribution(
             nearest_neighbor_spacings(
                 resonances,
@@ -139,8 +136,8 @@ class ResonanceStatisticOutputs:
             )
         )
         self.complex_energies.data.add_histogram_contribution(
-            resonances / energy_0,
-            widths / energy_0,
+            resonances / ensemble.spectral_radius,
+            widths / ensemble.spectral_radius,
         )
         self.form_factors.data.compute_moment_contributions(resonances)
 
@@ -152,18 +149,16 @@ class ResonanceStatisticOutputs:
         cdf: CDF,
         ensemble: ManyBodyEnsemble,
     ) -> None:
-        dimension = ensemble.dimension
-        energy_0 = ensemble.spectral_radius
         unfolded_resonances = unfold_values(
             resonances,
             cdf=cdf,
-            dimension=dimension,
+            dimension=ensemble.dimension,
         )
         unfolded_widths = unfold_widths(
             widths,
             resonances,
             cdf=cdf,
-            dimension=dimension,
+            dimension=ensemble.dimension,
         )
 
         self.resonances.data.add_histogram_contribution(unfolded_resonances)
@@ -175,13 +170,13 @@ class ResonanceStatisticOutputs:
             )
         )
         self.complex_energies.data.add_histogram_contribution(
-            resonances / energy_0,
+            resonances / ensemble.spectral_radius,
             unfolded_widths,
         )
         self.form_factors.data.compute_moment_contributions(unfolded_resonances)
 
 
-@attrs.frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
+@attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
 class ResonanceStatisticsOutputs:
     coefficients: CoefficientHistogramOutputs
     raw: ResonanceStatisticOutputs

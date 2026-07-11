@@ -47,35 +47,36 @@ def configure_matplotlib() -> None:
 
 
 def plot_data(data_path: str | Path) -> None:
-    data_path: Path = Path(data_path)
-    out_dir: Path = data_path.parent
+    data_path = Path(data_path)
+    out_dir = data_path.parent
 
-    plot: Plot = RMT_CONVERTER.structure(data_path, Plot)
+    plot = RMT_CONVERTER.structure(data_path, Plot)
     plot.plot(path=out_dir)
 
 
 def plot_structure_hook(src: str | Path | dict[str, Any] | NpzFile | Plot, _) -> Plot:
-    src_dict: dict[str, Any] = normalize_source(src)
-    metadata: dict[str, Any] = normalize_metadata(src_dict["metadata"])
+    src_dict = normalize_source(src)
+    metadata = normalize_metadata(src_dict["metadata"])
     src_dict["metadata"] = metadata
 
-    plot_key: str | None = metadata.get("name")
+    plot_key = metadata.get("name")
     if plot_key in PLOT_REGISTRY:
-        plot_cls: type[Plot] = PLOT_REGISTRY[plot_key]
+        plot_cls = PLOT_REGISTRY[plot_key]
     else:
         raise ValueError(f"No registered Plot class found in {src}")
 
     if plot_key in DATA_REGISTRY:
-        data_cls: type[Data] = DATA_REGISTRY[plot_key]
+        data_cls = DATA_REGISTRY[plot_key]
     else:
         raise ValueError(f"No registered Data class found for Plot in {src}")
 
-    data_inst: Data = RMT_CONVERTER.structure(src_dict, data_cls)
+    data_inst = RMT_CONVERTER.structure(src_dict, data_cls)
     return plot_cls(data=data_inst)
 
 
 def register_plot_hooks(plot_cls: type[Plot]) -> type[Plot]:
     RMT_CONVERTER.register_structure_hook(plot_cls, plot_structure_hook)
+
     return plot_cls
 
 
@@ -97,7 +98,7 @@ class Plot(ABC):
 
     def __init_subclass__(cls) -> None:
         if not inspect.isabstract(cls):
-            plot_key: str = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", cls.__name__)
+            plot_key = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", cls.__name__)
             plot_key = plot_key.lower()
             plot_key = plot_key.replace("_plot", "_data")
             PLOT_REGISTRY[plot_key] = cls
@@ -185,7 +186,7 @@ class Plot(ABC):
         self.axes.configure(ax=self.ax)
         self.legend.configure(ax=self.ax)
 
-        path: Path = Path(path)
+        path = Path(path)
         path.mkdir(parents=True, exist_ok=True)
         self.fig.savefig(path / self.file_name, dpi=self.dpi, bbox_inches="tight")
 

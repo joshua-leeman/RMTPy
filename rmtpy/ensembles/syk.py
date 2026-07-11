@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Callable, Iterator
-from typing import ClassVar
+from typing import Any, ClassVar
 
 import attrs
 import numba
@@ -16,12 +16,6 @@ from .many_body import ManyBodyEnsemble
 INITIALISM: str = "SYK"
 
 NUM_MAJORANAS_LIMIT_BY_Q: dict[int, int] = {2: 32, 4: 32, 6: 26, 8: 24, 10: 22}
-
-
-def choose_matrix_block_slice(syk: SachdevYeKitaevEnsemble) -> tuple[slice, slice]:
-    return rmtpy.fermions.choose_block_slice_from_parity(
-        syk.num_majoranas, syk.is_even_parity
-    )
 
 
 def compute_dyson_index(syk: SachdevYeKitaevEnsemble) -> int:
@@ -65,59 +59,72 @@ def create_spectral_weight(
 ) -> Callable[[np.ndarray], np.ndarray]:
     def syk_spectral_weight(energies: np.ndarray) -> np.ndarray:
         return rmtpy.polynomials.q_hermite_polynomial_weight_pdf(
-            energies, syk.spectral_radius, syk.suppression
+            energies, radius=syk.spectral_radius, eta=syk.suppression
         )
 
     return syk_spectral_weight
+
+
+def instantiate_majorana_fermion_basis(
+    syk: SachdevYeKitaevEnsemble,
+) -> rmtpy.fermions.MajoranaFermionBasis:
+    return rmtpy.fermions.MajoranaFermionBasis(
+        num_majoranas=syk.num_majoranas, in_real_basis=syk.dyson_index == 1
+    )
 
 
 @numba.njit(boundscheck=False, cache=True, fastmath=True)
 def create_syk_matrix_with_imaginary_prefactor(
     matrix: np.ndarray,
     rng: np.random.Generator,
-    real_dtype: type[np.floating],
+    real_dtype: type[np.floating[Any]],
     std_dev: float,
-    term_idxs: np.ndarray,
-    term_data: np.ndarray,
+    monomials_idxs: np.ndarray,
+    monomials_data: np.ndarray,
 ) -> np.ndarray:
-    num_terms: int = term_data.shape[0]
-    coeffs: np.ndarray = std_dev * rng.standard_normal(num_terms, real_dtype)
+    num_terms = monomials_data.shape[0]
+    coeffs = std_dev * rng.standard_normal(num_terms, real_dtype)
+
     matrix.fill(0.0)
-    for term_num in range(num_terms):
-        for entry in range(term_data.shape[1]):
-            matrix[term_idxs[term_num, 0, entry], term_idxs[term_num, 1, entry]] += (
-                1j * coeffs[term_num] * term_data[term_num, entry]
-            )
+    for i, monomial_data in enumerate(monomials_data):
+        for j, nonzero_monomial_entry in enumerate(monomial_data):
+            entry_idx = (monomials_idxs[i, 0, j], monomials_idxs[i, 1, j])
+            matrix[entry_idx] += 1j * coeffs[i] * nonzero_monomial_entry
 
 
 @numba.njit(boundscheck=False, cache=True, fastmath=True)
 def create_syk_matrix_without_imaginary_prefactor(
     matrix: np.ndarray,
     rng: np.random.Generator,
-    real_dtype: type[np.floating],
+    real_dtype: type[np.floating[Any]],
     std_dev: float,
-    term_idxs: np.ndarray,
-    term_data: np.ndarray,
+    monomials_idxs: np.ndarray,
+    monomials_data: np.ndarray,
 ) -> np.ndarray:
-    num_terms: int = term_data.shape[0]
-    coeffs: np.ndarray = std_dev * rng.standard_normal(num_terms, real_dtype)
+    num_terms = monomials_data.shape[0]
+    coeffs = std_dev * rng.standard_normal(num_terms, real_dtype)
+
     matrix.fill(0.0)
-    for term_num in range(num_terms):
-        for entry in range(term_data.shape[1]):
-            matrix[term_idxs[term_num, 0, entry], term_idxs[term_num, 1, entry]] += (
-                coeffs[term_num] * term_data[term_num, entry]
-            )
+    for i, monomial_data in enumerate(monomials_data):
+        for j, nonzero_monomial_entry in enumerate(monomial_data):
+            entry_idx = (monomials_idxs[i, 0, j], monomials_idxs[i, 1, j])
+            matrix[entry_idx] += coeffs[i] * nonzero_monomial_entry
 
 
 def is_num_majoranas_within_limit(syk: SachdevYeKitaevEnsemble, _, q: int) -> None:
     if syk.num_majoranas > NUM_MAJORANAS_LIMIT_BY_Q[q]:
         raise ValueError(
             f"For the SYK q={q} model, `num_majoranas` cannot exceed "
-            "{NUM_MAJORANAS_LIMIT_BY_Q[q]} due to memory constraints."
+            f"{NUM_MAJORANAS_LIMIT_BY_Q[q]} due to memory constraints."
+        )
+    elif q > syk.num_majoranas:
+        raise ValueError(
+            f"The SYK q-parameter {q} cannot exceed the number of majorana "
+            f"fermions, here {syk.num_majoranas}."
         )
 
 
-@attrs.frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
+@attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
 class SachdevYeKitaevEnsemble(ManyBodyEnsemble):
     initialism: ClassVar[str] = INITIALISM
 
@@ -165,12 +172,18 @@ class SachdevYeKitaevEnsemble(ManyBodyEnsemble):
         repr=False,
     )
 
-    _parity_block: tuple[slice, slice] = attrs.field(
-        default=attrs.Factory(choose_matrix_block_slice, takes_self=True),
+    majorana_fermion_basis: rmtpy.fermions.MajoranaFermionBasis = attrs.field(
+        default=attrs.Factory(instantiate_majorana_fermion_basis, takes_self=True),
         init=False,
         repr=False,
     )
-    _q_body_term_decomps: tuple[tuple[np.ndarray, ...], ...] | None = attrs.field(
+
+    _block_parity_slice: rmtpy.fermions.ParityBlockSlice | None = attrs.field(
+        default=None,
+        init=False,
+        repr=False,
+    )
+    _decomposed_q_monomials: rmtpy.fermions.DecomposedSparseArray | None = attrs.field(
         default=None,
         init=False,
         repr=False,
@@ -185,55 +198,67 @@ class SachdevYeKitaevEnsemble(ManyBodyEnsemble):
         return super().token_name + f"_{self.q}"
 
     @property
-    def q_body_term_decomps(self) -> tuple[tuple[np.ndarray, ...], ...]:
-        if self._q_body_term_decomps is None:
-            q_body_majorana_terms: tuple[tuple[np.ndarray, ...], ...] = (
-                rmtpy.fermions.create_q_body_majorana_terms(
-                    q=self.q,
-                    parity_block=self._parity_block,
-                    num_majoranas=self.num_majoranas,
-                    in_real_basis=self.dyson_index == 1,
-                )
+    def block_parity_slice(self) -> rmtpy.fermions.ParityBlockSlice:
+        if self._block_parity_slice is None:
+            object.__setattr__(
+                self,
+                "_parity_slice",
+                self.majorana_fermion_basis.parity_block_slice,
             )
-            object.__setattr__(self, "_q_body_term_decomps", q_body_majorana_terms)
 
-        return self._q_body_term_decomps
+        return self._block_parity_slice
+
+    @property
+    def decomposed_q_monomials(self) -> rmtpy.fermions.DecomposedSparseArray:
+        if self._decomposed_q_monomials is None:
+            object.__setattr__(
+                self,
+                "_decomposed_q_monomials",
+                self.majorana_fermion_basis.create_decomposed_q_monomials(q=self.q),
+            )
+
+        return self._decomposed_q_monomials
 
     def generate_matrix(self, *, use_complex_dtype: bool = False) -> np.ndarray:
-        matrix = self._initialize_matrix(use_complex_dtype=use_complex_dtype)
         create_syk_matrix = self._pick_syk_matrix_builder()
+
+        matrix = self._empty_matrix(use_complex_dtype=use_complex_dtype)
         create_syk_matrix(
             matrix,
             self.rng,
             self.real_dtype.type,
             self.std_dev,
-            self.q_body_term_decomps[0],
-            self.q_body_term_decomps[1],
+            self.decomposed_q_monomials[0],
+            self.decomposed_q_monomials[1],
         )
         return matrix
 
     def matrix_stream(
-        self, *, realizs: int, use_complex_dtype: bool = False
+        self, realizs: int, *, use_complex_dtype: bool = False
     ) -> Iterator[np.ndarray]:
-        matrix = self._initialize_matrix(use_complex_dtype=use_complex_dtype)
         create_syk_matrix = self._pick_syk_matrix_builder()
+
+        matrix = self._empty_matrix(use_complex_dtype=use_complex_dtype)
         for _ in range(realizs):
             create_syk_matrix(
                 matrix,
                 self.rng,
                 self.real_dtype.type,
                 self.std_dev,
-                self.q_body_term_decomps[0],
-                self.q_body_term_decomps[1],
+                self.decomposed_q_monomials[0],
+                self.decomposed_q_monomials[1],
             )
             yield matrix
 
-    def _initialize_matrix(self, *, use_complex_dtype: bool = False) -> np.ndarray:
-        size: int = self.dimension
+    def _empty_matrix(self, *, use_complex_dtype: bool = False) -> np.ndarray:
         if use_complex_dtype or self.dyson_index != 1:
-            return np.empty((size, size), self.complex_dtype.type, order="F")
+            return np.empty(
+                (self.dimension, self.dimension), self.complex_dtype.type, order="F"
+            )
         else:
-            return np.empty((size, size), self.real_dtype.type, order="F")
+            return np.empty(
+                (self.dimension, self.dimension), self.real_dtype.type, order="F"
+            )
 
     def _pick_syk_matrix_builder(self) -> Callable[[np.ndarray], np.ndarray]:
         if self.q % 4 == 2:

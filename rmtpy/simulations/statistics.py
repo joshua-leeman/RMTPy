@@ -15,6 +15,7 @@ from .observable import Observable
 from .plot import Plot
 
 DataT = TypeVar("DataT", bound=Data)
+Support = tuple[float, float]
 
 POLYNOMIAL_DEGREE_MIN: int = 2
 POLYNOMIAL_DEGREE_STEP: int = 2
@@ -29,7 +30,7 @@ def create_coefficient_histograms(
     *,
     prefix: str,
     max_degree: int,
-    support: tuple[float, float],
+    support: Support,
     plot_cls: type[Plot] | None = None,
     unfolding: str = "raw",
 ) -> list[Observable[Histogram]]:
@@ -50,8 +51,8 @@ def create_coefficient_histograms(
 def create_histogram2d_observable(
     *,
     file_name: str,
-    x_support: tuple[float, float],
-    y_support: tuple[float, float],
+    x_support: Support,
+    y_support: Support,
     x_log_base: float | None = None,
     y_log_base: float | None = None,
     x_num_bins: int | None = None,
@@ -85,7 +86,7 @@ def create_histogram2d_observable(
 def create_histogram_observable(
     *,
     file_name: str,
-    support: tuple[float, float],
+    support: Support,
     log_base: float | None = None,
     num_bins: int | None = None,
     plot_cls: type[Plot] | None = None,
@@ -123,22 +124,24 @@ def create_observable(
     )
     if metadata is not None:
         observable.metadata.update(metadata)
+
     return observable
 
 
 def nearest_neighbor_spacings(values: np.ndarray, *, degeneracy: int = 1) -> np.ndarray:
-    spacings: np.ndarray = np.diff(np.sort(values))
+    spacings = np.diff(np.sort(values))
     if degeneracy > 1:
         spacings = np.repeat(spacings[1::degeneracy], degeneracy)
+
     return spacings
 
 
-def scale_support(support: tuple[float, float], scale: float) -> tuple[float, float]:
+def scale_support(support: Support, scale: float) -> Support:
     return scale * support[0], scale * support[1]
 
 
 def simulation_output_path(simulation: Any, root: Path) -> Path:
-    path: Path = root
+    path = root
     for name, attr in attrs.fields_dict(type(simulation)).items():
         dir_name = attr.metadata.get("dir_name", None)
         if dir_name is None:
@@ -146,6 +149,7 @@ def simulation_output_path(simulation: Any, root: Path) -> Path:
 
         value = re.sub(r"[^\w\-.]", "_", str(getattr(simulation, name)))
         path /= f"{dir_name}_{value.replace('.', 'p')}"
+
     return path
 
 

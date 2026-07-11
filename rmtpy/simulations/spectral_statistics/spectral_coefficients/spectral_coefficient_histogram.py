@@ -59,19 +59,15 @@ class SpectralCoefficientHistogramPlot(Plot):
     histogram_legend: str = "simulation"
 
     legend_labels: tuple[str] = (histogram_legend,)
-    legend_handles: tuple[Patch] = (
-        Patch(color=histogram_color, alpha=histogram_alpha),
-    )
+    legend_handles: tuple[Patch] = (Patch(color=histogram_color, alpha=histogram_alpha),)
 
     def set_derived_attributes(self) -> None:
-        self.ensemble: ManyBodyEnsemble = self.structure_simulation_arg(
+        self.ensemble = self.structure_simulation_arg(
             "ensemble", ManyBodyEnsemble
         )
 
-        self.legend: SpectralCoefficientHistogramLegend = (
-            SpectralCoefficientHistogramLegend(
-                handles=self.legend_handles, labels=self.legend_labels
-            )
+        self.legend = SpectralCoefficientHistogramLegend(
+            handles=self.legend_handles, labels=self.legend_labels
         )
         if self.legend.title is None:
             self.legend.title = self.ensemble.to_latex

@@ -29,15 +29,15 @@ from .spectral_histogram import (
     UnfoldedSpectralHistogramPlot,
 )
 
-SFF_LOG_D_TIME_SUPPORT: tuple[float, float] = (-0.5, 1.5)
+SPECTRAL_COEFFICIENT_SUPPORT: rmtpy.density.Support = (-0.2, 0.2)
 
-SPACING_SUPPORT_UNITS_MEAN: tuple[float, float] = (0.0, 4.0)
+SPACING_SUPPORT_UNITS_MEAN: rmtpy.density.Support = (0.0, 4.0)
 
-SPECTRAL_COEFFICIENT_SUPPORT: tuple[float, float] = (-0.2, 0.2)
+SFF_LOG_D_TIME_SUPPORT: rmtpy.density.Support = (-0.5, 1.5)
 
-UNFOLDED_LEVEL_SUPPORT_UNITS_DIMENSION: tuple[float, float] = (-1.2, 1.2)
+UNFOLDED_LEVEL_SUPPORT_UNITS_DIMENSION: rmtpy.density.Support = (-1.2, 1.2)
 
-UNFOLDED_SFF_LOG_D_TIME_SUPPORT: tuple[float, float] = (-1.5, 0.5)
+UNFOLDED_SFF_LOG_D_TIME_SUPPORT: rmtpy.density.Support = (-1.5, 0.5)
 
 
 def create_raw_spacings_histogram_observable(

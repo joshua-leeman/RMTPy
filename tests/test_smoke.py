@@ -15,6 +15,7 @@ from rmtpy.simulations.partial_widths_statistics import (
 from rmtpy.simulations.resonance_statistics import ResonanceStatisticsSimulation
 from rmtpy.simulations.spectral_statistics import SpectralStatisticsSimulation
 from rmtpy.simulations.time_delay_statistics import TimeDelayStatisticsSimulation
+from rmtpy.universal import time_delay_pdf
 
 
 class SmokeTests(unittest.TestCase):
@@ -38,6 +39,34 @@ class SmokeTests(unittest.TestCase):
 
         np.testing.assert_array_equal(restored.counts, histogram.counts)
         np.testing.assert_allclose(restored.histogram, histogram.histogram)
+
+    def test_time_delay_pdf_normalizes(self) -> None:
+        num_channels = 4
+        heisenberg_time = 7.0
+        tau_min = (3 - np.sqrt(8)) / num_channels
+        tau_max = (3 + np.sqrt(8)) / num_channels
+        times = np.geomspace(
+            tau_min * heisenberg_time,
+            tau_max * heisenberg_time,
+            10_000,
+        )
+
+        pdf = time_delay_pdf(
+            num_channels=num_channels,
+            heisenberg_time=heisenberg_time,
+            times=times,
+        )
+
+        self.assertAlmostEqual(np.trapezoid(pdf, times), 1.0, places=4)
+
+    def test_multi_channel_time_delays_are_positive(self) -> None:
+        ensemble = GaussianOrthogonalEnsemble(num_majoranas=8, seed=123)
+        compound = Compound(ensemble=ensemble, num_free_complex_fermions=1)
+        time_delays, _ = next(
+            compound.time_delays_stream(energies=np.array([0.0]), realizs=1)
+        )
+
+        self.assertGreater(np.min(time_delays), -1e-10)
 
     def test_statistics_simulations_construct_observables(self) -> None:
         ensemble = GaussianOrthogonalEnsemble(

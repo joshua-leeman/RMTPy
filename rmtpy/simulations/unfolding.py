@@ -84,7 +84,7 @@ def _create_grid(factory: TruncatedPolynomialCdfFactory) -> np.ndarray:
     )
 
 
-@attrs.frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
+@attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
 class TruncatedPolynomialCdfFactory:
     density: rmtpy.density.DensityModel = attrs.field(
         validator=attrs.validators.instance_of(rmtpy.density.DensityModel),
@@ -169,9 +169,7 @@ class TruncatedPolynomialCdfFactory:
                 axis=0,
             )
             next_degree = degree + 1
-            interpolators.append(
-                self._create_interpolator(self.weight * polynomial_sum)
-            )
+            interpolators.append(self._create_interpolator(self.weight * polynomial_sum))
 
         return tuple(interpolators)
 

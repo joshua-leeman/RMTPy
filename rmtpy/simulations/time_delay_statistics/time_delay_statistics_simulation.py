@@ -1,11 +1,11 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
 import attrs
 import numpy as np
-from scipy.interpolate import PchipInterpolator
 
 from rmtpy.compounds import Compound
 from rmtpy.conversion import RMT_CONVERTER
@@ -71,7 +71,7 @@ def run_time_delay_statistics(
     compound: Compound,
     *,
     realizs: int,
-    energies: Any = (0.0,),
+    energies: Iterable[float] = (0.0,),
 ) -> None:
     TimeDelayStatisticsSimulation(
         compound=compound,
@@ -80,7 +80,7 @@ def run_time_delay_statistics(
     ).run()
 
 
-@attrs.frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
+@attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
 class TimeDelayStatisticsSimulation(Simulation):
     compound: Compound = attrs.field(
         converter=Compound.create,
@@ -98,7 +98,7 @@ class TimeDelayStatisticsSimulation(Simulation):
     )
 
     truncated_degrees: tuple[int, ...] = attrs.field(
-        default=attrs.Factory(),
+        default=attrs.Factory(create_truncated_degrees, takes_self=True),
         converter=tuple,
         init=False,
         repr=False,
@@ -147,9 +147,7 @@ class TimeDelayStatisticsSimulation(Simulation):
             observable.save_plot(out_dir / self.observable_output_path(observable))
 
     def realize_monte_carlo_simulation(self) -> None:
-        resonance_density = self.compound.resonance_density
-        avg_cdf_interpolators: tuple[PchipInterpolator, ...] | None = None
-        dimension = self.compound.ensemble.dimension
+        avg_cdf_interpolators = self.cdf_factory.average_interpolators()
 
         for time_delays, eigvals in self.compound.time_delays_stream(
             energies=self.energies, realizs=self.realizs
@@ -158,27 +156,24 @@ class TimeDelayStatisticsSimulation(Simulation):
             self.outputs.add_weight_unfolded(
                 time_delays,
                 energies=self.energies,
-                cdf=resonance_density.weight_cdf,
-                dimension=dimension,
+                cdf=self.compound.resonance_density.weight_cdf,
+                dimension=self.compound.ensemble.dimension,
             )
-
-            if avg_cdf_interpolators is None:
-                avg_cdf_interpolators = self.cdf_factory.average_interpolators()
 
             self.outputs.add_average_unfolded(
                 time_delays,
                 energies=self.energies,
                 cdfs=avg_cdf_interpolators,
-                dimension=dimension,
+                dimension=self.compound.ensemble.dimension,
             )
 
             if not self.outputs.var_unfolded_by_degree:
                 continue
 
-            coeffs = resonance_density.compute_variate_coeffs(eigvals)
+            coeffs = self.compound.resonance_density.compute_variate_coeffs(eigvals)
             self.outputs.add_variate_unfolded(
                 time_delays,
                 energies=self.energies,
                 cdfs=self.cdf_factory.interpolators_from_coeffs(coeffs),
-                dimension=dimension,
+                dimension=self.compound.ensemble.dimension,
             )

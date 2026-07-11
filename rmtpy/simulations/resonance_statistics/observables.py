@@ -5,6 +5,8 @@ from typing import TYPE_CHECKING
 import numpy as np
 from scipy.special import jn_zeros
 
+import rmtpy.density
+
 from ..observable import Observable
 from ..spectral_statistics.spectral_form_factors import finalize_form_factors
 from ..statistics import (
@@ -41,25 +43,25 @@ if TYPE_CHECKING:
 
 COMPLEX_ENERGY_NUM_BINS: int = 400
 
-COMPLEX_ENERGY_REAL_SUPPORT_UNITS_SPECTRAL_RADIUS: tuple[float, float] = (
+COMPLEX_ENERGY_REAL_SUPPORT_UNITS_SPECTRAL_RADIUS: rmtpy.density.Support = (
     -1.2,
     1.2,
 )
 
-COMPLEX_ENERGY_WIDTH_LOG10_SUPPORT: tuple[float, float] = (-8.0, 8.0)
+COMPLEX_ENERGY_WIDTH_LOG10_SUPPORT: rmtpy.density.Support = (-8.0, 8.0)
 
-RESONANCE_COEFFICIENT_SUPPORT: tuple[float, float] = (-0.2, 0.2)
+RESONANCE_COEFFICIENT_SUPPORT: rmtpy.density.Support = (-0.2, 0.2)
 
-RESONANCE_FORM_FACTOR_LOG_D_TIME_SUPPORT: tuple[float, float] = (-0.5, 1.5)
+RESONANCE_FORM_FACTOR_LOG_D_TIME_SUPPORT: rmtpy.density.Support = (-0.5, 1.5)
 
-RESONANCE_SPACING_SUPPORT_UNITS_MEAN_SPACING: tuple[float, float] = (0.0, 4.0)
+RESONANCE_SPACING_SUPPORT_UNITS_MEAN_SPACING: rmtpy.density.Support = (0.0, 4.0)
 
-RESONANCE_SUPPORT_UNITS_SPECTRAL_RADIUS: tuple[float, float] = (
+RESONANCE_SUPPORT_UNITS_SPECTRAL_RADIUS: rmtpy.density.Support = (
     -1.2,
     1.2,
 )
 
-RESONANCE_WIDTH_LOG10_SUPPORT: tuple[float, float] = (-4.0, 4.0)
+RESONANCE_WIDTH_LOG10_SUPPORT: rmtpy.density.Support = (-4.0, 4.0)
 
 RESONANCE_WIDTH_LOG_BASE: float = 10.0
 
@@ -69,27 +71,27 @@ UNFOLDED_COMPLEX_ENERGY_REAL_SUPPORT_UNITS_SPECTRAL_RADIUS = (
     RESONANCE_SUPPORT_UNITS_SPECTRAL_RADIUS
 )
 
-UNFOLDED_COMPLEX_ENERGY_WIDTH_LOG10_SUPPORT: tuple[float, float] = (
+UNFOLDED_COMPLEX_ENERGY_WIDTH_LOG10_SUPPORT: rmtpy.density.Support = (
     -8.0,
     8.0,
 )
 
-UNFOLDED_RESONANCE_FORM_FACTOR_LOG_D_TIME_SUPPORT: tuple[float, float] = (
+UNFOLDED_RESONANCE_FORM_FACTOR_LOG_D_TIME_SUPPORT: rmtpy.density.Support = (
     -1.5,
     0.5,
 )
 
-UNFOLDED_RESONANCE_SPACING_SUPPORT_UNITS_MEAN_SPACING: tuple[float, float] = (
+UNFOLDED_RESONANCE_SPACING_SUPPORT_UNITS_MEAN_SPACING: rmtpy.density.Support = (
     0.0,
     4.0,
 )
 
-UNFOLDED_RESONANCE_SUPPORT_UNITS_DIMENSION: tuple[float, float] = (
+UNFOLDED_RESONANCE_SUPPORT_UNITS_DIMENSION: rmtpy.density.Support = (
     -SUPPORT_SCALE_FACTOR,
     SUPPORT_SCALE_FACTOR,
 )
 
-UNFOLDED_RESONANCE_WIDTH_LOG10_SUPPORT: tuple[float, float] = (-4.0, 4.0)
+UNFOLDED_RESONANCE_WIDTH_LOG10_SUPPORT: rmtpy.density.Support = (-4.0, 4.0)
 
 
 def create_avg_unfolded_complex_energy_histograms(
@@ -195,7 +197,7 @@ def create_resonance_form_factors_observable(
     *,
     unfolding: str = "raw",
 ) -> Observable:
-    j_1_1: float = float(jn_zeros(1, 1)[0])
+    j_1_1 = float(jn_zeros(1, 1)[0])
     return create_observable(
         data=FormFactorsData(
             file_name="resonance_form_factors",
@@ -230,7 +232,7 @@ def create_resonance_spacing_histogram_observable(
     *,
     unfolding: str = "raw",
 ) -> Observable:
-    global_mean_spacing: float = (
+    global_mean_spacing = (
         2 * simulation.compound.ensemble.spectral_radius
     ) / simulation.compound.ensemble.dimension
 

@@ -34,7 +34,7 @@ def iter_observables(value: object) -> Iterator[Observable]:
     yield from iter_objects(value, Observable)
 
 
-@attrs.frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
+@attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
 class CoefficientHistogramOutputs:
     by_degree: tuple[Observable[Histogram], ...]
 

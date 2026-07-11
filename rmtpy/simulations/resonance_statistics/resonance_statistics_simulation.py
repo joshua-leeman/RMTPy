@@ -31,7 +31,7 @@ def run_resonance_statistics(compound: Compound, realizs: int) -> None:
     ResonanceStatisticsSimulation(compound=compound, realizs=realizs).run()
 
 
-@attrs.frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
+@attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
 class ResonanceStatisticsSimulation(Simulation):
     compound: Compound = attrs.field(
         converter=Compound.create,

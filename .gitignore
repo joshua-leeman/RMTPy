@@ -1,13 +1,17 @@
 # Project-specific files and directories
 .filelist
 rmtpy.code-workspace
-README.md
 pyproject.toml
 .ruff_cache/
+docs/
 output/
 scratch/
 archive/
 notebooks/
+
+# To delete later
+rmtpy_programming_content.txt
+finance_resume/
 
 # DotEnv configuration
 .env

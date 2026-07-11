@@ -7,8 +7,8 @@ import numpy as np
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 
-from ....compounds import Compound
-from ....ensembles import ManyBodyEnsemble
+import rmtpy.compounds
+
 from ...histogram import Histogram
 from ...plot import Plot, PlotAxes, PlotLegend
 
@@ -70,20 +70,21 @@ class ResonanceSpacingHistogramPlot(Plot):
     )
 
     def set_derived_attributes(self) -> None:
-        self.compound: Compound = self.structure_simulation_arg("compound", Compound)
-        self.ensemble: ManyBodyEnsemble = self.compound.ensemble
+        self.compound: rmtpy.compounds.Compound = self.structure_simulation_arg(
+            "compound", rmtpy.compounds.Compound
+        )
 
-        if self.ensemble.universality_class is not None:
-            self.surmise_legend = f"{self.ensemble.universality_class} surmise"
+        if self.compound.ensemble.universality_class is not None:
+            self.surmise_legend = f"{self.compound.ensemble.universality_class} surmise"
             self.legend_labels = (self.histogram_legend, self.surmise_legend)
 
-        self.legend: ResonanceSpacingHistogramLegend = ResonanceSpacingHistogramLegend(
+        self.legend = ResonanceSpacingHistogramLegend(
             handles=self.legend_handles, labels=self.legend_labels
         )
         if self.legend.title is None:
-            self.legend.title = self.ensemble.to_latex
+            self.legend.title = self.compound.ensemble.to_latex
 
-        mean_spacing: float = self.data.metadata["global_mean_spacing"]
+        mean_spacing = self.data.metadata["global_mean_spacing"]
 
         self.scale_limits_and_ticks(
             x=lambda value: value * mean_spacing,
@@ -101,10 +102,10 @@ class ResonanceSpacingHistogramPlot(Plot):
             zorder=self.histogram_zorder,
         )
 
-        spacings: np.ndarray = np.linspace(0, self.xlim[1], self.num_points)
+        spacings = np.linspace(0, self.xlim[1], self.num_points)
 
-        mean_spacing: float = self.data.metadata["global_mean_spacing"]
-        surmise: np.ndarray = self.ensemble.wigner_surmise(spacings / mean_spacing)
+        mean_spacing = self.data.metadata["global_mean_spacing"]
+        surmise = self.compound.ensemble.wigner_surmise(spacings / mean_spacing)
         surmise /= mean_spacing
 
         self.ax.plot(
@@ -176,21 +177,20 @@ class UnfoldedResonanceSpacingHistogramPlot(Plot):
     )
 
     def set_derived_attributes(self) -> None:
-        self.compound: Compound = self.structure_simulation_arg("compound", Compound)
-        self.ensemble: ManyBodyEnsemble = self.compound.ensemble
+        self.compound: rmtpy.compounds.Compound = self.structure_simulation_arg(
+            "compound", rmtpy.compounds.Compound
+        )
 
-        if self.ensemble.universality_class is not None:
-            self.surmise_legend = f"{self.ensemble.universality_class} surmise"
+        if self.compound.ensemble.universality_class is not None:
+            self.surmise_legend = f"{self.compound.ensemble.universality_class} surmise"
             self.legend_labels = (self.histogram_legend, self.surmise_legend)
 
-        self.legend: UnfoldedResonanceSpacingHistogramLegend = (
-            UnfoldedResonanceSpacingHistogramLegend(
-                handles=self.legend_handles,
-                labels=self.legend_labels,
-            )
+        self.legend = UnfoldedResonanceSpacingHistogramLegend(
+            handles=self.legend_handles,
+            labels=self.legend_labels,
         )
         if self.legend.title is None:
-            self.legend.title = self.ensemble.to_latex + "\nunfolded"
+            self.legend.title = self.compound.ensemble.to_latex + "\nunfolded"
 
     def plot(self, path: str | Path) -> None:
         self.set_derived_attributes()
@@ -203,8 +203,8 @@ class UnfoldedResonanceSpacingHistogramPlot(Plot):
             zorder=self.histogram_zorder,
         )
 
-        spacings: np.ndarray = np.linspace(0, self.xlim[1], self.num_points)
-        surmise: np.ndarray = self.ensemble.wigner_surmise(spacings)
+        spacings = np.linspace(0, self.xlim[1], self.num_points)
+        surmise = self.compound.ensemble.wigner_surmise(spacings)
 
         self.ax.plot(
             spacings,

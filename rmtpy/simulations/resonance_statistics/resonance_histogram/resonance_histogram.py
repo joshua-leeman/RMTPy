@@ -8,7 +8,7 @@ from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 
 from ....compounds import Compound
-from ....ensembles import ManyBodyEnsemble, PoissonEnsemble, SachdevYeKitaevEnsemble
+from ....ensembles import PoissonEnsemble, SachdevYeKitaevEnsemble
 from ...histogram import Histogram
 from ...plot import Plot, PlotAxes, PlotLegend
 
@@ -111,17 +111,17 @@ class ResonanceHistogramPlot(Plot):
     )
 
     def set_derived_attributes(self) -> None:
-        self.compound: Compound = self.structure_simulation_arg("compound", Compound)
-        ensemble: ManyBodyEnsemble = self.compound.ensemble
-        energy_0: float = ensemble.spectral_radius
+        self.compound = self.structure_simulation_arg("compound", Compound)
+        ensemble = self.compound.ensemble
+        energy_0 = ensemble.spectral_radius
 
-        self.legend: ResonanceHistogramLegend = ResonanceHistogramLegend(
+        self.legend = ResonanceHistogramLegend(
             handles=self.legend_handles, labels=self.legend_labels
         )
         if self.legend.title is None:
             self.legend.title = self.compound.to_latex
 
-        axes: ResonanceHistogramAxes = self.axes
+        axes = self.axes
         if isinstance(ensemble, PoissonEnsemble):
             self.ylim = self.poisson_ylim
 
@@ -160,10 +160,8 @@ class ResonanceHistogramPlot(Plot):
             zorder=self.histogram_zorder,
         )
 
-        energies: np.ndarray = np.linspace(self.xlim[0], self.xlim[1], self.num_points)
-        resonance_pdf: np.ndarray = self.compound.resonance_density.average_pdf(
-            energies
-        )
+        energies = np.linspace(self.xlim[0], self.xlim[1], self.num_points)
+        resonance_pdf = self.compound.resonance_density.average_pdf(energies)
 
         self.ax.plot(
             energies,
@@ -234,13 +232,11 @@ class UnfoldedResonanceHistogramPlot(Plot):
     )
 
     def set_derived_attributes(self) -> None:
-        self.compound: Compound = self.structure_simulation_arg("compound", Compound)
-        dimension: int = self.compound.ensemble.dimension
+        self.compound = self.structure_simulation_arg("compound", Compound)
+        dimension = self.compound.ensemble.dimension
 
-        self.legend: UnfoldedResonanceHistogramLegend = (
-            UnfoldedResonanceHistogramLegend(
-                handles=self.legend_handles, labels=self.legend_labels
-            )
+        self.legend = UnfoldedResonanceHistogramLegend(
+            handles=self.legend_handles, labels=self.legend_labels
         )
         if self.legend.title is None:
             self.legend.title = self.compound.to_latex + "\nunfolded"
@@ -263,7 +259,7 @@ class UnfoldedResonanceHistogramPlot(Plot):
 
         energies = np.linspace(self.xlim[0], self.xlim[1], self.num_points)
 
-        dimension: int = self.compound.ensemble.dimension
+        dimension = self.compound.ensemble.dimension
         unfolded_spectral_pdf = np.zeros(self.num_points)
         unfolded_spectral_pdf[np.abs(energies) < dimension / 2] = 1 / dimension
 

@@ -58,9 +58,7 @@ def create_raw_outputs(ensemble: ManyBodyEnsemble) -> SpectralStatisticOutputs:
 def create_spectral_statistics_outputs(
     ensemble: ManyBodyEnsemble,
 ) -> SpectralStatisticsOutputs:
-    degrees = tuple(
-        truncated_polynomial_degrees(ensemble.max_spectral_polynomial_degree)
-    )
+    degrees = tuple(truncated_polynomial_degrees(ensemble.max_spectral_polynomial_degree))
 
     return SpectralStatisticsOutputs(
         coefficients=CoefficientHistogramOutputs(
@@ -119,18 +117,17 @@ def create_unfolded_outputs(
     )
 
 
-@attrs.frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
+@attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
 class SpectralStatisticOutputs:
     levels: Observable[Histogram]
     spacings: Observable[Histogram]
     form_factors: Observable[FormFactorsData]
 
     def add_levels(self, levels: np.ndarray, *, degeneracy: int = 1) -> None:
-        spacings: np.ndarray = nearest_neighbor_spacings(
+        spacings = nearest_neighbor_spacings(
             levels,
             degeneracy=degeneracy,
         )
-
         self.levels.data.add_histogram_contribution(levels)
         self.spacings.data.add_histogram_contribution(spacings)
         self.form_factors.data.compute_moment_contributions(levels)
@@ -145,7 +142,7 @@ class SpectralStatisticOutputs:
         self.add_levels(unfold_values(levels, cdf=cdf, dimension=dimension))
 
 
-@attrs.frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
+@attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
 class SpectralStatisticsOutputs:
     coefficients: CoefficientHistogramOutputs
     raw: SpectralStatisticOutputs

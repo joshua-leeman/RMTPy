@@ -23,7 +23,7 @@ def create_partial_width_outputs(simulation) -> PartialWidthOutputs:
     return PartialWidthOutputs(histograms=tuple(create_width_histograms(simulation)))
 
 
-@attrs.frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
+@attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
 class PartialWidthOutputs:
     histograms: tuple[Observable[Histogram], ...]
 

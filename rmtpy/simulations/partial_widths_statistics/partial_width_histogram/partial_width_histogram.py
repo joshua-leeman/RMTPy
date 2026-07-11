@@ -59,14 +59,12 @@ class PartialWidthHistogramPlot(Plot):
     histogram_legend: str = "simulation"
 
     legend_labels: tuple[str] = (histogram_legend,)
-    legend_handles: tuple[Patch] = (
-        Patch(color=histogram_color, alpha=histogram_alpha),
-    )
+    legend_handles: tuple[Patch] = (Patch(color=histogram_color, alpha=histogram_alpha),)
 
     def set_derived_attributes(self) -> None:
-        self.compound: Compound = self.structure_simulation_arg("compound", Compound)
+        self.compound = self.structure_simulation_arg("compound", Compound)
 
-        self.legend: PartialWidthHistogramLegend = PartialWidthHistogramLegend(
+        self.legend = PartialWidthHistogramLegend(
             handles=self.legend_handles, labels=self.legend_labels
         )
         if self.legend.title is None:

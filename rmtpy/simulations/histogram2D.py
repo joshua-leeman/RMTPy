@@ -42,9 +42,9 @@ def finalize_histogram2D(hist: Histogram2D) -> None:
     hist.compute_histogram_probabilities()
 
 
-@attrs.frozen(kw_only=True, eq=False, weakref_slot=False, getstate_setstate=False)
+@attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
 class Histogram2D(Data):
-    x_support: tuple[float, float] = attrs.field(
+    x_support: rmtpy.density.Support = attrs.field(
         converter=tuple,
         validator=lambda _, __, x_support: rmtpy.validators.validate_support(x_support),
     )
@@ -62,7 +62,7 @@ class Histogram2D(Data):
         repr=False,
     )
 
-    y_support: tuple[float, float] = attrs.field(
+    y_support: rmtpy.density.Support = attrs.field(
         converter=tuple,
         validator=lambda _, __, y_support: rmtpy.validators.validate_support(y_support),
     )
@@ -118,9 +118,7 @@ class Histogram2D(Data):
     def realizs(self) -> int:
         return self._realizs_count[0]
 
-    def add_histogram_contribution(
-        self, x_data: np.ndarray, y_data: np.ndarray
-    ) -> None:
+    def add_histogram_contribution(self, x_data: np.ndarray, y_data: np.ndarray) -> None:
         x_indices = np.searchsorted(self.x_bins, x_data) - 1
         y_indices = np.searchsorted(self.y_bins, y_data) - 1
 
@@ -134,28 +132,28 @@ class Histogram2D(Data):
         np.add.at(self.counts, (x_indices[valid], y_indices[valid]), 1)
         self._realizs_count[0] += 1
 
-    def normalize_histogram(self) -> None:
-        bin_areas: np.ndarray = np.outer(np.diff(self.x_bins), np.diff(self.y_bins))
+    def compute_histogram(self) -> None:
+        bin_areas = np.outer(np.diff(self.x_bins), np.diff(self.y_bins))
         self.histogram[:] = self.counts / (np.sum(self.counts) * bin_areas)
 
     def compute_histogram_probabilities(self) -> None:
         self.histogram[:] = self.counts / np.sum(self.counts)
 
     def compute_average_x_curve(self) -> tuple[np.ndarray, np.ndarray]:
-        self.normalize_histogram()
-        bin_areas: np.ndarray = np.outer(np.diff(self.x_bins), np.diff(self.y_bins))
-        prob_x_and_y: np.ndarray = self.histogram * bin_areas
+        self.compute_histogram()
+        bin_areas = np.outer(np.diff(self.x_bins), np.diff(self.y_bins))
+        prob_x_and_y = self.histogram * bin_areas
 
-        prob_x: np.ndarray = np.sum(prob_x_and_y, axis=1)
-        prob_y_given_x: np.ndarray = np.divide(
+        prob_x = np.sum(prob_x_and_y, axis=1)
+        prob_y_given_x = np.divide(
             prob_x_and_y,
             prob_x[:, None],
             out=np.full_like(prob_x_and_y, np.nan),
             where=prob_x[:, None] > 0,
         )
 
-        y_vals: np.ndarray = rmtpy.density.compute_bin_centers(self.y_bins)
-        average_y_given_x: np.ndarray = np.sum(prob_y_given_x * y_vals[None, :], axis=1)
+        y_vals = rmtpy.density.compute_bin_centers(self.y_bins)
+        average_y_given_x = np.sum(prob_y_given_x * y_vals[None, :], axis=1)
 
-        x_vals: np.ndarray = rmtpy.density.compute_bin_centers(self.x_bins)
+        x_vals = rmtpy.density.compute_bin_centers(self.x_bins)
         return x_vals, average_y_given_x

@@ -8,7 +8,6 @@ from matplotlib.patches import Patch
 from matplotlib.ticker import NullFormatter
 
 from ....compounds import Compound
-from ....ensembles import ManyBodyEnsemble
 from ...histogram import Histogram
 from ...plot import Plot, PlotAxes, PlotLegend
 
@@ -60,21 +59,17 @@ class UnfoldedWidthHistogramPlot(Plot):
     histogram_legend: str = "simulation"
 
     legend_labels: tuple[str] = (histogram_legend,)
-    legend_handles: tuple[Patch] = (
-        Patch(color=histogram_color, alpha=histogram_alpha),
-    )
+    legend_handles: tuple[Patch] = (Patch(color=histogram_color, alpha=histogram_alpha),)
 
     def set_derived_attributes(self) -> None:
-        self.compound: Compound = self.structure_simulation_arg("compound", Compound)
-        mean_coupling_squared: float = np.mean(
-            self.compound.channel_coupling_strengths**2
-        )
-        ensemble: ManyBodyEnsemble = self.compound.ensemble
+        self.compound = self.structure_simulation_arg("compound", Compound)
+        mean_coupling_squared = np.mean(self.compound.coupling_strengths**2)
+        ensemble = self.compound.ensemble
 
-        self.legend: UnfoldedWidthHistogramLegend = UnfoldedWidthHistogramLegend(
+        self.legend = UnfoldedWidthHistogramLegend(
             handles=self.legend_handles, labels=self.legend_labels
         )
-        ten_exponent: float = np.log10(mean_coupling_squared / ensemble.spectral_radius)
+        ten_exponent = np.log10(mean_coupling_squared / ensemble.spectral_radius)
         ten_exponent = 0.00 if np.isclose(ten_exponent, 0) else ten_exponent
         if self.legend.title is None:
             self.legend.title = (
@@ -157,19 +152,15 @@ class WidthHistogramPlot(Plot):
     histogram_legend: str = "simulation"
 
     legend_labels: tuple[str] = (histogram_legend,)
-    legend_handles: tuple[Patch] = (
-        Patch(color=histogram_color, alpha=histogram_alpha),
-    )
+    legend_handles: tuple[Patch] = (Patch(color=histogram_color, alpha=histogram_alpha),)
 
     def set_derived_attributes(self) -> None:
-        self.compound: Compound = self.structure_simulation_arg("compound", Compound)
-        mean_coupling_squared: float = np.mean(
-            self.compound.channel_coupling_strengths**2
-        )
-        ensemble: ManyBodyEnsemble = self.compound.ensemble
-        energy_0: float = ensemble.spectral_radius
+        self.compound = self.structure_simulation_arg("compound", Compound)
+        mean_coupling_squared = np.mean(self.compound.coupling_strengths**2)
+        ensemble = self.compound.ensemble
+        energy_0 = ensemble.spectral_radius
 
-        self.legend: WidthHistogramLegend = WidthHistogramLegend(
+        self.legend = WidthHistogramLegend(
             handles=self.legend_handles, labels=self.legend_labels
         )
         if self.legend.title is None:
