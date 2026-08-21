@@ -1,82 +1,38 @@
 from __future__ import annotations
 
-import inspect
 import json
-import re
+from abc import ABC, abstractmethod
 from collections.abc import Iterator
+from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
 import attrs
-from cattrs.dispatch import StructureHook, UnstructureHook
+import numpy as np
 
 import rmtpy.conversion
 from rmtpy.conversion import RMT_CONVERTER
 
-from .data import REGISTRY as DATA_REGISTRY
+from .data import Data
 from .observable import Observable
-from .outputs import iter_objects, iter_observables
-
-REGISTRY: dict[str, type[Simulation]] = {}
-STRUCTURE_HOOKS: dict[str, StructureHook] = {
-    key: RMT_CONVERTER.get_structure_hook(val) for key, val in REGISTRY.items()
-}
-UNSTRUCTURE_HOOKS: dict[str, UnstructureHook] = {
-    key: RMT_CONVERTER.get_unstructure_hook(val) for key, val in REGISTRY.items()
-}
 
 
-def register_simulation_hooks(simulation_cls: type[Simulation]) -> type[Simulation]:
-    RMT_CONVERTER.register_structure_hook(simulation_cls, structure_hook_for_simulation)
-
-    return simulation_cls
-
-
-def structure_hook_for_simulation(
-    src: str | Path | dict[str, Any] | Simulation, _
-) -> Simulation:
-    if type(src) in REGISTRY.values():
-        return src
-    elif isinstance(src, (str, Path)):
-        path = Path(src)
-        with open(path / "metadata.json") as file:
-            metadata = json.load(file)
-    elif isinstance(src, dict):
-        metadata = src
-    else:
-        raise TypeError(f"Expected str, Path, dict, got {type(src).__name__}")
-
-    sim_dict = rmtpy.conversion.normalize_dict(metadata, REGISTRY)
-    sim_name = sim_dict.pop("name")
-    if not isinstance(sim_name, str):
-        raise ValueError(f"Invalid simulation name type: {type(sim_name).__name__}")
-
-    key = re.sub(r"_", "", sim_name).lower()
-    sim_cls = REGISTRY[key]
-
-    sim_args = sim_dict.pop("args")
-    if not isinstance(sim_args, dict):
-        raise ValueError(f"Invalid simulation args type: {type(sim_args).__name__}")
-
-    sim_inst = STRUCTURE_HOOKS[key](sim_args, sim_cls)
-
-    if isinstance(src, (str, Path)):
-        data_dirs = tuple(folder for folder in path.iterdir() if folder.is_dir())
-
-        for folder in data_dirs:
-            data_cls = DATA_REGISTRY.get(folder.name, None)
-            if data_cls is None:
-                continue
-
-            data = data_cls.load(folder / f"{folder.name}.npz")
-            object.__setattr__(sim_inst, folder.name + "_data", data)
-
-    return sim_inst
+def normalize_metadata_value(value: Any) -> Any:
+    if isinstance(value, np.ndarray):
+        return normalize_metadata_value(value.tolist())
+    if isinstance(value, np.generic):
+        return value.item()
+    if isinstance(value, dict):
+        return {key: normalize_metadata_value(item) for key, item in value.items()}
+    if isinstance(value, list | tuple):
+        return [normalize_metadata_value(item) for item in value]
+    return value
 
 
-@register_simulation_hooks
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
-class Simulation:
+class Simulation(ABC):
+    """Experiment coordinator whose output bundle owns the mutable accumulators."""
+
     metadata: dict[str, Any] = attrs.field(
         factory=dict,
         init=False,
@@ -89,62 +45,107 @@ class Simulation:
         for observable in self.iter_observables():
             observable.metadata.update({"simulation": self.metadata.copy()})
 
-    @classmethod
-    def __attrs_init_subclass__(cls) -> None:
-        if not inspect.isabstract(cls):
-            sim_key = re.sub(r"_", "", cls.__name__).lower()
-            REGISTRY[sim_key] = cls
-
-            STRUCTURE_HOOKS[sim_key] = RMT_CONVERTER.get_structure_hook(cls)
-            UNSTRUCTURE_HOOKS[sim_key] = RMT_CONVERTER.get_unstructure_hook(cls)
-
     @property
     def path_name(self) -> str:
         return rmtpy.conversion.insert_underscores(type(self).__name__).lower()
 
     @property
     def to_path(self) -> Path:
-        path = Path(self.path_name)
-        for name, attr in attrs.fields_dict(type(self)).items():
-            if attr.metadata.get("dir_name") is not None:
-                val = re.sub(r"[^\w\-.]", "_", str(getattr(self, name)))
-                path /= f"{attr.metadata['dir_name']}_{val.replace('.', 'p')}"
-
-        return path
+        return rmtpy.conversion.to_path(self, root=Path(self.path_name))
 
     def populate_metadata(self) -> None:
         self.metadata["name"] = type(self).__name__
-        self.metadata["args"] = {}
+        self.metadata["args"] = {
+            name: self._unstructure_argument(getattr(self, name))
+            for name, field in attrs.fields_dict(type(self)).items()
+            if field.init
+        }
 
-    def iter_attrs_of_type(self, cls: type) -> Iterator[object]:
-        yield from iter_objects(self, cls)
+    @staticmethod
+    def _unstructure_argument(value: Any) -> Any:
+        return normalize_metadata_value(RMT_CONVERTER.unstructure(value))
 
     def iter_observables(self) -> Iterator[Observable]:
-        yield from iter_observables(self)
+        outputs = getattr(self, "outputs", None)
+        if outputs is None or not hasattr(outputs, "iter_observables"):
+            raise NotImplementedError(
+                f"{type(self).__name__} must define an output bundle with "
+                "`iter_observables()`."
+            )
+        yield from outputs.iter_observables()
 
+    def find_observables(
+        self,
+        file_name: str | None = None,
+        **metadata: Any,
+    ) -> tuple[Observable, ...]:
+        """Return observables matching a data file name and metadata values."""
+        normalized_name = None
+        if file_name is not None:
+            normalized_name = file_name.removesuffix("_data")
+
+        return tuple(
+            observable
+            for observable in self.iter_observables()
+            if (
+                normalized_name is None
+                or observable.data.file_name.removesuffix("_data") == normalized_name
+            )
+            and all(
+                observable.metadata.get(key) == value for key, value in metadata.items()
+            )
+        )
+
+    def get_observable(
+        self,
+        file_name: str | None = None,
+        **metadata: Any,
+    ) -> Observable:
+        """Return one observable, raising when the selection is absent or ambiguous."""
+        matches = self.find_observables(file_name, **metadata)
+        if len(matches) != 1:
+            selection = {"file_name": file_name, **metadata}
+            raise LookupError(
+                f"Expected one observable matching {selection}, found {len(matches)}."
+            )
+        return matches[0]
+
+    def get_data(self, file_name: str | None = None, **metadata: Any) -> Data:
+        """Return the data carried by one matching observable."""
+        return self.get_observable(file_name, **metadata).data
+
+    def observable_output_path(self, observable: Observable) -> Path:
+        return Path()
+
+    @abstractmethod
     def realize_monte_carlo_simulation(self) -> None:
-        pass
+        raise NotImplementedError()
 
     def calculate_statistics(self) -> None:
         for observable in self.iter_observables():
-            print("Observable.plot_cls", observable.plot_cls)
-            print("Observable.data", observable.data)
             observable.calculate_statistics()
 
     def save_metadata(self, out_dir: str | Path) -> None:
+        out_dir = Path(out_dir)
+        out_dir.mkdir(parents=True, exist_ok=True)
         with open(out_dir / "metadata.json", "w") as file:
             json.dump(self.metadata, file, indent=4, default=str)
 
     def save_data(self, out_dir: str | Path) -> None:
+        out_dir = Path(out_dir)
         self.save_metadata(out_dir)
 
         for observable in self.iter_observables():
-            observable.save_data(Path(out_dir))
+            observable.save_data(out_dir / self.observable_output_path(observable))
 
     def save_plots(self, out_dir: str | Path) -> None:
+        out_dir = Path(out_dir)
+        simulation_args = deepcopy(self.metadata["args"])
         for observable in self.iter_observables():
-            observable.initialize_plot()
-            observable.save_plot(Path(out_dir))
+            observable.save_plot(
+                out_dir / self.observable_output_path(observable),
+                simulation_args=simulation_args,
+            )
 
     def run(self, out_dir: str | Path = "output") -> None:
         self.realize_monte_carlo_simulation()

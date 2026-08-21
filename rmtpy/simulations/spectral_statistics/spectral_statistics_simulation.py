@@ -4,15 +4,11 @@ from pathlib import Path
 
 import attrs
 
-from rmtpy.conversion import RMT_CONVERTER
+import rmtpy.conversion
 from rmtpy.ensembles import ManyBodyEnsemble
 
 from ..base import Simulation
-from ..statistics import (
-    REALIZATIONS_METADATA,
-    simulation_output_path,
-    truncated_polynomial_degrees,
-)
+from ..statistics import REALIZATIONS_METADATA, truncated_polynomial_degrees
 from ..unfolding import TruncatedPolynomialCdfFactory
 from .outputs import (
     SpectralStatisticsOutputs,
@@ -32,6 +28,8 @@ def run_spectral_statistics(ensemble: ManyBodyEnsemble, realizs: int) -> None:
 
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
 class SpectralStatisticsSimulation(Simulation):
+    """Monte Carlo experiment for closed-system spectral statistics."""
+
     ensemble: ManyBodyEnsemble = attrs.field(
         converter=ManyBodyEnsemble.create,
     )
@@ -49,9 +47,9 @@ class SpectralStatisticsSimulation(Simulation):
 
     @property
     def to_path(self) -> Path:
-        return simulation_output_path(
+        return rmtpy.conversion.to_path(
             self,
-            Path(self.path_name) / self.ensemble.to_path,
+            root=Path(self.path_name) / self.ensemble.to_path,
         )
 
     @property
@@ -59,11 +57,6 @@ class SpectralStatisticsSimulation(Simulation):
         return tuple(
             truncated_polynomial_degrees(self.ensemble.max_spectral_polynomial_degree)
         )
-
-    def populate_metadata(self) -> None:
-        super().populate_metadata()
-        self.metadata["args"]["ensemble"] = RMT_CONVERTER.unstructure(self.ensemble)
-        self.metadata["args"]["realizs"] = self.realizs
 
     def create_cdf_factory(self) -> TruncatedPolynomialCdfFactory:
         return TruncatedPolynomialCdfFactory(
@@ -88,6 +81,7 @@ class SpectralStatisticsSimulation(Simulation):
 
             self.outputs.weight_unfolded.add_unfolded_levels(
                 eigvals,
+                degeneracy=self.ensemble.eigval_degeneracy,
                 cdf=self.ensemble.spectral_density.weight_cdf,
                 dimension=self.ensemble.dimension,
             )
@@ -99,6 +93,7 @@ class SpectralStatisticsSimulation(Simulation):
             ):
                 outputs.add_unfolded_levels(
                     eigvals,
+                    degeneracy=self.ensemble.eigval_degeneracy,
                     cdf=cdf,
                     dimension=self.ensemble.dimension,
                 )
@@ -110,6 +105,7 @@ class SpectralStatisticsSimulation(Simulation):
             ):
                 outputs.add_unfolded_levels(
                     eigvals,
+                    degeneracy=self.ensemble.eigval_degeneracy,
                     cdf=cdf,
                     dimension=self.ensemble.dimension,
                 )

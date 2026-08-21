@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
 from typing import TYPE_CHECKING
 
 import attrs
@@ -9,10 +10,8 @@ from ..histogram import Histogram
 from ..observable import Observable
 from ..unfolding import CDF, unfold_time_delays
 from .observables import (
-    create_avg_unfolded_time_delay_histograms,
     create_time_delay_histograms,
-    create_var_unfolded_time_delay_histograms,
-    create_weight_unfolded_time_delay_histograms,
+    create_unfolded_time_delay_histograms,
 )
 
 if TYPE_CHECKING:
@@ -22,44 +21,56 @@ if TYPE_CHECKING:
 def create_time_delay_outputs(
     simulation: TimeDelayStatisticsSimulation,
 ) -> TimeDelayOutputs:
-    num_energies = simulation.energies.size
-    avg_unfolded = tuple(create_avg_unfolded_time_delay_histograms(simulation))
-    var_unfolded = tuple(create_var_unfolded_time_delay_histograms(simulation))
-
     return TimeDelayOutputs(
         raw=tuple(create_time_delay_histograms(simulation)),
-        weight_unfolded=tuple(create_weight_unfolded_time_delay_histograms(simulation)),
-        avg_unfolded_by_degree=group_observables_by_degree(
-            avg_unfolded,
-            num_energies=num_energies,
+        weight_unfolded=tuple(
+            create_unfolded_time_delay_histograms(
+                simulation=simulation,
+                file_name_prefix="time_delay_histogram_weight_unfolded",
+                unfolding="wgt",
+            )
         ),
-        var_unfolded_by_degree=group_observables_by_degree(
-            var_unfolded,
-            num_energies=num_energies,
+        avg_unfolded_by_degree=tuple(
+            tuple(
+                create_unfolded_time_delay_histograms(
+                    simulation=simulation,
+                    file_name_prefix="time_delay_histogram_avg_unfolded",
+                    unfolding="avg",
+                    degree=degree,
+                )
+            )
+            for degree in simulation.truncated_degrees
         ),
-    )
-
-
-def group_observables_by_degree(
-    observables: tuple[Observable[Histogram], ...],
-    *,
-    num_energies: int,
-) -> tuple[tuple[Observable[Histogram], ...], ...]:
-    if len(observables) % num_energies != 0:
-        raise ValueError("Time-delay observables do not divide evenly by energy.")
-
-    return tuple(
-        observables[start : start + num_energies]
-        for start in range(0, len(observables), num_energies)
+        var_unfolded_by_degree=tuple(
+            tuple(
+                create_unfolded_time_delay_histograms(
+                    simulation=simulation,
+                    file_name_prefix="time_delay_histogram_var_unfolded",
+                    unfolding="var",
+                    degree=degree,
+                )
+            )
+            for degree in simulation.truncated_degrees
+        ),
     )
 
 
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
 class TimeDelayOutputs:
+    """Time-delay histograms grouped by unfolding, degree, then energy."""
+
     raw: tuple[Observable[Histogram], ...]
     weight_unfolded: tuple[Observable[Histogram], ...]
     avg_unfolded_by_degree: tuple[tuple[Observable[Histogram], ...], ...]
     var_unfolded_by_degree: tuple[tuple[Observable[Histogram], ...], ...]
+
+    def iter_observables(self) -> Iterator[Observable]:
+        yield from self.raw
+        yield from self.weight_unfolded
+        for observables in self.avg_unfolded_by_degree:
+            yield from observables
+        for observables in self.var_unfolded_by_degree:
+            yield from observables
 
     def add_raw(self, time_delays: np.ndarray) -> None:
         for delay_values, observable in zip(time_delays, self.raw, strict=True):

@@ -33,6 +33,8 @@ def finalize_histogram(hist: Histogram) -> None:
 
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
 class Histogram(Data):
+    """Streaming one-dimensional histogram with fixed half-open support."""
+
     support: rmtpy.density.Support = attrs.field(
         converter=tuple,
         validator=lambda _, __, support: rmtpy.validators.validate_support(support),
@@ -85,7 +87,16 @@ class Histogram(Data):
         self._realizs_count[0] += 1
 
     def compute_histogram(self) -> None:
+        if np.sum(self.counts) == 0:
+            self.histogram.fill(0.0)
+            return
+
         self.histogram[:] = rmtpy.density.compute_histogram(self.counts, bins=self.bins)
 
     def compute_histogram_as_probabilities(self) -> None:
-        self.histogram[:] = self.counts / np.sum(self.counts)
+        total = np.sum(self.counts)
+        if total == 0:
+            self.histogram.fill(0.0)
+            return
+
+        self.histogram[:] = self.counts / total

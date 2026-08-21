@@ -24,7 +24,7 @@ def create_gse_matrix(
     rng: np.random.Generator,
     real_dtype: type[np.floating[Any]],
     std_dev: float,
-) -> np.ndarray:
+) -> None:
     halfway = matrix.shape[0] // 2
     top_left_block = matrix[:halfway, :halfway]
     top_right_block = matrix[:halfway, halfway:]
@@ -45,7 +45,7 @@ def create_skew_symmetric_matrix(
     rng: np.random.Generator,
     real_dtype: type[np.floating[Any]],
     std_dev: float,
-) -> np.ndarray:
+) -> None:
     size = matrix.shape[0]
     for i in range(size):
         matrix[i, i] = 0.0

@@ -5,26 +5,13 @@ from pathlib import Path
 import attrs
 from scipy.interpolate import PchipInterpolator
 
+import rmtpy.conversion
 from rmtpy.compounds import Compound
-from rmtpy.conversion import RMT_CONVERTER
 
 from ..base import Simulation
-from ..statistics import (
-    REALIZATIONS_METADATA,
-    simulation_output_path,
-    truncated_polynomial_degrees,
-)
+from ..statistics import REALIZATIONS_METADATA, truncated_polynomial_degrees
 from ..unfolding import TruncatedPolynomialCdfFactory
-from .outputs import (
-    ResonanceStatisticsOutputs,
-    create_resonance_statistics_outputs,
-)
-
-
-def create_outputs(
-    simulation: ResonanceStatisticsSimulation,
-) -> ResonanceStatisticsOutputs:
-    return create_resonance_statistics_outputs(simulation)
+from .outputs import ResonanceStatisticsOutputs, create_resonance_statistics_outputs
 
 
 def run_resonance_statistics(compound: Compound, realizs: int) -> None:
@@ -33,6 +20,8 @@ def run_resonance_statistics(compound: Compound, realizs: int) -> None:
 
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
 class ResonanceStatisticsSimulation(Simulation):
+    """Monte Carlo experiment for complex resonances of an open system."""
+
     compound: Compound = attrs.field(
         converter=Compound.create,
     )
@@ -43,16 +32,16 @@ class ResonanceStatisticsSimulation(Simulation):
     )
 
     outputs: ResonanceStatisticsOutputs = attrs.field(
-        default=attrs.Factory(create_outputs, takes_self=True),
+        default=attrs.Factory(create_resonance_statistics_outputs, takes_self=True),
         init=False,
         repr=False,
     )
 
     @property
     def to_path(self) -> Path:
-        return simulation_output_path(
+        return rmtpy.conversion.to_path(
             self,
-            Path(self.path_name) / self.compound.to_path,
+            root=Path(self.path_name) / self.compound.to_path,
         )
 
     @property
@@ -63,11 +52,6 @@ class ResonanceStatisticsSimulation(Simulation):
             )
         )
 
-    def populate_metadata(self) -> None:
-        super().populate_metadata()
-        self.metadata["args"]["compound"] = RMT_CONVERTER.unstructure(self.compound)
-        self.metadata["args"]["realizs"] = self.realizs
-
     def create_cdf_factory(self) -> TruncatedPolynomialCdfFactory:
         return TruncatedPolynomialCdfFactory(
             density=self.compound.resonance_density,
@@ -77,7 +61,7 @@ class ResonanceStatisticsSimulation(Simulation):
 
     def realize_monte_carlo_simulation(self) -> None:
         resonance_density = self.compound.resonance_density
-        cdf_factory = self.create_cdf_factory()
+        cdf_factory = self.create_cdf_factory() if self.truncated_degrees else None
         avg_cdf_interpolators: tuple[PchipInterpolator, ...] | None = None
         ensemble = self.compound.ensemble
 
@@ -100,6 +84,9 @@ class ResonanceStatisticsSimulation(Simulation):
                 cdf=resonance_density.weight_cdf,
                 ensemble=ensemble,
             )
+
+            if cdf_factory is None:
+                continue
 
             if avg_cdf_interpolators is None:
                 avg_cdf_interpolators = cdf_factory.average_interpolators()

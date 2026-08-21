@@ -1,3 +1,4 @@
+import math
 from collections.abc import Sequence
 from typing import Any
 
@@ -10,6 +11,8 @@ def validate_even_number(number: int) -> None:
 def validate_support(support: Sequence[float]) -> None:
     if len(support) != 2:
         raise ValueError("`support` must have length 2.")
+    if not all(math.isfinite(endpoint) for endpoint in support):
+        raise ValueError("`support` endpoints must be finite.")
     if support[0] >= support[1]:
         raise ValueError("`support` must be strictly increasing.")
 

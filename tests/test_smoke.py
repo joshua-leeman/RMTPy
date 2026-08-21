@@ -120,7 +120,7 @@ class SmokeTests(unittest.TestCase):
         )
         self.assertEqual(
             spe_out.weight_unfolded.levels.metadata["unfolding"],
-            "weight",
+            "wgt",
         )
         self.assertEqual(
             spe_out.avg_unfolded_by_degree[0].levels.metadata["unfolding"],
@@ -141,7 +141,7 @@ class SmokeTests(unittest.TestCase):
         )
         self.assertEqual(
             res_out.weight_unfolded.widths.metadata["unfolding"],
-            "weight",
+            "wgt",
         )
         self.assertEqual(
             res_out.avg_unfolded_by_degree[0].complex_energies.metadata["unfolding"],

@@ -44,6 +44,8 @@ def finalize_histogram2D(hist: Histogram2D) -> None:
 
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
 class Histogram2D(Data):
+    """Streaming two-dimensional histogram with fixed half-open supports."""
+
     x_support: rmtpy.density.Support = attrs.field(
         converter=tuple,
         validator=lambda _, __, x_support: rmtpy.validators.validate_support(x_support),
@@ -119,8 +121,8 @@ class Histogram2D(Data):
         return self._realizs_count[0]
 
     def add_histogram_contribution(self, x_data: np.ndarray, y_data: np.ndarray) -> None:
-        x_indices = np.searchsorted(self.x_bins, x_data) - 1
-        y_indices = np.searchsorted(self.y_bins, y_data) - 1
+        x_indices = np.searchsorted(self.x_bins, x_data, side="right") - 1
+        y_indices = np.searchsorted(self.y_bins, y_data, side="right") - 1
 
         valid = (
             (x_indices >= 0)
@@ -133,11 +135,21 @@ class Histogram2D(Data):
         self._realizs_count[0] += 1
 
     def compute_histogram(self) -> None:
+        total = np.sum(self.counts)
+        if total == 0:
+            self.histogram.fill(0.0)
+            return
+
         bin_areas = np.outer(np.diff(self.x_bins), np.diff(self.y_bins))
-        self.histogram[:] = self.counts / (np.sum(self.counts) * bin_areas)
+        self.histogram[:] = self.counts / (total * bin_areas)
 
     def compute_histogram_probabilities(self) -> None:
-        self.histogram[:] = self.counts / np.sum(self.counts)
+        total = np.sum(self.counts)
+        if total == 0:
+            self.histogram.fill(0.0)
+            return
+
+        self.histogram[:] = self.counts / total
 
     def compute_average_x_curve(self) -> tuple[np.ndarray, np.ndarray]:
         self.compute_histogram()

@@ -24,7 +24,7 @@ def create_gue_matrix(
     rng: np.random.Generator,
     real_dtype: type[np.floating[Any]],
     std_dev: float,
-) -> np.ndarray:
+) -> None:
     size = matrix.shape[0]
     for i in range(size):
         matrix[i, i] = 2 * std_dev * rng.standard_normal(None, real_dtype)

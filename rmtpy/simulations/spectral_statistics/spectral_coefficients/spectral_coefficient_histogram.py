@@ -15,7 +15,6 @@ from ...plot import Plot, PlotAxes, PlotLegend
 class SpectralCoefficientHistogramAxes(PlotAxes):
     xticks: tuple[float, ...] = (-0.2, -0.1, 0.0, 0.1, 0.2)  # units of energy_0
     xticks_minor: tuple[float, ...] = (-0.15, -0.05, 0.05, 0.15)
-    xlabel: str = r"$c$"
     xtick_labels: tuple[str, ...] = (
         r"$-0.2$",
         r"$-0.1$",
@@ -26,7 +25,6 @@ class SpectralCoefficientHistogramAxes(PlotAxes):
 
     yticks: tuple[float, ...] = tuple(range(0, 24, 4))  # units of 1 / (pi * energy_0)
     yticks_minor: tuple[float, ...] = tuple(range(2, 22, 4))
-    ylabel: str = r"$\ensavg{\rho(c)}$"
     ytick_labels: tuple[str, ...] = (
         r"$0$",
         r"$4$",
@@ -38,19 +36,13 @@ class SpectralCoefficientHistogramAxes(PlotAxes):
 
 
 @dataclasses.dataclass(repr=False, eq=False, kw_only=True)
-class SpectralCoefficientHistogramLegend(PlotLegend):
-    loc: str = "upper right"
-    bbox: tuple[float, float] = (0.94, 0.95)
-
-
-@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
 class SpectralCoefficientHistogramPlot(Plot):
     data: Histogram
     axes: SpectralCoefficientHistogramAxes = dataclasses.field(
         default_factory=SpectralCoefficientHistogramAxes
     )
 
-    xlim: tuple[float, float] = (-0.2, 0.2)  # units of energy_0
+    xlim: tuple[float, float] = (-0.25, 0.25)  # units of energy_0
     ylim: tuple[float, float] = (0.0, 20)  # units of 1 / (pi * energy_0)
 
     histogram_zorder: int = 1
@@ -62,13 +54,21 @@ class SpectralCoefficientHistogramPlot(Plot):
     legend_handles: tuple[Patch] = (Patch(color=histogram_color, alpha=histogram_alpha),)
 
     def set_derived_attributes(self) -> None:
-        self.ensemble = self.structure_simulation_arg(
+        coeff_degree: int = self.data.metadata["degree"]
+        self.axes.xlabel = rf"$c_{{{coeff_degree}}}$"
+        self.axes.ylabel = rf"$P(c_{{{coeff_degree}}})$"
+
+        self.ensemble: ManyBodyEnsemble = self.structure_simulation_arg(
             "ensemble", ManyBodyEnsemble
         )
 
-        self.legend = SpectralCoefficientHistogramLegend(
-            handles=self.legend_handles, labels=self.legend_labels
+        self.legend = PlotLegend(
+            handles=self.legend_handles,
+            labels=self.legend_labels,
+            loc="upper right",
+            bbox=(0.94, 0.95),
         )
+
         if self.legend.title is None:
             self.legend.title = self.ensemble.to_latex
 

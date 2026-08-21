@@ -14,7 +14,7 @@ DYSON_INDEX: int = 2
 
 INITIALISM: str = "BdGC"
 
-LATEX_NAME: str = "\\textrm{{BdG(C)}}"
+LATEX_NAME: str = "\\text{{BdG(C)}}"
 
 TOKEN_NAME: str = "BdG_C"
 
@@ -28,7 +28,7 @@ def create_bdgc_matrix(
     rng: np.random.Generator,
     real_dtype: type[np.floating[Any]],
     std_dev: float,
-) -> np.ndarray:
+) -> None:
     halfway_index = matrix.shape[0] // 2
 
     top_left_block = matrix[:halfway_index, :halfway_index]
@@ -50,7 +50,7 @@ def create_symmetric_matrix(
     rng: np.random.Generator,
     real_dtype: type[np.floating[Any]],
     std_dev: float,
-) -> np.ndarray:
+) -> None:
     size = matrix.shape[0]
     for i in range(size):
         matrix[i, i] = 2 * std_dev * rng.standard_normal(None, real_dtype)
@@ -78,7 +78,7 @@ class BogoliubovDeGennesCEnsemble(WignerDysonEnsemble):
 
     @property
     def latex_name(self) -> str:
-        return LATEX_NAME
+        return rf"{{{LATEX_NAME}}}({{{self.num_majoranas}}})"
 
     @property
     def token_name(self) -> str:

@@ -1,11 +1,8 @@
 from __future__ import annotations
 
-import re
 from collections.abc import Callable
-from pathlib import Path
 from typing import Any, TypeVar
 
-import attrs
 import numpy as np
 
 from .data import Data
@@ -138,19 +135,6 @@ def nearest_neighbor_spacings(values: np.ndarray, *, degeneracy: int = 1) -> np.
 
 def scale_support(support: Support, scale: float) -> Support:
     return scale * support[0], scale * support[1]
-
-
-def simulation_output_path(simulation: Any, root: Path) -> Path:
-    path = root
-    for name, attr in attrs.fields_dict(type(simulation)).items():
-        dir_name = attr.metadata.get("dir_name", None)
-        if dir_name is None:
-            continue
-
-        value = re.sub(r"[^\w\-.]", "_", str(getattr(simulation, name)))
-        path /= f"{dir_name}_{value.replace('.', 'p')}"
-
-    return path
 
 
 def truncated_polynomial_degrees(max_degree: int) -> range:

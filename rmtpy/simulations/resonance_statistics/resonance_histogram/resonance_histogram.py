@@ -17,65 +17,49 @@ from ...plot import Plot, PlotAxes, PlotLegend
 class ResonanceHistogramAxes(PlotAxes):
     xticks: tuple[float, ...] = (-1.0, 0.0, 1.0)  # units of energy_0
     xticks_minor: tuple[float, ...] = (-0.5, 0.5)
-    xlabel: str = r"$\mathcal{E}$"
+    xlabel: str = r"$\mathcal{E} / E_0$"
     xtick_labels: tuple[str, ...] = (
-        r"$-E_0$",
-        r"$0$",
-        r"$E_0$",
+        r"$-1.0$",
+        r"$0.0$",
+        r"$+1.0$",
     )
 
     yticks: tuple[float, ...] = (0.0, 1.0, 2.0)  # units of 1 / (pi * energy_0)
     yticks_minor: tuple[float, ...] = (0.0, 1.0, 2.0)
-    ylabel: str = r"$\ensavg{\rho(\mathcal{E})}$"
+    ylabel: str = r"$\pi E_0 \ensavg{\rho(\mathcal{E})}$"
     ytick_labels: tuple[str, ...] = (
-        r"$0$",
-        r"$\frac{1}{\pi E_0}$",
-        r"$\frac{2}{\pi E_0}$",
+        r"$0.0$",
+        r"$1.0$",
+        r"$2.0$",
     )
 
-    poisson_yticks: tuple[float, ...] = (
-        0.0,
-        0.25 * np.pi,
-        0.5 * np.pi,
-        0.75 * np.pi,
-    )  # units of 1 / (pi * energy_0)
-    poisson_yticks_minor: tuple[float, ...] = (
-        0.125 * np.pi,
-        0.375 * np.pi,
-        0.625 * np.pi,
-        0.875 * np.pi,
-    )
-    poisson_ytick_labels: tuple[str, ...] = (
-        r"$0$",
-        r"$\frac{1}{4E_0}$",
-        r"$\frac{1}{2E_0}$",
-        r"$\frac{3}{4E_0}$",
+    pois_yticks: tuple[float, ...] = (0.0, 1.0, 2.0, 3.0)  # units of 1 / (pi * energy_0)
+    pois_yticks_minor: tuple[float, ...] = (0.5, 1.5, 2.5)
+    pois_ytick_labels: tuple[str, ...] = (
+        r"$0.0$",
+        r"$1.0$",
+        r"$2.0$",
+        r"$3.0$",
     )
 
     syk2_yticks: tuple[float, ...] = tuple(range(6))  # units of 1 / (pi * energy_0)
     syk2_yticks_minor: tuple[float, ...] = tuple(x + 0.5 for x in range(6))
     syk2_ytick_labels: tuple[str, ...] = (
-        r"$0$",
-        r"$\frac{1}{\pi E_0}$",
-        r"$\frac{2}{\pi E_0}$",
-        r"$\frac{3}{\pi E_0}$",
-        r"$\frac{4}{\pi E_0}$",
-        r"$\frac{5}{\pi E_0}$",
+        r"$0.0$",
+        r"$1.0$",
+        r"$2.0$",
+        r"$3.0$",
+        r"$4.0$",
+        r"$5.0$",
     )
 
     syk4_yticks: tuple[float, ...] = tuple(range(3))  # units of 1 / (pi * energy_0)
     syk4_yticks_minor: tuple[float, ...] = tuple(x + 0.5 for x in range(3))
     syk4_ytick_labels: tuple[str, ...] = (
-        r"$0$",
-        r"$\frac{1}{\pi E_0}$",
-        r"$\frac{2}{\pi E_0}$",
+        r"$0.0$",
+        r"$1.0$",
+        r"$2.0$",
     )
-
-
-@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
-class ResonanceHistogramLegend(PlotLegend):
-    loc: str = "upper right"
-    bbox: tuple[float, float] = (0.94, 0.95)
 
 
 @dataclasses.dataclass(repr=False, eq=False, kw_only=True)
@@ -89,7 +73,7 @@ class ResonanceHistogramPlot(Plot):
     xlim: tuple[float, float] = (-1.2, 1.2)  # units of energy_0
     ylim: tuple[float, float] = (0.0, 2.6)  # units of 1 / (pi * energy_0)
 
-    poisson_ylim: tuple[float, float] = (0.0, 1.25)  # units of 1 / (pi * energy_0)
+    pois_ylim: tuple[float, float] = (0.0, 1.25)  # units of 1 / (pi * energy_0)
     syk2_ylim: tuple[float, float] = (0.0, 4.0)
     syk4_ylim: tuple[float, float] = (0.0, 2.5)
 
@@ -111,23 +95,36 @@ class ResonanceHistogramPlot(Plot):
     )
 
     def set_derived_attributes(self) -> None:
-        self.compound = self.structure_simulation_arg("compound", Compound)
+        self.compound: Compound = self.structure_simulation_arg("compound", Compound)
+        mean_coupling_squared = np.mean(self.compound.coupling_strengths**2)
         ensemble = self.compound.ensemble
         energy_0 = ensemble.spectral_radius
 
-        self.legend = ResonanceHistogramLegend(
-            handles=self.legend_handles, labels=self.legend_labels
+        self.legend = PlotLegend(
+            handles=self.legend_handles,
+            labels=self.legend_labels,
+            loc="upper right",
+            bbox=(0.99, 0.95),
         )
+
+        coupling_exponent = np.log10(mean_coupling_squared / ensemble.spectral_radius)
+        coupling_exponent = 0.0 if abs(coupling_exponent) < 0.005 else coupling_exponent
+        coupling_label = rf"$\alpha = {{{coupling_exponent:.1f}}}$"
         if self.legend.title is None:
-            self.legend.title = self.compound.to_latex
+            self.legend.title = (
+                self.compound.ensemble.to_latex
+                + "\n"
+                + rf"$N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
+                + f", {{{coupling_label}}}"
+            )
 
         axes = self.axes
         if isinstance(ensemble, PoissonEnsemble):
-            self.ylim = self.poisson_ylim
+            self.ylim = self.pois_ylim
 
-            axes.ytick_labels = axes.poisson_ytick_labels
-            axes.yticks = axes.poisson_yticks
-            axes.yticks_minor = axes.poisson_yticks_minor
+            axes.ytick_labels = axes.pois_ytick_labels
+            axes.yticks = axes.pois_yticks
+            axes.yticks_minor = axes.pois_yticks_minor
 
         elif isinstance(ensemble, SachdevYeKitaevEnsemble):
             if ensemble.q == 2:
@@ -179,28 +176,22 @@ class ResonanceHistogramPlot(Plot):
 class UnfoldedResonanceHistogramAxes(PlotAxes):
     xticks: tuple[float, ...] = (-0.5, 0.0, 0.5)  # units of dimension
     xticks_minor: tuple[float, ...] = (-0.25, 0.25)
-    xlabel: str = r"$\xi$"
+    xlabel: str = r"$\xi / D$"
     xtick_labels: tuple[str, ...] = (
-        r"$-\frac{D}{2}$",
-        r"$0$",
-        r"$\frac{D}{2}$",
+        r"$-0.5$",
+        r"$0.0$",
+        r"$+0.5$",
     )
 
     yticks: tuple[float, ...] = (0.0, 0.5, 1.0, 1.5)  # units of dimension^{-1}
     yticks_minor: tuple[float, ...] = (0.25, 0.75, 1.25, 1.75)
-    ylabel: str = r"$\ensavg{\rho(\xi)}$"
+    ylabel: str = r"$\ensavg{\rho(\xi)} D$"
     ytick_labels: tuple[str, ...] = (
-        r"$0$",
-        r"$\frac{1}{2 D}$",
-        r"$\frac{1}{D}$",
-        r"$\frac{3}{2 D}$",
+        r"$0.0$",
+        r"$0.5$",
+        r"$1.0$",
+        r"$1.5$",
     )
-
-
-@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
-class UnfoldedResonanceHistogramLegend(PlotLegend):
-    loc: str = "upper right"
-    bbox: tuple[float, float] = (0.94, 0.95)
 
 
 @dataclasses.dataclass(repr=False, eq=False, kw_only=True)
@@ -232,14 +223,40 @@ class UnfoldedResonanceHistogramPlot(Plot):
     )
 
     def set_derived_attributes(self) -> None:
-        self.compound = self.structure_simulation_arg("compound", Compound)
-        dimension = self.compound.ensemble.dimension
+        self.compound: Compound = self.structure_simulation_arg("compound", Compound)
+        mean_coupling_squared = np.mean(self.compound.coupling_strengths**2)
+        ensemble = self.compound.ensemble
+        dimension = ensemble.dimension
 
-        self.legend = UnfoldedResonanceHistogramLegend(
-            handles=self.legend_handles, labels=self.legend_labels
+        self.legend = PlotLegend(
+            handles=self.legend_handles,
+            labels=self.legend_labels,
+            loc="upper right",
+            bbox=(0.94, 0.95),
         )
+
+        coupling_exponent = np.log10(mean_coupling_squared / ensemble.spectral_radius)
+        coupling_exponent = 0 if abs(coupling_exponent) < 0.005 else coupling_exponent
+        coupling_label = rf"$\alpha = {{{coupling_exponent:.1f}}}$"
         if self.legend.title is None:
-            self.legend.title = self.compound.to_latex + "\nunfolded"
+            unfolding_type = self.data.metadata["unfolding"]
+            if unfolding_type != "wgt":
+                unfolding_degree = self.data.metadata["degree"]
+                self.legend.title = (
+                    self.compound.ensemble.to_latex
+                    + f"\n{unfolding_type}.\ unfolded, degree {unfolding_degree}"
+                    + "\n"
+                    + rf"$N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
+                    + f", {{{coupling_label}}}"
+                )
+            else:
+                self.legend.title = (
+                    self.compound.ensemble.to_latex
+                    + "\nwgt.\ unfolded"
+                    + "\n"
+                    + rf"$N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
+                    + f", {{{coupling_label}}}"
+                )
 
         self.scale_limits_and_ticks(
             x=lambda value: value * dimension,

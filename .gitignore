@@ -8,6 +8,7 @@ output/
 scratch/
 archive/
 notebooks/
+/architecture_report/
 
 # To delete later
 rmtpy_programming_content.txt

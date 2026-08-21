@@ -8,7 +8,6 @@ from typing import Any
 
 import attrs
 import numpy as np
-from cattrs.dispatch import StructureHook, UnstructureHook
 from scipy.linalg import solve
 from scipy.special import jn_zeros
 
@@ -19,18 +18,16 @@ from rmtpy.conversion import RMT_CONVERTER
 from rmtpy.ensembles import EnsembleLike, RandomMatrixEnsemble
 
 MAX_SPECTRAL_POLYNOMIAL_DEGREE_METADATA: dict[str, str] = {
-    "dir_name": "polydeg",
+    "dir_name": "max_polydeg",
 }
 
 NUM_FREE_COMPLEX_FERMIONS: int = 1
 NUM_FREE_COMPLEX_FERMIONS_METADATA: dict[str, str] = {
     "dir_name": "Nf",
-    "latex_name": r"N_\textrm{\tiny f}",
+    "latex_name": r"N_\text{f}",
 }
 
 REGISTRY: dict[str, type[Compound]] = {}
-STRUCTURE_HOOKS: dict[str, StructureHook] = {}
-UNSTRUCTURE_HOOKS: dict[str, UnstructureHook] = {}
 
 
 def compute_default_coupling_strengths(compound: Compound) -> float:
@@ -41,10 +38,6 @@ def compute_number_of_open_channels(compound: Compound) -> int:
     return math.comb(
         compound.ensemble.num_majoranas // 2, compound.num_free_complex_fermions
     )
-
-
-def create_coupling_strengths_id(compound: Compound) -> str:
-    return rmtpy.conversion.create_hashed_id(compound.coupling_strengths)
 
 
 def create_quantum_chaotic_compound(**kwargs: Any) -> Compound:
@@ -61,6 +54,14 @@ def is_num_free_fermions_valid(compound: Compound, _, num_free_fermions: int) ->
         )
 
 
+def is_num_channels_valid(compound: Compound, _, num_channels: int) -> None:
+    if num_channels > compound.ensemble.dimension:
+        raise ValueError(
+            "Number of open channels cannot exceed the ensemble dimension; "
+            f"got {num_channels} channels for dimension {compound.ensemble.dimension}."
+        )
+
+
 def normalize_coupling_strengths(
     coupling_strengths: Any, compound: Compound
 ) -> np.ndarray:
@@ -73,17 +74,31 @@ def normalize_coupling_strengths(
     if isinstance(coupling_strengths, (int, float)):
         if coupling_strengths <= 0 or not np.isfinite(coupling_strengths):
             raise ValueError("Coupling strength must be a positive, finite scalar.")
-        return np.full(compound.num_channels, coupling_strengths)
+        coupling_strengths_array = np.full(compound.num_channels, coupling_strengths)
+        coupling_strengths_array.flags.writeable = False
+        return coupling_strengths_array
 
-    coupling_strengths_array = np.ascontiguousarray(coupling_strengths)
+    coupling_strengths_array = np.array(coupling_strengths, copy=True, order="C")
     if coupling_strengths_array.shape != (compound.num_channels,):
         raise ValueError(
             f"Coupling strengths array must have shape ({compound.num_channels},), "
             f"got {coupling_strengths_array.shape}."
         )
-    if not np.isrealobj(coupling_strengths_array) or np.any(coupling_strengths_array < 0):
+    if not np.isrealobj(coupling_strengths_array):
         raise ValueError("Coupling strengths array must have real, nonnegative values.")
 
+    try:
+        is_finite = np.all(np.isfinite(coupling_strengths_array))
+        is_nonnegative = np.all(coupling_strengths_array >= 0)
+    except TypeError as error:
+        raise TypeError("Coupling strengths array must contain real numbers.") from error
+
+    if not is_finite or not is_nonnegative:
+        raise ValueError(
+            "Coupling strengths array must have finite, real, nonnegative values."
+        )
+
+    coupling_strengths_array.flags.writeable = False
     return coupling_strengths_array
 
 
@@ -93,8 +108,6 @@ def register_compound_class(comp_cls: type[Compound]) -> type[Compound]:
 
     key = rmtpy.conversion.to_registry_key(comp_cls.__name__)
     REGISTRY[key] = comp_cls
-    STRUCTURE_HOOKS[key] = RMT_CONVERTER.get_structure_hook(comp_cls)
-    UNSTRUCTURE_HOOKS[key] = RMT_CONVERTER.get_unstructure_hook(comp_cls)
 
     return comp_cls
 
@@ -128,6 +141,8 @@ def unstructure_hook_for_compound(comp: Compound) -> dict[str, Any]:
 @register_compound_class
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
 class Compound:
+    """Open system formed by coupling one closed ensemble to decay channels."""
+
     ensemble: EnsembleLike = attrs.field(
         converter=RandomMatrixEnsemble.create,
     )
@@ -143,6 +158,7 @@ class Compound:
     num_channels: int = attrs.field(
         default=attrs.Factory(compute_number_of_open_channels, takes_self=True),
         init=False,
+        validator=is_num_channels_valid,
     )
     coupling_strengths: np.ndarray = attrs.field(
         default=attrs.Factory(compute_default_coupling_strengths, takes_self=True),
@@ -152,12 +168,6 @@ class Compound:
 
     resonance_density: rmtpy.density.DensityModel = attrs.field(
         default=None,
-        init=False,
-        repr=False,
-    )
-
-    _coupling_strengths_id: str = attrs.field(
-        default=attrs.Factory(create_coupling_strengths_id, takes_self=True),
         init=False,
         repr=False,
     )
@@ -180,8 +190,6 @@ class Compound:
 
         key = rmtpy.conversion.to_registry_key(cls.__name__)
         REGISTRY[key] = cls
-        STRUCTURE_HOOKS[key] = RMT_CONVERTER.get_structure_hook(cls)
-        UNSTRUCTURE_HOOKS[key] = RMT_CONVERTER.get_unstructure_hook(cls)
 
     @classmethod
     def create(cls, src: dict[str, Any] | Compound) -> Compound:
@@ -189,11 +197,11 @@ class Compound:
 
     @property
     def latex_name(self) -> str:
-        return self.ensemble.latex_name + r"\textrm{ Compound}"
+        return self.ensemble.latex_name
 
     @property
     def token_name(self) -> str:
-        return self.ensemble.token_name + "_Compound"
+        return self.ensemble.token_name
 
     @property
     def to_latex(self) -> str:
@@ -212,7 +220,10 @@ class Compound:
         )
 
         if not coupling_strengths_is_constant_array:
-            return path / f"v_{self._coupling_strengths_id}"
+            coupling_strengths_id = rmtpy.conversion.create_hashed_id(
+                self.coupling_strengths
+            )
+            return path / f"v_{coupling_strengths_id}"
 
         return path / f"v_{self.coupling_strengths[0]:.5g}".replace(".", "p")
 
@@ -257,15 +268,13 @@ class Compound:
     def rotate_coupling_matrix_by_eigvecs(
         self, eigvecs: np.ndarray
     ) -> tuple[np.ndarray, np.ndarray]:
-        rotated_coupling_matrix = eigvecs[:, : self.num_channels]
+        rotated_coupling_matrix = eigvecs[:, : self.num_channels].copy()
         rotated_coupling_matrix *= self.coupling_strengths[None, :]
 
         if np.isrealobj(rotated_coupling_matrix):
             rotated_coupling_matrix_conj = rotated_coupling_matrix
         else:
-            rotated_coupling_matrix_conj = np.conjugate(
-                rotated_coupling_matrix, out=eigvecs[:, -self.num_channels :]
-            )
+            rotated_coupling_matrix_conj = np.conjugate(rotated_coupling_matrix)
 
         return rotated_coupling_matrix, rotated_coupling_matrix_conj
 
@@ -394,29 +403,38 @@ class Compound:
                 check_finite=False,
             )
 
-            return s_matrix, eigvals
+            yield s_matrix, eigvals
 
     def wigner_smith_matrix_stream(
         self, realizs: int, *, energies: np.ndarray
     ) -> Iterator[tuple[np.ndarray, np.ndarray]]:
-        for matrix, matrix_2, eigvals in self.reaction_matrix_pair_stream(
-            realizs, energies=np.asarray(energies)
-        ):
-            diag_indices = np.arange(self.num_channels)
-            matrix *= -1j
-            matrix[:, diag_indices, diag_indices] += 1
+        reaction_matrix_adjoint = np.empty(
+            (energies.size, self.num_channels, self.num_channels),
+            self.ensemble.complex_dtype.type,
+            order="C",
+        )
 
-            adjoint_matrix = matrix.swapaxes(-1, -2).conj()
+        for (
+            reaction_matrix,
+            reaction_matrix_2,
+            eigvals,
+        ) in self.reaction_matrix_pair_stream(realizs, energies=np.asarray(energies)):
+            diag_indices = np.arange(self.num_channels)
+            reaction_matrix *= -1j
+            reaction_matrix[:, diag_indices, diag_indices] += 1
+
+            np.conjugate(reaction_matrix.swapaxes(-1, -2), out=reaction_matrix_adjoint)
+
             left_factor = solve(
-                matrix,
-                matrix_2,
+                reaction_matrix,
+                reaction_matrix_2,
                 overwrite_a=True,
                 overwrite_b=True,
                 check_finite=False,
             )
 
             wigner_smith_matrix = solve(
-                adjoint_matrix.swapaxes(-1, -2),
+                reaction_matrix_adjoint.swapaxes(-1, -2),
                 left_factor.swapaxes(-1, -2),
                 overwrite_a=True,
                 overwrite_b=True,
@@ -426,15 +444,15 @@ class Compound:
                 wigner_smith_matrix.swapaxes(-1, -2) + wigner_smith_matrix.conj()
             )
 
-            yield wigner_smith_matrix, eigvals
+            yield wigner_smith_matrix, eigvals  # , s_matrix_diagonal
 
     def time_delays_stream(
         self, realizs: int, *, energies: np.ndarray
-    ) -> Iterator[np.ndarray]:
+    ) -> Iterator[tuple[np.ndarray, np.ndarray]]:
         for delay_matrix, eigvals in self.wigner_smith_matrix_stream(
             realizs, energies=np.asarray(energies)
         ):
-            yield np.linalg.eigvalsh(delay_matrix), eigvals
+            yield np.linalg.eigvalsh(delay_matrix), eigvals  # , s_matrix_diagonal
 
     def time_delay_pdf(self, times: np.ndarray) -> np.ndarray:
         global_mean_spacing = 2 * self.ensemble.spectral_radius / self.ensemble.dimension

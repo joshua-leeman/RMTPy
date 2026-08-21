@@ -68,11 +68,12 @@ def connected_sff(times: np.ndarray, *, dyson_index: int, dimension: int) -> np.
 def time_delay_pdf(
     times: np.ndarray, *, num_channels: int, heisenberg_time: float
 ) -> np.ndarray:
+    times = np.asarray(times)
     taus = times / heisenberg_time
     tau_plus = (3 + np.sqrt(8)) / num_channels
     tau_minus = (3 - np.sqrt(8)) / num_channels
 
-    pdf = np.zeros_like(times)
+    pdf = np.zeros_like(times, dtype=np.result_type(times.dtype, np.float64))
     in_support = (tau_minus < taus) & (taus < tau_plus)
     pdf[in_support] = np.sqrt(
         (tau_plus - taus[in_support]) * (taus[in_support] - tau_minus)

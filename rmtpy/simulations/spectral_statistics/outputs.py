@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
+
 import attrs
 import numpy as np
 
@@ -68,10 +70,10 @@ def create_spectral_statistics_outputs(
         ),
         raw=create_raw_outputs(ensemble),
         weight_unfolded=create_unfolded_outputs(
-            unfolding="weight",
-            level_file_name="spectral_histogram_weight_unfolded",
-            spacing_file_name="spacings_histogram_weight_unfolded",
-            form_factor_file_name="spectral_form_factors_weight_unfolded",
+            unfolding="wgt",
+            level_file_name="spectral_histogram_wgt_unfolded",
+            spacing_file_name="spacings_histogram_wgt_unfolded",
+            form_factor_file_name="spectral_form_factors_wgt_unfolded",
             dimension=ensemble.dimension,
         ),
         avg_unfolded_by_degree=create_degree_unfolded_outputs(
@@ -119,9 +121,16 @@ def create_unfolded_outputs(
 
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
 class SpectralStatisticOutputs:
+    """The three spectral observables for one unfolding prescription."""
+
     levels: Observable[Histogram]
     spacings: Observable[Histogram]
     form_factors: Observable[FormFactorsData]
+
+    def iter_observables(self) -> Iterator[Observable]:
+        yield self.levels
+        yield self.spacings
+        yield self.form_factors
 
     def add_levels(self, levels: np.ndarray, *, degeneracy: int = 1) -> None:
         spacings = nearest_neighbor_spacings(
@@ -136,16 +145,32 @@ class SpectralStatisticOutputs:
         self,
         levels: np.ndarray,
         *,
+        degeneracy: int = 1,
         cdf: CDF,
         dimension: int,
     ) -> None:
-        self.add_levels(unfold_values(levels, cdf=cdf, dimension=dimension))
+        self.add_levels(
+            unfold_values(levels, cdf=cdf, dimension=dimension), degeneracy=degeneracy
+        )
 
 
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
 class SpectralStatisticsOutputs:
+    """All spectral observables, grouped explicitly by unfolding and degree."""
+
     coefficients: CoefficientHistogramOutputs
     raw: SpectralStatisticOutputs
     weight_unfolded: SpectralStatisticOutputs
     avg_unfolded_by_degree: tuple[SpectralStatisticOutputs, ...]
     var_unfolded_by_degree: tuple[SpectralStatisticOutputs, ...]
+
+    def iter_observables(self) -> Iterator[Observable]:
+        yield from self.coefficients.iter_observables()
+        yield from self.raw.iter_observables()
+        yield from self.weight_unfolded.iter_observables()
+
+        for outputs in self.avg_unfolded_by_degree:
+            yield from outputs.iter_observables()
+
+        for outputs in self.var_unfolded_by_degree:
+            yield from outputs.iter_observables()

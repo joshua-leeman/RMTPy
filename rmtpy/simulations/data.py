@@ -17,6 +17,9 @@ REGISTRY: dict[str, type[Data]] = {}
 
 
 def data_structure_hook(src: str | Path | dict[str, Any] | NpzFile | Data, _) -> Data:
+    if isinstance(src, Data):
+        return src
+
     if isinstance(src, (str, Path)):
         file_name = Path(src).name
     else:
@@ -42,8 +45,14 @@ def data_structure_hook(src: str | Path | dict[str, Any] | NpzFile | Data, _) ->
             init_kwargs[name] = normalize_saved_value(src_dict[name])
 
     data_instance = data_cls(**init_kwargs)
-    for key, value in src_dict.items():
-        object.__setattr__(data_instance, key, normalize_saved_value(value))
+    for name, attr in attrs.fields_dict(data_cls).items():
+        if attr.init or name not in src_dict:
+            continue
+        object.__setattr__(
+            data_instance,
+            name,
+            normalize_saved_value(src_dict[name]),
+        )
 
     return data_instance
 
@@ -58,7 +67,7 @@ def file_name_for_init(value: Any) -> str:
     return file_name
 
 
-def load_data(path: str | Path) -> dict[str, Any]:
+def load_data(path: str | Path) -> Data:
     return Data.load(path=Path(path))
 
 
@@ -79,13 +88,18 @@ def normalize_saved_value(value: Any) -> Any:
     return value
 
 
-def normalize_source(src: str | Path | dict[str, Any]) -> dict[str, Any]:
+def normalize_source(
+    src: str | Path | dict[str, Any] | NpzFile,
+) -> dict[str, Any]:
     if isinstance(src, (str, Path)):
         with np.load(src, allow_pickle=True) as data:
             return {key: data[key] for key in data.files}
 
     if isinstance(src, dict):
         return src
+
+    if isinstance(src, NpzFile):
+        return {key: src[key] for key in src.files}
 
     raise TypeError(f"Expected path, dict, npz file, got {type(src).__name__}")
 
@@ -99,6 +113,8 @@ def register_data_hooks(data_cls: type[Data]) -> type[Data]:
 @register_data_hooks
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
 class Data:
+    """Persistable attrs record for one numerical result or accumulator."""
+
     file_name: str = attrs.field(
         default="simulation",
         converter=lambda name: str(name) + "_data",
@@ -130,7 +146,7 @@ class Data:
         path = Path(path)
         tmp_path = path.with_suffix(path.suffix + ".tmp")
         with open(tmp_path, "wb") as file:
-            np.savez(file, **attrs.asdict(self), allow_pickle=True)
+            np.savez(file, **attrs.asdict(self))
             file.flush()
             os.fsync(file.fileno())
         shutil.move(tmp_path, path)

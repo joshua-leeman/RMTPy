@@ -8,7 +8,6 @@ from typing import Any, ClassVar, TypeAlias
 
 import attrs
 import numpy as np
-from cattrs.dispatch import StructureHook, UnstructureHook
 
 import rmtpy.conversion
 from rmtpy.conversion import RMT_CONVERTER
@@ -23,8 +22,6 @@ DIMENSION_METADATA: dict[str, str] = {
 }
 
 REGISTRY: dict[str, type[RandomMatrixEnsemble]] = {}
-STRUCTURE_HOOKS: dict[str, StructureHook] = {}
-UNSTRUCTURE_HOOKS: dict[str, UnstructureHook] = {}
 
 SeedLike: TypeAlias = (
     None
@@ -95,6 +92,8 @@ def register_ensemble_hooks(
 @register_ensemble_hooks
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
 class RandomMatrixEnsemble:
+    """Common seeded configuration and conversion for random-matrix ensembles."""
+
     initialism: ClassVar[str] = INITIALISM
 
     dimension: int = attrs.field(
@@ -134,8 +133,6 @@ class RandomMatrixEnsemble:
 
         key = rmtpy.conversion.to_registry_key(cls.__name__)
         REGISTRY[key] = cls
-        STRUCTURE_HOOKS[key] = RMT_CONVERTER.get_structure_hook(cls)
-        UNSTRUCTURE_HOOKS[key] = RMT_CONVERTER.get_unstructure_hook(cls)
 
     @classmethod
     def create(cls, src: dict[str, Any] | RandomMatrixEnsemble) -> RandomMatrixEnsemble:
@@ -143,7 +140,7 @@ class RandomMatrixEnsemble:
 
     @property
     def latex_name(self) -> str:
-        return f"\\textrm{{{type(self).initialism}}}"
+        return f"\\text{{{type(self).initialism}}}"
 
     @property
     def token_name(self) -> str:

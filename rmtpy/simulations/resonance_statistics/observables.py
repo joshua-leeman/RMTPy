@@ -15,7 +15,6 @@ from ..statistics import (
     create_histogram_observable,
     create_observable,
     scale_support,
-    truncated_polynomial_degrees,
 )
 from .complex_energy_histogram import (
     ComplexEnergyHistogramPlot,
@@ -92,73 +91,6 @@ UNFOLDED_RESONANCE_SUPPORT_UNITS_DIMENSION: rmtpy.density.Support = (
 )
 
 UNFOLDED_RESONANCE_WIDTH_LOG10_SUPPORT: rmtpy.density.Support = (-4.0, 4.0)
-
-
-def create_avg_unfolded_complex_energy_histograms(
-    simulation: ResonanceStatisticsSimulation,
-) -> list[Observable]:
-    return [
-        create_unfolded_complex_energy_histogram_observable(
-            file_name=f"complex_energy_histogram_avg_unfolded_degree_{degree}",
-            unfolding="avg",
-            degree=degree,
-        )
-        for degree in resonance_truncated_degrees(simulation)
-    ]
-
-
-def create_avg_unfolded_resonance_form_factors(
-    simulation: ResonanceStatisticsSimulation,
-) -> list[Observable]:
-    return [
-        create_unfolded_resonance_form_factors_observable(
-            simulation,
-            file_name=f"resonance_form_factors_avg_unfolded_degree_{degree}",
-            unfolding="avg",
-            degree=degree,
-        )
-        for degree in resonance_truncated_degrees(simulation)
-    ]
-
-
-def create_avg_unfolded_resonance_histograms(
-    simulation: ResonanceStatisticsSimulation,
-) -> list[Observable]:
-    return [
-        create_unfolded_resonance_histogram_observable(
-            simulation,
-            file_name=f"resonance_histogram_avg_unfolded_degree_{degree}",
-            unfolding="avg",
-            degree=degree,
-        )
-        for degree in resonance_truncated_degrees(simulation)
-    ]
-
-
-def create_avg_unfolded_resonance_spacing_histograms(
-    simulation: ResonanceStatisticsSimulation,
-) -> list[Observable]:
-    return [
-        create_unfolded_resonance_spacing_histogram_observable(
-            file_name=f"resonance_spacing_histogram_avg_unfolded_degree_{degree}",
-            unfolding="avg",
-            degree=degree,
-        )
-        for degree in resonance_truncated_degrees(simulation)
-    ]
-
-
-def create_avg_unfolded_width_histograms(
-    simulation: ResonanceStatisticsSimulation,
-) -> list[Observable]:
-    return [
-        create_unfolded_width_histogram_observable(
-            file_name=f"width_histogram_avg_unfolded_degree_{degree}",
-            unfolding="avg",
-            degree=degree,
-        )
-        for degree in resonance_truncated_degrees(simulation)
-    ]
 
 
 def create_complex_energy_histogram_observable(
@@ -256,10 +188,6 @@ def create_unfolded_complex_energy_histogram_observable(
     unfolding: str,
     degree: int | None = None,
 ) -> Observable:
-    metadata: dict[str, int | str] = {"unfolding": unfolding}
-    if degree is not None:
-        metadata["degree"] = degree
-
     return create_histogram2d_observable(
         file_name=file_name,
         x_support=UNFOLDED_COMPLEX_ENERGY_REAL_SUPPORT_UNITS_SPECTRAL_RADIUS,
@@ -268,7 +196,7 @@ def create_unfolded_complex_energy_histogram_observable(
         y_support=UNFOLDED_COMPLEX_ENERGY_WIDTH_LOG10_SUPPORT,
         y_num_bins=COMPLEX_ENERGY_NUM_BINS,
         plot_cls=UnfoldedComplexEnergyHistogramPlot,
-        metadata=metadata,
+        metadata=create_unfolding_metadata(unfolding, degree),
     )
 
 
@@ -279,10 +207,6 @@ def create_unfolded_resonance_form_factors_observable(
     unfolding: str,
     degree: int | None = None,
 ) -> Observable:
-    metadata: dict[str, int | str] = {"unfolding": unfolding}
-    if degree is not None:
-        metadata["degree"] = degree
-
     return create_observable(
         data=FormFactorsData(
             file_name=file_name,
@@ -291,7 +215,7 @@ def create_unfolded_resonance_form_factors_observable(
             scale=2 * np.pi,
         ),
         plot_cls=UnfoldedResonanceFormFactorsPlot,
-        metadata=metadata,
+        metadata=create_unfolding_metadata(unfolding, degree),
         finalize=finalize_form_factors,
     )
 
@@ -303,10 +227,6 @@ def create_unfolded_resonance_histogram_observable(
     unfolding: str,
     degree: int | None = None,
 ) -> Observable:
-    metadata: dict[str, int | str] = {"unfolding": unfolding}
-    if degree is not None:
-        metadata["degree"] = degree
-
     return create_histogram_observable(
         file_name=file_name,
         support=scale_support(
@@ -314,7 +234,7 @@ def create_unfolded_resonance_histogram_observable(
             simulation.compound.ensemble.dimension,
         ),
         plot_cls=UnfoldedResonanceHistogramPlot,
-        metadata=metadata,
+        metadata=create_unfolding_metadata(unfolding, degree),
     )
 
 
@@ -324,15 +244,11 @@ def create_unfolded_resonance_spacing_histogram_observable(
     unfolding: str,
     degree: int | None = None,
 ) -> Observable:
-    metadata: dict[str, int | str] = {"unfolding": unfolding}
-    if degree is not None:
-        metadata["degree"] = degree
-
     return create_histogram_observable(
         file_name=file_name,
         support=UNFOLDED_RESONANCE_SPACING_SUPPORT_UNITS_MEAN_SPACING,
         plot_cls=UnfoldedResonanceSpacingHistogramPlot,
-        metadata=metadata,
+        metadata=create_unfolding_metadata(unfolding, degree),
     )
 
 
@@ -342,130 +258,12 @@ def create_unfolded_width_histogram_observable(
     unfolding: str,
     degree: int | None = None,
 ) -> Observable:
-    metadata: dict[str, int | str] = {"unfolding": unfolding}
-    if degree is not None:
-        metadata["degree"] = degree
-
     return create_histogram_observable(
         file_name=file_name,
         log_base=RESONANCE_WIDTH_LOG_BASE,
         support=UNFOLDED_RESONANCE_WIDTH_LOG10_SUPPORT,
         plot_cls=UnfoldedWidthHistogramPlot,
-        metadata=metadata,
-    )
-
-
-def create_var_unfolded_complex_energy_histograms(
-    simulation: ResonanceStatisticsSimulation,
-) -> list[Observable]:
-    return [
-        create_unfolded_complex_energy_histogram_observable(
-            file_name=f"complex_energy_histogram_var_unfolded_degree_{degree}",
-            unfolding="var",
-            degree=degree,
-        )
-        for degree in resonance_truncated_degrees(simulation)
-    ]
-
-
-def create_var_unfolded_resonance_form_factors(
-    simulation: ResonanceStatisticsSimulation,
-) -> list[Observable]:
-    return [
-        create_unfolded_resonance_form_factors_observable(
-            simulation,
-            file_name=f"resonance_form_factors_var_unfolded_degree_{degree}",
-            unfolding="var",
-            degree=degree,
-        )
-        for degree in resonance_truncated_degrees(simulation)
-    ]
-
-
-def create_var_unfolded_resonance_histograms(
-    simulation: ResonanceStatisticsSimulation,
-) -> list[Observable]:
-    return [
-        create_unfolded_resonance_histogram_observable(
-            simulation,
-            file_name=f"resonance_histogram_var_unfolded_degree_{degree}",
-            unfolding="var",
-            degree=degree,
-        )
-        for degree in resonance_truncated_degrees(simulation)
-    ]
-
-
-def create_var_unfolded_resonance_spacing_histograms(
-    simulation: ResonanceStatisticsSimulation,
-) -> list[Observable]:
-    return [
-        create_unfolded_resonance_spacing_histogram_observable(
-            file_name=f"resonance_spacing_histogram_var_unfolded_degree_{degree}",
-            unfolding="var",
-            degree=degree,
-        )
-        for degree in resonance_truncated_degrees(simulation)
-    ]
-
-
-def create_var_unfolded_width_histograms(
-    simulation: ResonanceStatisticsSimulation,
-) -> list[Observable]:
-    return [
-        create_unfolded_width_histogram_observable(
-            file_name=f"width_histogram_var_unfolded_degree_{degree}",
-            unfolding="var",
-            degree=degree,
-        )
-        for degree in resonance_truncated_degrees(simulation)
-    ]
-
-
-def create_weight_unfolded_complex_energy_histogram_observable(
-    _: ResonanceStatisticsSimulation,
-) -> Observable:
-    return create_unfolded_complex_energy_histogram_observable(
-        file_name="complex_energy_histogram_weight_unfolded",
-        unfolding="weight",
-    )
-
-
-def create_weight_unfolded_resonance_form_factors_observable(
-    simulation: ResonanceStatisticsSimulation,
-) -> Observable:
-    return create_unfolded_resonance_form_factors_observable(
-        simulation,
-        file_name="resonance_form_factors_wgt_unfolded",
-        unfolding="weight",
-    )
-
-
-def create_weight_unfolded_resonance_histogram_observable(
-    simulation: ResonanceStatisticsSimulation,
-) -> Observable:
-    return create_unfolded_resonance_histogram_observable(
-        simulation,
-        file_name="resonance_histogram_weight_unfolded",
-        unfolding="weight",
-    )
-
-
-def create_weight_unfolded_resonance_spacing_histogram_observable(
-    _: ResonanceStatisticsSimulation,
-) -> Observable:
-    return create_unfolded_resonance_spacing_histogram_observable(
-        file_name="resonance_spacing_histogram_wgt_unfolded",
-        unfolding="weight",
-    )
-
-
-def create_weight_unfolded_width_histogram_observable(
-    _: ResonanceStatisticsSimulation,
-) -> Observable:
-    return create_unfolded_width_histogram_observable(
-        file_name="width_histogram_weight_unfolded",
-        unfolding="weight",
+        metadata=create_unfolding_metadata(unfolding, degree),
     )
 
 
@@ -483,9 +281,12 @@ def create_width_histogram_observable(
     )
 
 
-def resonance_truncated_degrees(
-    simulation: ResonanceStatisticsSimulation,
-) -> range:
-    return truncated_polynomial_degrees(
-        simulation.compound.ensemble.max_spectral_polynomial_degree
-    )
+def create_unfolding_metadata(
+    unfolding: str,
+    degree: int | None,
+) -> dict[str, int | str]:
+    metadata: dict[str, int | str] = {"unfolding": unfolding}
+    if degree is not None:
+        metadata["degree"] = degree
+
+    return metadata

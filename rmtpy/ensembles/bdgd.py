@@ -13,7 +13,7 @@ DYSON_INDEX: int = 2
 
 INITIALISM: str = "BdGD"
 
-LATEX_NAME: str = "\\textrm{{BdG(D)}}"
+LATEX_NAME: str = "\\text{{BdG(D)}}"
 
 TOKEN_NAME: str = "BdG_D"
 
@@ -28,7 +28,7 @@ def create_bdgd_matrix(
     rng: np.random.Generator,
     real_dtype: type[np.floating[Any]],
     std_dev: float,
-) -> np.ndarray:
+) -> None:
     size = matrix.shape[0]
     for i in range(size):
         matrix[i, i] = 0.0
@@ -53,7 +53,7 @@ class BogoliubovDeGennesDEnsemble(WignerDysonEnsemble):
 
     @property
     def latex_name(self) -> str:
-        return LATEX_NAME
+        return rf"{{{LATEX_NAME}}}({{{self.num_majoranas}}})"
 
     @property
     def token_name(self) -> str:

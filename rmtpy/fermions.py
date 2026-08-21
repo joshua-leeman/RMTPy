@@ -201,6 +201,13 @@ def create_conjugated_compound_coupling_matrix(
             "`dyson_index` == 4 requires an even number of open channels; "
             f"got {num_channels}."
         )
+    elif dyson_index == 4 and not np.allclose(
+        coupling_strengths[::2], coupling_strengths[1::2]
+    ):
+        raise ValueError(
+            "`dyson_index` == 4 requires equal coupling strengths within each "
+            "Kramers pair."
+        )
 
     coupling_matrix_columns: list[sparse.csr_array] = []
     for indices in combinations(range(num_complex_fermions), num_free_complex_fermions):
@@ -217,7 +224,7 @@ def create_conjugated_compound_coupling_matrix(
     coupling_matrix = sparse.hstack(coupling_matrix_columns, format="csr")
 
     if dyson_index == 4:
-        coupling_strengths = np.repeat(coupling_strengths[1::2], 2)
+        coupling_strengths = np.repeat(coupling_strengths[::2], 2)
 
         pauli_1 = sparse.csr_array([[0, 1], [1, 0]])
         swap_adjacent_columns = sparse.kron(
@@ -246,7 +253,8 @@ def create_decomposed_width_matrix(
 
     num_nonzeros = len(width_matrix_coo.data)
     width_matrix_idxs = np.empty((2, num_nonzeros), np.int32, order="C")
-    width_matrix_data = np.empty((num_nonzeros,), np.complex64, order="C")
+    width_matrix_dtype = np.result_type(width_matrix_coo.data.dtype, np.complex64)
+    width_matrix_data = np.empty((num_nonzeros,), width_matrix_dtype, order="C")
 
     width_matrix_idxs[0, :] = width_matrix_coo.row
     width_matrix_idxs[1, :] = width_matrix_coo.col
@@ -257,6 +265,8 @@ def create_decomposed_width_matrix(
 
 @attrs.frozen(kw_only=True, eq=False, slots=False)
 class MajoranaFermionBasis:
+    """Lazily cached sparse fermion basis used by SYK ensembles and compounds."""
+
     num_majoranas: int = attrs.field(
         validator=[
             attrs.validators.instance_of(int),

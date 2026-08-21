@@ -7,16 +7,12 @@ from typing import Any
 import attrs
 import numpy as np
 
+import rmtpy.conversion
 from rmtpy.compounds import Compound
-from rmtpy.conversion import RMT_CONVERTER
 
 from ..base import Simulation
 from ..observable import Observable
-from ..statistics import (
-    REALIZATIONS_METADATA,
-    simulation_output_path,
-    truncated_polynomial_degrees,
-)
+from ..statistics import REALIZATIONS_METADATA, truncated_polynomial_degrees
 from ..unfolding import TruncatedPolynomialCdfFactory
 from .outputs import TimeDelayOutputs, create_time_delay_outputs
 
@@ -25,36 +21,12 @@ ENERGIES_METADATA: dict[str, str] = {
 }
 
 
-def create_cdf_factory(
-    sim: TimeDelayStatisticsSimulation,
-) -> TruncatedPolynomialCdfFactory:
-    return TruncatedPolynomialCdfFactory(
-        density=sim.compound.ensemble.spectral_density,
-        degrees=sim.truncated_degrees,
-        density_name="spectral",
-    )
-
-
-def create_outputs(
-    sim: TimeDelayStatisticsSimulation,
-) -> TimeDelayOutputs:
-    return create_time_delay_outputs(sim)
-
-
-def create_truncated_degrees(
-    sim: TimeDelayStatisticsSimulation,
-) -> range:
-    return truncated_polynomial_degrees(
-        sim.compound.ensemble.max_spectral_polynomial_degree
-    )
-
-
 def format_energy_path_value(energy: float) -> str:
     return f"{energy:.5g}".replace("-", "n").replace(".", "p")
 
 
 def normalize_energies(energies: Any) -> np.ndarray:
-    energies_array = np.asarray(energies, dtype=np.float64)
+    energies_array = np.array(energies, dtype=np.float64, copy=True, order="C")
     if energies_array.ndim == 0:
         energies_array = energies_array.reshape(1)
     if energies_array.ndim != 1:
@@ -64,7 +36,19 @@ def normalize_energies(energies: Any) -> np.ndarray:
     if not np.all(np.isfinite(energies_array)):
         raise ValueError("`energies` must contain finite values.")
 
-    return np.ascontiguousarray(energies_array)
+    energies_array[energies_array == 0.0] = 0.0
+    if np.unique(energies_array).size != energies_array.size:
+        raise ValueError("`energies` must contain unique values.")
+
+    path_values = tuple(format_energy_path_value(value) for value in energies_array)
+    if len(set(path_values)) != len(path_values):
+        raise ValueError(
+            "`energies` must remain unique when formatted with five significant "
+            "digits for output paths."
+        )
+
+    energies_array.flags.writeable = False
+    return energies_array
 
 
 def run_time_delay_statistics(
@@ -82,6 +66,8 @@ def run_time_delay_statistics(
 
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
 class TimeDelayStatisticsSimulation(Simulation):
+    """Monte Carlo experiment for proper delay times at fixed probe energies."""
+
     compound: Compound = attrs.field(
         converter=Compound.create,
     )
@@ -97,28 +83,25 @@ class TimeDelayStatisticsSimulation(Simulation):
         repr=False,
     )
 
-    truncated_degrees: tuple[int, ...] = attrs.field(
-        default=attrs.Factory(create_truncated_degrees, takes_self=True),
-        converter=tuple,
-        init=False,
-        repr=False,
-    )
-    cdf_factory: TruncatedPolynomialCdfFactory = attrs.field(
-        default=attrs.Factory(create_cdf_factory, takes_self=True),
-        init=False,
-        repr=False,
-    )
     outputs: TimeDelayOutputs = attrs.field(
-        default=attrs.Factory(create_outputs, takes_self=True),
+        default=attrs.Factory(create_time_delay_outputs, takes_self=True),
         init=False,
         repr=False,
     )
 
     @property
     def to_path(self) -> Path:
-        return simulation_output_path(
+        return rmtpy.conversion.to_path(
             self,
-            Path(self.path_name) / self.compound.to_path,
+            root=Path(self.path_name) / self.compound.to_path,
+        )
+
+    @property
+    def truncated_degrees(self) -> tuple[int, ...]:
+        return tuple(
+            truncated_polynomial_degrees(
+                self.compound.ensemble.max_spectral_polynomial_degree
+            )
         )
 
     def energy_path(self, energy: float) -> Path:
@@ -127,27 +110,17 @@ class TimeDelayStatisticsSimulation(Simulation):
     def observable_output_path(self, observable: Observable) -> Path:
         return self.energy_path(observable.metadata["energy"])
 
-    def populate_metadata(self) -> None:
-        super().populate_metadata()
-        self.metadata["args"]["compound"] = RMT_CONVERTER.unstructure(self.compound)
-        self.metadata["args"]["realizs"] = self.realizs
-        self.metadata["args"]["energies"] = self.energies.tolist()
-
-    def save_data(self, out_dir: str | Path) -> None:
-        out_dir = Path(out_dir)
-        self.save_metadata(out_dir)
-
-        for observable in self.iter_observables():
-            observable.save_data(out_dir / self.observable_output_path(observable))
-
-    def save_plots(self, out_dir: str | Path) -> None:
-        out_dir = Path(out_dir)
-        for observable in self.iter_observables():
-            observable.initialize_plot()
-            observable.save_plot(out_dir / self.observable_output_path(observable))
-
     def realize_monte_carlo_simulation(self) -> None:
-        avg_cdf_interpolators = self.cdf_factory.average_interpolators()
+        spectral_density = self.compound.ensemble.spectral_density
+        cdf_factory = None
+        avg_cdf_interpolators = ()
+        if self.truncated_degrees:
+            cdf_factory = TruncatedPolynomialCdfFactory(
+                density=spectral_density,
+                degrees=self.truncated_degrees,
+                density_name="spectral",
+            )
+            avg_cdf_interpolators = cdf_factory.average_interpolators()
 
         for time_delays, eigvals in self.compound.time_delays_stream(
             energies=self.energies, realizs=self.realizs
@@ -156,7 +129,7 @@ class TimeDelayStatisticsSimulation(Simulation):
             self.outputs.add_weight_unfolded(
                 time_delays,
                 energies=self.energies,
-                cdf=self.compound.resonance_density.weight_cdf,
+                cdf=spectral_density.weight_cdf,
                 dimension=self.compound.ensemble.dimension,
             )
 
@@ -170,10 +143,13 @@ class TimeDelayStatisticsSimulation(Simulation):
             if not self.outputs.var_unfolded_by_degree:
                 continue
 
-            coeffs = self.compound.resonance_density.compute_variate_coeffs(eigvals)
+            if cdf_factory is None:
+                raise RuntimeError("Variate unfolding requires a CDF factory.")
+
+            coeffs = spectral_density.compute_variate_coeffs(eigvals)
             self.outputs.add_variate_unfolded(
                 time_delays,
                 energies=self.energies,
-                cdfs=self.cdf_factory.interpolators_from_coeffs(coeffs),
+                cdfs=cdf_factory.interpolators_from_coeffs(coeffs),
                 dimension=self.compound.ensemble.dimension,
             )

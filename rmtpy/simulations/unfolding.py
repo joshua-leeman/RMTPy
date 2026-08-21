@@ -70,14 +70,23 @@ def unfold_widths(
 
 
 def _compute_polynomials(factory: TruncatedPolynomialCdfFactory) -> np.ndarray:
+    if not factory.degrees:
+        return np.empty((0, 0), dtype=np.float64)
+
     return factory.density.compute_polynomials(factory.grid)
 
 
 def _compute_weight(factory: TruncatedPolynomialCdfFactory) -> np.ndarray:
+    if not factory.degrees:
+        return np.empty(0, dtype=np.float64)
+
     return factory.density.compute_polynomial_weight(factory.grid)
 
 
 def _create_grid(factory: TruncatedPolynomialCdfFactory) -> np.ndarray:
+    if not factory.degrees:
+        return np.empty(0, dtype=np.float64)
+
     return rmtpy.density.array_of_floats(
         support=factory.density.plot_range,
         num_pts=factory.density.num_pts,
@@ -86,6 +95,8 @@ def _create_grid(factory: TruncatedPolynomialCdfFactory) -> np.ndarray:
 
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
 class TruncatedPolynomialCdfFactory:
+    """Build CDF interpolators for the requested polynomial truncation degrees."""
+
     density: rmtpy.density.DensityModel = attrs.field(
         validator=attrs.validators.instance_of(rmtpy.density.DensityModel),
     )
@@ -101,7 +112,6 @@ class TruncatedPolynomialCdfFactory:
                 attrs.validators.instance_of(int),
                 attrs.validators.ge(0),
             ],
-            iterable_validator=attrs.validators.min_len(1),
         ),
         repr=False,
     )

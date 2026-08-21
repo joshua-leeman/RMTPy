@@ -1,136 +1,66 @@
 # RMTPy
 
-**A computational laboratory for random-matrix universality—from symmetry class
-and many-body Hamiltonian to spectra, scattering resonances, decay widths, time
-delays, and reproducible Monte Carlo workflows.**
+**A computational laboratory for random-matrix universality: from a symmetry
+class or many-body Hamiltonian to spectra, scattering resonances, decay widths,
+proper time delays, and reproducible Monte Carlo experiments.**
 
-Random matrix theory is the art of discarding microscopic detail without losing
-collective structure. RMTPy turns that idea into a Python workflow: draw a closed
-Hamiltonian, resolve its spectrum, couple it to open channels, and ask which
-features are model-specific and which collapse onto universal laws.
+Random matrix theory discards microscopic detail without discarding collective
+structure. RMTPy turns that idea into a Python workflow: draw a closed
+Hamiltonian, resolve its spectrum, couple it to open channels, and compare raw
+and unfolded observables with universal laws.
 
-Wigner–Dyson and Bogoliubov–de Gennes ensembles, Poisson spectra, the
-Sachdev–Ye–Kitaev (SYK) model, and effective non-Hermitian Hamiltonians all live
-inside the same experiment. RMTPy follows their global density, local spacings,
-long-range correlations, complex poles, and channel response across symmetry
-classes, finite sizes, coupling strengths, and unfolding choices—then preserves
-the resulting data, figures, parameters, and random state together.
-
-## From matrix to measurement
+The repository is deliberately organized around the physics. The final object
+model is not flat, but it is small: an `Ensemble` describes a closed system, a
+`Compound` opens it, a `Simulation` runs an experiment, and an `Observable`
+holds one numerical result. Density models and fermion bases remain separate
+objects because they cache expensive, reusable mathematics. Plot objects are
+temporary views and are not retained by a simulation.
 
 ```text
-random ensemble H ──► eigenvalues/eigenvectors ──► density, spacings, form factors
-      │
-      └── + channel couplings W ──► H_eff, K(E), S(E), Q(E)
-                                           │
-                                           └──► resonances, widths, proper delays
+closed Ensemble H ──► eigvals/eigvecs ──► DensityModel ──► spectral statistics
+        │
+        └── Compound(H, channels) ──► H_eff, K(E), S(E), Q(E)
+                                             │
+                                             └──► resonances, widths, delays
 
-Monte Carlo streams ──► raw + unfolded statistics ──► .npz data + .png plots
-                                                          + metadata.json
+Simulation ──► typed Outputs ──► Observable ──► mutable Data accumulator
+                                      │
+                                      └──► transient Plot at save time
 ```
 
-For a closed (isolated) Hamiltonian $H$, RMTPy streams matrices, eigensystems,
-or just eigenvalues. An open system—one coupled to external channels—adds
-couplings $W$ and the effective Hamiltonian
+For an open system,
 
 $$
-H_{\mathrm{eff}} = H - \frac{i}{2}WW^\dagger,
+H_{\mathrm{eff}}=H-\frac{i}{2}WW^\dagger,
 \qquad
-\mathcal{E}_n = E_n - \frac{i}{2}\Gamma_n.
+\mathcal{E}_n=E_n-\frac{i}{2}\Gamma_n.
 $$
 
-Its complex poles provide resonance centers $E_n$ and widths $\Gamma_n$.
-The reaction matrix, scattering matrix, and Wigner–Smith matrix then expose the
-energy-dependent response. Proper delay times are the eigenvalues of the
-Wigner–Smith matrix $Q(E)$; they measure channel dwell or response times.
-
-## What is implemented
-
-| Layer | Capabilities |
-| --- | --- |
-| Closed ensembles | GOE, GUE, GSE, Bogoliubov–de Gennes classes C and D, Poisson levels with a configurable Wigner–Dyson eigenvector basis, and the even-$q$ SYK model |
-| Fermionic construction | Sparse Majorana and complex-fermion operators, charge conjugation, parity blocks, $q$-body monomials, channel-coupling matrices, and width matrices |
-| Open systems | Effective non-Hermitian Hamiltonians; resonances; partial widths; reaction, scattering, and Wigner–Smith matrices; proper time delays at one or more energies |
-| Density and unfolding | Empirical density estimation plus Chebyshev, Legendre, and $q$-Hermite expansions; weight, ensemble-average, and realization-specific unfolding |
-| Statistics | Level and resonance densities, nearest-neighbor spacings, width and time-delay distributions, complex-energy histograms, density-coefficient distributions, spectral form factors, and connected form factors |
-| Universal references | Wigner surmises, Porter–Thomas laws, connected GOE/GUE/GSE/Poisson form factors, and the compact-support proper-time-delay density |
-| Experiment outputs | Streaming accumulation, normalized 1D/2D histograms, parameter-derived paths, NumPy archives, simulation metadata, and publication-oriented Matplotlib figures |
-
-### Ensemble catalogue
-
-The concise aliases below are exported alongside the full class names.
-
-| Alias | Ensemble | Dyson index / defining structure | Bulk basis |
-| --- | --- | --- | --- |
-| `GOE` | `GaussianOrthogonalEnsemble` | $\beta=1$, real symmetric | semicircle / Chebyshev-$U$ |
-| `GUE` | `GaussianUnitaryEnsemble` | $\beta=2$, complex Hermitian | semicircle / Chebyshev-$U$ |
-| `GSE` | `GaussianSymplecticEnsemble` | $\beta=4$, self-dual Hermitian with Kramers degeneracy | semicircle / Chebyshev-$U$ |
-| `BdGC` | `BogoliubovDeGennesCEnsemble` | particle–hole-symmetric block construction | semicircle / Chebyshev-$U$ |
-| `BdGD` | `BogoliubovDeGennesDEnsemble` | imaginary antisymmetric Hermitian construction | semicircle / Chebyshev-$U$ |
-| `Poisson` | `PoissonEnsemble` | $\beta=0$, independent uniform levels | uniform / Legendre |
-| `SYK` | `SachdevYeKitaevEnsemble` | random $q$-body Majorana Hamiltonian; class inferred from $q$ and $N_m$ | $q$-Hermite |
-
-All concrete ensembles are keyword-only and accept an optional NumPy-compatible
-seed. In the present API, `num_majoranas` also parameterizes the classical
-Gaussian, BdG, and Poisson ensembles: it must be even and satisfy
-`4 <= num_majoranas <= 32`, and it sets the matrix dimension using the
-many-body parity-sector convention
-
-$$
-D = 2^{N_m/2-1}.
-$$
-
-`interaction_strength`, `dtype`, `seed`, and
-`max_spectral_polynomial_degree` are shared controls. SYK accepts `q` in
-`{2, 4, 6, 8, 10}`; current runnable configurations require
-`q < num_majoranas`. Memory-aware upper bounds on `num_majoranas` are 32 for
-$q=2,4$, 26 for $q=6$, 24 for $q=8$, and 22 for $q=10$. An
-`is_even_parity` flag is also present, subject to the limitation below.
-
-### Opening a closed system
-
-`Compound` couples an ensemble to
-
-$$
-M = \binom{N_m/2}{N_f}
-$$
-
-open channels. `num_free_complex_fermions=N_f` selects the channel count, while
-`coupling_strengths` accepts either one positive scalar or a real length-$M$
-nonnegative array; the default scalar is the square root of the ensemble's
-spectral radius.
-The object exposes effective-Hamiltonian, resonance, partial-width,
-reaction-matrix, scattering-matrix, Wigner–Smith, and time-delay calculations.
-
-Use `PoissonCompound` when the closed spectrum is `PoissonEnsemble`.
-`SYKCompound` instead builds its channels from few-fermion states and a sparse
-width matrix; its configured parity flag must match the parity of `N_f`, and a
-symplectic ($\beta=4$) construction requires an even channel count.
+The poles $\mathcal{E}_n$ give resonance centers $E_n$ and widths $\Gamma_n$.
+The reaction matrix, scattering matrix, and Wigner--Smith matrix describe the
+energy-dependent channel response; the eigenvalues of the Wigner--Smith matrix
+$Q(E)$ are the proper delay times.
 
 ## Installation
 
-RMTPy currently runs directly from a source checkout. It has no package-build
-metadata or PyPI release, so run Python from the repository root rather than
-using `pip install`.
+RMTPy currently runs from a source checkout. It has no package-build metadata or
+PyPI release, so run Python from the repository root.
 
 ```bash
 git clone https://github.com/joshua-leeman/RMTPy.git
 cd RMTPy
-
-conda create -n rmtpy-env -c conda-forge \
-  python=3.11 numpy scipy matplotlib numba attrs cattrs ruff
+conda env create -f environment.yml
 conda activate rmtpy-env
 ```
 
-The checked-in `environment.yml` supplies Python, NumPy, SciPy, and Matplotlib,
-but does not yet declare the required `numba`, `attrs`, and `cattrs` packages.
-The explicit environment command above is therefore the reliable setup path.
+The environment includes Python 3.11, NumPy, SciPy, Matplotlib, Numba, `attrs`,
+`cattrs`, and Ruff. Numerical work does not require TeX. Saving the
+publication-oriented plots does require a working LaTeX installation with
+`amsmath` and Latin Modern fonts.
 
-Full simulation runs save TeX-rendered figures. A working LaTeX installation
-with `amsmath` and Latin Modern fonts is required for that plotting step; matrix
-generation and numerical analysis do not otherwise depend on TeX.
+## Quick start
 
-## Quick start: closed and open spectra
+### A closed spectrum and an open system
 
 ```python
 import numpy as np
@@ -138,17 +68,16 @@ import numpy as np
 from rmtpy.compounds import Compound
 from rmtpy.ensembles import GOE
 
-# N_m = 8 gives an 8 x 8 Hamiltonian.
+# N_m = 8 gives one 8 x 8 parity block.
 ensemble = GOE(num_majoranas=8, seed=2025)
 
 eigenvalues = next(ensemble.eigvals_stream(realizs=1))
 spacings = np.diff(eigenvalues)
 
-print(ensemble.dimension)            # 8
-print(ensemble.universality_class)   # GOE
-print(eigenvalues.shape, spacings.shape)
+print(ensemble.dimension)           # 8
+print(ensemble.universality_class)  # GOE
 
-# Couple the closed system to C(4, 1) = 4 open channels.
+# N_f = 1 gives C(4, 1) = 4 open channels.
 compound = Compound(
     ensemble=ensemble,
     num_free_complex_fermions=1,
@@ -165,98 +94,241 @@ delay_times, closed_levels = next(
 centers = resonances.real
 widths = -2.0 * resonances.imag
 
-print(compound.num_channels)   # 4
-print(delay_times.shape)       # (number of energies, number of channels) = (1, 4)
+print(compound.num_channels)  # 4
+print(delay_times.shape)      # (number of energies, channels) = (1, 4)
 ```
 
-Streams avoid retaining a Monte Carlo ensemble in memory. Matrix streams reuse
-their working array, so copy a yielded matrix before advancing the iterator if
-you need to keep it.
+Monte Carlo methods are streams so that realizations do not accumulate in
+memory. Matrix streams reuse their working array. Copy a yielded matrix before
+advancing the iterator if it must be retained.
 
-## Run complete statistics pipelines
-
-Each simulation has a class API and a convenience runner exported from
-`rmtpy.simulations`.
+### A complete spectral-statistics experiment
 
 ```python
 from rmtpy.ensembles import GOE
 from rmtpy.simulations.spectral_statistics import SpectralStatisticsSimulation
 
-ensemble = GOE(
-    num_majoranas=8,
-    max_spectral_polynomial_degree=4,
-    seed=7,
-)
-
 simulation = SpectralStatisticsSimulation(
-    ensemble=ensemble,
+    ensemble=GOE(
+        num_majoranas=8,
+        max_spectral_polynomial_degree=4,
+        seed=7,
+    ),
     realizs=250,
 )
 simulation.run(out_dir="output")
 
-# Results remain available in memory as typed observables.
-raw_density = simulation.outputs.raw.levels.data
+# A short public lookup avoids a long output path.
+raw_density = simulation.get_data("spectral_histogram")
 print(raw_density.bins)
 print(raw_density.histogram)
+
+# The typed hierarchy remains available when its structure is useful.
+assert raw_density is simulation.outputs.raw.levels.data
+
+# Metadata can select a related group. This returns three observables:
+# levels, spacings, and form factors at degree 4.
+degree_four = simulation.find_observables(unfolding="avg", degree=4)
 ```
 
-| Simulation | Inputs | Accumulated products |
+`get_data()` and `get_observable()` require exactly one match and raise a
+`LookupError` if a selection is absent or ambiguous. `find_observables()` always
+returns a tuple. A file name may be given with or without its trailing `_data`.
+
+## The objects that matter
+
+The hierarchy is easiest to read as a sequence of scientific responsibilities.
+
+| Object | Owns | Why it is a separate object |
 | --- | --- | --- |
-| `SpectralStatisticsSimulation` | ensemble, realizations | level density, nearest-neighbor spacings, spectral/connected form factors, spectral-density coefficients |
-| `ResonanceStatisticsSimulation` | compound, realizations | resonance centers, widths, spacings, 2D complex-energy density, resonance form factors, resonance-density coefficients |
-| `PartialWidthsStatisticsSimulation` | compound, realizations, selected width indices | individual channel widths and per-state total widths, rescaled by their observed means |
-| `TimeDelayStatisticsSimulation` | compound, realizations, one or more energies | raw and unfolded proper-delay histograms in a separate subdirectory for each energy |
+| `RandomMatrixEnsemble` / `ManyBodyEnsemble` | Configuration, RNG, matrix/eigensystem streams, symmetry class | This is the closed Hamiltonian family. It is the natural source of universal reference laws. |
+| `DensityModel` | Support, weight, orthogonal polynomials, lazy PDF/CDF and coefficient caches | Density estimation and unfolding are reused by direct calculations, simulations, and plots. The object avoids recomputing expensive calibration data. |
+| `MajoranaFermionBasis` | Sparse Majorana and complex-fermion operators, parity slice, vacuum, charge conjugation | These arrays are expensive algebraic infrastructure shared by SYK matrix and channel construction. They are created lazily. |
+| `Compound` | One ensemble, channel strengths, resonance density, open-system streams | It represents a different physical system: the closed Hamiltonian plus its coupling to external channels. |
+| `Simulation` | Immutable experiment inputs, metadata, lifecycle, one output bundle | It coordinates realization, finalization, persistence, and plotting. It does not implement the physics already owned by an ensemble or compound. |
+| Output bundle | Typed grouping by quantity, unfolding, degree, and sometimes energy | It preserves scientifically meaningful alignment. It contains references to observables, not copies of the ensemble or compound. |
+| `Observable` | One `Data` object, optional finalizer, optional plot class | It is a thin descriptor. It does not retain a `Plot`. |
+| `Data` | Mutable NumPy buffers and result metadata | Frozen `attrs` wiring prevents accidental reassignment while arrays remain mutable for streaming accumulation. |
+| `Plot` | A temporary view of one `Data` object | It is constructed only while saving. All plots in one save pass share one detached model reconstructed from initial metadata, so the live simulation and RNG remain untouched. |
 
-The convenience functions are `run_spectral_statistics`,
-`run_resonance_statistics`, `run_partial_widths_statistics`, and
-`run_time_delay_statistics`. They call `.run()` with the default `output/` root;
-use the simulation classes when you need a different destination or in-memory
-access to observables.
+The answer to “is the repository too object-oriented?” is therefore: the
+physics hierarchy is justified; the old orchestration was too implicit. The
+current code keeps the physical objects and typed output grid while removing
+simulation deserialization magic, recursive object discovery, retained plots,
+plot registries, one-field legend subclasses, and forwarding factory chains.
 
-### Why four views of one spectrum?
+### How `attrs` construction works here
 
-Raw eigenvalues mix the slowly varying bulk density with local correlations.
-Unfolding removes that slow bulk-density variation by mapping a level $E$
-through a CDF $F$,
+All principal configuration objects are frozen, keyword-only `attrs` classes.
+Fields appear in this order:
+
+1. required physical inputs;
+2. optional controls with converters and validators;
+3. derived public attributes with `init=False` factories;
+4. private lazy caches prefixed with `_`.
+
+An ensemble first validates its physical inputs, derives quantities such as
+dimension and spectral radius, and then attaches one `DensityModel`. A
+`Compound` converts or accepts a live ensemble, derives the channel count,
+normalizes a copied read-only coupling array, and attaches a resonance-density
+model. SYK additionally derives one `MajoranaFermionBasis`; its expensive sparse
+monomials remain lazy.
+
+A simulation constructs its output bundle once through an `attrs.Factory` that
+receives the completed simulation. The bundle explicitly implements
+`iter_observables()`, so saving order is visible in the source rather than
+discovered by recursive reflection. Base metadata is generated automatically
+from the simulation's `init=True` fields.
+
+## Implemented physics
+
+### Ensemble catalogue
+
+The concise aliases below are exported with the full class names.
+
+| Alias | Ensemble | Dyson index / structure | Bulk basis |
+| --- | --- | --- | --- |
+| `GOE` | `GaussianOrthogonalEnsemble` | $\beta=1$, real symmetric | semicircle / Chebyshev-$U$ |
+| `GUE` | `GaussianUnitaryEnsemble` | $\beta=2$, complex Hermitian | semicircle / Chebyshev-$U$ |
+| `GSE` | `GaussianSymplecticEnsemble` | $\beta=4$, self-dual Hermitian with Kramers degeneracy | semicircle / Chebyshev-$U$ |
+| `BdGC` | `BogoliubovDeGennesCEnsemble` | particle--hole-symmetric block construction | semicircle / Chebyshev-$U$ |
+| `BdGD` | `BogoliubovDeGennesDEnsemble` | imaginary antisymmetric Hermitian construction | semicircle / Chebyshev-$U$ |
+| `Poisson` | `PoissonEnsemble` | independent uniform levels with configurable GOE/GUE/GSE eigenvectors | uniform / Legendre |
+| `SYK` | `SachdevYeKitaevEnsemble` | random even-$q$ Majorana Hamiltonian; class inferred from $q,N_m$ | $q$-Hermite |
+
+The Gaussian, BdG, Poisson, and SYK implementations share the many-body parity
+sector convention
 
 $$
-\widetilde E = D\,[F(E)-F(0)],
+D=2^{N_m/2-1}.
 $$
 
-so a unit interval represents one local mean spacing. RMTPy accumulates:
+`num_majoranas` must be even and satisfy `4 <= num_majoranas <= 32`.
+`interaction_strength`, `dtype`, `seed`, and
+`max_spectral_polynomial_degree` are common controls. SYK accepts `q` in
+`{2, 4, 6, 8, 10}` with `q < num_majoranas`; its memory-aware upper limits on
+$N_m$ are 32 for $q=2,4$, 26 for $q=6$, 24 for $q=8$, and 22 for $q=10$.
+`is_even_parity` selects the actual parity block and appears in SYK labels and
+output paths.
 
-1. **raw** values in physical model units;
-2. **weight-unfolded** values from the ensemble's leading orthogonal-polynomial
-   weight (semicircle, uniform, or $q$-Hermite);
-3. **average-unfolded** values from truncated ensemble-average density
-   expansions of even degree `2, 4, ...`;
-4. **variate-unfolded** values from a truncated density fitted separately to
-   each realization.
+`PoissonEnsemble.eigvecs_ensemble_flag` chooses `GOE`, `GUE`, or `GSE`
+eigenvectors. The nested eigenvector ensemble intentionally shares the one
+Poisson RNG; its choice is encoded in the output path.
 
-Widths are unfolded over their finite interval,
-$\widetilde\Gamma=D[F(E+\Gamma/2)-F(E-\Gamma/2)]$, and time delays are
-handled through reciprocal widths. Keeping all four views makes finite-size and
-non-stationary density effects visible instead of silently baking one detrending
-choice into the result.
+### Opening a closed system
 
-## Outputs and reproducibility
+`Compound` couples an ensemble to
 
-`Simulation.run()` performs realization, finalization, data persistence, and
-plotting. Its output path encodes the ensemble/compound and simulation
-parameters. Every run contains:
+$$
+C=\binom{N_m/2}{N_f}
+$$
 
-- `metadata.json` with the model, simulation arguments, and serialized RNG
-  state;
-- one `*_data.npz` archive per observable, containing counts/results and
-  metadata;
-- a matching `*_plot.png` where that observable has a plot implementation.
+channels. `num_free_complex_fermions=N_f` selects the channel count, which may
+not exceed the ensemble dimension. `coupling_strengths` accepts one positive
+finite scalar or a real, finite, nonnegative array of length $C$. Input arrays
+are copied and made read-only. The default scalar is the square root of the
+spectral radius.
 
-A representative tree is:
+The object exposes effective-Hamiltonian, resonance, partial-width, reaction,
+scattering, Wigner--Smith, and proper-delay streams. Use `PoissonCompound` for a
+Poisson closed spectrum. `SYKCompound` builds its couplings from few-fermion
+states and a sparse width matrix; the parity of $N_f$ must match the configured
+SYK parity, and a symplectic construction requires equal strengths within each
+Kramers pair.
+
+### Universal references
+
+`rmtpy.universal` supplies Wigner surmises, Porter--Thomas laws, connected
+GOE/GUE/GSE/Poisson spectral form factors, eigenvalue degeneracies, symmetry
+labels, and the compact-support proper-time-delay density. Ensemble and compound
+methods bind the relevant dimension, Dyson index, or channel count.
+
+## Simulation families and output layout
+
+Each family has a class API and a convenience runner exported from
+`rmtpy.simulations`.
+
+| Simulation | Inputs | Main products |
+| --- | --- | --- |
+| `SpectralStatisticsSimulation` | ensemble, realizations | levels, nearest-neighbor spacings, spectral and connected form factors, density coefficients |
+| `ResonanceStatisticsSimulation` | compound, realizations | centers, widths, spacings, 2-D complex-energy density, resonance form factors, density coefficients |
+| `PartialWidthsStatisticsSimulation` | compound, realizations, width selections | selected channel widths and per-state total widths, scaled by observed means |
+| `TimeDelayStatisticsSimulation` | compound, realizations, probe energies | raw and unfolded proper-delay histograms for each energy |
+
+Let `M=max_spectral_polynomial_degree`, let
+`T=(2, 4, ..., <= M)`, and let `k=len(T)`.
+
+| Output bundle | Observable count | Typed organization |
+| --- | ---: | --- |
+| spectral | `M + 6 + 6*k` | coefficients; raw and weight groups; average and variate groups by degree |
+| resonance | `M + 10 + 10*k` | coefficients; five-quantity raw and weight groups; five-quantity average and variate groups by degree |
+| time delay at `n` energies | `2*n*(k + 1)` | raw/weight by energy; average/variate by degree, then energy |
+| partial width | `len(width_indices)` | one histogram per requested selection, in request order |
+
+Degree zero is a supported, useful small-run configuration. It produces raw and
+weight-unfolded outputs but no coefficient, average-unfolded, or
+variate-unfolded groups. Degree one adds a degree-one coefficient histogram but
+still has no even-degree truncated groups.
+
+For partial widths, `(state, channel)` selects one channel contribution and
+`(state,)` sums all channels for that state. Selections must be nonempty,
+unique, length one or two, and in bounds. Defaults are filtered to the actual
+matrix and channel dimensions. File names are explicit, for example
+`partial_width_state_1_channel_0_histogram` and
+`total_width_state_1_histogram`.
+
+Time-delay energies may be a scalar or a finite, nonempty one-dimensional
+array-like. They are copied into a contiguous, read-only `float64` array.
+Numeric duplicates (including signed zero) and distinct values that would
+collide after five-significant-digit output-path formatting are rejected.
+
+## Unfolding
+
+Raw levels mix slowly varying bulk density with local correlations. Given a CDF
+$F$, RMTPy unfolds a value through
+
+$$
+\widetilde E=D\,[F(E)-F(0)]
+$$
+
+and a width through its finite interval,
+
+$$
+\widetilde\Gamma
+=D\,[F(E+\Gamma/2)-F(E-\Gamma/2)].
+$$
+
+The simulation grids retain four scientifically distinct views:
+
+1. **raw** values in model units;
+2. **weight-unfolded** values from the leading ensemble weight (semicircle,
+   uniform, or $q$-Hermite);
+3. **average-unfolded** values from ensemble-average density expansions at
+   truncation degrees in `T`;
+4. **variate-unfolded** values from coefficients fitted to each realization.
+
+Spectral unfolding uses `ensemble.spectral_density`. Resonance unfolding uses
+`compound.resonance_density` and fits variate coefficients to the resonance
+centers. Time-delay unfolding deliberately uses the closed spectral density:
+it maps $\tau\mapsto1/\tau$, unfolds that width about the fixed probe energy,
+and then takes the reciprocal. Nonfinite and nonpositive values are omitted.
+
+One mixed representation is intentional. In every “unfolded” 2-D
+complex-energy histogram, the horizontal coordinate remains the physical
+$E/E_0$, while only the vertical width is unfolded. The separate resonance
+histograms, spacings, and form factors do use unfolded centers. This lets a
+reader see unfolded-width variation across physical energy.
+
+## Persistence, paths, and plotting
+
+`Simulation.run()` realizes the Monte Carlo stream, finalizes all observables,
+saves their data, and then saves plots. Output paths are derived only from attrs
+fields carrying `dir_name` metadata.
 
 ```text
 output/
 └── spectral_statistics_simulation/
-    └── GOE/Nm_8/J_1p0/polydeg_4/realizs_250/
+    └── GOE/Nm_8/J_1p0/max_polydeg_4/realizs_250/
         ├── metadata.json
         ├── spectral_histogram/
         │   ├── spectral_histogram_data.npz
@@ -265,7 +337,19 @@ output/
         └── spectral_form_factors_var_unfolded_degree_4/
 ```
 
-Data objects support typed `.save()`/`.load()` round trips:
+Compound paths add the compound type, `Nf`, and either a constant coupling value
+or a stable hash of a nonconstant coupling array. Poisson paths add the
+eigenvector symmetry class; SYK paths add `q` and parity. Time-delay observables
+are routed beneath `energy_<value>` directories, where the energy uses five
+significant digits and replaces `-` by `n` and `.` by `p`, such as
+`energy_n0p25`.
+
+Every run writes one root `metadata.json`. Every observable writes
+`<name>/<name>_data.npz` and, when a plot class exists,
+`<name>/<name>_plot.png`. The archive metadata contains the initial simulation
+arguments and RNG state.
+
+Data objects support typed save/load round trips:
 
 ```python
 from rmtpy.simulations.histogram import Histogram
@@ -273,64 +357,100 @@ from rmtpy.simulations.histogram import Histogram
 histogram = Histogram.load("path/to/spectral_histogram_data.npz")
 ```
 
-Only load `.npz` files you trust: metadata restoration uses NumPy object arrays
-and therefore enables pickle loading.
+Only load archives you trust. Metadata is stored as an object array, so loading
+uses NumPy's pickle support. New archives contain only attrs fields; there is no
+spurious `allow_pickle` archive member.
 
-Ensembles and compounds also support dictionary conversion through
-`RMT_CONVERTER`, including polymorphic ensemble reconstruction. A seed and saved
-RNG state improve reproducibility, but bitwise identity across NumPy, SciPy,
-Numba, or BLAS/LAPACK versions is not promised.
+Whole simulation deserialization is intentionally not part of the API. The old
+registry path was incomplete and attempted to discover arbitrary output fields.
+Ensembles and compounds still support polymorphic `RMT_CONVERTER` dictionary
+round trips, and individual `Data` objects remain loadable.
 
-## Numerical design and limits
+Plots created by `Simulation.run()` share one transient detached model instead
+of reconstructing one model per observable. The detached graph is released when
+plot saving finishes, and plotting cannot advance the live simulation RNG. To
+replot a saved archive independently, provide the view explicitly:
 
-- Matrix construction and polynomial recurrences use Numba-compiled kernels;
-  eigensystems use SciPy BLAS/LAPACK; fermion operators are assembled sparsely.
-  The first call to a compiled kernel includes one-time JIT overhead.
-- Monte Carlo APIs stream realizations, and form factors evaluate time grids in
-  chunks to limit temporary memory.
-- Average-polynomial unfolding lazily estimates its reference coefficients from
-  `max(8192 // dimension, 10)` additional ensemble draws; budget those separately
-  from the simulation's requested `realizs`.
-- Dense diagonalization still scales cubically in `dimension`, while the
-  many-body Hilbert space grows exponentially in `num_majoranas`. Begin with
-  modest sizes; an accepted constructor value is not a promise that a dense run
-  fits your machine.
-- Histogram values outside an observable's fixed support are omitted, and CDF
-  interpolators extrapolate beyond their construction grids; inspect supports
-  when studying tails.
-- **Known limitation:** despite its name and iterator annotation,
-  `Compound.scattering_matrix_stream` is not a generator; it returns one tuple
-  after the first underlying realization. Use it only with `realizs=1`; the
-  reaction, resonance, and Wigner–Smith methods provide true streams.
-- SYK's `is_even_parity` flag is validated by `SYKCompound` but is not currently
-  propagated into `MajoranaFermionBasis`; matrix construction therefore remains
-  in the basis's default even-parity block.
-- `PoissonEnsemble.porter_thomas_distribution()` currently has a call-signature
-  defect. The general reference law in `rmtpy.universal` remains available, but
-  the Poisson-specific wrapper/theory overlay should not yet be relied upon.
-- Saved plots are produced correctly as part of `Simulation.run()`, but the
-  standalone `plot_data(path)` registry dispatch is not currently reliable for
-  generic histogram archives.
-- The public interface is research-stage and source-first: there is no semantic
-  version, packaged release, CI workflow, or exhaustive numerical validation
-  yet.
+```python
+from rmtpy.simulations.plot import plot_data
+from rmtpy.simulations.spectral_statistics.spectral_histogram import (
+    SpectralHistogramPlot,
+)
 
-## Repository map
+plot_data(
+    "path/to/spectral_histogram_data.npz",
+    plot_cls=SpectralHistogramPlot,
+)
+```
+
+## Source organization and coding conventions
+
+The code follows one consistent local pattern:
+
+- imports are ordered as future, standard library, third party, absolute
+  `rmtpy`, then relative package imports;
+- typed uppercase constants and their attrs metadata live near the top of a
+  module;
+- small `compute_*`, `create_*`, `normalize_*`, and validation helpers appear
+  before the class whose fields use them;
+- classes use explicit physics names, keyword-only construction, converters,
+  and validators rather than large generic configuration dictionaries;
+- abbreviations such as `eigvals`, `eigvecs`, `realizs`, `num_pts`, and
+  `std_dev` are used consistently in numerical paths;
+- feature subpackages keep observables, typed outputs, plots, and the simulation
+  coordinator near one another;
+- concise aliases (`GOE`, `GUE`, `SYK`, and so on) are exported from package
+  `__init__.py` files while implementations retain their full names.
 
 ```text
 rmtpy/
-├── ensembles/       # closed random-matrix and SYK ensembles
-├── compounds/       # channel coupling and open-system observables
-├── simulations/     # Monte Carlo outputs, unfolding, persistence, and plots
-├── density.py       # density models, CDFs, and unfolding primitives
-├── fermions.py      # sparse Majorana/complex-fermion algebra
+├── ensembles/       # closed Gaussian, BdG, Poisson, and SYK Hamiltonians
+├── compounds/       # channel coupling and open-system matrix streams
+├── simulations/     # experiments, output bundles, accumulators, and plots
+├── density.py       # density models, interpolated PDFs/CDFs, unfolding support
+├── fermions.py      # sparse Majorana and complex-fermion algebra
 ├── polynomials.py   # Chebyshev, Legendre, and q-Hermite systems
 ├── universal.py     # analytical universal reference laws
-└── conversion.py    # attrs/cattrs serialization and path/label helpers
+├── conversion.py    # attrs/cattrs conversion plus path and label helpers
+└── validators.py    # shared numerical validators
 
 tests/
-└── test_smoke.py    # compact integration coverage
+├── test_smoke.py
+├── test_numerical_regressions.py
+├── test_simulation_outputs.py
+└── test_simulation_lifecycle.py
 ```
+
+The local ignored `notebooks/` and `archive/` directories are research history,
+not runtime dependencies of `rmtpy`.
+
+## Numerical behavior and limits
+
+- Matrix construction and polynomial recurrences use Numba; eigensystems use
+  SciPy BLAS/LAPACK; fermion operators are assembled sparsely. The first call to
+  a compiled kernel includes JIT overhead.
+- Dense diagonalization scales cubically in `dimension`, while the many-body
+  Hilbert space grows exponentially in `num_majoranas`. Begin with modest sizes.
+- Average-polynomial unfolding lazily estimates reference coefficients from
+  `max(8192 // dimension, 10)` additional ensemble draws. The result is cached,
+  but those initial calibration draws advance the same RNG. Run order therefore
+  matters when density caches are first populated.
+- Histograms use fixed half-open supports and omit values outside them. CDF
+  interpolators extrapolate beyond their construction grids; inspect supports
+  when studying tails.
+- Zero-count histograms and form factors finalize to finite zeros. Partial-width
+  normalization instead requires a positive finite observed mean and raises
+  before changing any bin edges if that condition fails.
+- Output roots do not encode every input: seed, dtype, the time-energy list, and
+  partial-width selections are absent from the root path. Reusing a destination
+  can overwrite matching files and does not remove stale files from an earlier
+  run. Time energies are safe within one simulation but values from separate
+  runs can still share the same five-digit directory name.
+- A saved seed and RNG state support replay in the same software stack, but
+  bitwise identity across NumPy, SciPy, Numba, or BLAS/LAPACK versions is not
+  promised.
+- This remains a source-first research codebase: there is no semantic version,
+  packaged release, CI workflow, or exhaustive proof of every finite-size law.
 
 ## Tests and style
 
@@ -339,13 +459,13 @@ From the repository root:
 ```bash
 python -m unittest discover -s tests -v
 ruff check rmtpy tests
+ruff format --check rmtpy tests
 ```
 
-The current smoke suite verifies subtype-aware ensemble serialization,
-histogram `.npz` round trips, normalization of the analytical time-delay law,
-nonnegative multi-channel proper delays up to numerical tolerance, and
-construction/metadata of all four simulation families. It is integration smoke
-coverage, not a comprehensive proof of every ensemble law or plotting path.
+The suites cover polymorphic conversion and data round trips, analytical and
+matrix-level numerical regressions, all four output hierarchies, degree-zero
+experiments, partial-width validation and normalization, explicit observable
+lookup, transient plotting, path collisions, and finite empty-result handling.
 
 ## License
 

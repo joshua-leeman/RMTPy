@@ -31,7 +31,9 @@ def create_width_histogram_observable(
 ) -> Observable:
     if len(width_index) == 2:
         histogram = Histogram(
-            file_name=f"partial_width_{width_index[0]}{width_index[1]}_histogram",
+            file_name=(
+                f"partial_width_state_{width_index[0]}_channel_{width_index[1]}_histogram"
+            ),
             log_base=WIDTH_LOG_BASE,
             support=PARTIAL_WIDTH_LOG10_SUPPORT,
             num_bins=PARTIAL_WIDTH_NUM_BINS,
@@ -39,7 +41,7 @@ def create_width_histogram_observable(
         plot_cls = PartialWidthHistogramPlot
     elif len(width_index) == 1:
         histogram = Histogram(
-            file_name=f"total_width_{width_index[0]}_histogram",
+            file_name=f"total_width_state_{width_index[0]}_histogram",
             log_base=WIDTH_LOG_BASE,
             support=TOTAL_WIDTH_LOG10_SUPPORT,
             num_bins=TOTAL_WIDTH_NUM_BINS,

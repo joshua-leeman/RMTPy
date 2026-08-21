@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
-import inspect
 import logging
-import re
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from pathlib import Path
@@ -12,15 +10,11 @@ from typing import Any
 import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
-from numpy.lib.npyio import NpzFile
 
 from rmtpy.conversion import RMT_CONVERTER
 
-from .data import REGISTRY as DATA_REGISTRY
-from .data import Data, normalize_metadata, normalize_source
+from .data import Data
 from .histogram import Histogram
-
-PLOT_REGISTRY: dict[str, type[Plot]] = {}
 
 
 def configure_matplotlib() -> None:
@@ -35,7 +29,7 @@ def configure_matplotlib() -> None:
                 (
                     r"\newcommand{\ensavg}[1]{"
                     r"\langle\hspace{-0.7ex}\langle #1 "
-                    r"\hspace{-0.3ex} \rangle\hspace{-0.7ex}\rangle}"
+                    r"\rangle\hspace{-0.7ex}\rangle}"
                 ),
                 r"\newcommand{\diff}{\mathrm{d}}",
             ]
@@ -46,44 +40,20 @@ def configure_matplotlib() -> None:
         )
 
 
-def plot_data(data_path: str | Path) -> None:
+def plot_data(data_path: str | Path, *, plot_cls: type[Plot]) -> None:
     data_path = Path(data_path)
-    out_dir = data_path.parent
-
-    plot = RMT_CONVERTER.structure(data_path, Plot)
-    plot.plot(path=out_dir)
+    plot_cls(data=Data.load(data_path)).plot(path=data_path.parent)
 
 
-def plot_structure_hook(src: str | Path | dict[str, Any] | NpzFile | Plot, _) -> Plot:
-    src_dict = normalize_source(src)
-    metadata = normalize_metadata(src_dict["metadata"])
-    src_dict["metadata"] = metadata
-
-    plot_key = metadata.get("name")
-    if plot_key in PLOT_REGISTRY:
-        plot_cls = PLOT_REGISTRY[plot_key]
-    else:
-        raise ValueError(f"No registered Plot class found in {src}")
-
-    if plot_key in DATA_REGISTRY:
-        data_cls = DATA_REGISTRY[plot_key]
-    else:
-        raise ValueError(f"No registered Data class found for Plot in {src}")
-
-    data_inst = RMT_CONVERTER.structure(src_dict, data_cls)
-    return plot_cls(data=data_inst)
-
-
-def register_plot_hooks(plot_cls: type[Plot]) -> type[Plot]:
-    RMT_CONVERTER.register_structure_hook(plot_cls, plot_structure_hook)
-
-    return plot_cls
-
-
-@register_plot_hooks
 @dataclasses.dataclass(repr=False, eq=False, kw_only=True)
 class Plot(ABC):
+    """Transient view constructed when an observable is written as a figure."""
+
     data: Data
+    runtime_simulation_args: dict[str, Any] | None = dataclasses.field(
+        default=None,
+        repr=False,
+    )
 
     xlim: tuple[float, float] | None = None
     ylim: tuple[float, float] | None = None
@@ -96,16 +66,9 @@ class Plot(ABC):
     def __post_init__(self) -> None:
         configure_matplotlib()
 
-    def __init_subclass__(cls) -> None:
-        if not inspect.isabstract(cls):
-            plot_key = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", cls.__name__)
-            plot_key = plot_key.lower()
-            plot_key = plot_key.replace("_plot", "_data")
-            PLOT_REGISTRY[plot_key] = cls
-
     @property
     def file_name(self) -> str:
-        return self.data.file_name.replace("_data", "_plot")
+        return self.data.file_name.removesuffix("_data") + "_plot"
 
     @property
     def simulation_args(self) -> dict[str, Any]:
@@ -127,6 +90,19 @@ class Plot(ABC):
             raise ValueError(f"Simulation arg metadata not found: {key}.") from exc
 
     def structure_simulation_arg(self, key: str, cls: type) -> Any:
+        if self.runtime_simulation_args is not None:
+            try:
+                value = self.runtime_simulation_args[key]
+            except KeyError as exc:
+                raise ValueError(f"Simulation arg not found: {key}.") from exc
+
+            if isinstance(value, cls):
+                return value
+
+            structured_value = RMT_CONVERTER.structure(value, cls)
+            self.runtime_simulation_args[key] = structured_value
+            return structured_value
+
         return RMT_CONVERTER.structure(self.simulation_arg(key), cls)
 
     def create_figure(self) -> None:
@@ -199,9 +175,9 @@ class Plot(ABC):
 class PlotAxes:
     axes_width: float = 1.0
 
-    xlabel: str = r"$x$"
+    xlabel: None = None
     xlabel_fontsize: int = 12
-    ylabel: str = r"$y$"
+    ylabel: None = None
     ylabel_fontsize: int = 12
 
     xticks: tuple[float, ...] | None = None
@@ -219,8 +195,10 @@ class PlotAxes:
         for spine in ax.spines.values():
             spine.set_linewidth(self.axes_width)
 
-        ax.set_xlabel(self.xlabel, fontsize=self.xlabel_fontsize)
-        ax.set_ylabel(self.ylabel, fontsize=self.ylabel_fontsize)
+        if self.xlabel is not None:
+            ax.set_xlabel(self.xlabel, fontsize=self.xlabel_fontsize)
+        if self.ylabel is not None:
+            ax.set_ylabel(self.ylabel, fontsize=self.ylabel_fontsize)
 
         if self.xticks is not None:
             ax.set_xticks(self.xticks)
@@ -256,11 +234,15 @@ class PlotAxes:
 class PlotLegend:
     handles: tuple | None = None
     labels: tuple[str, ...] | None = None
+
     fontsize: int = 10
     textalignment: str = "left"
 
+    on_black_background: bool = False
+
     title: str | None = None
     title_fontsize: int = 10
+    title_linespacing: float = 1.5
 
     loc: str = "best"
     bbox: tuple[float, float] | None = None
@@ -268,7 +250,7 @@ class PlotLegend:
 
     def configure(self, ax: Axes) -> None:
         if self.handles is not None and self.labels is not None:
-            ax.legend(
+            legend = ax.legend(
                 handles=self.handles,
                 labels=self.labels,
                 title=self.title,
@@ -279,3 +261,10 @@ class PlotLegend:
                 title_fontsize=self.title_fontsize,
                 alignment=self.textalignment,
             )
+
+            legend.get_title().set_linespacing(self.title_linespacing)
+
+            if self.on_black_background:
+                legend.get_title().set_color("white")
+                for text in legend.get_texts():
+                    text.set_color("white")

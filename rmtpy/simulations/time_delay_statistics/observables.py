@@ -34,31 +34,13 @@ def compute_scaled_log_support(
     return tuple(endpoint + np.log(scale) / np.log(log_base) for endpoint in support)
 
 
-def create_avg_unfolded_time_delay_histograms(
-    simulation: TimeDelayStatisticsSimulation,
-) -> list[Observable]:
-    histograms: list[Observable] = []
-    for degree in simulation.truncated_degrees:
-        histograms.extend(
-            create_unfolded_time_delay_histograms(
-                simulation=simulation,
-                file_name_prefix="time_delay_histogram_avg_unfolded",
-                unfolding="avg",
-                degree=degree,
-            )
-        )
-    return histograms
-
-
 def create_raw_time_delay_histogram_support(
     simulation: TimeDelayStatisticsSimulation,
 ) -> rmtpy.density.Support:
-    energy_0 = simulation.compound.ensemble.spectral_radius
-    dimension = simulation.compound.ensemble.dimension
-    scale = float(jn_zeros(1, 1)[0]) / energy_0
+    scale = float(jn_zeros(1, 1)[0]) / simulation.compound.ensemble.spectral_radius
     return compute_scaled_log_support(
         RAW_LOG_D_TIME_DELAY_SUPPORT,
-        log_base=dimension,
+        log_base=simulation.compound.ensemble.dimension,
         scale=scale,
     )
 
@@ -161,32 +143,6 @@ def create_unfolded_time_delay_histograms(
         )
         for energy_index, energy in enumerate(simulation.energies)
     ]
-
-
-def create_var_unfolded_time_delay_histograms(
-    simulation: TimeDelayStatisticsSimulation,
-) -> list[Observable]:
-    histograms: list[Observable] = []
-    for degree in simulation.truncated_degrees:
-        histograms.extend(
-            create_unfolded_time_delay_histograms(
-                simulation=simulation,
-                file_name_prefix="time_delay_histogram_var_unfolded",
-                unfolding="var",
-                degree=degree,
-            )
-        )
-    return histograms
-
-
-def create_weight_unfolded_time_delay_histograms(
-    simulation: TimeDelayStatisticsSimulation,
-) -> list[Observable]:
-    return create_unfolded_time_delay_histograms(
-        simulation=simulation,
-        file_name_prefix="time_delay_histogram_weight_unfolded",
-        unfolding="weight",
-    )
 
 
 def finalize_time_delay_histogram(histogram: Histogram) -> None:

@@ -17,28 +17,22 @@ from ...plot import Plot, PlotAxes, PlotLegend
 class ResonanceSpacingHistogramAxes(PlotAxes):
     xticks: tuple[float, ...] = (0.0, 1.0, 2.0, 3.0, 4.0)  # units of mean spacing
     xticks_minor: tuple[float, ...] = (0.5, 1.5, 2.5, 3.5)
-    xlabel: str = r"$\Delta E$"
+    xlabel: str = r"$s / \Delta$"
     xtick_labels: tuple[str, ...] = (
-        r"$0$",
-        r"$d$",
-        r"$2d$",
-        r"$3d$",
-        r"$4d$",
+        r"$0.0$",
+        r"$1.0$",
+        r"$2.0$",
+        r"$3.0$",
+        r"$4.0$",
     )
 
     yticks: tuple[float, ...] = (0.5, 1.0)
     yticks_minor: tuple[float, ...] = (0.25, 0.75)
-    ylabel: str = r"$\ensavg{f(\Delta E)}$"
+    ylabel: str = r"$P(s) \Delta$"
     ytick_labels: tuple[str, ...] = (
-        r"$\frac{1}{2}d^{-1}$",
-        r"$d^{-1}$",
+        r"$0.5$",
+        r"$1.0$",
     )
-
-
-@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
-class ResonanceSpacingHistogramLegend(PlotLegend):
-    loc: str = "upper right"
-    bbox: tuple[float, float] = (0.94, 0.95)
 
 
 @dataclasses.dataclass(repr=False, eq=False, kw_only=True)
@@ -73,16 +67,30 @@ class ResonanceSpacingHistogramPlot(Plot):
         self.compound: rmtpy.compounds.Compound = self.structure_simulation_arg(
             "compound", rmtpy.compounds.Compound
         )
+        mean_coupling_squared = np.mean(self.compound.coupling_strengths**2)
+        ensemble = self.compound.ensemble
 
         if self.compound.ensemble.universality_class is not None:
             self.surmise_legend = f"{self.compound.ensemble.universality_class} surmise"
             self.legend_labels = (self.histogram_legend, self.surmise_legend)
 
-        self.legend = ResonanceSpacingHistogramLegend(
-            handles=self.legend_handles, labels=self.legend_labels
+        self.legend = PlotLegend(
+            handles=self.legend_handles,
+            labels=self.legend_labels,
+            loc="upper right",
+            bbox=(0.94, 0.95),
         )
+
+        coupling_exponent = np.log10(mean_coupling_squared / ensemble.spectral_radius)
+        coupling_exponent = 0.0 if abs(coupling_exponent) < 0.005 else coupling_exponent
+        coupling_label = rf"$\alpha = {{{coupling_exponent:.1f}}}$"
         if self.legend.title is None:
-            self.legend.title = self.compound.ensemble.to_latex
+            self.legend.title = (
+                self.compound.ensemble.to_latex
+                + "\n"
+                + rf"$N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
+                + f", {{{coupling_label}}}"
+            )
 
         mean_spacing = self.data.metadata["global_mean_spacing"]
 
@@ -124,7 +132,7 @@ class ResonanceSpacingHistogramPlot(Plot):
 class UnfoldedResonanceSpacingHistogramAxes(PlotAxes):
     xticks: tuple[float, ...] = (0.0, 1.0, 2.0, 3.0, 4.0)
     xticks_minor: tuple[float, ...] = (0.5, 1.5, 2.5, 3.5)
-    xlabel: str = r"$s$"
+    xlabel: str = r"$\sigma$"
     xtick_labels: tuple[str, ...] = (
         r"$0.0$",
         r"$1.0$",
@@ -135,17 +143,11 @@ class UnfoldedResonanceSpacingHistogramAxes(PlotAxes):
 
     yticks: tuple[float, ...] = (0.5, 1.0)
     yticks_minor: tuple[float, ...] = (0.25, 0.75)
-    ylabel: str = r"$\ensavg{f(s)}$"
+    ylabel: str = r"$P(\sigma)$"
     ytick_labels: tuple[str, ...] = (
         r"$0.5$",
         r"$1.0$",
     )
-
-
-@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
-class UnfoldedResonanceSpacingHistogramLegend(PlotLegend):
-    loc: str = "upper right"
-    bbox: tuple[float, float] = (0.94, 0.95)
 
 
 @dataclasses.dataclass(repr=False, eq=False, kw_only=True)
@@ -180,17 +182,42 @@ class UnfoldedResonanceSpacingHistogramPlot(Plot):
         self.compound: rmtpy.compounds.Compound = self.structure_simulation_arg(
             "compound", rmtpy.compounds.Compound
         )
+        mean_coupling_squared = np.mean(self.compound.coupling_strengths**2)
+        ensemble = self.compound.ensemble
 
         if self.compound.ensemble.universality_class is not None:
             self.surmise_legend = f"{self.compound.ensemble.universality_class} surmise"
             self.legend_labels = (self.histogram_legend, self.surmise_legend)
 
-        self.legend = UnfoldedResonanceSpacingHistogramLegend(
+        self.legend = PlotLegend(
             handles=self.legend_handles,
             labels=self.legend_labels,
+            loc="upper right",
+            bbox=(0.94, 0.95),
         )
+
+        coupling_exponent = np.log10(mean_coupling_squared / ensemble.spectral_radius)
+        coupling_exponent = 0 if abs(coupling_exponent) < 0.005 else coupling_exponent
+        coupling_label = rf"$\alpha = {{{coupling_exponent:.1f}}}$"
         if self.legend.title is None:
-            self.legend.title = self.compound.ensemble.to_latex + "\nunfolded"
+            unfolding_type = self.data.metadata["unfolding"]
+            if unfolding_type != "wgt":
+                unfolding_degree = self.data.metadata["degree"]
+                self.legend.title = (
+                    self.compound.ensemble.to_latex
+                    + f"\n{unfolding_type}.\ unfolded, degree {unfolding_degree}"
+                    + "\n"
+                    + rf"$N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
+                    + f", {{{coupling_label}}}"
+                )
+            else:
+                self.legend.title = (
+                    self.compound.ensemble.to_latex
+                    + "\nwgt.\ unfolded"
+                    + "\n"
+                    + rf"$N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
+                    + f", {{{coupling_label}}}"
+                )
 
     def plot(self, path: str | Path) -> None:
         self.set_derived_attributes()

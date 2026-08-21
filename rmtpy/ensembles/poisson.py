@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterator
-from typing import ClassVar
+from typing import Any, ClassVar
 
 import attrs
 import numba
@@ -23,6 +23,9 @@ INITIALISM: str = "Poisson"
 DYSON_INDEX: int = 0
 
 EIGVECS_ENSEMBLE_FLAG: str = "GUE"
+EIGVECS_ENSEMBLE_FLAG_METADATA: dict[str, str] = {
+    "dir_name": "eigvecs",
+}
 
 
 def compute_standard_deviation(poisson: PoissonEnsemble) -> float:
@@ -41,13 +44,13 @@ def create_spectral_weight(
 
 
 @numba.njit(boundscheck=False, cache=True, fastmath=True)
-def mirror_upper_to_lower_triangle_complex(matrix: np.ndarray) -> np.ndarray:
+def mirror_upper_to_lower_triangle_complex(matrix: np.ndarray) -> None:
     for i in range(matrix.shape[0]):
         matrix[i + 1 :, i] = matrix[i, i + 1 :].conj()
 
 
 @numba.njit(boundscheck=False, cache=True, fastmath=True)
-def mirror_upper_to_lower_triangle_real(matrix: np.ndarray) -> np.ndarray:
+def mirror_upper_to_lower_triangle_real(matrix: np.ndarray) -> None:
     for i in range(matrix.shape[0]):
         matrix[i + 1 :, i] = matrix[i, i + 1 :]
 
@@ -63,6 +66,7 @@ class PoissonEnsemble(ManyBodyEnsemble):
             lambda value: WIGNER_DYSON_ENSEMBLE_INITIALISMS_BY_NAME.get(value, value),
         ],
         validator=attrs.validators.in_(WIGNER_DYSON_ENSEMBLE_NAMES_BY_INITIALISM),
+        metadata=EIGVECS_ENSEMBLE_FLAG_METADATA,
     )
 
     std_dev: float = attrs.field(
@@ -95,11 +99,9 @@ class PoissonEnsemble(ManyBodyEnsemble):
 
         ens_dict = RMT_CONVERTER.unstructure(self)
         ens_dict["name"] = WIGNER_DYSON_ENSEMBLE_NAMES_BY_INITIALISM[flag]
+        ens_dict["args"]["seed"] = self.rng
+        ens_dict.pop("rng_state", None)
         return RMT_CONVERTER.structure(ens_dict, WignerDysonEnsemble)
-
-    @property
-    def path_name(self) -> str:
-        return super().to_path + f"_{type(self.eigvecs_ensemble).initialism.lower()}"
 
     def generate_eigenvalues(self) -> np.ndarray:
         eigvals = self.rng.random(self.dimension, self.real_dtype.type)
@@ -116,7 +118,6 @@ class PoissonEnsemble(ManyBodyEnsemble):
             use_complex_dtype=use_complex_dtype,
         )
 
-        eigvals = self.generate_eigenvalues()
         eigvecs = lapack_heev(
             self.eigvecs_ensemble.generate_matrix(
                 use_complex_dtype=use_complex_dtype,
@@ -124,9 +125,11 @@ class PoissonEnsemble(ManyBodyEnsemble):
             compute_v=1,
             overwrite_a=True,
         )[1]
+        eigvals = self.generate_eigenvalues()
 
         blas_her = self._pick_blas_her(use_complex_dtype=use_complex_dtype)
         matrix = self._empty_matrix(use_complex_dtype=use_complex_dtype)
+        matrix.fill(0.0)
         for mu in range(self.dimension):
             blas_her(float(eigvals[mu]), x=eigvecs[:, mu], a=matrix, overwrite_a=1)
 
@@ -146,6 +149,7 @@ class PoissonEnsemble(ManyBodyEnsemble):
         for eigvals, eigvecs in self.eigsys_stream(
             realizs, use_complex_dtype=use_complex_dtype
         ):
+            matrix.fill(0.0)
             for mu in range(self.dimension):
                 blas_her(float(eigvals[mu]), x=eigvecs[:, mu], a=matrix, overwrite_a=1)
 
@@ -179,14 +183,16 @@ class PoissonEnsemble(ManyBodyEnsemble):
         in_support = np.abs(eigvals) < self.spectral_radius
         cdf = np.zeros_like(eigvals, dtype=np.result_type(eigvals, float))
         cdf[in_support] = eigvals[in_support] / (2 * self.spectral_radius) + 0.5
-        cdf[eigvals > self.spectral_radius] = 1.0
+        cdf[eigvals >= self.spectral_radius] = 1.0
         return cdf
 
     def porter_thomas_distribution(
         self, widths: np.ndarray, *, num_channels: int = 1
     ) -> np.ndarray:
         return rmtpy.universal.porter_thomas_distribution(
-            self.eigvecs_ensemble.dyson_index, num_channels, widths
+            widths,
+            dyson_index=self.eigvecs_ensemble.dyson_index,
+            num_channels=num_channels,
         )
 
     def _empty_matrix(self, *, use_complex_dtype: bool = False) -> np.ndarray:
@@ -199,29 +205,29 @@ class PoissonEnsemble(ManyBodyEnsemble):
                 (self.dimension, self.dimension), self.real_dtype.type, order="F"
             )
 
-    def _pick_blas_gemm(self, *, use_complex_dtype: bool = False) -> type:
+    def _pick_blas_gemm(self, *, use_complex_dtype: bool = False) -> Callable[..., Any]:
         return self.eigvecs_ensemble._pick_blas_gemm(
             use_complex_dtype=use_complex_dtype,
         )
 
-    def _pick_blas_her(self, *, use_complex_dtype: bool = False) -> type:
+    def _pick_blas_her(self, *, use_complex_dtype: bool = False) -> Callable[..., Any]:
         return self.eigvecs_ensemble._pick_blas_her(
             use_complex_dtype=use_complex_dtype,
         )
 
-    def _pick_lapack_geev(self, *, use_complex_dtype: bool = False) -> type:
+    def _pick_lapack_geev(self, *, use_complex_dtype: bool = False) -> Callable[..., Any]:
         return self.eigvecs_ensemble._pick_lapack_geev(
             use_complex_dtype=use_complex_dtype,
         )
 
-    def _pick_lapack_heev(self, *, use_complex_dtype: bool = False) -> type:
+    def _pick_lapack_heev(self, *, use_complex_dtype: bool = False) -> Callable[..., Any]:
         return self.eigvecs_ensemble._pick_lapack_heev(
             use_complex_dtype=use_complex_dtype,
         )
 
     def _pick_mirror_triangle_method(
         self, *, use_complex_dtype: bool = False
-    ) -> Callable[[np.ndarray], np.ndarray]:
+    ) -> Callable[[np.ndarray], None]:
         if use_complex_dtype or self.eigvecs_ensemble.dyson_index != 1:
             return mirror_upper_to_lower_triangle_complex
         else:

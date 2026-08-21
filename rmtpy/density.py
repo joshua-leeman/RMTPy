@@ -11,7 +11,7 @@ from scipy.ndimage import gaussian_filter1d
 
 import rmtpy.validators
 
-MAX_POLYNOMIAL_DEGREE: int = 10
+MAX_POLYNOMIAL_DEGREE: int = 6
 
 SUPPORT_SCALE_FACTOR: float = 1.2
 
@@ -138,7 +138,7 @@ def unfold_widths_with_cdf(
 
 
 def compute_default_number_of_bins(density: DensityModel) -> int:
-    return int(np.ceil(np.sqrt(density.dimension)))
+    return max(int(np.ceil(np.sqrt(density.dimension))), 2)
 
 
 def compute_optimal_realizations(density: DensityModel) -> int:
@@ -157,6 +157,8 @@ def is_polynomial_expansion_completely_provided(
 
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
 class DensityModel:
+    """Lazy PDF, CDF, and polynomial model for one spectrum-producing stream."""
+
     dimension: int = attrs.field(
         converter=int,
         validator=attrs.validators.gt(0),
@@ -189,6 +191,7 @@ class DensityModel:
     support_scale_factor: float = attrs.field(
         default=SUPPORT_SCALE_FACTOR,
         converter=float,
+        validator=attrs.validators.ge(1.0),
         repr=False,
     )
     kernel_std_dev: float = attrs.field(
@@ -200,13 +203,13 @@ class DensityModel:
     num_pts: int = attrs.field(
         default=NUM_POINTS,
         converter=int,
-        validator=attrs.validators.gt(0),
+        validator=attrs.validators.gt(1),
         repr=False,
     )
     num_bins: int = attrs.field(
         default=attrs.Factory(compute_default_number_of_bins, takes_self=True),
         converter=int,
-        validator=attrs.validators.gt(0),
+        validator=attrs.validators.gt(1),
         repr=False,
     )
     optimal_realizs: int = attrs.field(
@@ -283,7 +286,7 @@ class DensityModel:
         center = sum(self.support) / 2
         x = (np.asarray(inputs) - center) / self.support_radius
 
-        return self.polynomials(x, self.max_polynomial_degree)
+        return self.polynomials(x, degree=self.max_polynomial_degree)
 
     def compute_variate_coeffs(self, sample: np.ndarray) -> np.ndarray:
         polynomials = self.compute_polynomials(np.asarray(sample))
@@ -407,7 +410,7 @@ class DensityModel:
             counts += np.histogram(sample, bins=bins)[0]
 
         return create_pdf_interpolator_from_histogram(
-            histogram=compute_histogram(counts, bins),
+            histogram=compute_histogram(counts, bins=bins),
             bins=bins,
             kernel_std_dev=self.kernel_std_dev,
         )
@@ -419,7 +422,7 @@ class DensityModel:
         counts = np.histogram(np.asarray(sample), bins=bins)[0]
 
         return create_pdf_interpolator_from_histogram(
-            histogram=compute_histogram(counts, bins),
+            histogram=compute_histogram(counts, bins=bins),
             bins=bins,
             kernel_std_dev=self.kernel_std_dev,
         )

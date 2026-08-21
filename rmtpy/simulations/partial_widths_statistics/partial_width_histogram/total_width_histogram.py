@@ -3,6 +3,7 @@ from __future__ import annotations
 import dataclasses
 from pathlib import Path
 
+from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 from matplotlib.ticker import NullFormatter
 
@@ -17,29 +18,23 @@ from ...plot import Plot, PlotAxes, PlotLegend
 class TotalWidthHistogramAxes(PlotAxes):
     xticks: tuple[float, ...] = tuple(range(-1, 2))  # log scale base 10
     xticks_minor: tuple[float, ...] = tuple()
-    xlabel: str = r"$Y = \Gamma / \ensavg{\Gamma}$"
+    xlabel: str = r"$\log_{10} Y$"
     xtick_labels: tuple[str, ...] = (
-        r"$10^{-1}$",
-        r"$10^{0}$",
-        r"$10^{1}$",
+        r"$-1.0$",
+        r"$0.0$",
+        r"$+1.0$",
     )
 
     yticks: tuple[float, ...] = tuple(range(-3, 2))  # log scale base 10
     yticks_minor: tuple[float, ...] = tuple()
-    ylabel: str = r"$P(Y)$"
+    ylabel: str = r"$\log_{10} P(Y)$"
     ytick_labels: tuple[str, ...] = (
-        r"$10^{-3}$",
-        r"$10^{-2}$",
-        r"$10^{-1}$",
-        r"$10^{0}$",
-        r"$10^{1}$",
+        r"$-3.0$",
+        r"$-2.0$",
+        r"$-1.0$",
+        r"$0.0$",
+        r"$+1.0$",
     )
-
-
-@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
-class TotalWidthHistogramLegend(PlotLegend):
-    loc: str = "upper right"
-    bbox: tuple[float, float] = (0.94, 0.95)
 
 
 @dataclasses.dataclass(repr=False, eq=False, kw_only=True)
@@ -57,17 +52,41 @@ class TotalWidthHistogramPlot(Plot):
     histogram_color: str = "BlueViolet"
     histogram_legend: str = "simulation"
 
-    legend_labels: tuple[str] = (histogram_legend,)
-    legend_handles: tuple[Patch] = (Patch(color=histogram_color, alpha=histogram_alpha),)
+    surmise_zorder: int = 2
+    surmise_width: float = 2.0
+    surmise_alpha: float = 1.0
+    surmise_color: str = "Black"
+    surmise_legend: str = "Porter-Thomas"
+
+    legend_labels: tuple[str] = (histogram_legend, surmise_legend)
+    legend_handles: tuple[Patch] = (
+        Patch(color=histogram_color, alpha=histogram_alpha),
+        Line2D([0], [0], color=surmise_color, linewidth=surmise_width),
+    )
 
     def set_derived_attributes(self) -> None:
-        self.compound = self.structure_simulation_arg("compound", Compound)
+        width_index: tuple[int, int] = self.data.metadata["index"]
+        state_label = width_index[0]
 
-        self.legend = TotalWidthHistogramLegend(
-            handles=self.legend_handles, labels=self.legend_labels
+        self.axes.xlabel = rf"$\log_{{10}} Y_{{{state_label}}}$"
+        self.axes.ylabel = rf"$\log_{{10}} P(Y_{{{state_label}}})$"
+
+        self.compound: Compound = self.structure_simulation_arg("compound", Compound)
+
+        self.legend = PlotLegend(
+            handles=self.legend_handles,
+            labels=self.legend_labels,
+            loc="upper right",
+            bbox=(0.97, 0.95),
         )
+
         if self.legend.title is None:
-            self.legend.title = self.compound.to_latex
+            self.legend.title = (
+                self.compound.ensemble.to_latex
+                + "\n"
+                + rf"$N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
+                + rf", $\mu = {{{state_label}}}$"
+            )
 
         self.scale_limits_and_ticks(
             x=lambda value: 10**value,

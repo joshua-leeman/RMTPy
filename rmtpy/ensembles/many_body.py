@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from abc import abstractmethod
-from collections.abc import Iterator
-from typing import ClassVar
+from collections.abc import Callable, Iterator
+from typing import Any, ClassVar
 
 import attrs
 import numpy as np
@@ -23,7 +23,6 @@ NUM_MAJORANAS_MIN: int = 4
 NUM_MAJORANAS_MAX: int = 32
 NUM_MAJORANAS_METADATA: dict[str, str] = {
     "dir_name": "Nm",
-    "latex_name": r"N_\textrm{\tiny m}",
 }
 
 INTERACTION_STRENGTH: float = 1.0
@@ -32,7 +31,7 @@ INTERACTION_STRENGTH_METADATA: dict[str, str] = {
 }
 
 MAX_SPECTRAL_POLYNOMIAL_DEGREE_METADATA: dict[str, str] = {
-    "dir_name": "polydeg",
+    "dir_name": "max_polydeg",
 }
 
 
@@ -46,6 +45,8 @@ def compute_spectral_radius(mbe: ManyBodyEnsemble) -> float:
 
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
 class ManyBodyEnsemble(RandomMatrixEnsemble):
+    """Closed Hamiltonian ensemble with spectral-density and universal-law helpers."""
+
     initialism: ClassVar[str] = INITIALISM
 
     num_majoranas: int = attrs.field(
@@ -117,15 +118,21 @@ class ManyBodyEnsemble(RandomMatrixEnsemble):
         return rmtpy.universal.eigval_degeneracy(dyson_index=self.dyson_index)
 
     @property
+    def latex_name(self) -> str:
+        return rf"{{{super().latex_name}}}({{{self.num_majoranas}}})"
+
+    @property
     def universality_class(self) -> str | None:
         return rmtpy.universal.universality_class(dyson_index=self.dyson_index)
 
     @abstractmethod
-    def generate_matrix(self, *, use_complex_dtype: bool = False) -> None:
+    def generate_matrix(self, *, use_complex_dtype: bool = False) -> np.ndarray:
         raise NotImplementedError()
 
     @abstractmethod
-    def matrix_stream(self, realizs: int, *, use_complex_dtype: bool = False) -> None:
+    def matrix_stream(
+        self, realizs: int, *, use_complex_dtype: bool = False
+    ) -> Iterator[np.ndarray]:
         raise NotImplementedError()
 
     def eigsys_stream(
@@ -155,7 +162,7 @@ class ManyBodyEnsemble(RandomMatrixEnsemble):
     def wigner_surmise(self, spacings: np.ndarray) -> np.ndarray:
         return rmtpy.universal.wigner_surmise(spacings, dyson_index=self.dyson_index)
 
-    def connected_sff(self, times: np.ndarray) -> np.ndarray:
+    def universal_connected_sff(self, times: np.ndarray) -> np.ndarray:
         return rmtpy.universal.connected_sff(
             times, dyson_index=self.dyson_index, dimension=self.dimension
         )
@@ -170,7 +177,7 @@ class ManyBodyEnsemble(RandomMatrixEnsemble):
                 (self.dimension, self.dimension), self.real_dtype.type, order="F"
             )
 
-    def _pick_blas_gemm(self, *, use_complex_dtype: bool = False) -> type:
+    def _pick_blas_gemm(self, *, use_complex_dtype: bool = False) -> Callable[..., Any]:
         if use_complex_dtype or self.dyson_index != 1:
             if self.complex_dtype.type == np.complex64:
                 return scipy.linalg.blas.cgemm
@@ -182,7 +189,7 @@ class ManyBodyEnsemble(RandomMatrixEnsemble):
             else:
                 return scipy.linalg.blas.dgemm
 
-    def _pick_blas_her(self, *, use_complex_dtype: bool = False) -> type:
+    def _pick_blas_her(self, *, use_complex_dtype: bool = False) -> Callable[..., Any]:
         if use_complex_dtype or self.dyson_index != 1:
             if self.complex_dtype.type == np.complex64:
                 return scipy.linalg.blas.cher
@@ -194,7 +201,7 @@ class ManyBodyEnsemble(RandomMatrixEnsemble):
             else:
                 return scipy.linalg.blas.dsyr
 
-    def _pick_lapack_geev(self, *, use_complex_dtype: bool = False) -> type:
+    def _pick_lapack_geev(self, *, use_complex_dtype: bool = False) -> Callable[..., Any]:
         if use_complex_dtype or self.dyson_index != 1:
             if self.complex_dtype.type == np.complex64:
                 return scipy.linalg.lapack.cgeev
@@ -206,7 +213,7 @@ class ManyBodyEnsemble(RandomMatrixEnsemble):
             else:
                 return scipy.linalg.lapack.dgeev
 
-    def _pick_lapack_heev(self, *, use_complex_dtype: bool = False) -> type:
+    def _pick_lapack_heev(self, *, use_complex_dtype: bool = False) -> Callable[..., Any]:
         if use_complex_dtype or self.dyson_index != 1:
             if self.complex_dtype.type == np.complex64:
                 return scipy.linalg.lapack.cheev

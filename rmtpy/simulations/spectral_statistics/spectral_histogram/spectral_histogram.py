@@ -21,65 +21,49 @@ from ...plot import Plot, PlotAxes, PlotLegend
 class SpectralHistogramAxes(PlotAxes):
     xticks: tuple[float, ...] = (-1.0, 0.0, 1.0)  # units of energy_0
     xticks_minor: tuple[float, ...] = (-0.5, 0.5)
-    xlabel: str = r"$E$"
+    xlabel: str = r"$E / E_0$"
     xtick_labels: tuple[str, ...] = (
-        r"$-E_0$",
-        r"$0$",
-        r"$E_0$",
+        r"$-1.0$",
+        r"$0.0$",
+        r"$+1.0$",
     )
 
     yticks: tuple[float, ...] = (0.0, 1.0, 2.0)  # units of 1 / (pi * energy_0)
     yticks_minor: tuple[float, ...] = (0.0, 1.0, 2.0)
-    ylabel: str = r"$\ensavg{\rho(E)}$"
+    ylabel: str = r"$\pi E_0 \ensavg{\rho(E)}$"
     ytick_labels: tuple[str, ...] = (
-        r"$0$",
-        r"$\frac{1}{\pi E_0}$",
-        r"$\frac{2}{\pi E_0}$",
+        r"$0.0$",
+        r"$1.0$",
+        r"$2.0$",
     )
 
-    poisson_yticks: tuple[float, ...] = (
-        0.0,
-        0.25 * np.pi,
-        0.5 * np.pi,
-        0.75 * np.pi,
-    )  # units of 1 / (pi * energy_0)
-    poisson_yticks_minor: tuple[float, ...] = (
-        0.125 * np.pi,
-        0.375 * np.pi,
-        0.625 * np.pi,
-        0.875 * np.pi,
-    )
-    poisson_ytick_labels: tuple[str, ...] = (
-        r"$0$",
-        r"$\frac{1}{4E_0}$",
-        r"$\frac{1}{2E_0}$",
-        r"$\frac{3}{4E_0}$",
+    pois_yticks: tuple[float, ...] = (0.0, 1.0, 2.0, 3.0)  # units of 1 / (pi * energy_0)
+    pois_yticks_minor: tuple[float, ...] = (0.5, 1.5, 2.5)
+    pois_ytick_labels: tuple[str, ...] = (
+        r"$0.0$",
+        r"$1.0$",
+        r"$2.0$",
+        r"$3.0$",
     )
 
     syk2_yticks: tuple[float, ...] = tuple(range(6))  # units of 1 / (pi * energy_0)
     syk2_yticks_minor: tuple[float, ...] = tuple(x + 0.5 for x in range(6))
     syk2_ytick_labels: tuple[str, ...] = (
-        r"$0$",
-        r"$\frac{1}{\pi E_0}$",
-        r"$\frac{2}{\pi E_0}$",
-        r"$\frac{3}{\pi E_0}$",
-        r"$\frac{4}{\pi E_0}$",
-        r"$\frac{5}{\pi E_0}$",
+        r"$0.0$",
+        r"$1.0$",
+        r"$2.0$",
+        r"$3.0$",
+        r"$4.0$",
+        r"$5.0$",
     )
 
     syk4_yticks: tuple[float, ...] = tuple(range(3))  # units of 1 / (pi * energy_0)
     syk4_yticks_minor: tuple[float, ...] = tuple(x + 0.5 for x in range(3))
     syk4_ytick_labels: tuple[str, ...] = (
-        r"$0$",
-        r"$\frac{1}{\pi E_0}$",
-        r"$\frac{2}{\pi E_0}$",
+        r"$0.0$",
+        r"$1.0$",
+        r"$2.0$",
     )
-
-
-@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
-class SpectralHistogramLegend(PlotLegend):
-    loc: str = "upper right"
-    bbox: tuple[float, float] = (0.94, 0.95)
 
 
 @dataclasses.dataclass(repr=False, eq=False, kw_only=True)
@@ -90,7 +74,7 @@ class SpectralHistogramPlot(Plot):
     xlim: tuple[float, float] = (-1.2, 1.2)  # units of energy_0
     ylim: tuple[float, float] = (0.0, 2.6)  # units of 1 / (pi * energy_0)
 
-    poisson_ylim: tuple[float, float] = (0.0, 1.25)  # units of 1 / (pi * energy_0)
+    pois_ylim: tuple[float, float] = (0.0, 1.25)  # units of 1 / (pi * energy_0)
     syk2_ylim: tuple[float, float] = (0.0, 4.0)
     syk4_ylim: tuple[float, float] = (0.0, 2.5)
 
@@ -114,24 +98,26 @@ class SpectralHistogramPlot(Plot):
     )
 
     def set_derived_attributes(self) -> None:
-        self.ensemble = self.structure_simulation_arg(
+        self.ensemble: ManyBodyEnsemble = self.structure_simulation_arg(
             "ensemble", ManyBodyEnsemble
         )
-        energy_0 = self.ensemble.spectral_radius
 
-        self.legend = SpectralHistogramLegend(
-            handles=self.legend_handles, labels=self.legend_labels
+        self.legend = PlotLegend(
+            handles=self.legend_handles,
+            labels=self.legend_labels,
+            loc="upper right",
+            bbox=(0.99, 0.95),
         )
         if self.legend.title is None:
             self.legend.title = self.ensemble.to_latex
 
         axes = self.axes
         if isinstance(self.ensemble, PoissonEnsemble):
-            self.ylim = self.poisson_ylim
+            self.ylim = self.pois_ylim
 
-            axes.ytick_labels = axes.poisson_ytick_labels
-            axes.yticks = axes.poisson_yticks
-            axes.yticks_minor = axes.poisson_yticks_minor
+            axes.ytick_labels = axes.pois_ytick_labels
+            axes.yticks = axes.pois_yticks
+            axes.yticks_minor = axes.pois_yticks_minor
 
         elif isinstance(self.ensemble, SachdevYeKitaevEnsemble):
             if self.ensemble.q == 2:
@@ -149,8 +135,8 @@ class SpectralHistogramPlot(Plot):
                 axes.yticks_minor = axes.syk4_yticks_minor
 
         self.scale_limits_and_ticks(
-            x=lambda value: value * energy_0,
-            y=lambda value: value / np.pi / energy_0,
+            x=lambda value: value * self.ensemble.spectral_radius,
+            y=lambda value: value / np.pi / self.ensemble.spectral_radius,
         )
 
     def plot(self, path: str | Path) -> None:
@@ -183,28 +169,22 @@ class SpectralHistogramPlot(Plot):
 class UnfoldedSpectralHistogramAxes(PlotAxes):
     xticks: tuple[float, ...] = (-0.5, 0.0, 0.5)  # units of dimension
     xticks_minor: tuple[float, ...] = (-0.25, 0.25)
-    xlabel: str = r"$\xi$"
+    xlabel: str = r"$\xi / D$"
     xtick_labels: tuple[str, ...] = (
-        r"$-\frac{D}{2}$",
-        r"$0$",
-        r"$\frac{D}{2}$",
+        r"$-0.5$",
+        r"$0.0$",
+        r"$+0.5$",
     )
 
     yticks: tuple[float, ...] = (0.0, 0.5, 1.0, 1.5)  # units of dimension^{-1}
     yticks_minor: tuple[float, ...] = (0.25, 0.75, 1.25, 1.75)
-    ylabel: str = r"$\ensavg{\rho(\xi)}$"
+    ylabel: str = r"$\ensavg{\rho(\xi)} D$"
     ytick_labels: tuple[str, ...] = (
-        r"$0$",
-        r"$\frac{1}{2 D}$",
-        r"$\frac{1}{D}$",
-        r"$\frac{3}{2 D}$",
+        r"$0.0$",
+        r"$0.5$",
+        r"$1.0$",
+        r"$1.5$",
     )
-
-
-@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
-class UnfoldedSpectralHistogramLegend(PlotLegend):
-    loc: str = "upper right"
-    bbox: tuple[float, float] = (0.94, 0.95)
 
 
 @dataclasses.dataclass(repr=False, eq=False, kw_only=True)
@@ -236,16 +216,28 @@ class UnfoldedSpectralHistogramPlot(Plot):
     )
 
     def set_derived_attributes(self) -> None:
-        self.ensemble = self.structure_simulation_arg(
+        self.ensemble: ManyBodyEnsemble = self.structure_simulation_arg(
             "ensemble", ManyBodyEnsemble
         )
         dimension = self.ensemble.dimension
 
-        self.legend = UnfoldedSpectralHistogramLegend(
-            handles=self.legend_handles, labels=self.legend_labels
+        self.legend = PlotLegend(
+            handles=self.legend_handles,
+            labels=self.legend_labels,
+            loc="upper right",
+            bbox=(0.94, 0.95),
         )
+
         if self.legend.title is None:
-            self.legend.title = self.ensemble.to_latex + "\nunfolded"
+            unfolding_type = self.data.metadata["unfolding"]
+            if unfolding_type != "wgt":
+                unfolding_degree = self.data.metadata["degree"]
+                self.legend.title = (
+                    self.ensemble.to_latex
+                    + f"\n{unfolding_type}.\ unfolded, degree {unfolding_degree}"
+                )
+            else:
+                self.legend.title = self.ensemble.to_latex + "\nwgt.\ unfolded"
 
         self.scale_limits_and_ticks(
             x=lambda value: value * dimension,

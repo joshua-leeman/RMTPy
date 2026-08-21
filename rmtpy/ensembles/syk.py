@@ -25,20 +25,20 @@ def compute_dyson_index(syk: SachdevYeKitaevEnsemble) -> int:
     return {(0, 0): 1, (0, 4): 4}.get((syk.q % 4, syk.num_majoranas % 8), 2)
 
 
-def compute_spectral_radius(syk: SachdevYeKitaevEnsemble) -> float:
-    return (2 * syk.std_dev) * np.sqrt(
-        math.comb(syk.num_majoranas, syk.q) / (1 - syk.suppression)
-    )
-
-
 def compute_standard_deviation(syk: SachdevYeKitaevEnsemble) -> float:
     return syk.interaction_strength * np.sqrt(
         math.factorial(syk.q - 1) / syk.num_majoranas ** (syk.q - 1)
     )
 
 
+def compute_spectral_radius(syk: SachdevYeKitaevEnsemble) -> float:
+    return (2 * syk.std_dev) * np.sqrt(
+        math.comb(syk.num_majoranas, syk.q) / (1 - syk.suppression)
+    )
+
+
 def compute_suppression_factor(syk: SachdevYeKitaevEnsemble) -> float:
-    return np.sum(
+    return sum(
         ((-1) ** (syk.q - k) / math.comb(syk.num_majoranas, syk.q))
         * (math.comb(syk.q, k) * math.comb(syk.num_majoranas - syk.q, syk.q - k))
         for k in range(syk.q + 1)
@@ -48,8 +48,12 @@ def compute_suppression_factor(syk: SachdevYeKitaevEnsemble) -> float:
 def create_spectral_polynomials(
     syk: SachdevYeKitaevEnsemble,
 ) -> Callable[[np.ndarray, int], np.ndarray]:
-    def syk_spectral_polynomials(x: np.ndarray, degree: int) -> np.ndarray:
-        return rmtpy.polynomials.q_hermite_polynomials(x, syk.suppression, degree)
+    def syk_spectral_polynomials(x: np.ndarray, *, degree: int) -> np.ndarray:
+        return rmtpy.polynomials.q_hermite_polynomials(
+            x,
+            eta=syk.suppression,
+            degree=degree,
+        )
 
     return syk_spectral_polynomials
 
@@ -69,7 +73,9 @@ def instantiate_majorana_fermion_basis(
     syk: SachdevYeKitaevEnsemble,
 ) -> rmtpy.fermions.MajoranaFermionBasis:
     return rmtpy.fermions.MajoranaFermionBasis(
-        num_majoranas=syk.num_majoranas, in_real_basis=syk.dyson_index == 1
+        num_majoranas=syk.num_majoranas,
+        in_real_basis=syk.dyson_index == 1,
+        is_even_parity=syk.is_even_parity,
     )
 
 
@@ -81,7 +87,7 @@ def create_syk_matrix_with_imaginary_prefactor(
     std_dev: float,
     monomials_idxs: np.ndarray,
     monomials_data: np.ndarray,
-) -> np.ndarray:
+) -> None:
     num_terms = monomials_data.shape[0]
     coeffs = std_dev * rng.standard_normal(num_terms, real_dtype)
 
@@ -100,7 +106,7 @@ def create_syk_matrix_without_imaginary_prefactor(
     std_dev: float,
     monomials_idxs: np.ndarray,
     monomials_data: np.ndarray,
-) -> np.ndarray:
+) -> None:
     num_terms = monomials_data.shape[0]
     coeffs = std_dev * rng.standard_normal(num_terms, real_dtype)
 
@@ -117,11 +123,22 @@ def is_num_majoranas_within_limit(syk: SachdevYeKitaevEnsemble, _, q: int) -> No
             f"For the SYK q={q} model, `num_majoranas` cannot exceed "
             f"{NUM_MAJORANAS_LIMIT_BY_Q[q]} due to memory constraints."
         )
-    elif q > syk.num_majoranas:
+    elif q >= syk.num_majoranas:
         raise ValueError(
-            f"The SYK q-parameter {q} cannot exceed the number of majorana "
+            f"The SYK q-parameter {q} must be less than the number of majorana "
             f"fermions, here {syk.num_majoranas}."
         )
+
+
+def normalize_q(q: Any, syk: SachdevYeKitaevEnsemble) -> int:
+    q = int(q)
+    if q not in NUM_MAJORANAS_LIMIT_BY_Q:
+        raise ValueError(
+            f"`q` must be one of {tuple(NUM_MAJORANAS_LIMIT_BY_Q)}, got {q}."
+        )
+
+    is_num_majoranas_within_limit(syk, None, q)
+    return q
 
 
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
@@ -129,11 +146,7 @@ class SachdevYeKitaevEnsemble(ManyBodyEnsemble):
     initialism: ClassVar[str] = INITIALISM
 
     q: int = attrs.field(
-        converter=int,
-        validator=[
-            attrs.validators.in_(NUM_MAJORANAS_LIMIT_BY_Q),
-            is_num_majoranas_within_limit,
-        ],
+        converter=attrs.Converter(normalize_q, takes_self=True),
     )
     is_even_parity: bool = attrs.field(
         default=True,
@@ -178,11 +191,6 @@ class SachdevYeKitaevEnsemble(ManyBodyEnsemble):
         repr=False,
     )
 
-    _block_parity_slice: rmtpy.fermions.ParityBlockSlice | None = attrs.field(
-        default=None,
-        init=False,
-        repr=False,
-    )
     _decomposed_q_monomials: rmtpy.fermions.DecomposedSparseArray | None = attrs.field(
         default=None,
         init=False,
@@ -190,23 +198,18 @@ class SachdevYeKitaevEnsemble(ManyBodyEnsemble):
     )
 
     @property
-    def path_name(self) -> str:
-        return super().latex_name + f"_{self.q}"
+    def latex_name(self) -> str:
+        parity = "even" if self.is_even_parity else "odd"
+        return (
+            rf"{{\text{{{type(self).initialism}}}}}_{{q = {self.q}}}"
+            rf"^\text{{{parity}}}"
+            rf"(N_\text{{m}} = {{{self.num_majoranas}}})"
+        )
 
     @property
     def token_name(self) -> str:
-        return super().token_name + f"_{self.q}"
-
-    @property
-    def block_parity_slice(self) -> rmtpy.fermions.ParityBlockSlice:
-        if self._block_parity_slice is None:
-            object.__setattr__(
-                self,
-                "_parity_slice",
-                self.majorana_fermion_basis.parity_block_slice,
-            )
-
-        return self._block_parity_slice
+        parity = "even" if self.is_even_parity else "odd"
+        return f"{super().token_name}_{self.q}_{parity}"
 
     @property
     def decomposed_q_monomials(self) -> rmtpy.fermions.DecomposedSparseArray:
@@ -260,7 +263,7 @@ class SachdevYeKitaevEnsemble(ManyBodyEnsemble):
                 (self.dimension, self.dimension), self.real_dtype.type, order="F"
             )
 
-    def _pick_syk_matrix_builder(self) -> Callable[[np.ndarray], np.ndarray]:
+    def _pick_syk_matrix_builder(self) -> Callable[..., None]:
         if self.q % 4 == 2:
             return create_syk_matrix_with_imaginary_prefactor
         else:

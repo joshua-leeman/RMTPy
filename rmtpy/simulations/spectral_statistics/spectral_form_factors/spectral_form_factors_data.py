@@ -13,15 +13,15 @@ NUM_TIMES: int = 6000
 TIME_CHUNK_SIZE: int = 1024
 
 
-def create_array_of_complex_zeros(form_factors: FormFactorsData) -> None:
+def create_array_of_complex_zeros(form_factors: FormFactorsData) -> np.ndarray:
     return np.zeros(form_factors.num_times, dtype=np.complex128)
 
 
-def create_array_of_float_zeros(form_factors: FormFactorsData) -> None:
+def create_array_of_float_zeros(form_factors: FormFactorsData) -> np.ndarray:
     return np.zeros(form_factors.num_times, dtype=np.float64)
 
 
-def create_array_of_logtimes(form_factors: FormFactorsData) -> None:
+def create_array_of_logtimes(form_factors: FormFactorsData) -> np.ndarray:
     return form_factors.scale * rmtpy.density.array_of_floats(
         support=form_factors.logD_time_support,
         num_pts=form_factors.num_times,
@@ -112,6 +112,11 @@ class FormFactorsData(Data):
         self._realizs_count[0] += 1
 
     def compute_form_factors(self) -> None:
+        if self.realizs == 0:
+            self.form_factor.fill(0.0)
+            self.connected_form_factor.fill(0.0)
+            return
+
         self.form_factor[:] = self.second_moment / self.realizs
         self.connected_form_factor[:] = (
             self.form_factor - np.abs(self.first_moment / self.realizs) ** 2
