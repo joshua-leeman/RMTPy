@@ -1,4 +1,6 @@
 import unittest
+from pathlib import Path
+from unittest.mock import patch
 
 import numpy as np
 
@@ -9,6 +11,9 @@ from rmtpy.simulations.partial_widths_statistics import (
 )
 from rmtpy.simulations.resonance_statistics import ResonanceStatisticsSimulation
 from rmtpy.simulations.time_delay_statistics import TimeDelayStatisticsSimulation
+from rmtpy.simulations.transmission_coefficients_simulation import (
+    TransmissionCoefficientsSimulation,
+)
 
 
 def create_compound(
@@ -170,6 +175,161 @@ class TimeDelayOutputTests(unittest.TestCase):
                     len(output_locations),
                     len(tuple(simulation.iter_observables())),
                 )
+
+
+class TransmissionCoefficientOutputTests(unittest.TestCase):
+    def test_each_selected_channel_is_averaged_across_energy(self) -> None:
+        simulation = TransmissionCoefficientsSimulation(
+            compound=create_compound(max_polynomial_degree=0),
+            realizs=2,
+            channel_indices=(0, 1),
+        )
+
+        spectral_density = simulation.compound.ensemble.spectral_density
+        expected_energy_range = spectral_density.plot_range
+        self.assertGreaterEqual(len(simulation.energies), 2)
+        np.testing.assert_allclose(
+            simulation.energies[[0, -1]],
+            expected_energy_range,
+        )
+        self.assertFalse(simulation.energies.flags.writeable)
+
+        channel_0_diagonal = np.linspace(0.5, 0.75, len(simulation.energies))
+        channel_1_diagonal = np.linspace(0.25, 0.0, len(simulation.energies))
+        scattering_matrices = np.zeros(
+            (len(simulation.energies), 2, 2),
+            dtype=np.complex128,
+        )
+        scattering_matrices[:, 0, 0] = channel_0_diagonal
+        scattering_matrices[:, 1, 1] = channel_1_diagonal
+        simulation.outputs.add_scattering_matrices(scattering_matrices)
+        simulation.outputs.add_scattering_matrices(scattering_matrices)
+        simulation.calculate_statistics()
+
+        self.assertEqual(len(simulation.outputs.by_channel), 2)
+        expected_coefficients = (
+            1.0 - channel_0_diagonal**2,
+            1.0 - channel_1_diagonal**2,
+        )
+        for channel_index, (observable, expected) in enumerate(
+            zip(
+                simulation.outputs.by_channel,
+                expected_coefficients,
+                strict=True,
+            )
+        ):
+            self.assertEqual(observable.metadata["channel_index"], channel_index)
+            self.assertEqual(observable.data.channel_index, channel_index)
+            self.assertEqual(observable.data.realizs, 2)
+            np.testing.assert_array_equal(observable.data.energies, simulation.energies)
+            np.testing.assert_allclose(
+                observable.data.transmission_coefficients,
+                expected,
+            )
+
+        output_paths = tuple(
+            simulation.observable_output_path(observable)
+            for observable in simulation.outputs.by_channel
+        )
+        self.assertEqual(output_paths, (Path("channel_0"), Path("channel_1")))
+
+        observable = simulation.outputs.by_channel[0]
+        plot = observable.plot_cls(
+            data=observable.data,
+            runtime_simulation_args={"compound": simulation.compound},
+        )
+        with patch.object(plot, "finish_plot"):
+            plot.plot(path="unused")
+
+        np.testing.assert_array_equal(plot.ax.lines[0].get_xdata(), simulation.energies)
+        np.testing.assert_allclose(plot.xlim, expected_energy_range)
+        self.assertEqual(plot.axes.xlabel, r"$E / E_0$")
+        self.assertEqual(plot.axes.ylabel, r"$T_{0}(E)$")
+
+    def test_invalid_channel_selections_are_rejected(self) -> None:
+        compound = create_compound(max_polynomial_degree=0)
+        for channel_indices in ((), (0, 0), (-1,), (compound.num_channels,)):
+            with self.subTest(channel_indices=channel_indices), self.assertRaises(
+                ValueError
+            ):
+                TransmissionCoefficientsSimulation(
+                    compound=compound,
+                    realizs=1,
+                    channel_indices=channel_indices,
+                )
+
+    def test_weisskopf_estimate_uses_every_open_channel(self) -> None:
+        simulation = TransmissionCoefficientsSimulation(
+            compound=create_compound(max_polynomial_degree=0),
+            realizs=2,
+            channel_indices=(0,),
+        )
+
+        scattering_matrices = np.zeros(
+            (len(simulation.energies), 2, 2),
+            dtype=np.complex128,
+        )
+        scattering_matrices[:, 0, 0] = 0.5
+        scattering_matrices[:, 1, 1] = 0.0
+        simulation.outputs.add_scattering_matrices(scattering_matrices)
+        simulation.outputs.add_scattering_matrices(scattering_matrices)
+        simulation.calculate_statistics()
+
+        observable = simulation.outputs.weisskopf_estimate
+        data = observable.data
+        self.assertEqual(data.num_channels, simulation.compound.num_channels)
+        self.assertEqual(data.realizs, 2)
+        np.testing.assert_allclose(
+            data.transmission_coefficients,
+            np.tile((0.75, 1.0), (len(simulation.energies), 1)),
+        )
+
+        spectral_density = simulation.compound.ensemble.spectral_density
+        weight_density = spectral_density.weight_pdf(simulation.energies)
+        in_support = weight_density > 0.0
+        expected = (
+            1.75
+            / (2.0 * simulation.compound.ensemble.dimension * weight_density[in_support])
+        )
+        np.testing.assert_allclose(data.weisskopf_estimate[in_support], expected)
+        self.assertTrue(np.all(np.isnan(data.weisskopf_estimate[~in_support])))
+
+        self.assertEqual(
+            simulation.observable_output_path(observable),
+            Path(),
+        )
+        self.assertEqual(len(tuple(simulation.iter_observables())), 2)
+
+        plot = observable.plot_cls(
+            data=data,
+            runtime_simulation_args={"compound": simulation.compound},
+        )
+        with patch.object(plot, "finish_plot"):
+            plot.plot(path="unused")
+
+        np.testing.assert_array_equal(plot.ax.lines[0].get_xdata(), simulation.energies)
+        np.testing.assert_allclose(plot.xlim, spectral_density.plot_range)
+        self.assertEqual(plot.axes.xlabel, r"$E / E_0$")
+        self.assertEqual(
+            plot.axes.ylabel,
+            r"$\Gamma_{\mathrm{Weisskopf}}(E)$",
+        )
+
+    def test_channel_selection_accepts_an_iterable(self) -> None:
+        simulation = TransmissionCoefficientsSimulation(
+            compound=create_compound(max_polynomial_degree=0),
+            realizs=1,
+            channel_indices=(index for index in (1, 0)),
+        )
+
+        self.assertEqual(simulation.channel_indices, (1, 0))
+        self.assertEqual(
+            tuple(
+                observable.data.channel_index
+                for observable in simulation.outputs.by_channel
+            ),
+            (1, 0),
+        )
 
 
 class PartialWidthOutputTests(unittest.TestCase):

@@ -254,6 +254,7 @@ Each family has a class API and a convenience runner exported from
 | `ResonanceStatisticsSimulation` | compound, realizations | centers, widths, spacings, 2-D complex-energy density, resonance form factors, density coefficients |
 | `PartialWidthsStatisticsSimulation` | compound, realizations, width selections | selected channel widths and per-state total widths, scaled by observed means |
 | `TimeDelayStatisticsSimulation` | compound, realizations, probe energies | raw and unfolded proper-delay histograms for each energy |
+| `TransmissionCoefficientsSimulation` | compound, realizations, channel selections | energy-resolved channel transmission coefficients and the Weisskopf estimate |
 
 Let `M=max_spectral_polynomial_degree`, let
 `T=(2, 4, ..., <= M)`, and let `k=len(T)`.
@@ -264,6 +265,7 @@ Let `M=max_spectral_polynomial_degree`, let
 | resonance | `M + 10 + 10*k` | coefficients; five-quantity raw and weight groups; five-quantity average and variate groups by degree |
 | time delay at `n` energies | `2*n*(k + 1)` | raw/weight by energy; average/variate by degree, then energy |
 | partial width | `len(width_indices)` | one histogram per requested selection, in request order |
+| transmission coefficients for `c` channels | `c + 1` | one `T_a(E)` plot per requested channel and one all-channel Weisskopf-estimate plot |
 
 Degree zero is a supported, useful small-run configuration. It produces raw and
 weight-unfolded outputs but no coefficient, average-unfolded, or
@@ -281,6 +283,56 @@ Time-delay energies may be a scalar or a finite, nonempty one-dimensional
 array-like. They are copied into a contiguous, read-only `float64` array.
 Numeric duplicates (including signed zero) and distinct values that would
 collide after five-significant-digit output-path formatting are rejected.
+
+Transmission coefficients use the same `Compound` coupling strengths as the
+other open-system experiments. Select the channel labels `a` with
+`channel_indices`. The simulation evaluates every selected channel on an
+energy grid spanning `compound.ensemble.spectral_density.plot_range`, the same
+horizontal range used by the raw spectral-density plot. At every grid point it
+averages the diagonal scattering amplitudes over realizations before calculating
+
+$$
+T_a(E)=1-\left|\left\langle S_{aa}(E)\right\rangle\right|^2.
+$$
+
+This is deliberately different from averaging `1 - |S_aa|^2` realization by
+realization. The former is the channel transmission coefficient. Each requested
+channel gets its own `transmission_coefficients_plot.png`, with energy on the
+horizontal axis and outputs grouped under `channel_<a>`.
+
+The simulation also produces exactly one Weisskopf estimate,
+
+$$
+\Gamma_{\mathrm{Weisskopf}}(E)
+=\frac{d(E)}{2}\sum_{a=1}^{\Lambda}T_a(E),
+\qquad
+d(E)=\frac{1}{D\,\rho_{\mathrm{weight}}(E)}.
+$$
+
+Unlike the individually requested transmission-coefficient outputs, this sum
+always includes all `compound.num_channels` open channels. Its plot uses the
+same energy grid and horizontal limits as every $T_a(E)$ plot. Where the
+spectral weight density vanishes outside its physical support, the estimate is
+stored as undefined rather than dividing by zero.
+
+```python
+from rmtpy.compounds import Compound
+from rmtpy.ensembles import GOE
+from rmtpy.simulations.transmission_coefficients_simulation import (
+    TransmissionCoefficientsSimulation,
+)
+
+compound = Compound(
+    ensemble=GOE(num_majoranas=8, seed=7),
+    coupling_strengths=[0.6, 1.0, 1.4, 1.8],
+)
+simulation = TransmissionCoefficientsSimulation(
+    compound=compound,
+    realizs=500,
+    channel_indices=(0, 2, 3),
+)
+simulation.run(out_dir="output")
+```
 
 ## Unfolding
 
