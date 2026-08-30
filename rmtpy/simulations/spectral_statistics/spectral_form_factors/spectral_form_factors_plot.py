@@ -10,21 +10,19 @@ from scipy.special import jn_zeros
 
 import rmtpy.ensembles
 
-from ...plot import Plot, PlotAxes, PlotLegend
+from ...plot import (
+    DIMENSION_TIME_LOG_SUPPORT,
+    UNFOLDED_DIMENSION_TIME_LOG_SUPPORT,
+    DimensionTimeAxes,
+    Plot,
+    PlotLegend,
+    UnfoldedDimensionTimeAxes,
+)
 from .spectral_form_factors_data import FormFactorsData
 
 
 @dataclasses.dataclass(repr=False, eq=False, kw_only=True)
-class FormFactorsAxes(PlotAxes):
-    xticks: tuple[float, ...] = (0.0, 0.5, 1.0)  # log scale base dimension
-    # t_0 = j_\text{\tiny 1,1} / J
-    xlabel: str = r"$u = t / t_0$"
-    xtick_labels: tuple[str, ...] = (
-        r"$N_\text{m}^{-1}$",
-        r"$D^{1/2} N_\text{m}^{-1}$",
-        r"$D N_\text{m}^{-1}$",
-    )
-
+class FormFactorsAxes(DimensionTimeAxes):
     yticks: tuple[float, ...] = (-2, -1, 0)  # log scale base dimension
     ytick_labels: tuple[str, ...] = (
         r"$D^{-2}$",
@@ -39,7 +37,7 @@ class FormFactorsPlot(Plot):
     axes: FormFactorsAxes = dataclasses.field(default_factory=FormFactorsAxes)
     num_points: int = 1000
 
-    xlim: tuple[float, float] = (-0.5, 1.5)  # log scale base dimension
+    xlim: tuple[float, float] = DIMENSION_TIME_LOG_SUPPORT
     ylim: tuple[float, float] = (-2.2, 0.2)
 
     # thouless_marker: str = "*"
@@ -139,15 +137,7 @@ class FormFactorsPlot(Plot):
 
 
 @dataclasses.dataclass(repr=False, eq=False, kw_only=True)
-class UnfoldedFormFactorsAxes(PlotAxes):
-    xticks: tuple[float, ...] = (-1.0, -0.5, 0.0)  # log scale base dimension
-    xlabel: str = r"$\upsilon = \tau / \tau_\text{\tiny H}$"
-    xtick_labels: tuple[str, ...] = (
-        r"$D^{-1}$",
-        r"$D^{-1/2}$",
-        r"$1$",
-    )
-
+class UnfoldedFormFactorsAxes(UnfoldedDimensionTimeAxes):
     yticks: tuple[float, ...] = (-2, -1, 0)  # log scale base dimension
     ytick_labels: tuple[str, ...] = (
         r"$D^{-2}$",
@@ -164,7 +154,7 @@ class UnfoldedFormFactorsPlot(Plot):
     )
     num_points: int = 1000
 
-    xlim: tuple[float, float] = (-1.5, 0.5)  # log scale base dimension
+    xlim: tuple[float, float] = UNFOLDED_DIMENSION_TIME_LOG_SUPPORT
     ylim: tuple[float, float] = (-2.2, 0.2)
 
     # thouless_marker: str = "*"

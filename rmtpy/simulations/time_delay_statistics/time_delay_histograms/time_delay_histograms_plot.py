@@ -12,7 +12,14 @@ import rmtpy.universal
 from rmtpy.compounds import Compound
 
 from ...histogram import Histogram
-from ...plot import Plot, PlotAxes, PlotLegend
+from ...plot import (
+    DIMENSION_TIME_LOG_SUPPORT,
+    UNFOLDED_DIMENSION_TIME_LOG_SUPPORT,
+    DimensionTimeAxes,
+    Plot,
+    PlotLegend,
+    UnfoldedDimensionTimeAxes,
+)
 
 
 def format_energy_label(energy: float, energy_0: float) -> str:
@@ -24,16 +31,7 @@ def format_energy_label(energy: float, energy_0: float) -> str:
 
 
 @dataclasses.dataclass(repr=False, eq=False, kw_only=True)
-class TimeDelayHistogramAxes(PlotAxes):
-    xticks: tuple[float, ...] = (0.0, 0.5, 1.0)  # log scale base dimension
-    # t_0 = j_\text{\tiny 1,1} / J
-    xlabel: str = r"$u = t / t_0$"
-    xtick_labels: tuple[str, ...] = (
-        r"$N_\text{m}^{-1}$",
-        r"$D^{1/2} N_\text{m}^{-1}$",
-        r"$D N_\text{m}^{-1}$",
-    )
-
+class TimeDelayHistogramAxes(DimensionTimeAxes):
     ylabel: str = r"$P(u)$"
 
 
@@ -45,7 +43,7 @@ class TimeDelayHistogramPlot(Plot):
     )
     num_points: int = 1000
 
-    xlim: tuple[float, float] = (-0.5, 1.5)  # log scale base dimension
+    xlim: tuple[float, float] = DIMENSION_TIME_LOG_SUPPORT
 
     histogram_zorder: int = 1
     histogram_alpha: float = 0.42
@@ -131,15 +129,7 @@ class TimeDelayHistogramPlot(Plot):
 
 
 @dataclasses.dataclass(repr=False, eq=False, kw_only=True)
-class UnfoldedTimeDelayHistogramAxes(PlotAxes):
-    xticks: tuple[float, ...] = (-1.0, -0.5, 0.0)  # log scale base dimension
-    xlabel: str = r"$\upsilon = \tau / \tau_\text{\tiny H}$"
-    xtick_labels: tuple[str, ...] = (
-        r"$D^{-1}$",
-        r"$D^{-1/2}$",
-        r"$1$",
-    )
-
+class UnfoldedTimeDelayHistogramAxes(UnfoldedDimensionTimeAxes):
     ylabel: str = r"$P(\upsilon)$"
 
 
@@ -149,7 +139,7 @@ class UnfoldedTimeDelayHistogramPlot(TimeDelayHistogramPlot):
         default_factory=UnfoldedTimeDelayHistogramAxes
     )
 
-    xlim: tuple[float, float] = (-1.5, 0.5)  # log scale base dimension
+    xlim: tuple[float, float] = UNFOLDED_DIMENSION_TIME_LOG_SUPPORT
 
     def set_derived_attributes(self) -> None:
         self.compound: Compound = self.structure_simulation_arg("compound", Compound)

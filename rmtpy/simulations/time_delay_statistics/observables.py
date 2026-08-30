@@ -9,6 +9,7 @@ import rmtpy.density
 
 from ..histogram import Histogram
 from ..observable import Observable
+from ..plot import DIMENSION_TIME_LOG_SUPPORT, UNFOLDED_DIMENSION_TIME_LOG_SUPPORT
 from ..statistics import create_histogram_observable
 from .time_delay_histograms import (
     TimeDelayHistogramPlot,
@@ -20,9 +21,11 @@ if TYPE_CHECKING:
 
 NUM_BINS: int = 100
 
-RAW_LOG_D_TIME_DELAY_SUPPORT: rmtpy.density.Support = (-0.5, 1.5)
+RAW_LOG_D_TIME_DELAY_SUPPORT: rmtpy.density.Support = DIMENSION_TIME_LOG_SUPPORT
 
-UNFOLDED_LOG_D_TIME_DELAY_SUPPORT: rmtpy.density.Support = (-1.5, 0.5)
+UNFOLDED_LOG_D_TIME_DELAY_SUPPORT: rmtpy.density.Support = (
+    UNFOLDED_DIMENSION_TIME_LOG_SUPPORT
+)
 
 
 def compute_scaled_log_support(

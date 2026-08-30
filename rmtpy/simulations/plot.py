@@ -16,6 +16,10 @@ from rmtpy.conversion import RMT_CONVERTER
 from .data import Data
 from .histogram import Histogram
 
+DIMENSION_TIME_LOG_SUPPORT: tuple[float, float] = (-0.5, 1.5)
+
+UNFOLDED_DIMENSION_TIME_LOG_SUPPORT: tuple[float, float] = (-1.5, 0.5)
+
 
 def configure_matplotlib() -> None:
     matplotlib.rcParams["axes.axisbelow"] = False
@@ -228,6 +232,33 @@ class PlotAxes:
             ax.set_yticklabels(self.ytick_labels, fontsize=self.tick_fontsize)
         else:
             ax.tick_params(axis="y", labelsize=self.tick_fontsize)
+
+
+@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
+class DimensionTimeAxes(PlotAxes):
+    """Shared raw-time axis for dimension-scaled dynamical observables."""
+
+    xticks: tuple[float, ...] = (0.0, 0.5, 1.0)  # log scale base dimension
+    # t_0 = j_\text{\tiny 1,1} / J
+    xlabel: str = r"$u = t / t_0$"
+    xtick_labels: tuple[str, ...] = (
+        r"$N_\text{m}^{-1}$",
+        r"$D^{1/2} N_\text{m}^{-1}$",
+        r"$D N_\text{m}^{-1}$",
+    )
+
+
+@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
+class UnfoldedDimensionTimeAxes(PlotAxes):
+    """Shared unfolded-time axis in units of the Heisenberg time."""
+
+    xticks: tuple[float, ...] = (-1.0, -0.5, 0.0)  # log scale base dimension
+    xlabel: str = r"$\upsilon = \tau / \tau_\text{\tiny H}$"
+    xtick_labels: tuple[str, ...] = (
+        r"$D^{-1}$",
+        r"$D^{-1/2}$",
+        r"$1$",
+    )
 
 
 @dataclasses.dataclass(repr=False, eq=False, kw_only=True)

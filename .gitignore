@@ -5,14 +5,11 @@ pyproject.toml
 .ruff_cache/
 docs/
 output/
+outputs/
 scratch/
 archive/
 notebooks/
-/architecture_report/
-
-# To delete later
-rmtpy_programming_content.txt
-finance_resume/
+architecture_report/
 
 # DotEnv configuration
 .env

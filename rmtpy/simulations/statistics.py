@@ -111,12 +111,14 @@ def create_observable(
     *,
     data: DataT,
     plot_cls: type[Plot] | None = None,
+    additional_plot_classes: tuple[type[Plot], ...] = (),
     metadata: dict[str, Any] | None = None,
     finalize: Callable[[Data], None] | None = None,
 ) -> Observable[DataT]:
     observable = Observable(
         data=data,
         plot_cls=plot_cls,
+        additional_plot_classes=additional_plot_classes,
         finalize=finalize,
     )
     if metadata is not None:

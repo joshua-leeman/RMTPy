@@ -7,6 +7,7 @@ import rmtpy.density
 from rmtpy.ensembles import ManyBodyEnsemble
 
 from ..observable import Observable
+from ..plot import DIMENSION_TIME_LOG_SUPPORT, UNFOLDED_DIMENSION_TIME_LOG_SUPPORT
 from ..statistics import (
     create_coefficient_histograms,
     create_histogram_observable,
@@ -33,11 +34,13 @@ SPECTRAL_COEFFICIENT_SUPPORT: rmtpy.density.Support = (-0.2, 0.2)
 
 SPACING_SUPPORT_UNITS_MEAN: rmtpy.density.Support = (0.0, 4.0)
 
-SFF_LOG_D_TIME_SUPPORT: rmtpy.density.Support = (-0.5, 1.5)
+SFF_LOG_D_TIME_SUPPORT: rmtpy.density.Support = DIMENSION_TIME_LOG_SUPPORT
 
 UNFOLDED_LEVEL_SUPPORT_UNITS_DIMENSION: rmtpy.density.Support = (-1.2, 1.2)
 
-UNFOLDED_SFF_LOG_D_TIME_SUPPORT: rmtpy.density.Support = (-1.5, 0.5)
+UNFOLDED_SFF_LOG_D_TIME_SUPPORT: rmtpy.density.Support = (
+    UNFOLDED_DIMENSION_TIME_LOG_SUPPORT
+)
 
 
 def create_raw_spacings_histogram_observable(

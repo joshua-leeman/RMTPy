@@ -8,6 +8,7 @@ from scipy.special import jn_zeros
 import rmtpy.density
 
 from ..observable import Observable
+from ..plot import DIMENSION_TIME_LOG_SUPPORT, UNFOLDED_DIMENSION_TIME_LOG_SUPPORT
 from ..spectral_statistics.spectral_form_factors import finalize_form_factors
 from ..statistics import (
     create_coefficient_histograms,
@@ -51,7 +52,9 @@ COMPLEX_ENERGY_WIDTH_LOG10_SUPPORT: rmtpy.density.Support = (-8.0, 8.0)
 
 RESONANCE_COEFFICIENT_SUPPORT: rmtpy.density.Support = (-0.2, 0.2)
 
-RESONANCE_FORM_FACTOR_LOG_D_TIME_SUPPORT: rmtpy.density.Support = (-0.5, 1.5)
+RESONANCE_FORM_FACTOR_LOG_D_TIME_SUPPORT: rmtpy.density.Support = (
+    DIMENSION_TIME_LOG_SUPPORT
+)
 
 RESONANCE_SPACING_SUPPORT_UNITS_MEAN_SPACING: rmtpy.density.Support = (0.0, 4.0)
 
@@ -76,8 +79,7 @@ UNFOLDED_COMPLEX_ENERGY_WIDTH_LOG10_SUPPORT: rmtpy.density.Support = (
 )
 
 UNFOLDED_RESONANCE_FORM_FACTOR_LOG_D_TIME_SUPPORT: rmtpy.density.Support = (
-    -1.5,
-    0.5,
+    UNFOLDED_DIMENSION_TIME_LOG_SUPPORT
 )
 
 UNFOLDED_RESONANCE_SPACING_SUPPORT_UNITS_MEAN_SPACING: rmtpy.density.Support = (

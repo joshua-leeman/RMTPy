@@ -147,7 +147,7 @@ The hierarchy is easiest to read as a sequence of scientific responsibilities.
 | `Compound` | One ensemble, channel strengths, resonance density, open-system streams | It represents a different physical system: the closed Hamiltonian plus its coupling to external channels. |
 | `Simulation` | Immutable experiment inputs, metadata, lifecycle, one output bundle | It coordinates realization, finalization, persistence, and plotting. It does not implement the physics already owned by an ensemble or compound. |
 | Output bundle | Typed grouping by quantity, unfolding, degree, and sometimes energy | It preserves scientifically meaningful alignment. It contains references to observables, not copies of the ensemble or compound. |
-| `Observable` | One `Data` object, optional finalizer, optional plot class | It is a thin descriptor. It does not retain a `Plot`. |
+| `Observable` | One `Data` object, optional finalizer, optional plot views | It is a thin descriptor. It does not retain a `Plot`. Multiple transient views may share one persisted result without duplicating its arrays. |
 | `Data` | Mutable NumPy buffers and result metadata | Frozen `attrs` wiring prevents accidental reassignment while arrays remain mutable for streaming accumulation. |
 | `Plot` | A temporary view of one `Data` object | It is constructed only while saving. All plots in one save pass share one detached model reconstructed from initial metadata, so the live simulation and RNG remain untouched. |
 
@@ -250,6 +250,7 @@ Each family has a class API and a convenience runner exported from
 
 | Simulation | Inputs | Main products |
 | --- | --- | --- |
+| `CDOEvolutionSimulation` | ensemble, realizations, initial state, time grid | basis probabilities, classical and quantum purity, von Neumann entropy, ensemble-averaged KL divergence |
 | `SpectralStatisticsSimulation` | ensemble, realizations | levels, nearest-neighbor spacings, spectral and connected form factors, density coefficients |
 | `ResonanceStatisticsSimulation` | compound, realizations | centers, widths, spacings, 2-D complex-energy density, resonance form factors, density coefficients |
 | `PartialWidthsStatisticsSimulation` | compound, realizations, width selections | selected channel widths and per-state total widths, scaled by observed means |
@@ -261,6 +262,7 @@ Let `M=max_spectral_polynomial_degree`, let
 
 | Output bundle | Observable count | Typed organization |
 | --- | ---: | --- |
+| CDO evolution | `1` (or `2`) | one time-resolved dynamics observable; optional retained evolved states |
 | spectral | `M + 6 + 6*k` | coefficients; raw and weight groups; average and variate groups by degree |
 | resonance | `M + 10 + 10*k` | coefficients; five-quantity raw and weight groups; five-quantity average and variate groups by degree |
 | time delay at `n` energies | `2*n*(k + 1)` | raw/weight by energy; average/variate by degree, then energy |
@@ -334,6 +336,31 @@ simulation = TransmissionCoefficientsSimulation(
 simulation.run(out_dir="output")
 ```
 
+`CDOEvolutionSimulation` evolves one normalized initial state under each closed
+Hamiltonian realization and forms the chaotic density operator
+
+$$
+\rho_{\mathrm{CDO}}(t)=\frac{1}{R}\sum_{r=1}^{R}
+|\psi_r(t)\rangle\langle\psi_r(t)|.
+$$
+
+Its time grid is zero followed by points spaced logarithmically in base $D$ and
+scaled by $j_{1,1}/E_0$. The KL output is the realization average
+$R^{-1}\sum_r D_{\mathrm{KL}}(\bar p\Vert p_r)$ for basis probabilities, where
+$\bar p=R^{-1}\sum_r p_r$. This reverse divergence is infinite if an individual
+realization assigns zero probability where $\bar p$ is positive. The accumulator
+chooses between state factors and a packed Hermitian density operator according
+to which exact representation is smaller; evolved states are therefore not
+retained as a persisted output unless `retain_evolved_states=True` is requested.
+
+The one CDO dynamics result produces three transient views:
+`cdo_probabilities_plot`, `cdo_purities_plot`, and `cdo_information_plot`.
+All three reuse the raw spectral-form-factor time axis exactly, including its
+$u=t/t_0$ label, dimension-scaled ticks, and plotted time range. Probabilities
+and purities use the same base-$D$ logarithmic vertical range as the form
+factor. Entropy and KL divergence use a linear vertical range from $0$ to
+$\log D$, matching the established information-plot scale.
+
 ## Unfolding
 
 Raw levels mix slowly varying bulk density with local correlations. Given a CDF
@@ -397,9 +424,11 @@ significant digits and replaces `-` by `n` and `.` by `p`, such as
 `energy_n0p25`.
 
 Every run writes one root `metadata.json`. Every observable writes
-`<name>/<name>_data.npz` and, when a plot class exists,
-`<name>/<name>_plot.png`. The archive metadata contains the initial simulation
-arguments and RNG state.
+`<name>/<name>_data.npz` and, when plot views exist, one or more PNG files in
+the same `<name>/` directory. Most observables use the conventional
+`<name>_plot.png` file name; multi-view data such as CDO dynamics use explicit
+quantity names. The archive metadata contains the initial simulation arguments
+and RNG state.
 
 Data objects support typed save/load round trips:
 

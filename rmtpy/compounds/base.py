@@ -444,7 +444,7 @@ class Compound:
                 wigner_smith_matrix.swapaxes(-1, -2) + wigner_smith_matrix.conj()
             )
 
-            yield wigner_smith_matrix, eigvals  # , s_matrix_diagonal
+            yield wigner_smith_matrix, eigvals
 
     def time_delays_stream(
         self, realizs: int, *, energies: np.ndarray
@@ -452,7 +452,7 @@ class Compound:
         for delay_matrix, eigvals in self.wigner_smith_matrix_stream(
             realizs, energies=np.asarray(energies)
         ):
-            yield np.linalg.eigvalsh(delay_matrix), eigvals  # , s_matrix_diagonal
+            yield np.linalg.eigvalsh(delay_matrix), eigvals
 
     def time_delay_pdf(self, times: np.ndarray) -> np.ndarray:
         global_mean_spacing = 2 * self.ensemble.spectral_radius / self.ensemble.dimension
