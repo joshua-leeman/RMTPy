@@ -7,14 +7,18 @@ import attrs
 import numpy as np
 import scipy.linalg.blas
 import scipy.linalg.lapack
+from numpy.typing import NDArray
 
-import rmtpy.density
 import rmtpy.universal
 import rmtpy.validators
-from rmtpy.density import DensityModel
+from rmtpy.density import MAX_POLYNOMIAL_DEGREE, DensityModel
 from rmtpy.polynomials import OrthogonalPolynomials, RealFunction
 
 from .base_ensemble import RandomMatrixEnsemble
+
+type HermitianMatrix = NDArray[np.floating] | NDArray[np.complexfloating]
+type UnitaryMatrix = NDArray[np.floating] | NDArray[np.complexfloating]
+type Eigenvalues = NDArray[np.floating]
 
 INITIALISM: str = "MBE"
 
@@ -64,7 +68,7 @@ class ManyBodyEnsemble(RandomMatrixEnsemble, ABC):
         metadata=INTERACTION_STRENGTH_METADATA,
     )
     max_spectral_polynomial_degree: int = attrs.field(
-        default=rmtpy.density.MAX_POLYNOMIAL_DEGREE,
+        default=MAX_POLYNOMIAL_DEGREE,
         converter=int,
         validator=attrs.validators.ge(0),
         metadata=MAX_SPECTRAL_POLYNOMIAL_DEGREE_METADATA,
@@ -110,13 +114,20 @@ class ManyBodyEnsemble(RandomMatrixEnsemble, ABC):
         )
 
     @abstractmethod
-    def generate_matrix(self, *, use_complex_dtype: bool = False) -> np.ndarray:
+    def generate_matrix(
+        self,
+        *,
+        use_complex_dtype: bool = False,
+    ) -> HermitianMatrix:
         raise NotImplementedError()
 
     @abstractmethod
     def matrix_stream(
-        self, realizs: int, *, use_complex_dtype: bool = False
-    ) -> Iterator[np.ndarray]:
+        self,
+        realizs: int,
+        *,
+        use_complex_dtype: bool = False,
+    ) -> Iterator[HermitianMatrix]:
         raise NotImplementedError()
 
     def eigsys_stream(
@@ -124,11 +135,11 @@ class ManyBodyEnsemble(RandomMatrixEnsemble, ABC):
         realizs: int,
         *,
         use_complex_dtype: bool = False,
-    ) -> Iterator[tuple[np.ndarray, np.ndarray]]:
+    ) -> Iterator[tuple[Eigenvalues, UnitaryMatrix]]:
         lapack_heev = self._pick_lapack_heev(use_complex_dtype=use_complex_dtype)
         for matrix in self.matrix_stream(realizs, use_complex_dtype=use_complex_dtype):
             eigvals, eigvecs, _info = cast(
-                tuple[np.ndarray, np.ndarray, object],
+                tuple[Eigenvalues, UnitaryMatrix, object],
                 lapack_heev(matrix, compute_v=1, overwrite_a=True),
             )
             yield eigvals, eigvecs
@@ -138,31 +149,34 @@ class ManyBodyEnsemble(RandomMatrixEnsemble, ABC):
         realizs: int,
         *,
         use_complex_dtype: bool = False,
-    ) -> Iterator[np.ndarray]:
+    ) -> Iterator[Eigenvalues]:
         lapack_heev = self._pick_lapack_heev(use_complex_dtype=use_complex_dtype)
         for matrix in self.matrix_stream(realizs, use_complex_dtype=use_complex_dtype):
             eigvals, _info = cast(
-                tuple[np.ndarray, object],
+                tuple[Eigenvalues, object],
                 lapack_heev(matrix, compute_v=0, overwrite_a=True),
             )
             yield eigvals
 
     def porter_thomas_distribution(
         self,
-        widths: np.ndarray,
+        widths: NDArray[np.floating],
         *,
         num_channels: int = 1,
-    ) -> np.ndarray:
+    ) -> NDArray[np.floating]:
         return rmtpy.universal.porter_thomas_distribution(
             widths,
             dyson_index=self.dyson_index,
             num_channels=num_channels,
         )
 
-    def wigner_surmise(self, spacings: np.ndarray) -> np.ndarray:
+    def wigner_surmise(self, spacings: NDArray[np.floating]) -> NDArray[np.floating]:
         return rmtpy.universal.wigner_surmise(spacings, dyson_index=self.dyson_index)
 
-    def universal_connected_sff(self, times: np.ndarray) -> np.ndarray:
+    def universal_connected_sff(
+        self,
+        times: NDArray[np.floating],
+    ) -> NDArray[np.floating]:
         return rmtpy.universal.connected_sff(
             times,
             dyson_index=self.dyson_index,
@@ -175,7 +189,7 @@ class ManyBodyEnsemble(RandomMatrixEnsemble, ABC):
 
         return self.real_dtype
 
-    def _create_empty_matrix(self, *, use_complex_dtype: bool = False) -> np.ndarray:
+    def _create_empty_matrix(self, *, use_complex_dtype: bool = False) -> HermitianMatrix:
         matrix_dtype = self._choose_linalg_dtype(use_complex_dtype=use_complex_dtype)
         return np.empty((self.dimension, self.dimension), matrix_dtype, order="F")
 

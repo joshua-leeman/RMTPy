@@ -5,6 +5,7 @@ from typing import cast
 
 import attrs
 import numpy as np
+from numpy.typing import NDArray
 from scipy import sparse
 
 import rmtpy.validators
@@ -12,7 +13,7 @@ import rmtpy.validators
 type MajoranaFermions = tuple[sparse.csr_array, ...]
 type ComplexFermions = tuple[tuple[sparse.csr_array, ...], tuple[sparse.csr_array, ...]]
 type ParityBlockSlice = tuple[slice, slice]
-type DecomposedSparseArray = tuple[np.ndarray, np.ndarray]
+type DecomposedSparseArray = tuple[NDArray[np.int32], NDArray[np.int8 | np.complex64]]
 
 
 def create_majorana_fermions(*, num_majoranas: int) -> MajoranaFermions:
@@ -185,7 +186,7 @@ def create_decomposed_q_monomials(
 def create_conjugated_compound_coupling_matrix(
     *,
     num_free_complex_fermions: int,
-    coupling_strengths: np.ndarray,
+    coupling_strengths: NDArray[np.floating],
     creation_operators: MajoranaFermions,
     vacuum_state: sparse.csr_array,
     parity_block_slice: ParityBlockSlice,
@@ -344,7 +345,7 @@ class MajoranaFermionBasis:
         self,
         *,
         num_free_complex_fermions: int,
-        coupling_strengths: np.ndarray,
+        coupling_strengths: NDArray[np.floating],
         dyson_index: int = 2,
     ) -> sparse.csc_array:
         return create_conjugated_compound_coupling_matrix(
