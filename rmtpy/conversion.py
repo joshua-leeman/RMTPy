@@ -97,7 +97,7 @@ def canonicalize_string_selection(
     return tuple(value for value in allowed.to_tuple() if value in normalized_set)
 
 
-def normalize_dict(
+def normalize_source(
     src: dict[str, str | dict[str, object]],
     *,
     registry: dict[str, type[attrs.AttrsInstance]],
@@ -134,7 +134,7 @@ def normalize_dict(
     return {"type": registered_cls.__name__, "parameters": parameters}
 
 
-def normalize_config_value(value: object) -> object:
+def normalize_value(value: object) -> object:
     if value is None or isinstance(value, bool | int | float | str):
         return value
 
@@ -146,27 +146,27 @@ def normalize_config_value(value: object) -> object:
 
     if isinstance(value, list | tuple):
         iterable = cast(list[object] | tuple[object, ...], value)
-        return [normalize_config_value(item) for item in iterable]
+        return [normalize_value(item) for item in iterable]
 
     if isinstance(value, dict):
         mapping = cast(dict[object, object], value)
         if any(not isinstance(key, str) for key in mapping):
             raise TypeError("Configuration mappings must use string keys.")
 
-        return {key: normalize_config_value(item) for key, item in mapping.items()}
+        return {key: normalize_value(item) for key, item in mapping.items()}
 
     if isinstance(value, np.ndarray):
-        return normalize_config_value(cast(list[object], value.tolist()))
+        return normalize_value(cast(list[object], value.tolist()))
 
     if isinstance(value, np.dtype):
         return value.name
 
     if isinstance(value, np.generic):
-        return normalize_config_value(value.item())
+        return normalize_value(value.item())
 
     if isinstance(value, np.random.SeedSequence):
         return {
-            "entropy": normalize_config_value(value.entropy),
+            "entropy": normalize_value(value.entropy),
             "spawn_key": list(value.spawn_key),
             "pool_size": value.pool_size,
         }
@@ -174,23 +174,21 @@ def normalize_config_value(value: object) -> object:
     if isinstance(value, np.random.Generator):
         return {
             "generator": type(value.bit_generator).__name__,
-            "state": normalize_config_value(value.bit_generator.state),
+            "state": normalize_value(value.bit_generator.state),
         }
 
     if isinstance(value, np.random.BitGenerator):
         return {
             "bit_generator": type(value).__name__,
-            "state": normalize_config_value(value.state),
+            "state": normalize_value(value.state),
         }
 
     if attrs.has(type(value)):
-        fields = cast("tuple[attrs.Attribute[object], ...]", attrs.fields(type(value)))
+        fields = cast(tuple[attrs.Attribute[object], ...], attrs.fields(type(value)))
         return {
             "type": type(value).__name__,
             "parameters": {
-                field.name: normalize_config_value(
-                    cast(object, getattr(value, field.name))
-                )
+                field.name: normalize_value(cast(object, getattr(value, field.name)))
                 for field in fields
                 if field.init
             },

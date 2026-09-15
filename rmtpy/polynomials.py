@@ -1,8 +1,20 @@
-from typing import cast
+from collections.abc import Callable
+from typing import Protocol, cast
 
 import numba
 import numpy as np
 from numpy.typing import NDArray
+
+type RealFunction = Callable[[NDArray[np.floating]], NDArray[np.floating]]
+
+
+class OrthogonalPolynomials(Protocol):
+    def __call__(
+        self,
+        x: NDArray[np.floating],
+        *,
+        degree: int,
+    ) -> NDArray[np.floating]: ...
 
 
 def chebyshev_polynomial_2_weight(

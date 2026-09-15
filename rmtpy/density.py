@@ -10,8 +10,17 @@ from scipy.interpolate import PchipInterpolator
 from scipy.ndimage import gaussian_filter1d
 
 import rmtpy.validators
+from rmtpy.polynomials import OrthogonalPolynomials, RealFunction
 
-type RealFunction = Callable[[NDArray[np.floating]], NDArray[np.floating]]
+
+class EigenvaluesStream(Protocol):
+    def __call__(
+        self,
+        realizs: int,
+        *,
+        use_complex_dtype: bool = False,
+    ) -> Iterator[NDArray[np.floating]]: ...
+
 
 MAX_POLYNOMIAL_DEGREE: int = 6
 
@@ -24,24 +33,6 @@ NUM_HISTOGRAM_COUNTS: int = 2**13
 GAUSSIAN_KERNEL_STANDARD_DEVIATION: float = 2.0
 
 NUM_POINTS: int = 1000
-
-
-class OrthogonalPolynomials(Protocol):
-    def __call__(
-        self,
-        x: NDArray[np.floating],
-        *,
-        degree: int,
-    ) -> NDArray[np.floating]: ...
-
-
-class EigValsStream(Protocol):
-    def __call__(
-        self,
-        realizs: int,
-        *,
-        use_complex_dtype: bool = False,
-    ) -> Iterator[NDArray[np.floating]]: ...
 
 
 def array_of_floats(
@@ -160,13 +151,13 @@ def unfold_widths_with_cdf(
     return dimension * (cdf(centers + widths / 2) - cdf(centers - widths / 2))
 
 
-def compute_default_number_of_bins(density: DensityModel) -> int:
+def _compute_default_number_of_bins(density: DensityModel) -> int:
     rough_estimate = cast(np.float64, np.sqrt(density.dimension))
     rounded_estimate = cast(np.float64, np.ceil(rough_estimate))
     return max(int(rounded_estimate), 2)
 
 
-def compute_optimal_realizations(density: DensityModel) -> int:
+def _compute_optimal_realizations(density: DensityModel) -> int:
     return max(NUM_HISTOGRAM_COUNTS // density.dimension, NUM_REALIZATIONS_MIN)
 
 
@@ -185,7 +176,7 @@ class DensityModel:
         default=None,
         validator=attrs.validators.optional(attrs.validators.is_callable()),
     )
-    sample_stream: EigValsStream = attrs.field(
+    sample_stream: EigenvaluesStream = attrs.field(
         validator=attrs.validators.is_callable(),
         repr=False,
     )
@@ -217,13 +208,13 @@ class DensityModel:
         repr=False,
     )
     num_bins: int = attrs.field(
-        default=attrs.Factory(compute_default_number_of_bins, takes_self=True),
+        default=attrs.Factory(_compute_default_number_of_bins, takes_self=True),
         converter=int,
         validator=attrs.validators.gt(1),
         repr=False,
     )
     optimal_realizs: int = attrs.field(
-        default=attrs.Factory(compute_optimal_realizations, takes_self=True),
+        default=attrs.Factory(_compute_optimal_realizations, takes_self=True),
         init=False,
         repr=False,
     )
@@ -415,7 +406,8 @@ class DensityModel:
         )
 
     def _create_variate_pdf_interpolator_from_sample(
-        self, sample: NDArray[np.floating]
+        self,
+        sample: NDArray[np.floating],
     ) -> PchipInterpolator:
         bins = np.linspace(*self.plot_range, self.num_bins + 1)
         counts = np.histogram(np.asarray(sample), bins=bins)[0]
@@ -450,7 +442,10 @@ class DensityModel:
         return weight_function * expansion_factor
 
     def _variate_pdf_from_sample(
-        self, points: NDArray[np.floating], *, sample: NDArray[np.floating] | None = None
+        self,
+        points: NDArray[np.floating],
+        *,
+        sample: NDArray[np.floating] | None = None,
     ) -> NDArray[np.floating]:
         if sample is None:
             raise ValueError("`sample` must be provided for sample-based PDFs.")
