@@ -1,5 +1,6 @@
+import ast
 import inspect
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import ClassVar, cast
 
@@ -7,7 +8,17 @@ import attrs
 import numpy as np
 
 import rmtpy.conversion
-from rmtpy.conversion import RMT_CONVERTER, SeedLike
+from rmtpy.conversion import RMT_CONVERTER
+
+type SeedLike = (
+    None
+    | bytes
+    | int
+    | np.random.SeedSequence
+    | np.random.BitGenerator
+    | np.random.Generator
+    | Sequence[int]
+)
 
 INITIALISM: str = "RME"
 
@@ -27,6 +38,10 @@ def _compute_complex_dtype(ensemble: RandomMatrixEnsemble) -> np.dtype[np.generi
 
 def _compute_real_dtype(ensemble: RandomMatrixEnsemble) -> np.dtype[np.generic]:
     return np.dtype(ensemble.dtype.char.lower())
+
+
+def _compute_seed(seed: str | SeedLike) -> SeedLike:
+    return ast.literal_eval(seed) if isinstance(seed, str) else seed
 
 
 def _create_random_number_generator(
@@ -100,7 +115,7 @@ class RandomMatrixEnsemble:
     )
     seed: SeedLike = attrs.field(
         default=None,
-        converter=rmtpy.conversion.convert_seed,
+        converter=_compute_seed,
     )
 
     complex_dtype: np.dtype[np.generic] = attrs.field(

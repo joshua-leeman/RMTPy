@@ -1,7 +1,6 @@
-import ast
 import hashlib
 import re
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable
 from enum import StrEnum
 from pathlib import Path
 from typing import cast
@@ -10,16 +9,6 @@ import attrs
 import cattrs
 import numpy as np
 from numpy.typing import DTypeLike, NDArray
-
-type SeedLike = (
-    None
-    | bytes
-    | int
-    | np.random.SeedSequence
-    | np.random.BitGenerator
-    | np.random.Generator
-    | Sequence[int]
-)
 
 
 def structure_dtype(value: DTypeLike, _: object) -> np.dtype[np.generic]:
@@ -33,11 +22,6 @@ def unstructure_dtype(dtype: np.dtype[np.generic]) -> str:
 RMT_CONVERTER: cattrs.Converter = cattrs.Converter()
 RMT_CONVERTER.register_structure_hook(np.dtype, structure_dtype)
 RMT_CONVERTER.register_unstructure_hook(np.dtype, unstructure_dtype)
-
-
-def convert_seed(seed: str | SeedLike) -> SeedLike:
-    parsed = ast.literal_eval(seed) if isinstance(seed, str) else seed
-    return parsed
 
 
 class StringEnum(StrEnum):
