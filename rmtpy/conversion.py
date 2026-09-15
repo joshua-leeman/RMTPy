@@ -22,11 +22,6 @@ type SeedLike = (
 )
 
 
-def convert_seed(seed: str | SeedLike) -> SeedLike:
-    parsed = ast.literal_eval(seed) if isinstance(seed, str) else seed
-    return parsed
-
-
 def structure_dtype(value: DTypeLike, _: object) -> np.dtype[np.generic]:
     return np.dtype(value)
 
@@ -38,6 +33,11 @@ def unstructure_dtype(dtype: np.dtype[np.generic]) -> str:
 RMT_CONVERTER: cattrs.Converter = cattrs.Converter()
 RMT_CONVERTER.register_structure_hook(np.dtype, structure_dtype)
 RMT_CONVERTER.register_unstructure_hook(np.dtype, unstructure_dtype)
+
+
+def convert_seed(seed: str | SeedLike) -> SeedLike:
+    parsed = ast.literal_eval(seed) if isinstance(seed, str) else seed
+    return parsed
 
 
 class StringEnum(StrEnum):
