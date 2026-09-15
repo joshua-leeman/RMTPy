@@ -16,9 +16,11 @@ from rmtpy.polynomials import Float64Function, OrthogonalPolynomials
 
 from .base_ensemble import RandomMatrixEnsemble
 
-type HermitianMatrix = NDArray[np.floating] | NDArray[np.complexfloating]
-type S_UnitaryMatrix = NDArray[np.floating] | NDArray[np.complexfloating]
-type RealEigenvalues = NDArray[np.floating]
+type RealSymmetricMatrix = NDArray[np.float64]
+type HermitianMatrix = NDArray[np.complex128]
+type RealEigenvalues = NDArray[np.float64]
+type OrthogonalMatrix = NDArray[np.float64]
+type UnitaryMatrix = NDArray[np.complex128]
 
 INITIALISM: str = "MBE"
 
@@ -118,7 +120,7 @@ class ManyBodyEnsemble(RandomMatrixEnsemble, ABC):
         self,
         *,
         use_complex_dtype: bool = False,
-    ) -> HermitianMatrix:
+    ) -> RealSymmetricMatrix | HermitianMatrix:
         raise NotImplementedError()
 
     @abstractmethod
@@ -127,7 +129,7 @@ class ManyBodyEnsemble(RandomMatrixEnsemble, ABC):
         realizs: int,
         *,
         use_complex_dtype: bool = False,
-    ) -> Iterator[HermitianMatrix]:
+    ) -> Iterator[RealSymmetricMatrix | HermitianMatrix]:
         raise NotImplementedError()
 
     def eigsys_stream(
@@ -135,11 +137,11 @@ class ManyBodyEnsemble(RandomMatrixEnsemble, ABC):
         realizs: int,
         *,
         use_complex_dtype: bool = False,
-    ) -> Iterator[tuple[RealEigenvalues, S_UnitaryMatrix]]:
+    ) -> Iterator[tuple[RealEigenvalues, OrthogonalMatrix | UnitaryMatrix]]:
         lapack_heev = self._pick_lapack_heev(use_complex_dtype=use_complex_dtype)
         for matrix in self.matrix_stream(realizs, use_complex_dtype=use_complex_dtype):
             eigvals, eigvecs, _info = cast(
-                tuple[RealEigenvalues, S_UnitaryMatrix, object],
+                tuple[RealEigenvalues, OrthogonalMatrix | UnitaryMatrix, object],
                 lapack_heev(matrix, compute_v=1, overwrite_a=True),
             )
             yield eigvals, eigvecs
@@ -160,23 +162,23 @@ class ManyBodyEnsemble(RandomMatrixEnsemble, ABC):
 
     def porter_thomas_distribution(
         self,
-        widths: NDArray[np.floating],
+        widths: NDArray[np.float64],
         *,
         num_channels: int = 1,
-    ) -> NDArray[np.floating]:
+    ) -> NDArray[np.float64]:
         return rmtpy.universal.porter_thomas_distribution(
             widths,
             dyson_index=self.dyson_index,
             num_channels=num_channels,
         )
 
-    def wigner_surmise(self, spacings: NDArray[np.floating]) -> NDArray[np.floating]:
+    def wigner_surmise(self, spacings: NDArray[np.float64]) -> NDArray[np.float64]:
         return rmtpy.universal.wigner_surmise(spacings, dyson_index=self.dyson_index)
 
     def universal_connected_sff(
         self,
-        times: NDArray[np.floating],
-    ) -> NDArray[np.floating]:
+        times: NDArray[np.float64],
+    ) -> NDArray[np.float64]:
         return rmtpy.universal.connected_sff(
             times,
             dyson_index=self.dyson_index,
@@ -189,7 +191,11 @@ class ManyBodyEnsemble(RandomMatrixEnsemble, ABC):
 
         return self.real_dtype
 
-    def _create_empty_matrix(self, *, use_complex_dtype: bool = False) -> HermitianMatrix:
+    def _create_empty_matrix(
+        self,
+        *,
+        use_complex_dtype: bool = False,
+    ) -> RealSymmetricMatrix | HermitianMatrix:
         matrix_dtype = self._choose_linalg_dtype(use_complex_dtype=use_complex_dtype)
         return np.empty((self.dimension, self.dimension), matrix_dtype, order="F")
 

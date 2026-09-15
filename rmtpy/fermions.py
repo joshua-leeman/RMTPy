@@ -186,7 +186,7 @@ def create_decomposed_q_monomials(
 def create_conjugated_compound_coupling_matrix(
     *,
     num_free_complex_fermions: int,
-    coupling_strengths: NDArray[np.floating],
+    coupling_strengths: NDArray[np.float64],
     creation_operators: MajoranaFermions,
     vacuum_state: sparse.csr_array,
     parity_block_slice: ParityBlockSlice,
@@ -344,7 +344,7 @@ class MajoranaFermionBasis:
         self,
         *,
         num_free_complex_fermions: int,
-        coupling_strengths: NDArray[np.floating],
+        coupling_strengths: NDArray[np.float64],
         dyson_index: int = 2,
     ) -> sparse.csc_array:
         return create_conjugated_compound_coupling_matrix(

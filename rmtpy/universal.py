@@ -14,10 +14,10 @@ def universality_class(*, dyson_index: int) -> str | None:
 
 
 def wigner_surmise(
-    spacings: NDArray[np.floating],
+    spacings: NDArray[np.float64],
     *,
     dyson_index: int,
-) -> NDArray[np.floating]:
+) -> NDArray[np.float64]:
     if dyson_index == 0:
         return np.exp(-spacings)
 
@@ -32,22 +32,22 @@ def wigner_surmise(
 
 
 def porter_thomas_distribution(
-    widths: NDArray[np.floating],
+    widths: NDArray[np.float64],
     *,
     dyson_index: int,
     num_channels: int,
-) -> NDArray[np.floating]:
+) -> NDArray[np.float64]:
     real_dof = num_channels if dyson_index == 1 else 2 * num_channels
     coeff = cast(int, (real_dof / 2) ** (real_dof / 2) / gamma(real_dof / 2))
     return coeff * widths ** (real_dof / 2 - 1) * np.exp(-real_dof * widths / 2)
 
 
 def connected_sff(
-    times: NDArray[np.floating],
+    times: NDArray[np.float64],
     *,
     dyson_index: int,
     dimension: int,
-) -> NDArray[np.floating]:
+) -> NDArray[np.float64]:
     tau = times / (2 * np.pi)
 
     if dyson_index == 1:
@@ -78,11 +78,11 @@ def connected_sff(
 
 
 def time_delay_pdf(
-    times: NDArray[np.floating],
+    times: NDArray[np.float64],
     *,
     num_channels: int,
     heisenberg_time: float,
-) -> NDArray[np.floating]:
+) -> NDArray[np.float64]:
     taus = times / heisenberg_time
     tau_plus = cast(float, (3 + np.sqrt(8)) / num_channels)
     tau_minus = cast(float, (3 - np.sqrt(8)) / num_channels)
