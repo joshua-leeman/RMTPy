@@ -1,14 +1,13 @@
-from __future__ import annotations
-
 from collections.abc import Iterator
-from typing import Any, ClassVar
+from typing import ClassVar, cast, override
 
 import attrs
 import numba
 import numpy as np
 
 from .gue import create_gue_matrix
-from .wigner_dyson import WignerDysonEnsemble
+from .many_body_ensemble import HermitianMatrix
+from .wigner_dyson_ensemble import WignerDysonEnsemble
 
 DYSON_INDEX: int = 4
 
@@ -16,37 +15,37 @@ INITIALISM: str = "GSE"
 
 
 def compute_standard_deviation(gse: GaussianSymplecticEnsemble) -> float:
-    return gse.spectral_radius / 2 / np.sqrt(2 * gse.dimension)
+    return cast(float, gse.spectral_radius / 2 / np.sqrt(2 * gse.dimension))
 
 
 def create_gse_matrix(
-    matrix: np.ndarray,
-    rng: np.random.Generator,
-    real_dtype: type[np.floating[Any]],
+    matrix: HermitianMatrix,
+    real_dtype: type[np.float64],
     std_dev: float,
+    rng: np.random.Generator,
 ) -> None:
-    halfway = matrix.shape[0] // 2
+    halfway = cast(int, matrix.shape[0] // 2)
     top_left_block = matrix[:halfway, :halfway]
     top_right_block = matrix[:halfway, halfway:]
     bottom_left_block = matrix[halfway:, :halfway]
     bottom_right_block = matrix[halfway:, halfway:]
 
-    create_gue_matrix(top_left_block, rng, real_dtype, std_dev)
-    np.conj(top_left_block, out=bottom_right_block)
+    create_gue_matrix(top_left_block, real_dtype, std_dev, rng)
+    _ = np.conjugate(top_left_block, out=bottom_right_block)
 
-    create_skew_symmetric_matrix(top_right_block, rng, real_dtype, std_dev)
-    np.negative(top_right_block, out=bottom_left_block)
-    np.conj(bottom_left_block, out=bottom_left_block)
+    create_skew_symmetric_matrix(top_right_block, real_dtype, std_dev, rng)
+    _ = np.negative(top_right_block, out=bottom_left_block)
+    _ = np.conjugate(bottom_left_block, out=bottom_left_block)
 
 
 @numba.njit(boundscheck=False, cache=True, fastmath=True)
 def create_skew_symmetric_matrix(
-    matrix: np.ndarray,
-    rng: np.random.Generator,
-    real_dtype: type[np.floating[Any]],
+    matrix: HermitianMatrix,
+    real_dtype: type[np.float64],
     std_dev: float,
+    rng: np.random.Generator,
 ) -> None:
-    size = matrix.shape[0]
+    size = cast(int, matrix.shape[0])
     for i in range(size):
         matrix[i, i] = 0.0
         matrix[i + 1 :, i] = std_dev * (
@@ -71,15 +70,24 @@ class GaussianSymplecticEnsemble(WignerDysonEnsemble):
         repr=False,
     )
 
-    def generate_matrix(self, *, use_complex_dtype: bool = False) -> np.ndarray:
-        matrix = self._empty_matrix(use_complex_dtype=use_complex_dtype)
-        create_gse_matrix(matrix, self.rng, self.real_dtype.type, self.std_dev)
+    @override
+    def generate_matrix(
+        self,
+        *,
+        use_complex_dtype: bool = False,
+    ) -> HermitianMatrix:
+        matrix = self._allocate_complex_hermitian_matrix_memory()
+        create_gse_matrix(matrix, self.real_dtype.type, self.std_dev, self.rng)
         return matrix
 
+    @override
     def matrix_stream(
-        self, realizs: int, *, use_complex_dtype: bool = False
-    ) -> Iterator[np.ndarray]:
-        matrix = self._empty_matrix(use_complex_dtype=use_complex_dtype)
+        self,
+        realizs: int,
+        *,
+        use_complex_dtype: bool = False,
+    ) -> Iterator[HermitianMatrix]:
+        matrix = self._allocate_complex_hermitian_matrix_memory()
         for _ in range(realizs):
-            create_gse_matrix(matrix, self.rng, self.real_dtype.type, self.std_dev)
+            create_gse_matrix(matrix, self.real_dtype.type, self.std_dev, self.rng)
             yield matrix

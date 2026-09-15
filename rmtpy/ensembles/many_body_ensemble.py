@@ -185,10 +185,10 @@ class ManyBodyEnsemble(RandomMatrixEnsemble, ABC):
             dimension=self.dimension,
         )
 
-    def _create_empty_complex_hermitian_matrix(self) -> HermitianMatrix:
+    def _allocate_complex_hermitian_matrix_memory(self) -> HermitianMatrix:
         return np.empty((self.dimension, self.dimension), self.complex_dtype, order="F")
 
-    def _create_empty_real_symmetric_matrix(self) -> RealSymmetricMatrix:
+    def _allocate_empty_real_symmetric_matrix_memory(self) -> RealSymmetricMatrix:
         return np.empty((self.dimension, self.dimension), self.real_dtype, order="F")
 
     def _create_spectral_polynomials(self) -> OrthogonalPolynomials | None:

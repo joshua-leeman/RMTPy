@@ -1,13 +1,12 @@
-from __future__ import annotations
-
 from collections.abc import Iterator
-from typing import Any, ClassVar
+from typing import ClassVar, cast, override
 
 import attrs
 import numba
 import numpy as np
 
-from .wigner_dyson import WignerDysonEnsemble
+from .many_body_ensemble import HermitianMatrix
+from .wigner_dyson_ensemble import WignerDysonEnsemble
 
 DYSON_INDEX: int = 2
 
@@ -19,17 +18,17 @@ TOKEN_NAME: str = "BdG_D"
 
 
 def compute_standard_deviation(bdgd: BogoliubovDeGennesDEnsemble) -> float:
-    return bdgd.spectral_radius / 2 / np.sqrt(bdgd.dimension)
+    return cast(float, bdgd.spectral_radius / 2 / np.sqrt(bdgd.dimension))
 
 
 @numba.njit(boundscheck=False, cache=True, fastmath=True)
 def create_bdgd_matrix(
-    matrix: np.ndarray,
-    rng: np.random.Generator,
-    real_dtype: type[np.floating[Any]],
+    matrix: HermitianMatrix,
+    real_dtype: type[np.float64],
     std_dev: float,
+    rng: np.random.Generator,
 ) -> None:
-    size = matrix.shape[0]
+    size = cast(int, matrix.shape[0])
     for i in range(size):
         matrix[i, i] = 0.0
         matrix[i + 1 :, i] = std_dev * 1j * rng.standard_normal(size - i - 1, real_dtype)
@@ -52,22 +51,33 @@ class BogoliubovDeGennesDEnsemble(WignerDysonEnsemble):
     )
 
     @property
+    @override
     def latex_name(self) -> str:
         return rf"{{{LATEX_NAME}}}({{{self.num_majoranas}}})"
 
     @property
+    @override
     def token_name(self) -> str:
         return TOKEN_NAME
 
-    def generate_matrix(self, *, use_complex_dtype: bool = False) -> np.ndarray:
-        matrix = self._empty_matrix(use_complex_dtype=use_complex_dtype)
-        create_bdgd_matrix(matrix, self.rng, self.real_dtype.type, self.std_dev)
+    @override
+    def generate_matrix(
+        self,
+        *,
+        use_complex_dtype: bool = False,
+    ) -> HermitianMatrix:
+        matrix = self._allocate_complex_hermitian_matrix_memory()
+        create_bdgd_matrix(matrix, self.real_dtype.type, self.std_dev, self.rng)
         return matrix
 
+    @override
     def matrix_stream(
-        self, realizs: int, *, use_complex_dtype: bool = False
-    ) -> Iterator[np.ndarray]:
-        matrix = self._empty_matrix(use_complex_dtype=use_complex_dtype)
+        self,
+        realizs: int,
+        *,
+        use_complex_dtype: bool = False,
+    ) -> Iterator[HermitianMatrix]:
+        matrix = self._allocate_complex_hermitian_matrix_memory()
         for _ in range(realizs):
-            create_bdgd_matrix(matrix, self.rng, self.real_dtype.type, self.std_dev)
+            create_bdgd_matrix(matrix, self.real_dtype.type, self.std_dev, self.rng)
             yield matrix

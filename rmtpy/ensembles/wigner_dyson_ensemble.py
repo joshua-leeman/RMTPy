@@ -7,15 +7,19 @@ import numpy as np
 from numpy.typing import NDArray
 
 import rmtpy.conversion
-import rmtpy.polynomials
-from rmtpy.polynomials import Float64Function, OrthogonalPolynomials
+from rmtpy.polynomials import (
+    Float64Function,
+    OrthogonalPolynomials,
+    chebyshev_polynomial_2_weight,
+    chebyshev_polynomials_2,
+)
 
 from .many_body_ensemble import ManyBodyEnsemble
 
 INITIALISM: str = "WDE"
 
-WIGNER_DYSON_ENSEMBLE_INITIALISMS_BY_NAME = {}
-WIGNER_DYSON_ENSEMBLE_NAMES_BY_INITIALISM = {}
+WIGNER_DYSON_ENSEMBLE_INITIALISMS_BY_NAME: dict[str, str] = {}
+WIGNER_DYSON_ENSEMBLE_NAMES_BY_INITIALISM: dict[str, str] = {}
 
 
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
@@ -40,9 +44,7 @@ class WignerDysonEnsemble(ManyBodyEnsemble, ABC):
             *,
             degree: int,
         ) -> NDArray[np.float64]:
-            return rmtpy.polynomials.chebyshev_polynomials_2(
-                np.asarray(x, dtype=np.float64), degree=degree
-            )
+            return chebyshev_polynomials_2(x, degree=degree)
 
         return spectral_polynomials
 
@@ -51,7 +53,7 @@ class WignerDysonEnsemble(ManyBodyEnsemble, ABC):
         def wigner_semicircle_distribution(
             energies: NDArray[np.float64],
         ) -> NDArray[np.float64]:
-            return rmtpy.polynomials.chebyshev_polynomial_2_weight(
+            return chebyshev_polynomial_2_weight(
                 energies, support_radius=self.spectral_radius
             )
 
