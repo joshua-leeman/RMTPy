@@ -1,0 +1,153 @@
+import inspect
+from collections.abc import Callable
+from pathlib import Path
+from typing import ClassVar, cast
+
+import attrs
+import numpy as np
+
+import rmtpy.conversion
+from rmtpy.conversion import RMT_CONVERTER, SeedLike
+
+INITIALISM: str = "RME"
+
+DTYPE: np.dtype[np.generic] = np.dtype("complex128")
+
+DIMENSION_METADATA: dict[str, str] = {
+    "dir_name": "dim",
+    "latex_name": "D",
+}
+
+REGISTRY: dict[str, type[attrs.AttrsInstance]] = {}
+
+
+def compute_complex_dtype(ensemble: RandomMatrixEnsemble) -> np.dtype[np.generic]:
+    return np.dtype(ensemble.dtype.char.upper())
+
+
+def compute_real_dtype(ensemble: RandomMatrixEnsemble) -> np.dtype[np.generic]:
+    return np.dtype(ensemble.dtype.char.lower())
+
+
+def create_random_number_generator(ensemble: RandomMatrixEnsemble) -> np.random.Generator:
+    return np.random.default_rng(ensemble.seed)
+
+
+def structure_hook_for_ensemble(
+    src: dict[str, str | dict[str, object]] | RandomMatrixEnsemble,
+    _: object,
+) -> RandomMatrixEnsemble:
+    if isinstance(src, dict):
+        ensemble_dict = rmtpy.conversion.normalize_source(src, registry=REGISTRY)
+
+        ensemble_type = ensemble_dict["type"]
+        if not isinstance(ensemble_type, str):
+            raise TypeError("Configuration `type` must be a string.")
+
+        parameters = ensemble_dict["parameters"]
+        if not isinstance(parameters, dict):
+            raise TypeError("Configuration `parameters` must be a dictionary.")
+
+        key = rmtpy.conversion.to_registry_key(ensemble_type)
+        ensemble_factory = cast(Callable[..., RandomMatrixEnsemble], REGISTRY[key])
+        return ensemble_factory(**parameters)
+
+    return src
+
+
+def unstructure_hook_for_ensemble(
+    ensemble: RandomMatrixEnsemble,
+) -> dict[str, str | dict[str, object]]:
+    fields = cast(dict[str, attrs.Attribute[object]], attrs.fields_dict(type(ensemble)))
+    parameters = {
+        name: RMT_CONVERTER.unstructure(getattr(ensemble, name))
+        for name, attr in fields.items()
+        if attr.init
+    }
+
+    return {
+        "type": type(ensemble).__name__,
+        "parameters": parameters,
+    }
+
+
+def register_ensemble_hooks(
+    ensemble_cls: type[RandomMatrixEnsemble],
+) -> type[RandomMatrixEnsemble]:
+    RMT_CONVERTER.register_structure_hook(ensemble_cls, structure_hook_for_ensemble)
+    RMT_CONVERTER.register_unstructure_hook(ensemble_cls, unstructure_hook_for_ensemble)
+
+    return ensemble_cls
+
+
+@register_ensemble_hooks
+@attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
+class RandomMatrixEnsemble:
+    initialism: ClassVar[str] = INITIALISM
+
+    dimension: int = attrs.field(
+        validator=(
+            attrs.validators.instance_of(int),
+            attrs.validators.gt(0),
+        ),
+        metadata=DIMENSION_METADATA,
+    )
+    dtype: np.dtype[np.generic] = attrs.field(
+        default=DTYPE,
+        converter=np.dtype,
+    )
+    seed: SeedLike = attrs.field(
+        default=None,
+        converter=rmtpy.conversion.convert_seed,
+    )
+
+    complex_dtype: np.dtype[np.generic] = attrs.field(
+        default=attrs.Factory(compute_complex_dtype, takes_self=True),
+        init=False,
+        repr=False,
+    )
+    real_dtype: np.dtype[np.generic] = attrs.field(
+        default=attrs.Factory(compute_real_dtype, takes_self=True),
+        init=False,
+        repr=False,
+    )
+    rng: np.random.Generator = attrs.field(
+        default=attrs.Factory(create_random_number_generator, takes_self=True),
+        init=False,
+        repr=False,
+    )
+
+    @classmethod
+    def __attrs_init_subclass__(cls) -> None:
+        if inspect.isabstract(cls):
+            return
+
+        key = rmtpy.conversion.to_registry_key(cls.__name__)
+        REGISTRY[key] = cls
+
+    @classmethod
+    def create(
+        cls,
+        src: dict[str, str | dict[str, object]] | RandomMatrixEnsemble,
+    ) -> RandomMatrixEnsemble:
+        return RMT_CONVERTER.structure(src, cls)
+
+    @property
+    def latex_name(self) -> str:
+        return f"\\text{{{type(self).initialism}}}"
+
+    @property
+    def token_name(self) -> str:
+        return type(self).initialism
+
+    @property
+    def to_latex(self) -> str:
+        return rmtpy.conversion.to_latex(self, latex_name=self.latex_name)
+
+    @property
+    def to_path(self) -> Path:
+        return rmtpy.conversion.to_path(self, root=Path(self.token_name))
+
+    @property
+    def rng_state(self) -> dict[str, object]:
+        return dict(self.rng.bit_generator.state)
