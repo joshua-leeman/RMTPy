@@ -52,9 +52,12 @@ class GaussianOrthogonalEnsemble(WignerDysonEnsemble):
         *,
         use_complex_dtype: bool = False,
     ) -> RealSymmetricMatrix | HermitianMatrix:
-        matrix = self._create_empty_matrix(use_complex_dtype=use_complex_dtype)
-        real_dtype = cast(type[np.float64], self.real_dtype.type)
-        create_goe_matrix(matrix, real_dtype, self.std_dev, self.rng)
+        if use_complex_dtype:
+            matrix = self._allocate_complex_hermitian_matrix_memory()
+        else:
+            matrix = self._allocate_empty_real_symmetric_matrix_memory()
+
+        create_goe_matrix(matrix, self.real_dtype.type, self.std_dev, self.rng)
         return matrix
 
     @override
@@ -64,8 +67,11 @@ class GaussianOrthogonalEnsemble(WignerDysonEnsemble):
         *,
         use_complex_dtype: bool = False,
     ) -> Iterator[RealSymmetricMatrix | HermitianMatrix]:
-        matrix = self._create_empty_matrix(use_complex_dtype=use_complex_dtype)
-        real_dtype = cast(type[np.float64], self.real_dtype.type)
+        if use_complex_dtype:
+            matrix = self._allocate_complex_hermitian_matrix_memory()
+        else:
+            matrix = self._allocate_empty_real_symmetric_matrix_memory()
+
         for _ in range(realizs):
-            create_goe_matrix(matrix, real_dtype, self.std_dev, self.rng)
+            create_goe_matrix(matrix, self.real_dtype.type, self.std_dev, self.rng)
             yield matrix

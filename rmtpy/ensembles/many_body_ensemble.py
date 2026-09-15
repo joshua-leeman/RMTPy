@@ -185,19 +185,11 @@ class ManyBodyEnsemble(RandomMatrixEnsemble, ABC):
             dimension=self.dimension,
         )
 
-    def _choose_linalg_dtype(self, use_complex_dtype: bool = False) -> np.dtype:
-        if use_complex_dtype or self.dyson_index != 1:
-            return self.complex_dtype
+    def _create_empty_complex_hermitian_matrix(self) -> HermitianMatrix:
+        return np.empty((self.dimension, self.dimension), self.complex_dtype, order="F")
 
-        return self.real_dtype
-
-    def _create_empty_matrix(
-        self,
-        *,
-        use_complex_dtype: bool = False,
-    ) -> RealSymmetricMatrix | HermitianMatrix:
-        matrix_dtype = self._choose_linalg_dtype(use_complex_dtype=use_complex_dtype)
-        return np.empty((self.dimension, self.dimension), matrix_dtype, order="F")
+    def _create_empty_real_symmetric_matrix(self) -> RealSymmetricMatrix:
+        return np.empty((self.dimension, self.dimension), self.real_dtype, order="F")
 
     def _create_spectral_polynomials(self) -> OrthogonalPolynomials | None:
         return
@@ -205,20 +197,26 @@ class ManyBodyEnsemble(RandomMatrixEnsemble, ABC):
     def _create_spectral_weight(self) -> Float64Function | None:
         return
 
+    def _pick_linalg_dtype(self, use_complex_dtype: bool = False) -> np.dtype:
+        if use_complex_dtype or self.dyson_index != 1:
+            return self.complex_dtype
+        else:
+            return self.real_dtype
+
     def _pick_blas_gemm(self, *, use_complex_dtype: bool = False):
-        matrix_dtype = self._choose_linalg_dtype(use_complex_dtype=use_complex_dtype)
+        matrix_dtype = self._pick_linalg_dtype(use_complex_dtype=use_complex_dtype)
         return scipy.linalg.get_blas_funcs("gemm", dtype=matrix_dtype)
 
     def _pick_blas_her(self, *, use_complex_dtype: bool = False):
-        matrix_dtype = self._choose_linalg_dtype(use_complex_dtype=use_complex_dtype)
+        matrix_dtype = self._pick_linalg_dtype(use_complex_dtype=use_complex_dtype)
         routine = "her" if np.issubdtype(matrix_dtype, np.complexfloating) else "syr"
         return scipy.linalg.blas.get_blas_funcs(routine, dtype=matrix_dtype)
 
     def _pick_lapack_geev(self, *, use_complex_dtype: bool = False):
-        matrix_dtype = self._choose_linalg_dtype(use_complex_dtype=use_complex_dtype)
+        matrix_dtype = self._pick_linalg_dtype(use_complex_dtype=use_complex_dtype)
         return scipy.linalg.get_lapack_funcs("geev", dtype=matrix_dtype)
 
     def _pick_lapack_heev(self, *, use_complex_dtype: bool = False):
-        matrix_dtype = self._choose_linalg_dtype(use_complex_dtype=use_complex_dtype)
+        matrix_dtype = self._pick_linalg_dtype(use_complex_dtype=use_complex_dtype)
         routine = "heev" if np.issubdtype(matrix_dtype, np.complexfloating) else "syev"
         return scipy.linalg.lapack.get_lapack_funcs(routine, dtype=matrix_dtype)

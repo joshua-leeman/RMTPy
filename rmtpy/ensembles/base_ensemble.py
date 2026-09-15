@@ -32,11 +32,11 @@ DIMENSION_METADATA: dict[str, str] = {
 REGISTRY: dict[str, type[attrs.AttrsInstance]] = {}
 
 
-def _compute_complex_dtype(ensemble: RandomMatrixEnsemble) -> np.dtype[np.generic]:
+def _compute_complex_dtype(ensemble: RandomMatrixEnsemble) -> np.dtype[np.complex128]:
     return np.dtype(ensemble.dtype.char.upper())
 
 
-def _compute_real_dtype(ensemble: RandomMatrixEnsemble) -> np.dtype[np.generic]:
+def _compute_real_dtype(ensemble: RandomMatrixEnsemble) -> np.dtype[np.float64]:
     return np.dtype(ensemble.dtype.char.lower())
 
 
@@ -118,12 +118,12 @@ class RandomMatrixEnsemble:
         converter=_compute_seed,
     )
 
-    complex_dtype: np.dtype[np.generic] = attrs.field(
+    complex_dtype: np.dtype[np.complex128] = attrs.field(
         default=attrs.Factory(_compute_complex_dtype, takes_self=True),
         init=False,
         repr=False,
     )
-    real_dtype: np.dtype[np.generic] = attrs.field(
+    real_dtype: np.dtype[np.float64] = attrs.field(
         default=attrs.Factory(_compute_real_dtype, takes_self=True),
         init=False,
         repr=False,
