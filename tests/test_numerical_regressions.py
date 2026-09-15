@@ -1,6 +1,10 @@
+# pyright: reportAny=false, reportUnknownMemberType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownParameterType=false, reportUnknownLambdaType=false, reportUnusedCallResult=false, reportPrivateUsage=false, reportImplicitStringConcatenation=false, reportMissingParameterType=false, reportUnnecessaryIsInstance=false, reportImplicitOverride=false, reportExplicitAny=false, reportOptionalMemberAccess=false, reportOptionalSubscript=false
+
 import unittest
+from collections.abc import Iterator
 
 import numpy as np
+from numpy.typing import NDArray
 
 from rmtpy.compounds import Compound
 from rmtpy.density import DensityModel
@@ -9,7 +13,12 @@ from rmtpy.universal import porter_thomas_distribution, time_delay_pdf
 from rmtpy.validators import validate_support
 
 
-def deterministic_sample_stream(realizs: int):
+def deterministic_sample_stream(
+    realizs: int,
+    *,
+    use_complex_dtype: bool = False,
+) -> Iterator[NDArray[np.float64]]:
+    del use_complex_dtype
     sample = np.linspace(-0.9, 0.9, 1024)
     for _ in range(realizs):
         yield sample
@@ -45,13 +54,16 @@ class DensityRegressionTests(unittest.TestCase):
 
 class PoissonRegressionTests(unittest.TestCase):
     def test_matrix_stream_resets_its_accumulation_buffer(self) -> None:
-        arguments = {
-            "num_majoranas": 6,
-            "max_spectral_polynomial_degree": 0,
-            "seed": 123,
-        }
-        ensemble = Poisson(**arguments)
-        reference = Poisson(**arguments)
+        ensemble = Poisson(
+            num_majoranas=6,
+            max_spectral_polynomial_degree=0,
+            seed=123,
+        )
+        reference = Poisson(
+            num_majoranas=6,
+            max_spectral_polynomial_degree=0,
+            seed=123,
+        )
         matrix_stream = ensemble.matrix_stream(2, use_complex_dtype=True)
         eigsys_stream = reference.eigsys_stream(2, use_complex_dtype=True)
 
@@ -163,7 +175,7 @@ class CompoundRegressionTests(unittest.TestCase):
                 ValueError,
                 Compound,
                 ensemble=GOE(num_majoranas=4),
-                coupling_strengths=[1.0, invalid_value],
+                coupling_strengths=np.array([1.0, invalid_value]),
             )
 
 

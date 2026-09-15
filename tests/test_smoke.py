@@ -1,6 +1,6 @@
-import tempfile
+# pyright: reportAny=false, reportUnknownMemberType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownParameterType=false, reportUnknownLambdaType=false, reportUnusedCallResult=false, reportPrivateUsage=false, reportImplicitStringConcatenation=false, reportMissingParameterType=false, reportUnnecessaryIsInstance=false, reportImplicitOverride=false, reportExplicitAny=false, reportOptionalMemberAccess=false, reportOptionalSubscript=false
+
 import unittest
-from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -8,7 +8,7 @@ import numpy as np
 from rmtpy.compounds import Compound
 from rmtpy.conversion import RMT_CONVERTER
 from rmtpy.ensembles import GaussianOrthogonalEnsemble, ManyBodyEnsemble
-from rmtpy.simulations.histogram import Histogram, finalize_histogram
+from rmtpy.simulations.histogram import Histogram
 from rmtpy.simulations.partial_widths_statistics import (
     PartialWidthsStatisticsSimulation,
 )
@@ -27,18 +27,16 @@ class SmokeTests(unittest.TestCase):
         self.assertIsInstance(restored, GaussianOrthogonalEnsemble)
         self.assertEqual(restored.dimension, ensemble.dimension)
 
-    def test_histogram_save_load_round_trip(self) -> None:
+    def test_histogram_finalization_is_data_only(self) -> None:
         histogram = Histogram(file_name="example", support=(0.0, 1.0), num_bins=4)
         histogram.add_histogram_contribution(np.array([0.1, 0.2, 0.8]))
-        finalize_histogram(histogram)
+        histogram.compute_histogram()
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            path: Path = Path(tmpdir) / "example_data.npz"
-            histogram.save(path)
-            restored: Histogram = Histogram.load(path)
-
-        np.testing.assert_array_equal(restored.counts, histogram.counts)
-        np.testing.assert_allclose(restored.histogram, histogram.histogram)
+        self.assertEqual(int(np.sum(histogram.counts)), 3)
+        self.assertAlmostEqual(
+            float(np.sum(histogram.histogram * np.diff(histogram.bins))),
+            1.0,
+        )
 
     def test_time_delay_pdf_normalizes(self) -> None:
         num_channels = 4
@@ -68,7 +66,7 @@ class SmokeTests(unittest.TestCase):
 
         self.assertGreater(np.min(time_delays), -1e-10)
 
-    def test_statistics_simulations_construct_observables(self) -> None:
+    def test_statistics_simulations_return_typed_results(self) -> None:
         ensemble = GaussianOrthogonalEnsemble(
             num_majoranas=4,
             max_spectral_polynomial_degree=2,
@@ -91,7 +89,7 @@ class SmokeTests(unittest.TestCase):
         time_delay = TimeDelayStatisticsSimulation(
             compound=compound,
             realizs=1,
-            energies=[0.0, 0.1],
+            energies=(0.0, 0.1),
         )
         default_time_delay = TimeDelayStatisticsSimulation(
             compound=compound,
@@ -100,82 +98,81 @@ class SmokeTests(unittest.TestCase):
 
         np.testing.assert_allclose(default_time_delay.energies, np.array([0.0]))
 
-        self.assertGreater(len(tuple(spectral.iter_observables())), 0)
-        self.assertGreater(len(tuple(resonance.iter_observables())), 0)
-        self.assertGreater(len(tuple(partial_widths.iter_observables())), 0)
-        self.assertGreater(len(tuple(time_delay.iter_observables())), 0)
-
-        spe_out = spectral.outputs
-        res_out = resonance.outputs
-        wid_out = partial_widths.outputs
-        tim_out = time_delay.outputs
+        spectral_result = spectral.execute()
+        resonance_result = resonance.execute()
+        partial_widths_result = partial_widths.execute()
+        time_delay_result = time_delay.execute()
+        self.assertGreater(len(tuple(spectral_result.iterate_data())), 0)
+        self.assertGreater(len(tuple(resonance_result.iterate_data())), 0)
+        self.assertGreater(len(tuple(partial_widths_result.iterate_data())), 0)
+        self.assertGreater(len(tuple(time_delay_result.iterate_data())), 0)
 
         self.assertEqual(
-            spe_out.coefficients.by_degree[0].metadata["unfolding"],
+            spectral_result.coefficients[0].metadata["unfolding"],
             "raw",
         )
         self.assertEqual(
-            spe_out.raw.levels.metadata["unfolding"],
+            spectral_result.raw.levels.metadata["unfolding"],
             "raw",
         )
         self.assertEqual(
-            spe_out.weight_unfolded.levels.metadata["unfolding"],
-            "wgt",
+            spectral_result.weight.levels.metadata["unfolding"],
+            "weight",
         )
         self.assertEqual(
-            spe_out.avg_unfolded_by_degree[0].levels.metadata["unfolding"],
-            "avg",
+            spectral_result.average_by_degree[0].statistics.levels.metadata["unfolding"],
+            "average",
         )
         self.assertEqual(
-            spe_out.var_unfolded_by_degree[0].levels.metadata["unfolding"],
-            "var",
+            spectral_result.variate_by_degree[0].statistics.levels.metadata["unfolding"],
+            "variate",
         )
 
         self.assertEqual(
-            res_out.coefficients.by_degree[0].metadata["unfolding"],
+            resonance_result.coefficients[0].metadata["unfolding"],
             "raw",
         )
         self.assertEqual(
-            res_out.raw.widths.metadata["unfolding"],
+            resonance_result.raw.widths.metadata["unfolding"],
             "raw",
         )
         self.assertEqual(
-            res_out.weight_unfolded.widths.metadata["unfolding"],
-            "wgt",
+            resonance_result.weight.widths.metadata["unfolding"],
+            "weight",
         )
         self.assertEqual(
-            res_out.avg_unfolded_by_degree[0].complex_energies.metadata["unfolding"],
-            "avg",
+            resonance_result.average_by_degree[0].statistics.complex_energies.metadata[
+                "unfolding"
+            ],
+            "average",
         )
 
         self.assertEqual(
-            wid_out.histograms[0].metadata["unfolding"],
+            partial_widths_result.statistics[0].histogram.metadata["unfolding"],
             "raw",
         )
 
         self.assertEqual(
-            tim_out.raw[0].data.file_name,
+            time_delay_result.raw[0].histogram.file_name,
             "time_delay_histogram_data",
         )
+        self.assertEqual(time_delay_result.raw[1].energy_index, 1)
+        self.assertEqual(time_delay_result.raw[1].energy, 0.1)
         self.assertEqual(
-            time_delay.observable_output_path(tim_out.raw[1]),
-            Path("energy_0p1"),
-        )
-        self.assertEqual(
-            tim_out.raw[0].metadata["unfolding"],
+            time_delay_result.raw[0].histogram.metadata["unfolding"],
             "raw",
         )
         self.assertEqual(
-            len(tim_out.raw),
+            len(time_delay_result.raw),
             2,
         )
         self.assertIsInstance(
             time_delay.energies,
             np.ndarray,
         )
-        self.assertNotIn(
-            "energies_",
-            str(time_delay.to_path),
+        self.assertEqual(
+            time_delay_result.context.output_request["unfolding_modes"],
+            ["raw", "weight", "average", "variate"],
         )
 
 
