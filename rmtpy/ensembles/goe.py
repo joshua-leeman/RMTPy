@@ -56,7 +56,6 @@ class GaussianOrthogonalEnsemble(WignerDysonEnsemble):
             matrix = self._allocate_complex_hermitian_matrix_memory()
         else:
             matrix = self._allocate_empty_real_symmetric_matrix_memory()
-
         create_goe_matrix(matrix, self.real_dtype.type, self.std_dev, self.rng)
         return matrix
 
@@ -71,7 +70,6 @@ class GaussianOrthogonalEnsemble(WignerDysonEnsemble):
             matrix = self._allocate_complex_hermitian_matrix_memory()
         else:
             matrix = self._allocate_empty_real_symmetric_matrix_memory()
-
         for _ in range(realizs):
             create_goe_matrix(matrix, self.real_dtype.type, self.std_dev, self.rng)
             yield matrix

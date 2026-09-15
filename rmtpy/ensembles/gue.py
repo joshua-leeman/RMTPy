@@ -1,13 +1,12 @@
-from __future__ import annotations
-
 from collections.abc import Iterator
-from typing import Any, ClassVar
+from typing import ClassVar, cast, override
 
 import attrs
 import numba
 import numpy as np
 
-from .wigner_dyson import WignerDysonEnsemble
+from .many_body_ensemble import HermitianMatrix
+from .wigner_dyson_ensemble import WignerDysonEnsemble
 
 DYSON_INDEX: int = 2
 
@@ -15,17 +14,17 @@ INITIALISM: str = "GUE"
 
 
 def compute_standard_deviation(gue: GaussianUnitaryEnsemble) -> float:
-    return gue.spectral_radius / 2 / np.sqrt(2 * gue.dimension)
+    return cast(float, gue.spectral_radius / 2 / np.sqrt(2 * gue.dimension))
 
 
 @numba.njit(boundscheck=False, cache=True, fastmath=True)
 def create_gue_matrix(
-    matrix: np.ndarray,
-    rng: np.random.Generator,
-    real_dtype: type[np.floating[Any]],
+    matrix: HermitianMatrix,
+    real_dtype: type[np.float64],
     std_dev: float,
+    rng: np.random.Generator,
 ) -> None:
-    size = matrix.shape[0]
+    size = cast(int, matrix.shape[0])
     for i in range(size):
         matrix[i, i] = 2 * std_dev * rng.standard_normal(None, real_dtype)
         matrix[i + 1 :, i] = std_dev * (
@@ -50,15 +49,24 @@ class GaussianUnitaryEnsemble(WignerDysonEnsemble):
         repr=False,
     )
 
-    def generate_matrix(self, *, use_complex_dtype: bool = False) -> np.ndarray:
-        matrix = self._empty_matrix(use_complex_dtype=use_complex_dtype)
-        create_gue_matrix(matrix, self.rng, self.real_dtype.type, self.std_dev)
+    @override
+    def generate_matrix(
+        self,
+        *,
+        use_complex_dtype: bool = False,
+    ) -> HermitianMatrix:
+        matrix = self._allocate_complex_hermitian_matrix_memory()
+        create_gue_matrix(matrix, self.real_dtype.type, self.std_dev, self.rng)
         return matrix
 
+    @override
     def matrix_stream(
-        self, realizs: int, *, use_complex_dtype: bool = False
-    ) -> Iterator[np.ndarray]:
-        matrix = self._empty_matrix(use_complex_dtype=use_complex_dtype)
+        self,
+        realizs: int,
+        *,
+        use_complex_dtype: bool = False,
+    ) -> Iterator[HermitianMatrix]:
+        matrix = self._allocate_complex_hermitian_matrix_memory()
         for _ in range(realizs):
-            create_gue_matrix(matrix, self.rng, self.real_dtype.type, self.std_dev)
+            create_gue_matrix(matrix, self.real_dtype.type, self.std_dev, self.rng)
             yield matrix
