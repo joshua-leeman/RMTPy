@@ -9,10 +9,10 @@ from scipy import sparse
 
 import rmtpy.validators
 
-MajoranaFermions = tuple[sparse.csr_array, ...]
-ComplexFermions = tuple[tuple[sparse.csr_array, ...], tuple[sparse.csr_array, ...]]
-ParityBlockSlice = tuple[slice, slice]
-DecomposedSparseArray = tuple[np.ndarray, np.ndarray]
+type MajoranaFermions = tuple[sparse.csr_array, ...]
+type ComplexFermions = tuple[tuple[sparse.csr_array, ...], tuple[sparse.csr_array, ...]]
+type ParityBlockSlice = tuple[slice, slice]
+type DecomposedSparseArray = tuple[np.ndarray, np.ndarray]
 
 
 def create_majorana_fermions(*, num_majoranas: int) -> MajoranaFermions:
