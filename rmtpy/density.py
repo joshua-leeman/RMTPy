@@ -13,7 +13,7 @@ import rmtpy.validators
 from rmtpy.polynomials import OrthogonalPolynomials, RealFunction
 
 
-class EigenvaluesStream(Protocol):
+class SpectrumStream(Protocol):
     def __call__(
         self,
         realizs: int,
@@ -176,7 +176,7 @@ class DensityModel:
         default=None,
         validator=attrs.validators.optional(attrs.validators.is_callable()),
     )
-    sample_stream: EigenvaluesStream = attrs.field(
+    sample_stream: SpectrumStream = attrs.field(
         validator=attrs.validators.is_callable(),
         repr=False,
     )
