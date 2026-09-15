@@ -1,22 +1,31 @@
+from typing import cast
+
 import numba
 import numpy as np
+from numpy.typing import NDArray
 
 
-def chebyshev_polynomial_2_weight_pdf(
-    energies: np.ndarray, *, radius: float
-) -> np.ndarray:
+def chebyshev_polynomial_2_weight(
+    energies: NDArray[np.float64],
+    *,
+    support_radius: float,
+) -> NDArray[np.float64]:
     energies = np.asarray(energies)
-    x = energies / radius
+    x = energies / support_radius
 
-    in_support = np.abs(energies) < radius
+    in_support = np.abs(energies) < support_radius
     pdf = np.zeros_like(x, dtype=np.result_type(x, np.float64))
-    pdf[in_support] = 2 / np.pi / radius * np.sqrt(1.0 - x[in_support] ** 2)
+    pdf[in_support] = 2 / np.pi / support_radius * np.sqrt(1.0 - x[in_support] ** 2)
 
     return pdf
 
 
 @numba.njit(boundscheck=False, cache=True, fastmath=True)
-def chebyshev_polynomials_2(x: np.ndarray, *, degree: int) -> np.ndarray:
+def chebyshev_polynomials_2(
+    x: NDArray[np.float64],
+    *,
+    degree: int,
+) -> NDArray[np.float64]:
     polynomials = np.empty((degree + 1, x.size), dtype=np.float64)
 
     polynomials[0, :] = 1.0
@@ -29,19 +38,27 @@ def chebyshev_polynomials_2(x: np.ndarray, *, degree: int) -> np.ndarray:
     return polynomials
 
 
-def legendre_polynomial_weight_pdf(energies: np.ndarray, *, radius: float) -> np.ndarray:
+def legendre_polynomial_weight(
+    energies: NDArray[np.float64],
+    *,
+    support_radius: float,
+) -> NDArray[np.float64]:
     energies = np.asarray(energies)
-    x = energies / radius
+    x = energies / support_radius
 
-    in_support = np.abs(energies) < radius
+    in_support = np.abs(energies) < support_radius
     pdf = np.zeros_like(x, dtype=np.result_type(x, np.float64))
-    pdf[in_support] = 1 / (2 * radius)
+    pdf[in_support] = 1 / (2 * support_radius)
 
     return pdf
 
 
 @numba.njit(boundscheck=False, cache=True, fastmath=True)
-def legendre_polynomials(x: np.ndarray, *, degree: int) -> np.ndarray:
+def legendre_polynomials(
+    x: NDArray[np.float64],
+    *,
+    degree: int,
+) -> NDArray[np.float64]:
     polynomials = np.empty((degree + 1, x.size), dtype=np.float64)
 
     polynomials[0, :] = 1.0
@@ -57,30 +74,39 @@ def legendre_polynomials(x: np.ndarray, *, degree: int) -> np.ndarray:
     return polynomials
 
 
-def q_hermite_polynomial_weight_pdf(
-    energies: np.ndarray,
+def q_hermite_polynomial_weight(
+    energies: NDArray[np.float64],
     *,
-    radius: float,
+    support_radius: float,
     eta: float,
     partial_product_order: int = 100,
-) -> np.ndarray:
+) -> NDArray[np.float64]:
     energies = np.asarray(energies)
-    x = energies / radius
+    x = energies / support_radius
 
-    k = np.arange(partial_product_order)
-    etak1 = eta ** (k + 1)
+    index_range = np.arange(partial_product_order)
+    etak1 = eta ** (index_range + 1)
 
-    in_support = np.abs(energies) < radius
-    product = np.zeros_like(x, dtype=np.result_type(x, np.float64))
+    in_support = np.abs(energies) < support_radius
+    prefactor = np.zeros_like(x, dtype=np.result_type(x, np.float64))
     term1 = 1.0 - (4 * x[in_support][:, None] ** 2) * etak1 / (1.0 + etak1) ** 2
-    term2 = (1.0 - eta ** (2 * k + 2)) / (1.0 - eta ** (2 * k + 1))
-    product[in_support] = np.exp(np.sum(np.log(term1) + np.log(term2)[None, :], axis=1))
+    term2 = (1.0 - eta ** (2 * index_range + 2)) / (1.0 - eta ** (2 * index_range + 1))
 
-    return product * chebyshev_polynomial_2_weight_pdf(energies, radius=radius)
+    log_terms = np.log(term1) + np.log(term2)[None, :]
+    prefactor[in_support] = np.exp(cast(NDArray[np.float64], np.sum(log_terms, axis=1)))
+
+    return prefactor * chebyshev_polynomial_2_weight(
+        energies, support_radius=support_radius
+    )
 
 
 @numba.njit(boundscheck=False, cache=True, fastmath=True)
-def q_hermite_polynomials(x: np.ndarray, *, eta: float, degree: int) -> np.ndarray:
+def q_hermite_polynomials(
+    x: NDArray[np.float64],
+    *,
+    eta: float,
+    degree: int,
+) -> NDArray[np.float64]:
     polynomials = np.empty((degree + 1, x.size), dtype=np.float64)
 
     polynomials[0, :] = 1.0

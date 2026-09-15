@@ -1,8 +1,7 @@
-from __future__ import annotations
-
 import math
 from functools import cached_property
 from itertools import combinations
+from typing import cast
 
 import attrs
 import numpy as np
@@ -30,7 +29,7 @@ def create_majorana_fermions(*, num_majoranas: int) -> MajoranaFermions:
         return tuple(majorana_fermions)
 
     for i in range(num_majoranas // 2 - 1):
-        identity_matrix = sparse.eye_array(2 ** (i + 1), format="csr")
+        identity_matrix = sparse.eye_array(cast(int, pow(2, i + 1)), format="csr")
         next_majorana_fermions: list[sparse.csr_array] = [
             sparse.kron(pauli_matrices[0], majorana_fermion, format="csr")
             for majorana_fermion in majorana_fermions
@@ -50,11 +49,13 @@ def create_majorana_fermions(*, num_majoranas: int) -> MajoranaFermions:
         else:
             return tuple(next_majorana_fermions)
 
+    raise RuntimeError("Failed to construct Majorana fermions: Invalid `num_majoranas`.")
+
 
 def create_charge_conj_unitary_from_majoranas(
     majorana_fermions: MajoranaFermions,
 ) -> sparse.csr_array:
-    dimension = 2 ** (len(majorana_fermions) // 2)
+    dimension = cast(int, pow(2, len(majorana_fermions) // 2))
     running_product = sparse.eye_array(dimension, format="csr")
 
     for majorana_fermion in majorana_fermions[::2]:
@@ -64,7 +65,9 @@ def create_charge_conj_unitary_from_majoranas(
 
 
 def rotate_majorana_fermions_to_real_basis(
-    *, majorana_fermions: MajoranaFermions, charge_conj_unitary: sparse.csr_array
+    *,
+    majorana_fermions: MajoranaFermions,
+    charge_conj_unitary: sparse.csr_array,
 ) -> MajoranaFermions:
     rotated_majorana_fermions: list[sparse.csr_array] = []
     for majorana_fermion in majorana_fermions:
@@ -97,7 +100,7 @@ def create_vacuum_from_complex_fermions(
     complex_fermions: ComplexFermions,
 ) -> sparse.csr_array:
     num_complex_fermions = len(complex_fermions[0])
-    dimension = 2**num_complex_fermions
+    dimension = cast(int, pow(2, num_complex_fermions))
 
     vacuum_projector = sparse.eye_array(dimension, format="csr")
     for k in range(num_complex_fermions):
@@ -107,9 +110,9 @@ def create_vacuum_from_complex_fermions(
     arbitrary_state = sparse.csr_array(np.ones((dimension, 1)))
     vacuum_state = vacuum_projector.dot(arbitrary_state)
 
-    vacuum_state_norm = vacuum_state.multiply(vacuum_state.conj()).sum()
-    if vacuum_state_norm != 1.0:
-        vacuum_state /= np.sqrt(vacuum_state_norm)
+    vacuum_squared_norm = cast(float, vacuum_state.multiply(vacuum_state.conj()).sum())
+    if vacuum_squared_norm != 1.0:
+        vacuum_state = cast(sparse.csr_array, vacuum_state / np.sqrt(vacuum_squared_norm))
 
     return vacuum_state
 
@@ -121,17 +124,20 @@ def create_vacuum_from_number_of_majoranas(num_majoranas: int) -> sparse.csr_arr
 
 
 def choose_block_slice_from_parity(
-    *, is_even_parity: bool, num_majoranas: int
+    *,
+    is_even_parity: bool,
+    num_majoranas: int,
 ) -> ParityBlockSlice:
     vacuum_state = create_vacuum_from_number_of_majoranas(num_majoranas)
-
     if vacuum_state.count_nonzero() != 1:
         raise ValueError("Vacuum state must have only one nonzero entry.")
-    elif not np.isclose(vacuum_state.multiply(vacuum_state.conj()).sum(), 1.0):
+
+    vacuum_state_norm = cast(float, vacuum_state.multiply(vacuum_state.conj()).sum())
+    if not np.isclose(vacuum_state_norm, 1.0):
         raise ValueError("Vacuum state must be normalized.")
 
     parity_sector_dimension = vacuum_state.shape[0] // 2
-    index_of_nonzero_entry = vacuum_state.nonzero()[0][0]
+    index_of_nonzero_entry = cast(int, vacuum_state.nonzero()[0][0])
 
     if (index_of_nonzero_entry < parity_sector_dimension) ^ (not is_even_parity):
         block_starting_idx = 0
@@ -152,7 +158,7 @@ def create_decomposed_q_monomials(
     in_real_basis: bool,
 ) -> DecomposedSparseArray:
     num_majoranas = len(majorana_fermions)
-    num_nonzeros = 2 ** (num_majoranas // 2 - 1)
+    num_nonzeros = cast(int, pow(2, num_majoranas // 2 - 1))
     num_monomials = math.comb(num_majoranas, q)
 
     monomials_dtype = np.int8 if in_real_basis else np.complex64
@@ -193,20 +199,20 @@ def create_conjugated_compound_coupling_matrix(
     if coupling_strengths.shape != (num_channels,):
         raise ValueError(
             "`coupling_strengths` must contain one coupling per generated "
-            f"operator string; expected shape ({num_channels},), "
-            f"got {coupling_strengths.shape}."
+            + f"operator string; expected shape ({num_channels},), "
+            + f"got {coupling_strengths.shape}."
         )
     elif dyson_index == 4 and num_channels % 2 != 0:
         raise ValueError(
             "`dyson_index` == 4 requires an even number of open channels; "
-            f"got {num_channels}."
+            + f"got {num_channels}."
         )
     elif dyson_index == 4 and not np.allclose(
         coupling_strengths[::2], coupling_strengths[1::2]
     ):
         raise ValueError(
             "`dyson_index` == 4 requires equal coupling strengths within each "
-            "Kramers pair."
+            + "Kramers pair."
         )
 
     coupling_matrix_columns: list[sparse.csr_array] = []
@@ -216,7 +222,7 @@ def create_conjugated_compound_coupling_matrix(
             state = creation_operators[index].dot(state)
 
         if dyson_index == 1:
-            state /= np.sqrt(2)
+            state = cast(sparse.csr_array, state / np.sqrt(2))
             state += charge_conj_unitary.dot(state)
 
         coupling_matrix_columns.append(state[parity_block_slice[0]])
@@ -231,18 +237,21 @@ def create_conjugated_compound_coupling_matrix(
             sparse.eye_array(num_channels // 2, format="csr"), pauli_1
         )
         coupling_matrix_columns_swapped = coupling_matrix.dot(swap_adjacent_columns)
-        charge_conj_block: sparse.csr_matrix = charge_conj_unitary[parity_block_slice]
+        charge_conj_block = charge_conj_unitary[parity_block_slice]
 
-        coupling_matrix[:, 1::2] *= -1
+        column_signs = np.ones(num_channels)
+        column_signs[1::2] = -1
+        coupling_matrix = coupling_matrix.dot(sparse.diags(column_signs, format="csr"))
+
         coupling_matrix += charge_conj_block.dot(coupling_matrix_columns_swapped)
-        coupling_matrix /= np.sqrt(2)
+        coupling_matrix = cast(sparse.csr_matrix, coupling_matrix / np.sqrt(2))
 
     coupling_matrix = coupling_matrix.multiply(coupling_strengths).tocsr()
 
-    if np.allclose(coupling_matrix.data.imag, 0.0):
+    if np.allclose(np.imag(coupling_matrix.data), 0.0):
         coupling_matrix = coupling_matrix.real
 
-    return coupling_matrix.transpose()
+    return cast(sparse.csc_array, coupling_matrix.transpose())
 
 
 def create_decomposed_width_matrix(
@@ -265,14 +274,12 @@ def create_decomposed_width_matrix(
 
 @attrs.frozen(kw_only=True, eq=False, slots=False)
 class MajoranaFermionBasis:
-    """Lazily cached sparse fermion basis used by SYK ensembles and compounds."""
-
     num_majoranas: int = attrs.field(
-        validator=[
+        validator=(
             attrs.validators.instance_of(int),
             attrs.validators.gt(0),
             rmtpy.validators.is_even_number,
-        ],
+        ),
     )
     in_real_basis: bool = attrs.field(
         default=False,
@@ -289,7 +296,7 @@ class MajoranaFermionBasis:
 
     @cached_property
     def dimension(self) -> int:
-        return 2**self.num_complex_fermions
+        return cast(int, pow(2, self.num_complex_fermions))
 
     @cached_property
     def majorana_fermions(self) -> MajoranaFermions:

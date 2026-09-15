@@ -1,4 +1,7 @@
+from typing import cast
+
 import numpy as np
+from numpy.typing import NDArray
 from scipy.special import gamma
 
 
@@ -10,7 +13,11 @@ def universality_class(*, dyson_index: int) -> str | None:
     return {0: "Poisson", 1: "GOE", 2: "GUE", 4: "GSE"}.get(dyson_index)
 
 
-def wigner_surmise(spacings: np.ndarray, *, dyson_index: int) -> np.ndarray:
+def wigner_surmise(
+    spacings: NDArray[np.floating],
+    *,
+    dyson_index: int,
+) -> NDArray[np.floating]:
     if dyson_index == 0:
         return np.exp(-np.asarray(spacings))
 
@@ -25,17 +32,25 @@ def wigner_surmise(spacings: np.ndarray, *, dyson_index: int) -> np.ndarray:
 
 
 def porter_thomas_distribution(
-    widths: np.ndarray, *, dyson_index: int, num_channels: int
-) -> np.ndarray:
+    widths: NDArray[np.floating],
+    *,
+    dyson_index: int,
+    num_channels: int,
+) -> NDArray[np.floating]:
     real_dof = num_channels if dyson_index == 1 else 2 * num_channels
 
     widths = np.asarray(widths)
-    coeff = (real_dof / 2) ** (real_dof / 2) / gamma(real_dof / 2)
+    coeff = cast(int, (real_dof / 2) ** (real_dof / 2) / gamma(real_dof / 2))
 
     return coeff * widths ** (real_dof / 2 - 1) * np.exp(-real_dof * widths / 2)
 
 
-def connected_sff(times: np.ndarray, *, dyson_index: int, dimension: int) -> np.ndarray:
+def connected_sff(
+    times: NDArray[np.floating],
+    *,
+    dyson_index: int,
+    dimension: int,
+) -> NDArray[np.floating]:
     tau = np.asarray(times) / (2 * np.pi)
 
     if dyson_index == 1:
@@ -56,7 +71,7 @@ def connected_sff(times: np.ndarray, *, dyson_index: int, dimension: int) -> np.
         csff = np.full_like(tau, 2 / dimension)
         csff[2 * tau == 1] = np.nan
 
-        mask = (tau < 1) & (2 * tau != 1)
+        mask = cast(NDArray[np.bool_], (tau < 1) & (2 * tau != 1))
         csff[mask] = tau[mask] * (2 - np.log(np.abs(2 * tau[mask] - 1))) / dimension
 
         return csff
@@ -66,12 +81,15 @@ def connected_sff(times: np.ndarray, *, dyson_index: int, dimension: int) -> np.
 
 
 def time_delay_pdf(
-    times: np.ndarray, *, num_channels: int, heisenberg_time: float
-) -> np.ndarray:
+    times: NDArray[np.floating],
+    *,
+    num_channels: int,
+    heisenberg_time: float,
+) -> NDArray[np.floating]:
     times = np.asarray(times)
     taus = times / heisenberg_time
-    tau_plus = (3 + np.sqrt(8)) / num_channels
-    tau_minus = (3 - np.sqrt(8)) / num_channels
+    tau_plus = cast(float, (3 + np.sqrt(8)) / num_channels)
+    tau_minus = cast(float, (3 - np.sqrt(8)) / num_channels)
 
     pdf = np.zeros_like(times, dtype=np.result_type(times.dtype, np.float64))
     in_support = (tau_minus < taus) & (taus < tau_plus)

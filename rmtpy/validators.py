@@ -1,6 +1,5 @@
 import math
 from collections.abc import Sequence
-from typing import Any
 
 
 def validate_even_number(number: int) -> None:
@@ -17,9 +16,9 @@ def validate_support(support: Sequence[float]) -> None:
         raise ValueError("`support` must be strictly increasing.")
 
 
-def is_even_number(_: Any, __: Any, number: int) -> None:
+def is_even_number(_inst: object, _attr: object, number: int) -> None:
     validate_even_number(number)
 
 
-def is_valid_support(_: Any, __: Any, support: Sequence[float]) -> None:
+def is_valid_support(_inst: object, _attr: object, support: Sequence[float]) -> None:
     validate_support(support)
