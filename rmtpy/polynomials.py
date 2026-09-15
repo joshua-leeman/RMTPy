@@ -5,16 +5,16 @@ import numba
 import numpy as np
 from numpy.typing import NDArray
 
-type RealFunction = Callable[[NDArray[np.floating]], NDArray[np.floating]]
+type Float64Function = Callable[[NDArray[np.float64]], NDArray[np.float64]]
 
 
 class OrthogonalPolynomials(Protocol):
     def __call__(
         self,
-        x: NDArray[np.floating],
+        x: NDArray[np.float64],
         *,
         degree: int,
-    ) -> NDArray[np.floating]: ...
+    ) -> NDArray[np.float64]: ...
 
 
 def chebyshev_polynomial_2_weight(
@@ -22,7 +22,6 @@ def chebyshev_polynomial_2_weight(
     *,
     support_radius: float,
 ) -> NDArray[np.float64]:
-    energies = np.asarray(energies)
     x = energies / support_radius
 
     in_support = np.abs(energies) < support_radius
@@ -55,7 +54,6 @@ def legendre_polynomial_weight(
     *,
     support_radius: float,
 ) -> NDArray[np.float64]:
-    energies = np.asarray(energies)
     x = energies / support_radius
 
     in_support = np.abs(energies) < support_radius
@@ -93,7 +91,6 @@ def q_hermite_polynomial_weight(
     eta: float,
     partial_product_order: int = 100,
 ) -> NDArray[np.float64]:
-    energies = np.asarray(energies)
     x = energies / support_radius
 
     index_range = np.arange(partial_product_order)

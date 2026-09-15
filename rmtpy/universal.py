@@ -19,10 +19,10 @@ def wigner_surmise(
     dyson_index: int,
 ) -> NDArray[np.floating]:
     if dyson_index == 0:
-        return np.exp(-np.asarray(spacings))
+        return np.exp(-spacings)
 
     degeneracy = eigval_degeneracy(dyson_index=dyson_index)
-    adjusted_spacings = np.asarray(spacings) / degeneracy
+    adjusted_spacings = spacings / degeneracy
 
     idx = dyson_index
     a = 2 * gamma((idx + 2) / 2) ** (idx + 1) / gamma((idx + 1) / 2) ** (idx + 2)
@@ -38,10 +38,7 @@ def porter_thomas_distribution(
     num_channels: int,
 ) -> NDArray[np.floating]:
     real_dof = num_channels if dyson_index == 1 else 2 * num_channels
-
-    widths = np.asarray(widths)
     coeff = cast(int, (real_dof / 2) ** (real_dof / 2) / gamma(real_dof / 2))
-
     return coeff * widths ** (real_dof / 2 - 1) * np.exp(-real_dof * widths / 2)
 
 
@@ -51,7 +48,7 @@ def connected_sff(
     dyson_index: int,
     dimension: int,
 ) -> NDArray[np.floating]:
-    tau = np.asarray(times) / (2 * np.pi)
+    tau = times / (2 * np.pi)
 
     if dyson_index == 1:
         csff = np.empty_like(tau)
@@ -86,7 +83,6 @@ def time_delay_pdf(
     num_channels: int,
     heisenberg_time: float,
 ) -> NDArray[np.floating]:
-    times = np.asarray(times)
     taus = times / heisenberg_time
     tau_plus = cast(float, (3 + np.sqrt(8)) / num_channels)
     tau_minus = cast(float, (3 - np.sqrt(8)) / num_channels)

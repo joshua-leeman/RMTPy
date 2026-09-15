@@ -12,13 +12,13 @@ from numpy.typing import NDArray
 import rmtpy.universal
 import rmtpy.validators
 from rmtpy.density import MAX_POLYNOMIAL_DEGREE, DensityModel
-from rmtpy.polynomials import OrthogonalPolynomials, RealFunction
+from rmtpy.polynomials import Float64Function, OrthogonalPolynomials
 
 from .base_ensemble import RandomMatrixEnsemble
 
 type HermitianMatrix = NDArray[np.floating] | NDArray[np.complexfloating]
-type UnitaryMatrix = NDArray[np.floating] | NDArray[np.complexfloating]
-type Eigenvalues = NDArray[np.floating]
+type S_UnitaryMatrix = NDArray[np.floating] | NDArray[np.complexfloating]
+type RealEigenvalues = NDArray[np.floating]
 
 INITIALISM: str = "MBE"
 
@@ -135,11 +135,11 @@ class ManyBodyEnsemble(RandomMatrixEnsemble, ABC):
         realizs: int,
         *,
         use_complex_dtype: bool = False,
-    ) -> Iterator[tuple[Eigenvalues, UnitaryMatrix]]:
+    ) -> Iterator[tuple[RealEigenvalues, S_UnitaryMatrix]]:
         lapack_heev = self._pick_lapack_heev(use_complex_dtype=use_complex_dtype)
         for matrix in self.matrix_stream(realizs, use_complex_dtype=use_complex_dtype):
             eigvals, eigvecs, _info = cast(
-                tuple[Eigenvalues, UnitaryMatrix, object],
+                tuple[RealEigenvalues, S_UnitaryMatrix, object],
                 lapack_heev(matrix, compute_v=1, overwrite_a=True),
             )
             yield eigvals, eigvecs
@@ -149,11 +149,11 @@ class ManyBodyEnsemble(RandomMatrixEnsemble, ABC):
         realizs: int,
         *,
         use_complex_dtype: bool = False,
-    ) -> Iterator[Eigenvalues]:
+    ) -> Iterator[RealEigenvalues]:
         lapack_heev = self._pick_lapack_heev(use_complex_dtype=use_complex_dtype)
         for matrix in self.matrix_stream(realizs, use_complex_dtype=use_complex_dtype):
             eigvals, _info = cast(
-                tuple[Eigenvalues, object],
+                tuple[RealEigenvalues, object],
                 lapack_heev(matrix, compute_v=0, overwrite_a=True),
             )
             yield eigvals
@@ -196,7 +196,7 @@ class ManyBodyEnsemble(RandomMatrixEnsemble, ABC):
     def _create_spectral_polynomials(self) -> OrthogonalPolynomials | None:
         return
 
-    def _create_spectral_weight(self) -> RealFunction | None:
+    def _create_spectral_weight(self) -> Float64Function | None:
         return
 
     def _pick_blas_gemm(self, *, use_complex_dtype: bool = False):

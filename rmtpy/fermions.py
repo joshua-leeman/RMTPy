@@ -196,7 +196,6 @@ def create_conjugated_compound_coupling_matrix(
     num_complex_fermions = len(creation_operators)
     num_channels = math.comb(num_complex_fermions, num_free_complex_fermions)
 
-    coupling_strengths = np.asarray(coupling_strengths)
     if coupling_strengths.shape != (num_channels,):
         raise ValueError(
             "`coupling_strengths` must contain one coupling per generated "
