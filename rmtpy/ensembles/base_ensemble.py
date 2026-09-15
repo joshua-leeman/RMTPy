@@ -21,19 +21,21 @@ DIMENSION_METADATA: dict[str, str] = {
 REGISTRY: dict[str, type[attrs.AttrsInstance]] = {}
 
 
-def compute_complex_dtype(ensemble: RandomMatrixEnsemble) -> np.dtype[np.generic]:
+def _compute_complex_dtype(ensemble: RandomMatrixEnsemble) -> np.dtype[np.generic]:
     return np.dtype(ensemble.dtype.char.upper())
 
 
-def compute_real_dtype(ensemble: RandomMatrixEnsemble) -> np.dtype[np.generic]:
+def _compute_real_dtype(ensemble: RandomMatrixEnsemble) -> np.dtype[np.generic]:
     return np.dtype(ensemble.dtype.char.lower())
 
 
-def create_random_number_generator(ensemble: RandomMatrixEnsemble) -> np.random.Generator:
+def _create_random_number_generator(
+    ensemble: RandomMatrixEnsemble,
+) -> np.random.Generator:
     return np.random.default_rng(ensemble.seed)
 
 
-def structure_hook_for_ensemble(
+def _structure_hook_for_ensemble(
     src: dict[str, str | dict[str, object]] | RandomMatrixEnsemble,
     _: object,
 ) -> RandomMatrixEnsemble:
@@ -55,7 +57,7 @@ def structure_hook_for_ensemble(
     return src
 
 
-def unstructure_hook_for_ensemble(
+def _unstructure_hook_for_ensemble(
     ensemble: RandomMatrixEnsemble,
 ) -> dict[str, str | dict[str, object]]:
     fields = cast(dict[str, attrs.Attribute[object]], attrs.fields_dict(type(ensemble)))
@@ -71,16 +73,16 @@ def unstructure_hook_for_ensemble(
     }
 
 
-def register_ensemble_hooks(
+def _register_ensemble_hooks(
     ensemble_cls: type[RandomMatrixEnsemble],
 ) -> type[RandomMatrixEnsemble]:
-    RMT_CONVERTER.register_structure_hook(ensemble_cls, structure_hook_for_ensemble)
-    RMT_CONVERTER.register_unstructure_hook(ensemble_cls, unstructure_hook_for_ensemble)
+    RMT_CONVERTER.register_structure_hook(ensemble_cls, _structure_hook_for_ensemble)
+    RMT_CONVERTER.register_unstructure_hook(ensemble_cls, _unstructure_hook_for_ensemble)
 
     return ensemble_cls
 
 
-@register_ensemble_hooks
+@_register_ensemble_hooks
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
 class RandomMatrixEnsemble:
     initialism: ClassVar[str] = INITIALISM
@@ -102,17 +104,17 @@ class RandomMatrixEnsemble:
     )
 
     complex_dtype: np.dtype[np.generic] = attrs.field(
-        default=attrs.Factory(compute_complex_dtype, takes_self=True),
+        default=attrs.Factory(_compute_complex_dtype, takes_self=True),
         init=False,
         repr=False,
     )
     real_dtype: np.dtype[np.generic] = attrs.field(
-        default=attrs.Factory(compute_real_dtype, takes_self=True),
+        default=attrs.Factory(_compute_real_dtype, takes_self=True),
         init=False,
         repr=False,
     )
     rng: np.random.Generator = attrs.field(
-        default=attrs.Factory(create_random_number_generator, takes_self=True),
+        default=attrs.Factory(_create_random_number_generator, takes_self=True),
         init=False,
         repr=False,
     )
