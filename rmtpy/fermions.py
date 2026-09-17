@@ -10,10 +10,12 @@ from scipy import sparse
 
 from .validators import is_even_number
 
+type ParityBlockSlice = tuple[slice, slice]
 type MajoranaFermions = tuple[sparse.csr_array, ...]
 type ComplexFermions = tuple[tuple[sparse.csr_array, ...], tuple[sparse.csr_array, ...]]
-type ParityBlockSlice = tuple[slice, slice]
-type DecomposedSparseArray = tuple[NDArray[np.int32], NDArray[np.int8 | np.complex64]]
+type DecomposedSparseArray = tuple[
+    NDArray[np.int32], NDArray[np.int8] | NDArray[np.complex64]
+]
 
 
 def build_majorana_fermions(*, num_majoranas: int) -> MajoranaFermions:
@@ -162,10 +164,11 @@ def build_decomposed_q_monomials(
     num_nonzeros = cast(int, pow(2, num_majoranas // 2 - 1))
     num_monomials = math.comb(num_majoranas, q)
 
-    monomials_dtype = np.int8 if in_real_basis else np.complex64
-
     monomials_idxs = np.empty((num_monomials, 2, num_nonzeros), np.int32, order="C")
-    monomials_data = np.empty((num_monomials, num_nonzeros), monomials_dtype, order="C")
+    if in_real_basis:
+        monomials_data = np.empty((num_monomials, num_nonzeros), np.int8, order="C")
+    else:
+        monomials_data = np.empty((num_monomials, num_nonzeros), np.complex64, order="C")
 
     for term_num, idx_tuple in enumerate(combinations(range(num_majoranas), q)):
         q_body_term = majorana_fermions[idx_tuple[0]]
