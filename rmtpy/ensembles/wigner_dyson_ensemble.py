@@ -38,14 +38,14 @@ class WignerDysonEnsemble(ManyBodyEnsemble, ABC):
 
     @override
     def _build_spectral_polynomials(self) -> OrthogonalPolynomials:
-        def spectral_polynomials(
+        def wigner_dyson_spectral_polynomials(
             x: NDArray[np.float64],
             *,
             degree: int,
         ) -> NDArray[np.float64]:
             return chebyshev_polynomials_2(x, degree=degree)
 
-        return spectral_polynomials
+        return wigner_dyson_spectral_polynomials
 
     @override
     def _build_spectral_weight(self) -> Float64Function:
@@ -53,7 +53,8 @@ class WignerDysonEnsemble(ManyBodyEnsemble, ABC):
             energies: NDArray[np.float64],
         ) -> NDArray[np.float64]:
             return chebyshev_polynomial_2_weight(
-                energies, support_radius=self.spectral_radius
+                energies,
+                support_radius=self.spectral_radius,
             )
 
         return wigner_semicircle_distribution
