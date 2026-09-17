@@ -13,12 +13,8 @@ DYSON_INDEX: int = 1
 INITIALISM: str = "GOE"
 
 
-def compute_standard_deviation(goe: GaussianOrthogonalEnsemble) -> float:
-    return cast(float, goe.spectral_radius / 2 / np.sqrt(goe.dimension))
-
-
 @numba.njit(boundscheck=False, cache=True, fastmath=True)
-def create_goe_matrix(
+def _build_goe_matrix(
     matrix: RealSymmetricMatrix | HermitianMatrix,
     real_dtype: type[np.float64],
     std_dev: float,
@@ -31,12 +27,16 @@ def create_goe_matrix(
         matrix[i, i + 1 :] = matrix[i + 1 :, i]
 
 
+def _compute_standard_deviation(goe: GaussianOrthogonalEnsemble) -> float:
+    return cast(float, goe.spectral_radius / 2 / np.sqrt(goe.dimension))
+
+
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
 class GaussianOrthogonalEnsemble(WignerDysonEnsemble):
     initialism: ClassVar[str] = INITIALISM
 
     std_dev: float = attrs.field(
-        default=attrs.Factory(compute_standard_deviation, takes_self=True),
+        default=attrs.Factory(_compute_standard_deviation, takes_self=True),
         init=False,
         repr=False,
     )
@@ -56,7 +56,7 @@ class GaussianOrthogonalEnsemble(WignerDysonEnsemble):
             matrix = self._allocate_complex_hermitian_matrix_memory()
         else:
             matrix = self._allocate_empty_real_symmetric_matrix_memory()
-        create_goe_matrix(matrix, self.real_dtype.type, self.std_dev, self.rng)
+        _build_goe_matrix(matrix, self.real_dtype.type, self.std_dev, self.rng)
         return matrix
 
     @override
@@ -71,5 +71,5 @@ class GaussianOrthogonalEnsemble(WignerDysonEnsemble):
         else:
             matrix = self._allocate_empty_real_symmetric_matrix_memory()
         for _ in range(realizs):
-            create_goe_matrix(matrix, self.real_dtype.type, self.std_dev, self.rng)
+            _build_goe_matrix(matrix, self.real_dtype.type, self.std_dev, self.rng)
             yield matrix

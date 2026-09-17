@@ -16,7 +16,7 @@ type ParityBlockSlice = tuple[slice, slice]
 type DecomposedSparseArray = tuple[NDArray[np.int32], NDArray[np.int8 | np.complex64]]
 
 
-def create_majorana_fermions(*, num_majoranas: int) -> MajoranaFermions:
+def build_majorana_fermions(*, num_majoranas: int) -> MajoranaFermions:
     pauli_matrices = (
         sparse.csr_array([[0, 1], [1, 0]], dtype=np.complex64),
         sparse.csr_array([[0, -1j], [1j, 0]], dtype=np.complex64),
@@ -53,7 +53,7 @@ def create_majorana_fermions(*, num_majoranas: int) -> MajoranaFermions:
     raise RuntimeError("Failed to construct Majorana fermions: Invalid `num_majoranas`.")
 
 
-def create_charge_conj_unitary_from_majoranas(
+def build_charge_conj_unitary_from_majoranas(
     majorana_fermions: MajoranaFermions,
 ) -> sparse.csr_array:
     dimension = cast(int, pow(2, len(majorana_fermions) // 2))
@@ -82,7 +82,7 @@ def rotate_majorana_fermions_to_real_basis(
     return tuple(rotated_majorana_fermions)
 
 
-def create_complex_fermions_from_majoranas(
+def build_complex_fermions_from_majoranas(
     majorana_fermions: MajoranaFermions,
 ) -> ComplexFermions:
     num_complex_fermions = len(majorana_fermions) // 2
@@ -97,7 +97,7 @@ def create_complex_fermions_from_majoranas(
     return tuple(annihilation_operators), tuple(creation_operators)
 
 
-def create_vacuum_from_complex_fermions(
+def build_vacuum_from_complex_fermions(
     complex_fermions: ComplexFermions,
 ) -> sparse.csr_array:
     num_complex_fermions = len(complex_fermions[0])
@@ -118,10 +118,10 @@ def create_vacuum_from_complex_fermions(
     return vacuum_state
 
 
-def create_vacuum_from_number_of_majoranas(num_majoranas: int) -> sparse.csr_array:
-    majorana_fermions = create_majorana_fermions(num_majoranas=num_majoranas)
-    complex_fermions = create_complex_fermions_from_majoranas(majorana_fermions)
-    return create_vacuum_from_complex_fermions(complex_fermions)
+def build_vacuum_from_number_of_majoranas(num_majoranas: int) -> sparse.csr_array:
+    majorana_fermions = build_majorana_fermions(num_majoranas=num_majoranas)
+    complex_fermions = build_complex_fermions_from_majoranas(majorana_fermions)
+    return build_vacuum_from_complex_fermions(complex_fermions)
 
 
 def choose_block_slice_from_parity(
@@ -129,7 +129,7 @@ def choose_block_slice_from_parity(
     is_even_parity: bool,
     num_majoranas: int,
 ) -> ParityBlockSlice:
-    vacuum_state = create_vacuum_from_number_of_majoranas(num_majoranas)
+    vacuum_state = build_vacuum_from_number_of_majoranas(num_majoranas)
     if vacuum_state.count_nonzero() != 1:
         raise ValueError("Vacuum state must have only one nonzero entry.")
 
@@ -151,7 +151,7 @@ def choose_block_slice_from_parity(
     )
 
 
-def create_decomposed_q_monomials(
+def build_decomposed_q_monomials(
     *,
     q: int,
     majorana_fermions: MajoranaFermions,
@@ -183,7 +183,7 @@ def create_decomposed_q_monomials(
     return monomials_idxs, monomials_data
 
 
-def create_conjugated_compound_coupling_matrix(
+def build_conjugated_compound_coupling_matrix(
     *,
     num_free_complex_fermions: int,
     coupling_strengths: NDArray[np.float64],
@@ -254,7 +254,7 @@ def create_conjugated_compound_coupling_matrix(
     return cast(sparse.csc_array, coupling_matrix.transpose())
 
 
-def create_decomposed_width_matrix(
+def build_decomposed_width_matrix(
     coupling_matrix_conj: sparse.csc_array,
 ) -> DecomposedSparseArray:
     width_matrix = coupling_matrix_conj.transpose() @ coupling_matrix_conj
@@ -300,10 +300,10 @@ class MajoranaFermionBasis:
 
     @cached_property
     def majorana_fermions(self) -> MajoranaFermions:
-        majorana_fermions = create_majorana_fermions(num_majoranas=self.num_majoranas)
+        majorana_fermions = build_majorana_fermions(num_majoranas=self.num_majoranas)
 
         if self.in_real_basis:
-            charge_conj_unitary = create_charge_conj_unitary_from_majoranas(
+            charge_conj_unitary = build_charge_conj_unitary_from_majoranas(
                 majorana_fermions
             )
             majorana_fermions = rotate_majorana_fermions_to_real_basis(
@@ -322,32 +322,32 @@ class MajoranaFermionBasis:
 
     @cached_property
     def complex_fermions(self) -> ComplexFermions:
-        return create_complex_fermions_from_majoranas(self.majorana_fermions)
+        return build_complex_fermions_from_majoranas(self.majorana_fermions)
 
     @cached_property
     def charge_conj_unitary(self) -> sparse.csr_array:
-        return create_charge_conj_unitary_from_majoranas(self.majorana_fermions)
+        return build_charge_conj_unitary_from_majoranas(self.majorana_fermions)
 
     @cached_property
     def vacuum_state(self) -> sparse.csr_array:
-        return create_vacuum_from_complex_fermions(self.complex_fermions)
+        return build_vacuum_from_complex_fermions(self.complex_fermions)
 
-    def create_decomposed_q_monomials(self, *, q: int) -> DecomposedSparseArray:
-        return create_decomposed_q_monomials(
+    def build_decomposed_q_monomials(self, *, q: int) -> DecomposedSparseArray:
+        return build_decomposed_q_monomials(
             q=q,
             majorana_fermions=self.majorana_fermions,
             parity_block_slice=self.parity_block_slice,
             in_real_basis=self.in_real_basis,
         )
 
-    def create_conjugated_compound_coupling_matrix(
+    def build_conjugated_compound_coupling_matrix(
         self,
         *,
         num_free_complex_fermions: int,
         coupling_strengths: NDArray[np.float64],
         dyson_index: int = 2,
     ) -> sparse.csc_array:
-        return create_conjugated_compound_coupling_matrix(
+        return build_conjugated_compound_coupling_matrix(
             num_free_complex_fermions=num_free_complex_fermions,
             coupling_strengths=coupling_strengths,
             creation_operators=self.complex_fermions[1],

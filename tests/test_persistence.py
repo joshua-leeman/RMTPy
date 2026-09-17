@@ -135,7 +135,7 @@ class _FailingFigure:
 @dataclasses.dataclass(repr=False, eq=False, kw_only=True)
 class _ConcretePlot(Plot):
     def plot(self, path: str | Path) -> None:
-        self.create_figure()
+        self.build_figure()
         self.finish_plot(path)
 
 

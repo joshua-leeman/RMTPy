@@ -49,7 +49,7 @@ def _compute_seed(seed: str | SeedLike) -> SeedLike:
     return ast.literal_eval(seed) if isinstance(seed, str) else seed
 
 
-def _create_random_number_generator(
+def _build_random_number_generator(
     ensemble: RandomMatrixEnsemble,
 ) -> np.random.Generator:
     return np.random.default_rng(ensemble.seed)
@@ -134,7 +134,7 @@ class RandomMatrixEnsemble:
         repr=False,
     )
     rng: np.random.Generator = attrs.field(
-        default=attrs.Factory(_create_random_number_generator, takes_self=True),
+        default=attrs.Factory(_build_random_number_generator, takes_self=True),
         init=False,
         repr=False,
     )

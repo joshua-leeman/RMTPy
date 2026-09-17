@@ -113,8 +113,8 @@ class ManyBodyEnsemble(RandomMatrixEnsemble, ABC):
     def spectral_density(self) -> DensityModel:
         return DensityModel(
             max_polynomial_degree=self.max_spectral_polynomial_degree,
-            polynomials=self._create_spectral_polynomials(),
-            weight_function=self._create_spectral_weight(),
+            polynomials=self._build_spectral_polynomials(),
+            weight_function=self._build_spectral_weight(),
             dimension=self.dimension,
             support=(-self.spectral_radius, self.spectral_radius),
             sample_stream=self.eigvals_stream,
@@ -185,7 +185,9 @@ class ManyBodyEnsemble(RandomMatrixEnsemble, ABC):
         times: NDArray[np.float64],
     ) -> NDArray[np.float64]:
         return connected_sff(
-            times, dyson_index=self.dyson_index, dimension=self.dimension
+            times,
+            dyson_index=self.dyson_index,
+            dimension=self.dimension,
         )
 
     def _allocate_complex_hermitian_matrix_memory(self) -> HermitianMatrix:
@@ -194,10 +196,10 @@ class ManyBodyEnsemble(RandomMatrixEnsemble, ABC):
     def _allocate_empty_real_symmetric_matrix_memory(self) -> RealSymmetricMatrix:
         return np.empty((self.dimension, self.dimension), self.real_dtype, order="F")
 
-    def _create_spectral_polynomials(self) -> OrthogonalPolynomials | None:
+    def _build_spectral_polynomials(self) -> OrthogonalPolynomials | None:
         return
 
-    def _create_spectral_weight(self) -> Float64Function | None:
+    def _build_spectral_weight(self) -> Float64Function | None:
         return
 
     def _pick_linalg_dtype(self, use_complex_dtype: bool = False) -> np.dtype:

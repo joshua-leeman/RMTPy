@@ -33,7 +33,7 @@ from rmtpy.simulations.time_delay_statistics.time_delay_histograms.time_delay_hi
 )
 
 
-def create_compound(
+def build_compound(
     *,
     max_polynomial_degree: int,
     num_free_complex_fermions: int = 1,

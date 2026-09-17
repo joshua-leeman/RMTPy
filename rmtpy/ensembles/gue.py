@@ -13,12 +13,8 @@ DYSON_INDEX: int = 2
 INITIALISM: str = "GUE"
 
 
-def compute_standard_deviation(gue: GaussianUnitaryEnsemble) -> float:
-    return cast(float, gue.spectral_radius / 2 / np.sqrt(2 * gue.dimension))
-
-
 @numba.njit(boundscheck=False, cache=True, fastmath=True)
-def create_gue_matrix(
+def _build_gue_matrix(
     matrix: HermitianMatrix,
     real_dtype: type[np.float64],
     std_dev: float,
@@ -34,12 +30,16 @@ def create_gue_matrix(
         matrix[i, i + 1 :] = np.conj(matrix[i + 1 :, i])
 
 
+def _compute_standard_deviation(gue: GaussianUnitaryEnsemble) -> float:
+    return cast(float, gue.spectral_radius / 2 / np.sqrt(2 * gue.dimension))
+
+
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
 class GaussianUnitaryEnsemble(WignerDysonEnsemble):
     initialism: ClassVar[str] = INITIALISM
 
     std_dev: float = attrs.field(
-        default=attrs.Factory(compute_standard_deviation, takes_self=True),
+        default=attrs.Factory(_compute_standard_deviation, takes_self=True),
         init=False,
         repr=False,
     )
@@ -56,7 +56,7 @@ class GaussianUnitaryEnsemble(WignerDysonEnsemble):
         use_complex_dtype: bool = False,
     ) -> HermitianMatrix:
         matrix = self._allocate_complex_hermitian_matrix_memory()
-        create_gue_matrix(matrix, self.real_dtype.type, self.std_dev, self.rng)
+        _build_gue_matrix(matrix, self.real_dtype.type, self.std_dev, self.rng)
         return matrix
 
     @override
@@ -68,5 +68,5 @@ class GaussianUnitaryEnsemble(WignerDysonEnsemble):
     ) -> Iterator[HermitianMatrix]:
         matrix = self._allocate_complex_hermitian_matrix_memory()
         for _ in range(realizs):
-            create_gue_matrix(matrix, self.real_dtype.type, self.std_dev, self.rng)
+            _build_gue_matrix(matrix, self.real_dtype.type, self.std_dev, self.rng)
             yield matrix

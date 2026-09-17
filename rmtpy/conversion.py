@@ -61,7 +61,7 @@ def insert_underscores(string: str) -> str:
     return re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", string)
 
 
-def create_hashed_id(array: NDArray[np.generic], *, num_hex: int = 16) -> str:
+def build_hashed_id(array: NDArray[np.generic], *, num_hex: int = 16) -> str:
     hash_object = hashlib.sha256()
     hash_object.update(str(array.dtype).encode())
     hash_object.update(str(array.shape).encode())

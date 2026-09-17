@@ -29,7 +29,7 @@ from rmtpy.simulations.unfolding import (
 )
 
 
-def create_compound(*, max_degree: int = 0, seed: int = 123) -> Compound:
+def build_compound(*, max_degree: int = 0, seed: int = 123) -> Compound:
     return Compound(
         ensemble=GOE(
             num_majoranas=4,
@@ -70,7 +70,7 @@ def histogram2d_counts(
 class ResonanceStatisticsTests(unittest.TestCase):
     def test_poles_become_centers_widths_and_requested_raw_quantities(self) -> None:
         simulation = ResonanceStatisticsSimulation(
-            compound=create_compound(),
+            compound=build_compound(),
             realizs=1,
             request=ResonanceStatisticsRequest(
                 quantities=(
@@ -156,7 +156,7 @@ class ResonanceStatisticsTests(unittest.TestCase):
         for max_degree, (degrees, data_count) in expected.items():
             with self.subTest(max_degree=max_degree):
                 simulation = ResonanceStatisticsSimulation(
-                    compound=create_compound(max_degree=max_degree, seed=40 + max_degree),
+                    compound=build_compound(max_degree=max_degree, seed=40 + max_degree),
                     realizs=1,
                 )
                 result = simulation.execute()
@@ -181,7 +181,7 @@ class ResonanceStatisticsTests(unittest.TestCase):
 
     def test_selective_width_request_omits_other_work_and_grids(self) -> None:
         simulation = ResonanceStatisticsSimulation(
-            compound=create_compound(max_degree=2),
+            compound=build_compound(max_degree=2),
             realizs=1,
             request=ResonanceStatisticsRequest(
                 quantities=("widths",),
@@ -230,7 +230,7 @@ class ResonanceStatisticsTests(unittest.TestCase):
         self,
     ) -> None:
         simulation = ResonanceStatisticsSimulation(
-            compound=create_compound(max_degree=2, seed=51),
+            compound=build_compound(max_degree=2, seed=51),
             realizs=1,
             request=ResonanceStatisticsRequest(
                 quantities=("resonances",),
@@ -252,10 +252,10 @@ class ResonanceStatisticsTests(unittest.TestCase):
 
     def test_average_calibration_timing_and_seeded_rng_match(self) -> None:
         simulation = ResonanceStatisticsSimulation(
-            compound=create_compound(max_degree=2, seed=314159),
+            compound=build_compound(max_degree=2, seed=314159),
             realizs=2,
         )
-        control = create_compound(max_degree=2, seed=314159)
+        control = build_compound(max_degree=2, seed=314159)
         initial_rng_state = deepcopy(simulation.compound.rng_state)
         factory = TruncatedPolynomialCdfFactory(
             density=control.resonance_density,
@@ -337,7 +337,7 @@ class ResonanceStatisticsTests(unittest.TestCase):
                 ResonanceStatisticsRequest(unfolding_modes=(legacy_name,))
 
         simulation = ResonanceStatisticsSimulation(
-            compound=create_compound(),
+            compound=build_compound(),
             realizs=1,
         )
         with (
@@ -355,7 +355,7 @@ class ResonanceStatisticsTests(unittest.TestCase):
 
     def test_persistence_plotting_and_run_consumers(self) -> None:
         simulation = ResonanceStatisticsSimulation(
-            compound=create_compound(seed=88),
+            compound=build_compound(seed=88),
             realizs=1,
             request=ResonanceStatisticsRequest(
                 quantities=("resonances",),
@@ -383,7 +383,7 @@ class ResonanceStatisticsTests(unittest.TestCase):
         self.assertEqual(simulation.compound.rng_state, completed_rng_state)
 
         data_only = ResonanceStatisticsSimulation(
-            compound=create_compound(seed=89),
+            compound=build_compound(seed=89),
             realizs=1,
             request=ResonanceStatisticsRequest(
                 quantities=("widths",),

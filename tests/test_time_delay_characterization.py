@@ -28,7 +28,7 @@ from rmtpy.simulations.time_delay_statistics.time_delay_statistics_simulation im
 from rmtpy.simulations.unfolding import TruncatedPolynomialCdfFactory
 
 
-def create_compound(*, max_degree: int = 0, seed: int = 123) -> Compound:
+def build_compound(*, max_degree: int = 0, seed: int = 123) -> Compound:
     return Compound(
         ensemble=GOE(
             num_majoranas=4,
@@ -52,7 +52,7 @@ class TimeDelayStatisticsTests(unittest.TestCase):
     def test_energies_are_copied_read_only_unique_and_path_safe(self) -> None:
         source = np.array([-0.25, 0.125])
         simulation = TimeDelayStatisticsSimulation(
-            compound=create_compound(),
+            compound=build_compound(),
             realizs=1,
             energies=source,
         )
@@ -64,7 +64,7 @@ class TimeDelayStatisticsTests(unittest.TestCase):
             simulation.energies[0] = 0.0
 
         close = TimeDelayStatisticsSimulation(
-            compound=create_compound(),
+            compound=build_compound(),
             realizs=1,
             energies=(0.123456, 0.123457),
         )
@@ -73,7 +73,7 @@ class TimeDelayStatisticsTests(unittest.TestCase):
         for energies in ((-0.0, 0.0), (0.1, 0.1)):
             with self.subTest(energies=energies), self.assertRaises(ValueError):
                 TimeDelayStatisticsSimulation(
-                    compound=create_compound(),
+                    compound=build_compound(),
                     realizs=1,
                     energies=energies,
                 )
@@ -98,7 +98,7 @@ class TimeDelayStatisticsTests(unittest.TestCase):
 
     def test_degree_by_energy_axes_and_canonical_metadata(self) -> None:
         simulation = TimeDelayStatisticsSimulation(
-            compound=create_compound(max_degree=2, seed=41),
+            compound=build_compound(max_degree=2, seed=41),
             realizs=1,
             energies=(-0.25, 0.0, 0.125),
         )
@@ -138,7 +138,7 @@ class TimeDelayStatisticsTests(unittest.TestCase):
 
     def test_open_channel_shape_and_closed_eigenvalue_coefficients(self) -> None:
         simulation = TimeDelayStatisticsSimulation(
-            compound=create_compound(max_degree=2),
+            compound=build_compound(max_degree=2),
             realizs=1,
             energies=(-0.1, 0.1),
             request=TimeDelayStatisticsRequest(
@@ -170,7 +170,7 @@ class TimeDelayStatisticsTests(unittest.TestCase):
         self.assertEqual(len(result.variate_by_degree[0].by_energy), 2)
 
         failed = TimeDelayStatisticsSimulation(
-            compound=create_compound(),
+            compound=build_compound(),
             realizs=1,
             energies=(-0.1, 0.1),
         )
@@ -188,7 +188,7 @@ class TimeDelayStatisticsTests(unittest.TestCase):
 
     def test_selective_raw_request_omits_unfolding_and_calibration(self) -> None:
         simulation = TimeDelayStatisticsSimulation(
-            compound=create_compound(max_degree=2),
+            compound=build_compound(max_degree=2),
             realizs=1,
             energies=(0.0,),
             request=TimeDelayStatisticsRequest(unfolding_modes=("raw",)),
@@ -227,11 +227,11 @@ class TimeDelayStatisticsTests(unittest.TestCase):
 
     def test_average_calibration_precedes_seeded_delay_stream(self) -> None:
         simulation = TimeDelayStatisticsSimulation(
-            compound=create_compound(max_degree=2, seed=314159),
+            compound=build_compound(max_degree=2, seed=314159),
             realizs=2,
             energies=(-0.1, 0.1),
         )
-        control = create_compound(max_degree=2, seed=314159)
+        control = build_compound(max_degree=2, seed=314159)
         initial_rng_state = deepcopy(simulation.compound.rng_state)
         factory = TruncatedPolynomialCdfFactory(
             density=control.ensemble.spectral_density,
@@ -300,7 +300,7 @@ class TimeDelayStatisticsTests(unittest.TestCase):
 
     def test_persistence_plotting_and_run_consumers(self) -> None:
         simulation = TimeDelayStatisticsSimulation(
-            compound=create_compound(seed=81),
+            compound=build_compound(seed=81),
             realizs=1,
             energies=(0.123456, 0.123457),
             request=TimeDelayStatisticsRequest(unfolding_modes=("raw", "weight")),
@@ -340,7 +340,7 @@ class TimeDelayStatisticsTests(unittest.TestCase):
         self.assertEqual(simulation.compound.rng_state, completed_rng_state)
 
         data_only = TimeDelayStatisticsSimulation(
-            compound=create_compound(seed=82),
+            compound=build_compound(seed=82),
             realizs=1,
             request=TimeDelayStatisticsRequest(unfolding_modes=("raw",)),
         )

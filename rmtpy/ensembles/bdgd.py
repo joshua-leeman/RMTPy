@@ -17,12 +17,8 @@ LATEX_NAME: str = "\\text{{BdG(D)}}"
 TOKEN_NAME: str = "BdG_D"
 
 
-def compute_standard_deviation(bdgd: BogoliubovDeGennesDEnsemble) -> float:
-    return cast(float, bdgd.spectral_radius / 2 / np.sqrt(bdgd.dimension))
-
-
 @numba.njit(boundscheck=False, cache=True, fastmath=True)
-def create_bdgd_matrix(
+def _build_bdgd_matrix(
     matrix: HermitianMatrix,
     real_dtype: type[np.float64],
     std_dev: float,
@@ -35,12 +31,16 @@ def create_bdgd_matrix(
         matrix[i, i + 1 :] = np.conj(matrix[i + 1 :, i])
 
 
+def _compute_standard_deviation(bdgd: BogoliubovDeGennesDEnsemble) -> float:
+    return cast(float, bdgd.spectral_radius / 2 / np.sqrt(bdgd.dimension))
+
+
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
 class BogoliubovDeGennesDEnsemble(WignerDysonEnsemble):
     initialism: ClassVar[str] = INITIALISM
 
     std_dev: float = attrs.field(
-        default=attrs.Factory(compute_standard_deviation, takes_self=True),
+        default=attrs.Factory(_compute_standard_deviation, takes_self=True),
         init=False,
         repr=False,
     )
@@ -67,7 +67,7 @@ class BogoliubovDeGennesDEnsemble(WignerDysonEnsemble):
         use_complex_dtype: bool = False,
     ) -> HermitianMatrix:
         matrix = self._allocate_complex_hermitian_matrix_memory()
-        create_bdgd_matrix(matrix, self.real_dtype.type, self.std_dev, self.rng)
+        _build_bdgd_matrix(matrix, self.real_dtype.type, self.std_dev, self.rng)
         return matrix
 
     @override
@@ -79,5 +79,5 @@ class BogoliubovDeGennesDEnsemble(WignerDysonEnsemble):
     ) -> Iterator[HermitianMatrix]:
         matrix = self._allocate_complex_hermitian_matrix_memory()
         for _ in range(realizs):
-            create_bdgd_matrix(matrix, self.real_dtype.type, self.std_dev, self.rng)
+            _build_bdgd_matrix(matrix, self.real_dtype.type, self.std_dev, self.rng)
             yield matrix

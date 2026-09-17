@@ -84,7 +84,7 @@ def compute_histogram(
     return counts / (total_counts * np.diff(bins))
 
 
-def create_pdf_interpolator_from_histogram(
+def build_pdf_interpolator_from_histogram(
     histogram: NDArray[np.float64],
     *,
     bins: NDArray[np.float64],
@@ -96,7 +96,7 @@ def create_pdf_interpolator_from_histogram(
     return PchipInterpolator(centers, pdf_values, extrapolate=True)
 
 
-def create_cdf_interpolator_from_pdf(
+def build_cdf_interpolator_from_pdf(
     pdf: Float64Function,
     *,
     inputs: NDArray[np.float64],
@@ -232,15 +232,15 @@ class DensityModel:
 
     @cached_property
     def _average_pdf_interpolator(self) -> PchipInterpolator:
-        return self._create_average_pdf_interpolator_from_samples()
+        return self._build_average_pdf_interpolator_from_samples()
 
     @cached_property
     def _average_cdf_interpolator(self) -> PchipInterpolator:
-        return self._create_average_cdf_interpolator()
+        return self._build_average_cdf_interpolator()
 
     @cached_property
     def _weight_cdf_interpolator(self) -> PchipInterpolator:
-        return self._create_weight_cdf_interpolator()
+        return self._build_weight_cdf_interpolator()
 
     def average_cdf(self, points: NDArray[np.float64]) -> NDArray[np.float64]:
         if not self.has_polynomial_expansion:
@@ -279,7 +279,7 @@ class DensityModel:
         polynomials = self.compute_polynomials(sample.astype(np.float64))
         return cast(NDArray[np.float64], np.mean(polynomials, axis=1))
 
-    def create_variate_cdf_interpolator(
+    def build_variate_cdf_interpolator(
         self,
         *,
         interval: tuple[float, float] | None = None,
@@ -301,7 +301,7 @@ class DensityModel:
         else:
             left_mass = 0.0
 
-        return create_cdf_interpolator_from_pdf(
+        return build_cdf_interpolator_from_pdf(
             pdf,
             inputs=array_of_floats(support=interval, num_pts=self.num_pts),
             left_tail_mass=left_mass,
@@ -328,7 +328,7 @@ class DensityModel:
         coeffs: NDArray[np.float64] | None = None,
         sample: NDArray[np.float64] | None = None,
     ) -> NDArray[np.float64]:
-        cdf_interpolator = self.create_variate_cdf_interpolator(
+        cdf_interpolator = self.build_variate_cdf_interpolator(
             coeffs=coeffs, sample=sample
         )
         return cdf_interpolator(points)
@@ -348,7 +348,7 @@ class DensityModel:
     def _average_cdf_from_polynomials(
         self, points: NDArray[np.float64]
     ) -> NDArray[np.float64]:
-        return self.create_variate_cdf_interpolator(coeffs=self.average_coeffs)(points)
+        return self.build_variate_cdf_interpolator(coeffs=self.average_coeffs)(points)
 
     def _average_cdf_from_samples(
         self, points: NDArray[np.float64]
@@ -373,39 +373,39 @@ class DensityModel:
         average_coeffs /= self.optimal_realizs
         return average_coeffs
 
-    def _create_weight_cdf_interpolator(self) -> PchipInterpolator:
-        return create_cdf_interpolator_from_pdf(
+    def _build_weight_cdf_interpolator(self) -> PchipInterpolator:
+        return build_cdf_interpolator_from_pdf(
             self.weight_pdf,
             inputs=np.linspace(*self.plot_range, self.num_pts),
         )
 
-    def _create_average_cdf_interpolator(self) -> PchipInterpolator:
-        return create_cdf_interpolator_from_pdf(
+    def _build_average_cdf_interpolator(self) -> PchipInterpolator:
+        return build_cdf_interpolator_from_pdf(
             self.average_pdf,
             inputs=np.linspace(*self.plot_range, self.num_pts),
         )
 
-    def _create_average_pdf_interpolator_from_samples(self) -> PchipInterpolator:
+    def _build_average_pdf_interpolator_from_samples(self) -> PchipInterpolator:
         bins = np.linspace(*self.plot_range, self.num_bins + 1)
         counts = np.zeros(self.num_bins, dtype=np.intp)
 
         for sample in self.sample_stream(self.optimal_realizs):
             counts += np.histogram(sample, bins=bins)[0]
 
-        return create_pdf_interpolator_from_histogram(
+        return build_pdf_interpolator_from_histogram(
             histogram=compute_histogram(counts, bins=bins),
             bins=bins,
             kernel_std_dev=self.kernel_std_dev,
         )
 
-    def _create_variate_pdf_interpolator_from_sample(
+    def _build_variate_pdf_interpolator_from_sample(
         self,
         sample: NDArray[np.float64],
     ) -> PchipInterpolator:
         bins = np.linspace(*self.plot_range, self.num_bins + 1)
         counts = np.histogram(sample, bins=bins)[0]
 
-        return create_pdf_interpolator_from_histogram(
+        return build_pdf_interpolator_from_histogram(
             histogram=compute_histogram(counts, bins=bins),
             bins=bins,
             kernel_std_dev=self.kernel_std_dev,
@@ -443,5 +443,5 @@ class DensityModel:
         if sample is None:
             raise ValueError("`sample` must be provided for sample-based PDFs.")
 
-        pdf_interpolator = self._create_variate_pdf_interpolator_from_sample(sample)
+        pdf_interpolator = self._build_variate_pdf_interpolator_from_sample(sample)
         return pdf_interpolator(points)

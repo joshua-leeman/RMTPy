@@ -23,11 +23,11 @@ from rmtpy.simulations.partial_widths_statistics.partial_width_histogram import 
     PartialWidthHistogramPlot,
 )
 from rmtpy.simulations.partial_widths_statistics.partial_widths_statistics_simulation import (
-    create_width_statistics,
+    build_width_statistics,
 )
 
 
-def create_compound(*, num_free_complex_fermions: int = 1, seed: int = 123) -> Compound:
+def build_compound(*, num_free_complex_fermions: int = 1, seed: int = 123) -> Compound:
     return Compound(
         ensemble=GOE(num_majoranas=4, seed=seed),
         num_free_complex_fermions=num_free_complex_fermions,
@@ -45,7 +45,7 @@ def histogram_counts(samples: list[float], bins: np.ndarray) -> np.ndarray:
 class PartialWidthsStatisticsTests(unittest.TestCase):
     def test_partial_and_total_transformations_preserve_request_order(self) -> None:
         simulation = PartialWidthsStatisticsSimulation(
-            compound=create_compound(),
+            compound=build_compound(),
             realizs=2,
         )
         samples = (
@@ -90,19 +90,19 @@ class PartialWidthsStatisticsTests(unittest.TestCase):
     def test_default_and_invalid_indices_follow_compound_shape(self) -> None:
         self.assertEqual(
             PartialWidthsStatisticsSimulation(
-                compound=create_compound(), realizs=1
+                compound=build_compound(), realizs=1
             ).width_indices,
             ((0, 0), (1, 0), (1, 1), (0,), (1,)),
         )
         self.assertEqual(
             PartialWidthsStatisticsSimulation(
-                compound=create_compound(num_free_complex_fermions=0),
+                compound=build_compound(num_free_complex_fermions=0),
                 realizs=1,
             ).width_indices,
             ((0, 0), (1, 0), (0,), (1,)),
         )
 
-        compound = create_compound(num_free_complex_fermions=0)
+        compound = build_compound(num_free_complex_fermions=0)
         invalid_cases = ((), ((0, 0), (0, 0)), ((0, 0, 0),), ((2,),), ((0, 1),))
         for width_indices in invalid_cases:
             with self.subTest(width_indices=width_indices), self.assertRaises(ValueError):
@@ -114,7 +114,7 @@ class PartialWidthsStatisticsTests(unittest.TestCase):
 
     def test_selective_request_allocates_only_selected_histograms(self) -> None:
         simulation = PartialWidthsStatisticsSimulation(
-            compound=create_compound(),
+            compound=build_compound(),
             realizs=1,
             width_indices=((1,),),
         )
@@ -133,10 +133,10 @@ class PartialWidthsStatisticsTests(unittest.TestCase):
         self.assertEqual(tuple(result.iterate_data()), (result.statistics[0].histogram,))
 
     def test_zero_mean_is_terminal_and_does_not_rescale_bins(self) -> None:
-        statistics = create_width_statistics(((0, 0), (0,)))
+        statistics = build_width_statistics(((0, 0), (0,)))
         initial_bins = tuple(statistic.histogram.bins.copy() for statistic in statistics)
         simulation = PartialWidthsStatisticsSimulation(
-            compound=create_compound(),
+            compound=build_compound(),
             realizs=1,
             width_indices=((0, 0), (0,)),
         )
@@ -144,7 +144,7 @@ class PartialWidthsStatisticsTests(unittest.TestCase):
         with (
             patch(
                 "rmtpy.simulations.partial_widths_statistics."
-                "partial_widths_statistics_simulation.create_width_statistics",
+                "partial_widths_statistics_simulation.build_width_statistics",
                 return_value=statistics,
             ),
             patch.object(
@@ -194,7 +194,7 @@ class PartialWidthsStatisticsTests(unittest.TestCase):
 
     def test_persistence_plotting_and_run_side_effects_are_explicit(self) -> None:
         simulation = PartialWidthsStatisticsSimulation(
-            compound=create_compound(seed=77),
+            compound=build_compound(seed=77),
             realizs=1,
             width_indices=((0, 0),),
         )
@@ -223,7 +223,7 @@ class PartialWidthsStatisticsTests(unittest.TestCase):
         self.assertEqual(simulation.compound.rng_state, completed_rng_state)
 
         data_only = PartialWidthsStatisticsSimulation(
-            compound=create_compound(seed=78),
+            compound=build_compound(seed=78),
             realizs=1,
             width_indices=((0, 0),),
         )

@@ -29,10 +29,10 @@ from rmtpy.simulations.cdo_evolution.cdo_dynamics import (
     CDOInformationPlot,
     CDOProbabilitiesPlot,
     CDOPuritiesPlot,
-    create_cdo_time_grid,
+    build_cdo_time_grid,
 )
 from rmtpy.simulations.cdo_evolution.data_factories import (
-    create_kl_divergence_histogram_data,
+    build_kl_divergence_histogram_data,
 )
 from rmtpy.simulations.cdo_evolution.kl_divergence_histogram import (
     KLDivergenceHistogramPlot,
@@ -174,7 +174,7 @@ class CDOAccumulatorTests(unittest.TestCase):
         )
         return states, heisenberg_states
 
-    def create_accumulator(
+    def build_accumulator(
         self,
         *,
         retain_evolved_states: bool,
@@ -225,8 +225,8 @@ class CDOAccumulatorTests(unittest.TestCase):
 
     def test_explicit_calculation_agrees_in_both_internal_modes(self) -> None:
         states, heisenberg_states = self.fixture_states()
-        density_accumulator = self.create_accumulator(retain_evolved_states=False)
-        state_accumulator = self.create_accumulator(retain_evolved_states=True)
+        density_accumulator = self.build_accumulator(retain_evolved_states=False)
+        state_accumulator = self.build_accumulator(retain_evolved_states=True)
 
         density_accumulator.add(states[0], heisenberg_state=heisenberg_states[0])
         self.assertEqual(density_accumulator.accumulation_mode, "density_operator")
@@ -705,7 +705,7 @@ class CDOEvolutionTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             simulation.initial_state[0] = 1.0
 
-        times = create_cdo_time_grid(
+        times = build_cdo_time_grid(
             dimension=simulation.ensemble.dimension,
             scale=simulation.time_scale,
             logD_time_support=simulation.logD_time_support,
@@ -717,7 +717,7 @@ class CDOEvolutionTests(unittest.TestCase):
         self.assertTrue(np.all(times[1:] > 0.0))
         self.assertFalse(times.flags.writeable)
 
-        explicit_times = create_cdo_time_grid(
+        explicit_times = build_cdo_time_grid(
             dimension=4,
             scale=2.0,
             logD_time_support=(-1.0, 1.0),
@@ -816,7 +816,7 @@ class CDOEvolutionTests(unittest.TestCase):
                     logD_time_support=(-1.0, 0.0),
                     time_chunk_size=2,
                 )
-                times = create_cdo_time_grid(
+                times = build_cdo_time_grid(
                     dimension=simulation.ensemble.dimension,
                     scale=simulation.time_scale,
                     logD_time_support=simulation.logD_time_support,
@@ -838,8 +838,8 @@ class CDOEvolutionTests(unittest.TestCase):
 
                 with patch(
                     "rmtpy.simulations.cdo_evolution.cdo_evolution_simulation."
-                    "create_kl_divergence_histogram_data",
-                    wraps=create_kl_divergence_histogram_data,
+                    "build_kl_divergence_histogram_data",
+                    wraps=build_kl_divergence_histogram_data,
                 ) as histogram_factory:
                     result = simulation.execute()
                 self.assertEqual(
@@ -986,12 +986,12 @@ class CDOEvolutionTests(unittest.TestCase):
         with (
             patch(
                 "rmtpy.simulations.cdo_evolution.cdo_evolution_simulation."
-                "create_cdo_dynamics_data",
+                "build_cdo_dynamics_data",
                 side_effect=AssertionError("dynamics factory called"),
             ),
             patch(
                 "rmtpy.simulations.cdo_evolution.cdo_evolution_simulation."
-                "create_cdo_time_grid",
+                "build_cdo_time_grid",
                 side_effect=AssertionError("unused time grid created"),
             ),
         ):
@@ -1005,7 +1005,7 @@ class CDOEvolutionTests(unittest.TestCase):
 
         with patch(
             "rmtpy.simulations.cdo_evolution.cdo_evolution_simulation."
-            "create_kl_divergence_histogram_data",
+            "build_kl_divergence_histogram_data",
             side_effect=AssertionError("histogram factory called"),
         ):
             result = CDOEvolutionSimulation(
@@ -1023,7 +1023,7 @@ class CDOEvolutionTests(unittest.TestCase):
             "add_histogram_contribution",
             side_effect=AssertionError("scalar histogram loop used"),
         ):
-            histogram = create_kl_divergence_histogram_data(
+            histogram = build_kl_divergence_histogram_data(
                 divergences=samples,
                 heisenberg_time=7.0,
             )

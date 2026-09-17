@@ -25,7 +25,7 @@ from rmtpy.simulations.transmission_coefficients_simulation.weisskopf_estimate i
 )
 
 
-def create_compound(*, seed: int = 123) -> Compound:
+def build_compound(*, seed: int = 123) -> Compound:
     return Compound(
         ensemble=GOE(num_majoranas=4, seed=seed),
         coupling_strengths=np.array([0.75, 1.25]),
@@ -45,7 +45,7 @@ def scattering_matrix(
 class TransmissionCoefficientsTests(unittest.TestCase):
     def test_complex_average_precedes_modulus_and_channel_routing(self) -> None:
         simulation = TransmissionCoefficientsSimulation(
-            compound=create_compound(),
+            compound=build_compound(),
             realizs=2,
             channel_indices=(1, 0),
         )
@@ -96,7 +96,7 @@ class TransmissionCoefficientsTests(unittest.TestCase):
 
     def test_weisskopf_uses_all_channels_and_leading_weight_density(self) -> None:
         simulation = TransmissionCoefficientsSimulation(
-            compound=create_compound(),
+            compound=build_compound(),
             realizs=1,
             channel_indices=(0,),
         )
@@ -125,7 +125,7 @@ class TransmissionCoefficientsTests(unittest.TestCase):
 
     def test_invalid_density_values_remain_undefined(self) -> None:
         simulation = TransmissionCoefficientsSimulation(
-            compound=create_compound(),
+            compound=build_compound(),
             realizs=1,
         )
         density = np.ones(len(simulation.energies))
@@ -157,7 +157,7 @@ class TransmissionCoefficientsTests(unittest.TestCase):
         self,
     ) -> None:
         simulation = TransmissionCoefficientsSimulation(
-            compound=create_compound(),
+            compound=build_compound(),
             realizs=1,
             channel_indices=(1,),
         )
@@ -181,7 +181,7 @@ class TransmissionCoefficientsTests(unittest.TestCase):
             tuple(channel.channel_index for channel in result.by_channel), (1,)
         )
 
-        compound = create_compound()
+        compound = build_compound()
         for channel_indices in ((), (0, 0), (-1,), (compound.num_channels,), ((0, 1),)):
             with (
                 self.subTest(channel_indices=channel_indices),
@@ -195,7 +195,7 @@ class TransmissionCoefficientsTests(unittest.TestCase):
 
     def test_malformed_stream_is_a_terminal_failure(self) -> None:
         simulation = TransmissionCoefficientsSimulation(
-            compound=create_compound(),
+            compound=build_compound(),
             realizs=1,
         )
         malformed = np.zeros((len(simulation.energies), 1, 1), dtype=np.complex128)
@@ -215,11 +215,11 @@ class TransmissionCoefficientsTests(unittest.TestCase):
 
     def test_seeded_stream_and_rng_match_direct_scattering(self) -> None:
         simulation = TransmissionCoefficientsSimulation(
-            compound=create_compound(seed=314159),
+            compound=build_compound(seed=314159),
             realizs=2,
             channel_indices=(0,),
         )
-        control = create_compound(seed=314159)
+        control = build_compound(seed=314159)
         initial_rng_state = deepcopy(simulation.compound.rng_state)
         diagonal_sum = np.zeros(
             (len(simulation.energies), control.num_channels),
@@ -250,7 +250,7 @@ class TransmissionCoefficientsTests(unittest.TestCase):
 
     def test_persistence_plotting_and_run_consumers(self) -> None:
         simulation = TransmissionCoefficientsSimulation(
-            compound=create_compound(seed=90),
+            compound=build_compound(seed=90),
             realizs=1,
             channel_indices=(0,),
         )
@@ -284,7 +284,7 @@ class TransmissionCoefficientsTests(unittest.TestCase):
         self.assertEqual(simulation.compound.rng_state, completed_rng_state)
 
         data_only = TransmissionCoefficientsSimulation(
-            compound=create_compound(seed=91),
+            compound=build_compound(seed=91),
             realizs=1,
         )
         with patch("rmtpy.simulations.persistence.save_run") as save_result:

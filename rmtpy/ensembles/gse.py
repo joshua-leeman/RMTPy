@@ -5,7 +5,6 @@ import attrs
 import numba
 import numpy as np
 
-from .gue import create_gue_matrix
 from .many_body_ensemble import HermitianMatrix
 from .wigner_dyson_ensemble import WignerDysonEnsemble
 
@@ -14,11 +13,7 @@ DYSON_INDEX: int = 4
 INITIALISM: str = "GSE"
 
 
-def compute_standard_deviation(gse: GaussianSymplecticEnsemble) -> float:
-    return cast(float, gse.spectral_radius / 2 / np.sqrt(2 * gse.dimension))
-
-
-def create_gse_matrix(
+def _build_gse_matrix(
     matrix: HermitianMatrix,
     real_dtype: type[np.float64],
     std_dev: float,
@@ -30,16 +25,33 @@ def create_gse_matrix(
     bottom_left_block = matrix[halfway:, :halfway]
     bottom_right_block = matrix[halfway:, halfway:]
 
-    create_gue_matrix(top_left_block, real_dtype, std_dev, rng)
+    _build_gue_matrix(top_left_block, real_dtype, std_dev, rng)
     _ = np.conjugate(top_left_block, out=bottom_right_block)
 
-    create_skew_symmetric_matrix(top_right_block, real_dtype, std_dev, rng)
+    _build_skew_symmetric_matrix(top_right_block, real_dtype, std_dev, rng)
     _ = np.negative(top_right_block, out=bottom_left_block)
     _ = np.conjugate(bottom_left_block, out=bottom_left_block)
 
 
 @numba.njit(boundscheck=False, cache=True, fastmath=True)
-def create_skew_symmetric_matrix(
+def _build_gue_matrix(
+    matrix: HermitianMatrix,
+    real_dtype: type[np.float64],
+    std_dev: float,
+    rng: np.random.Generator,
+) -> None:
+    size = cast(int, matrix.shape[0])
+    for i in range(size):
+        matrix[i, i] = 2 * std_dev * rng.standard_normal(None, real_dtype)
+        matrix[i + 1 :, i] = std_dev * (
+            rng.standard_normal(size - i - 1, real_dtype)
+            + 1j * rng.standard_normal(size - i - 1, real_dtype)
+        )
+        matrix[i, i + 1 :] = np.conj(matrix[i + 1 :, i])
+
+
+@numba.njit(boundscheck=False, cache=True, fastmath=True)
+def _build_skew_symmetric_matrix(
     matrix: HermitianMatrix,
     real_dtype: type[np.float64],
     std_dev: float,
@@ -55,12 +67,16 @@ def create_skew_symmetric_matrix(
         matrix[i, i + 1 :] = -matrix[i + 1 :, i]
 
 
+def _compute_standard_deviation(gse: GaussianSymplecticEnsemble) -> float:
+    return cast(float, gse.spectral_radius / 2 / np.sqrt(2 * gse.dimension))
+
+
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
 class GaussianSymplecticEnsemble(WignerDysonEnsemble):
     initialism: ClassVar[str] = INITIALISM
 
     std_dev: float = attrs.field(
-        default=attrs.Factory(compute_standard_deviation, takes_self=True),
+        default=attrs.Factory(_compute_standard_deviation, takes_self=True),
         init=False,
         repr=False,
     )
@@ -77,7 +93,7 @@ class GaussianSymplecticEnsemble(WignerDysonEnsemble):
         use_complex_dtype: bool = False,
     ) -> HermitianMatrix:
         matrix = self._allocate_complex_hermitian_matrix_memory()
-        create_gse_matrix(matrix, self.real_dtype.type, self.std_dev, self.rng)
+        _build_gse_matrix(matrix, self.real_dtype.type, self.std_dev, self.rng)
         return matrix
 
     @override
@@ -89,5 +105,5 @@ class GaussianSymplecticEnsemble(WignerDysonEnsemble):
     ) -> Iterator[HermitianMatrix]:
         matrix = self._allocate_complex_hermitian_matrix_memory()
         for _ in range(realizs):
-            create_gse_matrix(matrix, self.real_dtype.type, self.std_dev, self.rng)
+            _build_gse_matrix(matrix, self.real_dtype.type, self.std_dev, self.rng)
             yield matrix
