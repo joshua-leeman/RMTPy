@@ -6,7 +6,7 @@ import attrs
 import numpy as np
 from numpy.typing import NDArray
 
-from ..conversion import to_registry_key
+from ..conversion import to_key_of_registry
 from ..polynomials import (
     Float64Function,
     OrthogonalPolynomials,
@@ -31,7 +31,7 @@ class WignerDysonEnsemble(ManyBodyEnsemble, ABC):
         super().__attrs_init_subclass__()
 
         if not inspect.isabstract(cls):
-            initialism = to_registry_key(cls.initialism)
+            initialism = to_key_of_registry(cls.initialism)
 
             WIGNER_DYSON_ENSEMBLE_NAMES_BY_INITIALISM[initialism] = cls.__name__.lower()
             WIGNER_DYSON_ENSEMBLE_INITIALISMS_BY_NAME[cls.__name__.lower()] = initialism

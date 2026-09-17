@@ -8,13 +8,13 @@ import numpy as np
 from .many_body_ensemble import HermitianMatrix
 from .wigner_dyson_ensemble import WignerDysonEnsemble
 
-DYSON_INDEX: int = 2
-
 INITIALISM: str = "BdGC"
 
 LATEX_NAME: str = "\\text{{BdG(C)}}"
 
 TOKEN_NAME: str = "BdG_C"
+
+DYSON_INDEX: int = 2
 
 
 def _build_bdgc_matrix(

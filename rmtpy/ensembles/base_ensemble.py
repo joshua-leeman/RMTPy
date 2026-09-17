@@ -9,10 +9,11 @@ import numpy as np
 
 from ..conversion import (
     RMT_CONVERTER,
-    normalize_source,
+    SourceDict,
+    canonicalize_source_dict,
+    to_key_of_registry,
     to_latex,
     to_path,
-    to_registry_key,
 )
 
 type SeedLike = (
@@ -56,11 +57,11 @@ def _build_random_number_generator(
 
 
 def _structure_hook_for_ensemble(
-    src: dict[str, str | dict[str, object]] | RandomMatrixEnsemble,
+    src: SourceDict | RandomMatrixEnsemble,
     _: object,
 ) -> RandomMatrixEnsemble:
     if isinstance(src, dict):
-        ensemble_dict = normalize_source(src, registry=REGISTRY)
+        ensemble_dict = canonicalize_source_dict(src, registry=REGISTRY)
 
         ensemble_type = ensemble_dict["type"]
         if not isinstance(ensemble_type, str):
@@ -70,7 +71,7 @@ def _structure_hook_for_ensemble(
         if not isinstance(parameters, dict):
             raise TypeError("Configuration `parameters` must be a dictionary.")
 
-        key = to_registry_key(ensemble_type)
+        key = to_key_of_registry(ensemble_type)
         ensemble_factory = cast(Callable[..., RandomMatrixEnsemble], REGISTRY[key])
         return ensemble_factory(**parameters)
 
@@ -79,7 +80,7 @@ def _structure_hook_for_ensemble(
 
 def _unstructure_hook_for_ensemble(
     ensemble: RandomMatrixEnsemble,
-) -> dict[str, str | dict[str, object]]:
+) -> SourceDict:
     fields = cast(dict[str, attrs.Attribute[object]], attrs.fields_dict(type(ensemble)))
     parameters = {
         name: RMT_CONVERTER.unstructure(getattr(ensemble, name))
@@ -144,13 +145,13 @@ class RandomMatrixEnsemble:
         if inspect.isabstract(cls):
             return
 
-        key = to_registry_key(cls.__name__)
+        key = to_key_of_registry(cls.__name__)
         REGISTRY[key] = cls
 
     @classmethod
     def create(
         cls,
-        src: dict[str, str | dict[str, object]] | RandomMatrixEnsemble,
+        src: SourceDict | RandomMatrixEnsemble,
     ) -> RandomMatrixEnsemble:
         return RMT_CONVERTER.structure(src, cls)
 

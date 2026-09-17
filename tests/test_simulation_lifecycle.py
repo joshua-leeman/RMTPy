@@ -9,7 +9,7 @@ import attrs
 import numpy as np
 
 from rmtpy.compounds import Compound
-from rmtpy.conversion import normalize_value
+from rmtpy.conversion import to_json_compatible
 from rmtpy.ensembles import GOE
 from rmtpy.simulations.histogram import Histogram
 from rmtpy.simulations.histogram2D import Histogram2D
@@ -228,7 +228,7 @@ class SimulationLifecycleTests(unittest.TestCase):
         histogram.compute_histogram_probabilities()
         plot = ComplexEnergyHistogramPlot(
             data=histogram,
-            simulation_parameters={"compound": normalize_value(compound)},
+            simulation_parameters={"compound": to_json_compatible(compound)},
         )
 
         with patch.object(ComplexEnergyHistogramPlot, "finish_plot"):

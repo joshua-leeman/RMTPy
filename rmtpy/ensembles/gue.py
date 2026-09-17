@@ -8,9 +8,9 @@ import numpy as np
 from .many_body_ensemble import HermitianMatrix
 from .wigner_dyson_ensemble import WignerDysonEnsemble
 
-DYSON_INDEX: int = 2
-
 INITIALISM: str = "GUE"
+
+DYSON_INDEX: int = 2
 
 
 @numba.njit(boundscheck=False, cache=True, fastmath=True)

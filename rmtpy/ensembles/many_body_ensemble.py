@@ -101,13 +101,13 @@ class ManyBodyEnsemble(RandomMatrixEnsemble, ABC):
         return eigval_degeneracy(dyson_index=self.dyson_index)
 
     @property
+    def universality_class(self) -> str | None:
+        return universality_class(dyson_index=self.dyson_index)
+
+    @property
     @override
     def latex_name(self) -> str:
         return rf"{{{super().latex_name}}}({{{self.num_majoranas}}})"
-
-    @property
-    def universality_class(self) -> str | None:
-        return universality_class(dyson_index=self.dyson_index)
 
     @cached_property
     def spectral_density(self) -> DensityModel:
