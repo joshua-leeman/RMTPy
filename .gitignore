@@ -1,15 +1,14 @@
 # Project-specific files and directories
-.filelist
+.ruff_cache/
 rmtpy.code-workspace
 pyproject.toml
-.ruff_cache/
 docs/
 output/
 outputs/
 scratch/
 archive/
 notebooks/
-architecture_report/
+reports/
 
 # DotEnv configuration
 .env

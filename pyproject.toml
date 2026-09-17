@@ -1,6 +1,13 @@
+[project]
+requires-python = ">=3.14"
+
+[tool.black]
+line-length = 90
+target-version = ["py314"]
+
 [tool.ruff]
 line-length = 90
-target-version = "py311"
+target-version = "py314"
 
 [tool.ruff.lint]
 select = [
