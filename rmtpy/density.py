@@ -9,8 +9,8 @@ from scipy.integrate import cumulative_trapezoid
 from scipy.interpolate import PchipInterpolator
 from scipy.ndimage import gaussian_filter1d
 
-import rmtpy.validators
-from rmtpy.polynomials import Float64Function, OrthogonalPolynomials
+from .polynomials import Float64Function, OrthogonalPolynomials
+from .validators import is_valid_support, validate_support
 
 
 class SpectrumStream(Protocol):
@@ -41,7 +41,7 @@ def array_of_floats(
     num_pts: int,
     log_base: float | None = None,
 ) -> NDArray[np.float64]:
-    rmtpy.validators.validate_support(support)
+    validate_support(support)
     if log_base is None:
         return np.linspace(*support, num_pts)
     else:
@@ -179,7 +179,7 @@ class DensityModel:
     )
     support: tuple[float, float] = attrs.field(
         converter=cast(Callable[[object], tuple[float, float]], tuple),
-        validator=rmtpy.validators.is_valid_support,
+        validator=is_valid_support,
     )
 
     support_scale_factor: float = attrs.field(
@@ -289,7 +289,7 @@ class DensityModel:
         if interval is None:
             interval = self.plot_range
         else:
-            rmtpy.validators.validate_support(interval)
+            validate_support(interval)
 
         def pdf(points: NDArray[np.float64]) -> NDArray[np.float64]:
             return self.variate_pdf(points, coeffs=coeffs, sample=sample)

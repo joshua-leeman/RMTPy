@@ -8,7 +8,7 @@ import numpy as np
 from numpy.typing import NDArray
 from scipy import sparse
 
-import rmtpy.validators
+from .validators import is_even_number
 
 type MajoranaFermions = tuple[sparse.csr_array, ...]
 type ComplexFermions = tuple[tuple[sparse.csr_array, ...], tuple[sparse.csr_array, ...]]
@@ -278,7 +278,7 @@ class MajoranaFermionBasis:
         validator=(
             attrs.validators.instance_of(int),
             attrs.validators.gt(0),
-            rmtpy.validators.is_even_number,
+            is_even_number,
         ),
     )
     in_real_basis: bool = attrs.field(

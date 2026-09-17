@@ -7,8 +7,13 @@ from typing import ClassVar, cast
 import attrs
 import numpy as np
 
-import rmtpy.conversion
-from rmtpy.conversion import RMT_CONVERTER
+from ..conversion import (
+    RMT_CONVERTER,
+    normalize_source,
+    to_latex,
+    to_path,
+    to_registry_key,
+)
 
 type SeedLike = (
     None
@@ -55,7 +60,7 @@ def _structure_hook_for_ensemble(
     _: object,
 ) -> RandomMatrixEnsemble:
     if isinstance(src, dict):
-        ensemble_dict = rmtpy.conversion.normalize_source(src, registry=REGISTRY)
+        ensemble_dict = normalize_source(src, registry=REGISTRY)
 
         ensemble_type = ensemble_dict["type"]
         if not isinstance(ensemble_type, str):
@@ -65,7 +70,7 @@ def _structure_hook_for_ensemble(
         if not isinstance(parameters, dict):
             raise TypeError("Configuration `parameters` must be a dictionary.")
 
-        key = rmtpy.conversion.to_registry_key(ensemble_type)
+        key = to_registry_key(ensemble_type)
         ensemble_factory = cast(Callable[..., RandomMatrixEnsemble], REGISTRY[key])
         return ensemble_factory(**parameters)
 
@@ -139,7 +144,7 @@ class RandomMatrixEnsemble:
         if inspect.isabstract(cls):
             return
 
-        key = rmtpy.conversion.to_registry_key(cls.__name__)
+        key = to_registry_key(cls.__name__)
         REGISTRY[key] = cls
 
     @classmethod
@@ -159,11 +164,11 @@ class RandomMatrixEnsemble:
 
     @property
     def to_latex(self) -> str:
-        return rmtpy.conversion.to_latex(self, latex_name=self.latex_name)
+        return to_latex(self, latex_name=self.latex_name)
 
     @property
     def to_path(self) -> Path:
-        return rmtpy.conversion.to_path(self, root=Path(self.token_name))
+        return to_path(self, root=Path(self.token_name))
 
     @property
     def rng_state(self) -> dict[str, object]:

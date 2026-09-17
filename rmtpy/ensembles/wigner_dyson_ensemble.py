@@ -6,14 +6,13 @@ import attrs
 import numpy as np
 from numpy.typing import NDArray
 
-import rmtpy.conversion
-from rmtpy.polynomials import (
+from ..conversion import to_registry_key
+from ..polynomials import (
     Float64Function,
     OrthogonalPolynomials,
     chebyshev_polynomial_2_weight,
     chebyshev_polynomials_2,
 )
-
 from .many_body_ensemble import ManyBodyEnsemble
 
 INITIALISM: str = "WDE"
@@ -32,7 +31,7 @@ class WignerDysonEnsemble(ManyBodyEnsemble, ABC):
         super().__attrs_init_subclass__()
 
         if not inspect.isabstract(cls):
-            initialism = rmtpy.conversion.to_registry_key(cls.initialism)
+            initialism = to_registry_key(cls.initialism)
 
             WIGNER_DYSON_ENSEMBLE_NAMES_BY_INITIALISM[initialism] = cls.__name__.lower()
             WIGNER_DYSON_ENSEMBLE_INITIALISMS_BY_NAME[cls.__name__.lower()] = initialism

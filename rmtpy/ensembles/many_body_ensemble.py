@@ -9,11 +9,16 @@ import scipy.linalg.blas
 import scipy.linalg.lapack
 from numpy.typing import NDArray
 
-import rmtpy.universal
-import rmtpy.validators
-from rmtpy.density import MAX_POLYNOMIAL_DEGREE, DensityModel
-from rmtpy.polynomials import Float64Function, OrthogonalPolynomials
-
+from ..density import MAX_POLYNOMIAL_DEGREE, DensityModel
+from ..polynomials import Float64Function, OrthogonalPolynomials
+from ..universal import (
+    connected_sff,
+    eigval_degeneracy,
+    porter_thomas_distribution,
+    universality_class,
+    wigner_surmise,
+)
+from ..validators import is_even_number
 from .base_ensemble import RandomMatrixEnsemble
 
 type RealSymmetricMatrix = NDArray[np.float64]
@@ -59,7 +64,7 @@ class ManyBodyEnsemble(RandomMatrixEnsemble, ABC):
             attrs.validators.instance_of(int),
             attrs.validators.ge(NUM_MAJORANAS_MIN),
             attrs.validators.le(NUM_MAJORANAS_MAX),
-            rmtpy.validators.is_even_number,
+            is_even_number,
         ),
         metadata=NUM_MAJORANAS_METADATA,
     )
@@ -93,7 +98,7 @@ class ManyBodyEnsemble(RandomMatrixEnsemble, ABC):
 
     @property
     def eigval_degeneracy(self) -> int:
-        return rmtpy.universal.eigval_degeneracy(dyson_index=self.dyson_index)
+        return eigval_degeneracy(dyson_index=self.dyson_index)
 
     @property
     @override
@@ -102,7 +107,7 @@ class ManyBodyEnsemble(RandomMatrixEnsemble, ABC):
 
     @property
     def universality_class(self) -> str | None:
-        return rmtpy.universal.universality_class(dyson_index=self.dyson_index)
+        return universality_class(dyson_index=self.dyson_index)
 
     @cached_property
     def spectral_density(self) -> DensityModel:
@@ -166,23 +171,21 @@ class ManyBodyEnsemble(RandomMatrixEnsemble, ABC):
         *,
         num_channels: int = 1,
     ) -> NDArray[np.float64]:
-        return rmtpy.universal.porter_thomas_distribution(
+        return porter_thomas_distribution(
             widths,
             dyson_index=self.dyson_index,
             num_channels=num_channels,
         )
 
     def wigner_surmise(self, spacings: NDArray[np.float64]) -> NDArray[np.float64]:
-        return rmtpy.universal.wigner_surmise(spacings, dyson_index=self.dyson_index)
+        return wigner_surmise(spacings, dyson_index=self.dyson_index)
 
     def universal_connected_sff(
         self,
         times: NDArray[np.float64],
     ) -> NDArray[np.float64]:
-        return rmtpy.universal.connected_sff(
-            times,
-            dyson_index=self.dyson_index,
-            dimension=self.dimension,
+        return connected_sff(
+            times, dyson_index=self.dyson_index, dimension=self.dimension
         )
 
     def _allocate_complex_hermitian_matrix_memory(self) -> HermitianMatrix:
