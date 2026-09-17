@@ -1,0 +1,245 @@
+import math
+from collections.abc import Callable, Iterator
+from functools import cached_property
+from typing import ClassVar, cast, override
+
+import attrs
+import numba
+import numpy as np
+from numpy.typing import NDArray
+
+from ..fermions import DecomposedSparseArray, MajoranaFermionBasis
+from ..polynomials import (
+    Float64Function,
+    OrthogonalPolynomials,
+    q_hermite_polynomial_weight,
+    q_hermite_polynomials,
+)
+from .many_body_ensemble import HermitianMatrix, ManyBodyEnsemble, RealSymmetricMatrix
+
+INITIALISM: str = "SYK"
+
+NUM_MAJORANAS_LIMIT_BY_Q: dict[int, int] = {2: 32, 4: 32, 6: 26, 8: 24, 10: 22}
+
+
+@numba.njit(boundscheck=False, cache=True, fastmath=True)
+def _build_syk_matrix_with_imaginary_prefactor(
+    matrix: HermitianMatrix,
+    real_dtype: type[np.float64],
+    std_dev: float,
+    monomials_idxs: NDArray[np.int32],
+    monomials_data: NDArray[np.complex64],
+    rng: np.random.Generator,
+) -> None:
+    num_monomials = cast(int, monomials_data.shape[0])
+    num_nonzeros = cast(int, monomials_data.shape[1])
+    coefficients = std_dev * rng.standard_normal(num_monomials, real_dtype)
+
+    matrix.fill(0.0)
+    for i in range(num_monomials):
+        for j in range(num_nonzeros):
+            entry_idx = (monomials_idxs[i, 0, j], monomials_idxs[i, 1, j])
+            matrix[entry_idx] += 1j * coefficients[i] * monomials_data[i, j]
+
+
+@numba.njit(boundscheck=False, cache=True, fastmath=True)
+def _build_syk_matrix_without_imaginary_prefactor(
+    matrix: RealSymmetricMatrix | HermitianMatrix,
+    real_dtype: type[np.float64],
+    std_dev: float,
+    monomials_idxs: NDArray[np.int32],
+    monomials_data: NDArray[np.int8] | NDArray[np.complex64],
+    rng: np.random.Generator,
+) -> None:
+    num_monomials = cast(int, monomials_data.shape[0])
+    num_nonzeros = cast(int, monomials_data.shape[1])
+    coefficients = std_dev * rng.standard_normal(num_monomials, real_dtype)
+
+    matrix.fill(0.0)
+    for i in range(num_monomials):
+        for j in range(num_nonzeros):
+            entry_idx = (monomials_idxs[i, 0, j], monomials_idxs[i, 1, j])
+            matrix[entry_idx] += coefficients[i] * monomials_data[i, j]
+
+
+def _are_num_majoranas_within_limit(
+    syk: SachdevYeKitaevEnsemble, _: attrs.Attribute[int], q: int
+) -> None:
+    if q not in NUM_MAJORANAS_LIMIT_BY_Q:
+        raise ValueError(
+            f"`q` must be one of {tuple(NUM_MAJORANAS_LIMIT_BY_Q)}, got {q}."
+        )
+    if syk.num_majoranas > NUM_MAJORANAS_LIMIT_BY_Q[q]:
+        raise ValueError(
+            f"For the SYK q={q} model, `num_majoranas` cannot exceed "
+            + f"{NUM_MAJORANAS_LIMIT_BY_Q[q]} due to memory constraints."
+        )
+    elif q >= syk.num_majoranas:
+        raise ValueError(
+            f"The SYK q-parameter {q} must be less than the number of majorana "
+            + f"fermions, here {syk.num_majoranas}."
+        )
+
+
+def _compute_dyson_index(syk: SachdevYeKitaevEnsemble) -> int:
+    if syk.q == 2:
+        return 0
+
+    return {(0, 0): 1, (0, 4): 4}.get((syk.q % 4, syk.num_majoranas % 8), 2)
+
+
+def _compute_standard_deviation(syk: SachdevYeKitaevEnsemble) -> float:
+    conventional_denominator = cast(int, pow(syk.num_majoranas, (syk.q - 1)))
+    variance_numerical_factor = math.factorial(syk.q - 1) / conventional_denominator
+    return cast(float, syk.interaction_strength * np.sqrt(variance_numerical_factor))
+
+
+def _compute_suppression_factor(syk: SachdevYeKitaevEnsemble) -> float:
+    return sum(
+        ((-1) ** (syk.q - k) / math.comb(syk.num_majoranas, syk.q))
+        * (math.comb(syk.q, k) * math.comb(syk.num_majoranas - syk.q, syk.q - k))
+        for k in range(syk.q + 1)
+    )
+
+
+def _compute_spectral_radius(syk: SachdevYeKitaevEnsemble) -> float:
+    radius_numerical_factor = math.comb(syk.num_majoranas, syk.q) / (1 - syk.suppression)
+    return cast(float, (2 * syk.std_dev) * np.sqrt(radius_numerical_factor))
+
+
+def _create_majorana_fermion_basis(syk: SachdevYeKitaevEnsemble) -> MajoranaFermionBasis:
+    return MajoranaFermionBasis(
+        num_majoranas=syk.num_majoranas,
+        in_real_basis=syk.dyson_index == 1,
+        is_even_parity=syk.is_even_parity,
+    )
+
+
+@attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
+class SachdevYeKitaevEnsemble(ManyBodyEnsemble):
+    initialism: ClassVar[str] = INITIALISM
+
+    q: int = attrs.field(
+        converter=int,
+        validator=_are_num_majoranas_within_limit,
+    )
+    is_even_parity: bool = attrs.field(
+        default=True,
+        converter=attrs.converters.to_bool,
+    )
+
+    suppression: float = attrs.field(
+        default=attrs.Factory(_compute_suppression_factor, takes_self=True),
+        init=False,
+        repr=False,
+    )
+    std_dev: float = attrs.field(
+        default=attrs.Factory(_compute_standard_deviation, takes_self=True),
+        init=False,
+        repr=False,
+    )
+    spectral_radius: float = attrs.field(
+        default=attrs.Factory(_compute_spectral_radius, takes_self=True),
+        init=False,
+        repr=False,
+    )
+    dyson_index: int = attrs.field(
+        default=attrs.Factory(_compute_dyson_index, takes_self=True),
+        init=False,
+        repr=False,
+    )
+
+    _majorana_fermion_basis: MajoranaFermionBasis = attrs.field(
+        default=attrs.Factory(_create_majorana_fermion_basis, takes_self=True),
+        init=False,
+        repr=False,
+    )
+
+    @property
+    @override
+    def latex_name(self) -> str:
+        parity = "even" if self.is_even_parity else "odd"
+        return (
+            rf"{{\text{{{type(self).initialism}}}}}_{{q = {self.q}}}"
+            rf"^\text{{{parity}}}"
+            rf"(N_\text{{m}} = {{{self.num_majoranas}}})"
+        )
+
+    @property
+    @override
+    def token_name(self) -> str:
+        parity = "even" if self.is_even_parity else "odd"
+        return f"{super().token_name}_{self.q}_{parity}"
+
+    @cached_property
+    def _decomposed_q_monomials(self) -> DecomposedSparseArray:
+        return self._majorana_fermion_basis.build_decomposed_q_monomials(q=self.q)
+
+    @override
+    def generate_matrix(self, *, use_complex_dtype: bool = False) -> np.ndarray:
+        if use_complex_dtype or self.dyson_index != 1:
+            matrix = self._allocate_complex_hermitian_matrix_memory()
+        else:
+            matrix = self._allocate_empty_real_symmetric_matrix_memory()
+
+        build_syk_matrix = self._pick_syk_matrix_builder()
+        build_syk_matrix(
+            matrix,
+            self.rng,
+            self.real_dtype.type,
+            self.std_dev,
+            self._decomposed_q_monomials[0],
+            self._decomposed_q_monomials[1],
+        )
+        return matrix
+
+    @override
+    def matrix_stream(
+        self, realizs: int, *, use_complex_dtype: bool = False
+    ) -> Iterator[np.ndarray]:
+        if use_complex_dtype or self.dyson_index != 1:
+            matrix = self._allocate_complex_hermitian_matrix_memory()
+        else:
+            matrix = self._allocate_empty_real_symmetric_matrix_memory()
+
+        build_syk_matrix = self._pick_syk_matrix_builder()
+        for _ in range(realizs):
+            build_syk_matrix(
+                matrix,
+                self.rng,
+                self.real_dtype.type,
+                self.std_dev,
+                self._decomposed_q_monomials[0],
+                self._decomposed_q_monomials[1],
+            )
+            yield matrix
+
+    @override
+    def _build_spectral_polynomials(self) -> OrthogonalPolynomials:
+        def syk_model_spectral_polynomials(
+            x: NDArray[np.float64],
+            *,
+            degree: int,
+        ) -> NDArray[np.float64]:
+            return q_hermite_polynomials(x, eta=self.suppression, degree=degree)
+
+        return syk_model_spectral_polynomials
+
+    @override
+    def _build_spectral_weight(self) -> Float64Function:
+        def syk_model_spectral_weight(
+            energies: NDArray[np.float64],
+        ) -> NDArray[np.float64]:
+            return q_hermite_polynomial_weight(
+                energies,
+                support_radius=self.spectral_radius,
+                eta=self.suppression,
+            )
+
+        return syk_model_spectral_weight
+
+    def _pick_syk_matrix_builder(self) -> Callable[..., None]:
+        if self.q % 4 == 2:
+            return _build_syk_matrix_with_imaginary_prefactor
+        else:
+            return _build_syk_matrix_without_imaginary_prefactor
