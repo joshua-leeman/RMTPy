@@ -25,19 +25,19 @@ NUM_MAJORANAS_LIMIT_BY_Q: dict[int, int] = {2: 32, 4: 32, 6: 26, 8: 24, 10: 22}
 @numba.njit(boundscheck=False, cache=True, fastmath=True)
 def _build_syk_matrix_with_imaginary_prefactor(
     matrix: HermitianMatrix,
-    real_dtype: type[np.float64],
+    real_dtype: type[np.floating],
     std_dev: float,
     monomials_idxs: NDArray[np.int32],
-    monomials_data: NDArray[np.complex64],
+    monomials_data: NDArray[np.complexfloating],
     rng: np.random.Generator,
 ) -> None:
-    num_monomials = cast(int, monomials_data.shape[0])
-    num_nonzeros = cast(int, monomials_data.shape[1])
-    coefficients = std_dev * rng.standard_normal(num_monomials, real_dtype)
+    num_monomials = monomials_data.shape[0]  # pyright: ignore[reportAny]
+    num_nonzeros = monomials_data.shape[1]  # pyright: ignore[reportAny]
+    coefficients = std_dev * rng.standard_normal(num_monomials, real_dtype)  # pyright: ignore[reportAny, reportUnknownVariableType]
 
     matrix.fill(0.0)
-    for i in range(num_monomials):
-        for j in range(num_nonzeros):
+    for i in range(num_monomials):  # pyright: ignore[reportAny]
+        for j in range(num_nonzeros):  # pyright: ignore[reportAny]
             entry_idx = (monomials_idxs[i, 0, j], monomials_idxs[i, 1, j])
             matrix[entry_idx] += 1j * coefficients[i] * monomials_data[i, j]
 
@@ -45,19 +45,19 @@ def _build_syk_matrix_with_imaginary_prefactor(
 @numba.njit(boundscheck=False, cache=True, fastmath=True)
 def _build_syk_matrix_without_imaginary_prefactor(
     matrix: RealSymmetricMatrix | HermitianMatrix,
-    real_dtype: type[np.float64],
+    real_dtype: type[np.floating],
     std_dev: float,
     monomials_idxs: NDArray[np.int32],
-    monomials_data: NDArray[np.int8] | NDArray[np.complex64],
+    monomials_data: NDArray[np.int8] | NDArray[np.complexfloating],
     rng: np.random.Generator,
 ) -> None:
-    num_monomials = cast(int, monomials_data.shape[0])
-    num_nonzeros = cast(int, monomials_data.shape[1])
-    coefficients = std_dev * rng.standard_normal(num_monomials, real_dtype)
+    num_monomials = monomials_data.shape[0]  # pyright: ignore[reportAny]
+    num_nonzeros = monomials_data.shape[1]  # pyright: ignore[reportAny]
+    coefficients = std_dev * rng.standard_normal(num_monomials, real_dtype)  # pyright: ignore[reportAny, reportUnknownVariableType]
 
     matrix.fill(0.0)
-    for i in range(num_monomials):
-        for j in range(num_nonzeros):
+    for i in range(num_monomials):  # pyright: ignore[reportAny]
+        for j in range(num_nonzeros):  # pyright: ignore[reportAny]
             entry_idx = (monomials_idxs[i, 0, j], monomials_idxs[i, 1, j])
             matrix[entry_idx] += coefficients[i] * monomials_data[i, j]
 
@@ -185,11 +185,11 @@ class SachdevYeKitaevEnsemble(ManyBodyEnsemble):
         build_syk_matrix = self._pick_syk_matrix_builder()
         build_syk_matrix(
             matrix,
-            self.rng,
             self.real_dtype.type,
             self.std_dev,
             self._decomposed_q_monomials[0],
             self._decomposed_q_monomials[1],
+            self.rng,
         )
         return matrix
 
@@ -206,11 +206,11 @@ class SachdevYeKitaevEnsemble(ManyBodyEnsemble):
         for _ in range(realizs):
             build_syk_matrix(
                 matrix,
-                self.rng,
                 self.real_dtype.type,
                 self.std_dev,
                 self._decomposed_q_monomials[0],
                 self._decomposed_q_monomials[1],
+                self.rng,
             )
             yield matrix
 

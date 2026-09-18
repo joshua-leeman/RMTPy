@@ -19,7 +19,7 @@ class SpectrumStream(Protocol):
         realizs: int,
         *,
         use_complex_dtype: bool = False,
-    ) -> Iterator[NDArray[np.float64]]: ...
+    ) -> Iterator[NDArray[np.floating]]: ...
 
 
 MAX_POLYNOMIAL_DEGREE: int = 6
@@ -274,7 +274,7 @@ class DensityModel:
 
     def compute_variate_coeffs(
         self,
-        sample: NDArray[np.float64],
+        sample: NDArray[np.floating],
     ) -> NDArray[np.float64]:
         polynomials = self.compute_polynomials(sample.astype(np.float64))
         return cast(NDArray[np.float64], np.mean(polynomials, axis=1))

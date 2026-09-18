@@ -124,12 +124,12 @@ class RandomMatrixEnsemble:
         converter=_compute_seed,
     )
 
-    complex_dtype: np.dtype[np.complex128] = attrs.field(
+    complex_dtype: np.dtype[np.complexfloating] = attrs.field(
         default=attrs.Factory(_compute_complex_dtype, takes_self=True),
         init=False,
         repr=False,
     )
-    real_dtype: np.dtype[np.float64] = attrs.field(
+    real_dtype: np.dtype[np.floating] = attrs.field(
         default=attrs.Factory(_compute_real_dtype, takes_self=True),
         init=False,
         repr=False,

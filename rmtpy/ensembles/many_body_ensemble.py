@@ -21,11 +21,11 @@ from ..universal import (
 from ..validators import is_even_number
 from .base_ensemble import RandomMatrixEnsemble
 
-type RealSymmetricMatrix = NDArray[np.float64]
-type HermitianMatrix = NDArray[np.complex128]
-type RealEigenvalues = NDArray[np.float64]
-type OrthogonalMatrix = NDArray[np.float64]
-type UnitaryMatrix = NDArray[np.complex128]
+type RealSymmetricMatrix = NDArray[np.floating]
+type HermitianMatrix = NDArray[np.complexfloating]
+type RealEigenvalues = NDArray[np.floating]
+type OrthogonalMatrix = NDArray[np.floating]
+type UnitaryMatrix = NDArray[np.complexfloating]
 
 INITIALISM: str = "MBE"
 

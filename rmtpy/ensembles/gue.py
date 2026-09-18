@@ -16,16 +16,16 @@ DYSON_INDEX: int = 2
 @numba.njit(boundscheck=False, cache=True, fastmath=True)
 def _build_gue_matrix(
     matrix: HermitianMatrix,
-    real_dtype: type[np.float64],
+    real_dtype: type[np.floating],
     std_dev: float,
     rng: np.random.Generator,
 ) -> None:
-    size = cast(int, matrix.shape[0])
-    for i in range(size):
+    size = matrix.shape[0]  # pyright: ignore[reportAny]
+    for i in range(size):  # pyright: ignore[reportAny]
         matrix[i, i] = 2 * std_dev * rng.standard_normal(None, real_dtype)
         matrix[i + 1 :, i] = std_dev * (
-            rng.standard_normal(size - i - 1, real_dtype)
-            + 1j * rng.standard_normal(size - i - 1, real_dtype)
+            rng.standard_normal(size - i - 1, real_dtype)  # pyright: ignore[reportAny]
+            + 1j * rng.standard_normal(size - i - 1, real_dtype)  # pyright: ignore[reportAny]
         )
         matrix[i, i + 1 :] = np.conj(matrix[i + 1 :, i])
 
