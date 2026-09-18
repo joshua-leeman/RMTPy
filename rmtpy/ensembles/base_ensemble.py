@@ -78,9 +78,7 @@ def _structure_hook_for_ensemble(
     return src
 
 
-def _unstructure_hook_for_ensemble(
-    ensemble: RandomMatrixEnsemble,
-) -> SourceDict:
+def _unstructure_hook_for_ensemble(ensemble: RandomMatrixEnsemble) -> SourceDict:
     fields = cast(dict[str, attrs.Attribute[object]], attrs.fields_dict(type(ensemble)))
     parameters = {
         name: RMT_CONVERTER.unstructure(getattr(ensemble, name))

@@ -201,7 +201,7 @@ class PoissonEnsemble(ManyBodyEnsemble):
         )
 
     @override
-    def _build_spectral_polynomials(self) -> OrthogonalPolynomials:
+    def assign_spectral_polynomials(self) -> OrthogonalPolynomials:
         def poisson_spectral_polynomials(
             x: NDArray[np.float64],
             *,
@@ -212,7 +212,7 @@ class PoissonEnsemble(ManyBodyEnsemble):
         return poisson_spectral_polynomials
 
     @override
-    def _build_spectral_weight(self) -> Float64Function:
+    def assign_spectral_weight(self) -> Float64Function:
         def poisson_spectral_weight(
             energies: NDArray[np.float64],
         ) -> NDArray[np.float64]:

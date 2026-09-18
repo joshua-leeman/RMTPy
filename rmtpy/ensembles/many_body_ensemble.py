@@ -9,6 +9,8 @@ import scipy.linalg.blas
 import scipy.linalg.lapack
 from numpy.typing import NDArray
 
+from rmtpy.conversion import RMT_CONVERTER, SourceDict
+
 from ..density import MAX_POLYNOMIAL_DEGREE, DensityModel
 from ..polynomials import Float64Function, OrthogonalPolynomials
 from ..universal import (
@@ -96,6 +98,14 @@ class ManyBodyEnsemble(RandomMatrixEnsemble, ABC):
         repr=False,
     )
 
+    @classmethod
+    @override
+    def create(
+        cls,
+        src: SourceDict | RandomMatrixEnsemble,
+    ) -> ManyBodyEnsemble:
+        return RMT_CONVERTER.structure(src, cls)
+
     @property
     def eigval_degeneracy(self) -> int:
         return eigval_degeneracy(dyson_index=self.dyson_index)
@@ -113,8 +123,8 @@ class ManyBodyEnsemble(RandomMatrixEnsemble, ABC):
     def spectral_density(self) -> DensityModel:
         return DensityModel(
             max_polynomial_degree=self.max_spectral_polynomial_degree,
-            polynomials=self._build_spectral_polynomials(),
-            weight_function=self._build_spectral_weight(),
+            polynomials=self.assign_spectral_polynomials(),
+            weight_function=self.assign_spectral_weight(),
             dimension=self.dimension,
             support=(-self.spectral_radius, self.spectral_radius),
             sample_stream=self.eigvals_stream,
@@ -196,10 +206,10 @@ class ManyBodyEnsemble(RandomMatrixEnsemble, ABC):
     def _allocate_empty_real_symmetric_matrix_memory(self) -> RealSymmetricMatrix:
         return np.empty((self.dimension, self.dimension), self.real_dtype, order="F")
 
-    def _build_spectral_polynomials(self) -> OrthogonalPolynomials | None:
+    def assign_spectral_polynomials(self) -> OrthogonalPolynomials | None:
         return
 
-    def _build_spectral_weight(self) -> Float64Function | None:
+    def assign_spectral_weight(self) -> Float64Function | None:
         return
 
     def _pick_linalg_dtype(self, use_complex_dtype: bool = False) -> np.dtype:

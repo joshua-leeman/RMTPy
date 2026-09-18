@@ -37,7 +37,7 @@ class WignerDysonEnsemble(ManyBodyEnsemble, ABC):
             WIGNER_DYSON_ENSEMBLE_INITIALISMS_BY_NAME[cls.__name__.lower()] = initialism
 
     @override
-    def _build_spectral_polynomials(self) -> OrthogonalPolynomials:
+    def assign_spectral_polynomials(self) -> OrthogonalPolynomials:
         def wigner_dyson_spectral_polynomials(
             x: NDArray[np.float64],
             *,
@@ -48,7 +48,7 @@ class WignerDysonEnsemble(ManyBodyEnsemble, ABC):
         return wigner_dyson_spectral_polynomials
 
     @override
-    def _build_spectral_weight(self) -> Float64Function:
+    def assign_spectral_weight(self) -> Float64Function:
         def wigner_semicircle_distribution(
             energies: NDArray[np.float64],
         ) -> NDArray[np.float64]:
