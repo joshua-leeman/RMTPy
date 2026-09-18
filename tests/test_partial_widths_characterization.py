@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import numpy as np
 
-from rmtpy.compounds import Compound
+from rmtpy.compounds import CompoundEnsemble
 from rmtpy.ensembles import GOE
 from rmtpy.simulations.base_simulation import SimulationExecutionState as ExecutionState
 from rmtpy.simulations.partial_widths_statistics import (
@@ -27,8 +27,10 @@ from rmtpy.simulations.partial_widths_statistics.partial_widths_statistics_simul
 )
 
 
-def build_compound(*, num_free_complex_fermions: int = 1, seed: int = 123) -> Compound:
-    return Compound(
+def build_compound(
+    *, num_free_complex_fermions: int = 1, seed: int = 123
+) -> CompoundEnsemble:
+    return CompoundEnsemble(
         ensemble=GOE(num_majoranas=4, seed=seed),
         num_free_complex_fermions=num_free_complex_fermions,
     )
@@ -54,7 +56,7 @@ class PartialWidthsStatisticsTests(unittest.TestCase):
         )
 
         with patch.object(
-            Compound,
+            CompoundEnsemble,
             "partial_widths_stream",
             return_value=iter(samples),
         ):
@@ -122,7 +124,7 @@ class PartialWidthsStatisticsTests(unittest.TestCase):
         self.assertFalse(hasattr(simulation, "_buffers"))
 
         with patch.object(
-            Compound,
+            CompoundEnsemble,
             "partial_widths_stream",
             return_value=iter((np.array([[1.0, 2.0], [3.0, 4.0]]),)),
         ):
@@ -148,7 +150,7 @@ class PartialWidthsStatisticsTests(unittest.TestCase):
                 return_value=statistics,
             ),
             patch.object(
-                Compound,
+                CompoundEnsemble,
                 "partial_widths_stream",
                 return_value=iter((np.zeros((2, 2)),)),
             ),
@@ -167,11 +169,11 @@ class PartialWidthsStatisticsTests(unittest.TestCase):
 
     def test_seeded_result_and_rng_match_direct_stream(self) -> None:
         simulation = PartialWidthsStatisticsSimulation(
-            compound=Compound(ensemble=GOE(num_majoranas=4, seed=314159)),
+            compound=CompoundEnsemble(ensemble=GOE(num_majoranas=4, seed=314159)),
             realizs=2,
             width_indices=((0, 0), (1,)),
         )
-        control = Compound(ensemble=GOE(num_majoranas=4, seed=314159))
+        control = CompoundEnsemble(ensemble=GOE(num_majoranas=4, seed=314159))
         initial_rng_state = deepcopy(simulation.compound.rng_state)
         samples = list(control.partial_widths_stream(realizs=2))
 

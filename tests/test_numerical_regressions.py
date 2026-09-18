@@ -6,7 +6,7 @@ from collections.abc import Iterator
 import numpy as np
 from numpy.typing import NDArray
 
-from rmtpy.compounds import Compound
+from rmtpy.compounds import CompoundEnsemble
 from rmtpy.density import DensityModel
 from rmtpy.ensembles import GOE, GUE, SYK, Poisson
 from rmtpy.universal import porter_thomas_distribution, time_delay_pdf
@@ -126,9 +126,9 @@ class SYKRegressionTests(unittest.TestCase):
         )
 
 
-class CompoundRegressionTests(unittest.TestCase):
+class CompoundEnsembleRegressionTests(unittest.TestCase):
     def test_complex_rotation_does_not_alias_eigenvectors(self) -> None:
-        compound = Compound(
+        compound = CompoundEnsemble(
             ensemble=GUE(num_majoranas=4, seed=123),
             num_free_complex_fermions=1,
         )
@@ -145,7 +145,7 @@ class CompoundRegressionTests(unittest.TestCase):
         np.testing.assert_allclose(rotated_conj, rotated.conj())
 
     def test_complex_widths_are_nonnegative_and_scattering_streams(self) -> None:
-        compound = Compound(
+        compound = CompoundEnsemble(
             ensemble=GUE(num_majoranas=4, seed=9),
             num_free_complex_fermions=1,
         )
@@ -160,7 +160,7 @@ class CompoundRegressionTests(unittest.TestCase):
 
     def test_coupling_strengths_are_finite_copies(self) -> None:
         source = np.array([1.0, 2.0])
-        compound = Compound(
+        compound = CompoundEnsemble(
             ensemble=GOE(num_majoranas=4),
             coupling_strengths=source,
         )
@@ -173,7 +173,7 @@ class CompoundRegressionTests(unittest.TestCase):
         for invalid_value in (np.nan, np.inf):
             self.assertRaises(
                 ValueError,
-                Compound,
+                CompoundEnsemble,
                 ensemble=GOE(num_majoranas=4),
                 coupling_strengths=np.array([1.0, invalid_value]),
             )

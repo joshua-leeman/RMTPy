@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import numpy as np
 
-from rmtpy.compounds import Compound
+from rmtpy.compounds import CompoundEnsemble
 from rmtpy.ensembles import GOE
 from rmtpy.simulations.base_simulation import SimulationExecutionState as ExecutionState
 from rmtpy.simulations.transmission_coefficients_simulation import (
@@ -25,8 +25,8 @@ from rmtpy.simulations.transmission_coefficients_simulation.weisskopf_estimate i
 )
 
 
-def build_compound(*, seed: int = 123) -> Compound:
-    return Compound(
+def build_compound(*, seed: int = 123) -> CompoundEnsemble:
+    return CompoundEnsemble(
         ensemble=GOE(num_majoranas=4, seed=seed),
         coupling_strengths=np.array([0.75, 1.25]),
     )
@@ -53,7 +53,7 @@ class TransmissionCoefficientsTests(unittest.TestCase):
         second = scattering_matrix(simulation.energies, (-1.0, -0.5 + 0.5j))
 
         with patch.object(
-            Compound,
+            CompoundEnsemble,
             "scattering_matrix_stream",
             return_value=iter(((first, np.empty(0)), (second, np.empty(0)))),
         ):
@@ -102,7 +102,7 @@ class TransmissionCoefficientsTests(unittest.TestCase):
         )
         matrices = scattering_matrix(simulation.energies, (0.5, 0.0))
         with patch.object(
-            Compound,
+            CompoundEnsemble,
             "scattering_matrix_stream",
             return_value=iter(((matrices, np.empty(0)),)),
         ):
@@ -139,7 +139,7 @@ class TransmissionCoefficientsTests(unittest.TestCase):
                 return_value=density,
             ),
             patch.object(
-                Compound,
+                CompoundEnsemble,
                 "scattering_matrix_stream",
                 return_value=iter(((matrices, np.empty(0)),)),
             ),
@@ -172,7 +172,7 @@ class TransmissionCoefficientsTests(unittest.TestCase):
 
         matrices = scattering_matrix(simulation.energies, (0.0, 0.25))
         with patch.object(
-            Compound,
+            CompoundEnsemble,
             "scattering_matrix_stream",
             return_value=iter(((matrices, np.empty(0)),)),
         ):
@@ -201,7 +201,7 @@ class TransmissionCoefficientsTests(unittest.TestCase):
         malformed = np.zeros((len(simulation.energies), 1, 1), dtype=np.complex128)
         with (
             patch.object(
-                Compound,
+                CompoundEnsemble,
                 "scattering_matrix_stream",
                 return_value=iter(((malformed, np.empty(0)),)),
             ),

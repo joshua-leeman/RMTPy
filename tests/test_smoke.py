@@ -5,7 +5,7 @@ from typing import Any
 
 import numpy as np
 
-from rmtpy.compounds import Compound
+from rmtpy.compounds import CompoundEnsemble
 from rmtpy.conversion import RMT_CONVERTER
 from rmtpy.ensembles import GaussianOrthogonalEnsemble, ManyBodyEnsemble
 from rmtpy.simulations.histogram import Histogram
@@ -59,7 +59,7 @@ class SmokeTests(unittest.TestCase):
 
     def test_multi_channel_time_delays_are_positive(self) -> None:
         ensemble = GaussianOrthogonalEnsemble(num_majoranas=8, seed=123)
-        compound = Compound(ensemble=ensemble, num_free_complex_fermions=1)
+        compound = CompoundEnsemble(ensemble=ensemble, num_free_complex_fermions=1)
         time_delays, _ = next(
             compound.time_delays_stream(energies=np.array([0.0]), realizs=1)
         )
@@ -72,7 +72,7 @@ class SmokeTests(unittest.TestCase):
             max_spectral_polynomial_degree=2,
             seed=123,
         )
-        compound = Compound(ensemble=ensemble)
+        compound = CompoundEnsemble(ensemble=ensemble)
 
         spectral = SpectralStatisticsSimulation(
             ensemble=ensemble,

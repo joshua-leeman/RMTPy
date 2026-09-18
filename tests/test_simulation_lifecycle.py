@@ -8,7 +8,7 @@ from unittest.mock import patch
 import attrs
 import numpy as np
 
-from rmtpy.compounds import Compound
+from rmtpy.compounds import CompoundEnsemble
 from rmtpy.conversion import to_json_compatible
 from rmtpy.ensembles import GOE
 from rmtpy.simulations.histogram import Histogram
@@ -61,7 +61,7 @@ class SimulationLifecycleTests(unittest.TestCase):
 
     def test_run_context_is_derived_from_attrs_init_fields(self) -> None:
         simulation = TimeDelayStatisticsSimulation(
-            compound=Compound(ensemble=GOE(num_majoranas=4, seed=123)),
+            compound=CompoundEnsemble(ensemble=GOE(num_majoranas=4, seed=123)),
             realizs=2,
             energies=(-0.25, 0.125),
         )
@@ -70,14 +70,14 @@ class SimulationLifecycleTests(unittest.TestCase):
         args = result.context.simulation_config["parameters"]
         self.assertEqual(args["realizs"], 2)
         self.assertEqual(args["energies"], [-0.25, 0.125])
-        self.assertEqual(args["compound"]["type"], "Compound")
+        self.assertEqual(args["compound"]["type"], "CompoundEnsemble")
         self.assertEqual(
             args["compound"]["parameters"]["coupling_strengths"],
             simulation.compound.coupling_strengths.tolist(),
         )
 
     def test_exact_energy_identity_rejects_only_duplicates(self) -> None:
-        compound = Compound(ensemble=GOE(num_majoranas=4))
+        compound = CompoundEnsemble(ensemble=GOE(num_majoranas=4))
 
         simulation = TimeDelayStatisticsSimulation(
             compound=compound,
@@ -97,7 +97,7 @@ class SimulationLifecycleTests(unittest.TestCase):
     def test_energy_input_is_copied_and_read_only(self) -> None:
         source = np.array([-0.25, 0.25])
         simulation = TimeDelayStatisticsSimulation(
-            compound=Compound(ensemble=GOE(num_majoranas=4)),
+            compound=CompoundEnsemble(ensemble=GOE(num_majoranas=4)),
             realizs=1,
             energies=source,
         )
@@ -160,7 +160,7 @@ class SimulationLifecycleTests(unittest.TestCase):
             ),
             realizs=1,
         )
-        compound = Compound(
+        compound = CompoundEnsemble(
             ensemble=GOE(
                 num_majoranas=4,
                 max_spectral_polynomial_degree=0,
@@ -218,7 +218,7 @@ class SimulationLifecycleTests(unittest.TestCase):
                     self.assertTrue(np.all(np.isfinite(value)))
 
     def test_empty_complex_energy_histogram_can_be_plotted(self) -> None:
-        compound = Compound(ensemble=GOE(num_majoranas=4, seed=201))
+        compound = CompoundEnsemble(ensemble=GOE(num_majoranas=4, seed=201))
         histogram = Histogram2D(
             file_name="empty_complex_energy",
             x_support=(-1.0, 1.0),

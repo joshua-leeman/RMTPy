@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import numpy as np
 
-from rmtpy.compounds import Compound
+from rmtpy.compounds import CompoundEnsemble
 from rmtpy.ensembles import GOE
 from rmtpy.simulations.base_simulation import SimulationExecutionState as ExecutionState
 from rmtpy.simulations.histogram2D import Histogram2D
@@ -29,8 +29,8 @@ from rmtpy.simulations.unfolding import (
 )
 
 
-def build_compound(*, max_degree: int = 0, seed: int = 123) -> Compound:
-    return Compound(
+def build_compound(*, max_degree: int = 0, seed: int = 123) -> CompoundEnsemble:
+    return CompoundEnsemble(
         ensemble=GOE(
             num_majoranas=4,
             max_spectral_polynomial_degree=max_degree,
@@ -89,7 +89,7 @@ class ResonanceStatisticsTests(unittest.TestCase):
         radius = simulation.compound.ensemble.spectral_radius
 
         with patch.object(
-            Compound,
+            CompoundEnsemble,
             "resonances_stream",
             return_value=iter((poles,)),
         ):
@@ -192,7 +192,7 @@ class ResonanceStatisticsTests(unittest.TestCase):
         poles = np.array([-0.25 - 0.5j, 0.25 - 0.25j])
         with (
             patch.object(
-                Compound,
+                CompoundEnsemble,
                 "resonances_stream",
                 return_value=iter((poles,)),
             ),

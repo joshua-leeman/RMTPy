@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import numpy as np
 
-from rmtpy.compounds import Compound
+from rmtpy.compounds import CompoundEnsemble
 from rmtpy.ensembles import GOE
 from rmtpy.simulations.base_simulation import SimulationExecutionState as ExecutionState
 from rmtpy.simulations.time_delay_statistics import (
@@ -28,8 +28,8 @@ from rmtpy.simulations.time_delay_statistics.time_delay_statistics_simulation im
 from rmtpy.simulations.unfolding import TruncatedPolynomialCdfFactory
 
 
-def build_compound(*, max_degree: int = 0, seed: int = 123) -> Compound:
-    return Compound(
+def build_compound(*, max_degree: int = 0, seed: int = 123) -> CompoundEnsemble:
+    return CompoundEnsemble(
         ensemble=GOE(
             num_majoranas=4,
             max_spectral_polynomial_degree=max_degree,
@@ -153,7 +153,7 @@ class TimeDelayStatisticsTests(unittest.TestCase):
 
         with (
             patch.object(
-                Compound,
+                CompoundEnsemble,
                 "time_delays_stream",
                 return_value=iter(((delays, closed_eigenvalues),)),
             ),
@@ -177,7 +177,7 @@ class TimeDelayStatisticsTests(unittest.TestCase):
         malformed = np.ones((2, 1))
         with (
             patch.object(
-                Compound,
+                CompoundEnsemble,
                 "time_delays_stream",
                 return_value=iter(((malformed, closed_eigenvalues),)),
             ),
@@ -197,7 +197,7 @@ class TimeDelayStatisticsTests(unittest.TestCase):
         delays = np.ones((1, simulation.compound.num_channels))
         with (
             patch.object(
-                Compound,
+                CompoundEnsemble,
                 "time_delays_stream",
                 return_value=iter(((delays, np.array([-0.5, 0.5])),)),
             ),

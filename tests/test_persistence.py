@@ -14,7 +14,7 @@ import attrs
 import numpy as np
 
 import rmtpy.simulations as simulations
-from rmtpy.compounds import Compound
+from rmtpy.compounds import CompoundEnsemble
 from rmtpy.density import DensityModel
 from rmtpy.ensembles import GOE
 from rmtpy.simulations.base_data import Data
@@ -404,7 +404,7 @@ class PersistenceTests(unittest.TestCase):
         )
         spectral = spectral_simulation.execute()
         resonance_simulation = ResonanceStatisticsSimulation(
-            compound=Compound(
+            compound=CompoundEnsemble(
                 ensemble=GOE(
                     num_majoranas=4,
                     max_spectral_polynomial_degree=2,
@@ -495,7 +495,7 @@ class PersistenceTests(unittest.TestCase):
 
     def test_loaded_complex_energy_plot_does_not_mutate_probabilities(self) -> None:
         result = ResonanceStatisticsSimulation(
-            compound=Compound(ensemble=GOE(num_majoranas=4, seed=23)),
+            compound=CompoundEnsemble(ensemble=GOE(num_majoranas=4, seed=23)),
             realizs=1,
             request=ResonanceStatisticsRequest(
                 quantities=("complex_energies",),

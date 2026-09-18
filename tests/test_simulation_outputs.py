@@ -2,7 +2,7 @@
 
 import unittest
 
-from rmtpy.compounds import Compound
+from rmtpy.compounds import CompoundEnsemble
 from rmtpy.ensembles import GaussianOrthogonalEnsemble
 from rmtpy.simulations.base_plot import (
     DimensionTimeAxes,
@@ -38,13 +38,13 @@ def build_compound(
     max_polynomial_degree: int,
     num_free_complex_fermions: int = 1,
     seed: int = 123,
-) -> Compound:
+) -> CompoundEnsemble:
     ensemble = GaussianOrthogonalEnsemble(
         num_majoranas=4,
         max_spectral_polynomial_degree=max_polynomial_degree,
         seed=seed,
     )
-    return Compound(
+    return CompoundEnsemble(
         ensemble=ensemble,
         num_free_complex_fermions=num_free_complex_fermions,
     )
