@@ -80,11 +80,11 @@ class PoissonRegressionTests(unittest.TestCase):
     def test_rng_path_cdf_and_porter_thomas_wrapper(self) -> None:
         ensemble = Poisson(num_majoranas=4, seed=123)
 
-        self.assertIs(ensemble.rng, ensemble.eigvecs_ensemble.rng)
+        self.assertIs(ensemble.rng, ensemble.eigvec_ensemble.rng)
         self.assertEqual(ensemble.cdf(np.array([ensemble.spectral_radius]))[0], 1.0)
         self.assertNotEqual(
-            Poisson(num_majoranas=4, eigvecs_ensemble_flag="GOE").to_path,
-            Poisson(num_majoranas=4, eigvecs_ensemble_flag="GUE").to_path,
+            Poisson(num_majoranas=4, eigvec_ensemble_flag="GOE").to_path,
+            Poisson(num_majoranas=4, eigvec_ensemble_flag="GUE").to_path,
         )
 
         widths = np.array([0.5, 1.0, 2.0])
@@ -92,7 +92,7 @@ class PoissonRegressionTests(unittest.TestCase):
             ensemble.porter_thomas_distribution(widths),
             porter_thomas_distribution(
                 widths,
-                dyson_index=ensemble.eigvecs_ensemble.dyson_index,
+                dyson_index=ensemble.eigvec_ensemble.dyson_index,
                 num_channels=1,
             ),
         )

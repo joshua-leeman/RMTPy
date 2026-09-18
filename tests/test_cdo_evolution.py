@@ -22,26 +22,29 @@ from rmtpy.simulations.cdo_evolution import (
 )
 from rmtpy.simulations.cdo_evolution.accumulator import (
     CDONumericalAccumulator,
+    classical_kl,
     clip_kl_divergence_roundoff,
     compute_classical_kl_divergences,
 )
 from rmtpy.simulations.cdo_evolution.cdo_dynamics import (
     CDOInformationPlot,
+    CDOKLRatioPlot,
     CDOProbabilitiesPlot,
     CDOPuritiesPlot,
     build_cdo_time_grid,
+)
+from rmtpy.simulations.cdo_evolution.cdo_evolution_simulation import (
+    mixed_estimate_probabilities,
 )
 from rmtpy.simulations.cdo_evolution.data_factories import (
     build_kl_divergence_histogram_data,
 )
 from rmtpy.simulations.cdo_evolution.kl_divergence_histogram import (
+    KLDivergenceHistogramData,
     KLDivergenceHistogramPlot,
 )
 from rmtpy.simulations.histogram import Histogram
-from rmtpy.simulations.spectral_statistics.spectral_form_factors import (
-    FormFactorsData,
-    FormFactorsPlot,
-)
+from rmtpy.simulations.statistics import LOG_D_TIME_SUPPORT
 
 
 def require[T](value: T | None) -> T:
@@ -51,12 +54,6 @@ def require[T](value: T | None) -> T:
 
 def direct_analysis(states: np.ndarray) -> tuple[np.ndarray, ...]:
     states = np.asarray(states)
-    probabilities_by_realization = np.abs(states) ** 2
-    probabilities_by_realization /= np.sum(
-        probabilities_by_realization,
-        axis=2,
-        keepdims=True,
-    )
     normalized_states = states / np.sqrt(
         np.sum(np.abs(states) ** 2, axis=2, keepdims=True)
     )
@@ -89,19 +86,11 @@ def direct_analysis(states: np.ndarray) -> tuple[np.ndarray, ...]:
     eigenvalues /= np.sum(eigenvalues, axis=1, keepdims=True)
     quantum_purity = np.sum(eigenvalues**2, axis=1)
     entropy = -np.sum(xlogy(eigenvalues, eigenvalues), axis=1)
-    kl_divergence = np.mean(
-        compute_classical_kl_divergences(
-            mixed_probabilities[np.newaxis, ...],
-            probabilities_by_realization,
-        ),
-        axis=0,
-    )
     return (
         mixed_probabilities,
         classical_purity,
         quantum_purity,
         entropy,
-        kl_divergence,
     )
 
 
@@ -132,10 +121,58 @@ def normalized_probabilities(states: np.ndarray) -> np.ndarray:
     return probabilities
 
 
-def direct_heisenberg_kl_divergences(states: np.ndarray) -> np.ndarray:
-    probabilities = normalized_probabilities(states)
-    mixed_probabilities = np.mean(probabilities, axis=0)
-    return compute_classical_kl_divergences(mixed_probabilities, probabilities)
+def uniform_estimate(dimension: int, num_times: int | None = None) -> np.ndarray:
+    value = np.full(dimension, 1.0 / dimension, dtype=np.float64)
+    if num_times is None:
+        return value
+    return np.repeat(value[np.newaxis, :], num_times, axis=0)
+
+
+def direct_mean_kl(estimate: np.ndarray, states: np.ndarray) -> np.ndarray:
+    return np.mean(classical_kl(estimate, normalized_probabilities(states)), axis=0)
+
+
+def direct_heisenberg_kl(
+    estimate: np.ndarray,
+    states: np.ndarray,
+) -> np.ndarray:
+    return classical_kl(estimate, normalized_probabilities(states))
+
+
+def mixed_estimates(
+    *,
+    num_majoranas: int,
+    goe_seed: int,
+    gue_seed: int,
+    initial_state: np.ndarray,
+    times: np.ndarray | None,
+    heisenberg_time: float | None,
+    realizs: int,
+    time_chunk_size: int,
+    dtype: str | None = None,
+) -> tuple[np.ndarray | None, np.ndarray | None, np.ndarray | None, np.ndarray | None]:
+    goe_kwargs: dict[str, Any] = {"num_majoranas": num_majoranas, "seed": goe_seed}
+    gue_kwargs: dict[str, Any] = {"num_majoranas": num_majoranas, "seed": gue_seed}
+    if dtype is not None:
+        goe_kwargs["dtype"] = dtype
+        gue_kwargs["dtype"] = dtype
+    goe_grid, goe_heisenberg = mixed_estimate_probabilities(
+        GOE(**goe_kwargs),
+        initial_state,
+        times=times,
+        heisenberg_time=heisenberg_time,
+        realizs=realizs,
+        time_chunk_size=time_chunk_size,
+    )
+    gue_grid, gue_heisenberg = mixed_estimate_probabilities(
+        GUE(**gue_kwargs),
+        initial_state,
+        times=times,
+        heisenberg_time=heisenberg_time,
+        realizs=realizs,
+        time_chunk_size=time_chunk_size,
+    )
+    return goe_grid, gue_grid, goe_heisenberg, gue_heisenberg
 
 
 def histogram_counts(samples: np.ndarray, bins: np.ndarray) -> np.ndarray:
@@ -178,7 +215,19 @@ class CDOAccumulatorTests(unittest.TestCase):
         self,
         *,
         retain_evolved_states: bool,
+        goe_estimate: np.ndarray | None = None,
+        gue_estimate: np.ndarray | None = None,
+        goe_heisenberg: np.ndarray | None = None,
+        gue_heisenberg: np.ndarray | None = None,
     ) -> CDONumericalAccumulator:
+        if goe_estimate is None:
+            goe_estimate = uniform_estimate(2, 5)
+        if gue_estimate is None:
+            gue_estimate = uniform_estimate(2, 5)
+        if goe_heisenberg is None:
+            goe_heisenberg = uniform_estimate(2)
+        if gue_heisenberg is None:
+            gue_heisenberg = uniform_estimate(2)
         return CDONumericalAccumulator(
             dimension=2,
             num_times=5,
@@ -188,6 +237,10 @@ class CDOAccumulatorTests(unittest.TestCase):
             include_dynamics=True,
             include_heisenberg_kl=True,
             retain_evolved_states=retain_evolved_states,
+            goe_estimate_probabilities=goe_estimate,
+            gue_estimate_probabilities=gue_estimate,
+            goe_heisenberg_estimate=goe_heisenberg,
+            gue_heisenberg_estimate=gue_heisenberg,
         )
 
     def assert_analysis_matches(
@@ -195,6 +248,10 @@ class CDOAccumulatorTests(unittest.TestCase):
         accumulator: CDONumericalAccumulator,
         states: np.ndarray,
         heisenberg_states: np.ndarray,
+        goe_estimate: np.ndarray,
+        gue_estimate: np.ndarray,
+        goe_heisenberg: np.ndarray,
+        gue_heisenberg: np.ndarray,
     ) -> None:
         result = accumulator.finalize()
         self.assertIsNotNone(result.dynamics)
@@ -207,26 +264,57 @@ class CDOAccumulatorTests(unittest.TestCase):
                 result.dynamics.classical_purity,
                 result.dynamics.quantum_purity,
                 result.dynamics.entropy,
-                result.dynamics.kl_divergence,
             ),
             expected,
             strict=True,
         ):
             self.assertEqual(actual.dtype, np.dtype(np.float64))
             np.testing.assert_allclose(actual, reference, rtol=1e-13, atol=1e-13)
-
-        expected_heisenberg_kl = direct_heisenberg_kl_divergences(heisenberg_states)
         np.testing.assert_allclose(
-            require(result.heisenberg_kl_divergences),
-            expected_heisenberg_kl,
+            result.dynamics.kl_goe,
+            direct_mean_kl(goe_estimate, states),
+            rtol=1e-13,
+            atol=1e-13,
+        )
+        np.testing.assert_allclose(
+            result.dynamics.kl_gue,
+            direct_mean_kl(gue_estimate, states),
+            rtol=1e-13,
+            atol=1e-13,
+        )
+        np.testing.assert_allclose(
+            require(result.heisenberg_kl_goe),
+            direct_heisenberg_kl(goe_heisenberg, heisenberg_states),
+            rtol=1e-13,
+            atol=1e-13,
+        )
+        np.testing.assert_allclose(
+            require(result.heisenberg_kl_gue),
+            direct_heisenberg_kl(gue_heisenberg, heisenberg_states),
             rtol=1e-13,
             atol=1e-13,
         )
 
     def test_explicit_calculation_agrees_in_both_internal_modes(self) -> None:
         states, heisenberg_states = self.fixture_states()
-        density_accumulator = self.build_accumulator(retain_evolved_states=False)
-        state_accumulator = self.build_accumulator(retain_evolved_states=True)
+        goe_estimate = uniform_estimate(2, 5)
+        gue_estimate = np.array([[0.8, 0.2]] * 5, dtype=np.float64)
+        goe_heisenberg = uniform_estimate(2)
+        gue_heisenberg = np.array([0.8, 0.2], dtype=np.float64)
+        density_accumulator = self.build_accumulator(
+            retain_evolved_states=False,
+            goe_estimate=goe_estimate,
+            gue_estimate=gue_estimate,
+            goe_heisenberg=goe_heisenberg,
+            gue_heisenberg=gue_heisenberg,
+        )
+        state_accumulator = self.build_accumulator(
+            retain_evolved_states=True,
+            goe_estimate=goe_estimate,
+            gue_estimate=gue_estimate,
+            goe_heisenberg=goe_heisenberg,
+            gue_heisenberg=gue_heisenberg,
+        )
 
         density_accumulator.add(states[0], heisenberg_state=heisenberg_states[0])
         self.assertEqual(density_accumulator.accumulation_mode, "density_operator")
@@ -248,7 +336,15 @@ class CDOAccumulatorTests(unittest.TestCase):
         for accumulator in (density_accumulator, state_accumulator):
             accumulator.add(states[1], heisenberg_state=heisenberg_states[1])
             self.assertEqual(accumulator.statistics_chunk_size, 2)
-            self.assert_analysis_matches(accumulator, states, heisenberg_states)
+            self.assert_analysis_matches(
+                accumulator,
+                states,
+                heisenberg_states,
+                goe_estimate,
+                gue_estimate,
+                goe_heisenberg,
+                gue_heisenberg,
+            )
 
         self.assertEqual(state_accumulator.accumulation_mode, "states")
         state_result = state_accumulator.finalize()
@@ -264,14 +360,16 @@ class CDOAccumulatorTests(unittest.TestCase):
                 state_result.dynamics.classical_purity,
                 state_result.dynamics.quantum_purity,
                 state_result.dynamics.entropy,
-                state_result.dynamics.kl_divergence,
+                state_result.dynamics.kl_goe,
+                state_result.dynamics.kl_gue,
             ),
             (
                 density_result.dynamics.probabilities,
                 density_result.dynamics.classical_purity,
                 density_result.dynamics.quantum_purity,
                 density_result.dynamics.entropy,
-                density_result.dynamics.kl_divergence,
+                density_result.dynamics.kl_goe,
+                density_result.dynamics.kl_gue,
             ),
             strict=True,
         ):
@@ -338,40 +436,48 @@ class CDOAccumulatorTests(unittest.TestCase):
             time_chunk_size=2,
             include_dynamics=False,
             include_heisenberg_kl=True,
+            goe_heisenberg_estimate=uniform_estimate(3),
+            gue_heisenberg_estimate=uniform_estimate(3),
         )
         self.assertIsNone(histogram_only.accumulation_mode)
-        self.assertIsNone(histogram_only._log_probability_sum)
+        self.assertIsNone(histogram_only._kl_goe_sum)
         self.assertIsNone(histogram_only._state_buffer)
         self.assertIsNone(histogram_only._density_operator_lower_sum)
         self.assertIsNone(histogram_only._lower_indices)
-        self.assertEqual(histogram_only._heisenberg_probabilities.shape, (3, 3))
+        self.assertEqual(require(histogram_only._heisenberg_kl_goe).shape, (3,))
+        self.assertEqual(require(histogram_only._heisenberg_kl_gue).shape, (3,))
 
-        chunked_histogram = CDONumericalAccumulator(
+        goe_heisenberg = np.array([0.7, 0.3], dtype=np.float64)
+        gue_heisenberg = np.array([0.4, 0.6], dtype=np.float64)
+        per_realization = CDONumericalAccumulator(
             dimension=2,
             num_times=1,
             target_realizs=5,
             complex_dtype=np.complex128,
             time_chunk_size=5,
             include_dynamics=False,
-            max_workspace_array_bytes=2 * 2 * np.dtype(np.float64).itemsize,
+            goe_heisenberg_estimate=goe_heisenberg,
+            gue_heisenberg_estimate=gue_heisenberg,
         )
-        for value in range(1, 6):
-            chunked_histogram.add(
-                None,
-                heisenberg_state=np.array([value, 1.0]),
-            )
-        self.assertEqual(chunked_histogram.heisenberg_statistics_chunk_size, 2)
-        with patch(
-            "rmtpy.simulations.cdo_evolution.accumulator."
-            "compute_classical_kl_divergences",
-            wraps=compute_classical_kl_divergences,
-        ) as compute_kl:
-            chunked_result = chunked_histogram.finalize()
-        self.assertEqual(
-            [call.args[1].shape for call in compute_kl.call_args_list],
-            [(2, 2), (2, 2), (1, 2)],
+        heisenberg_states = np.array(
+            [[value, 1.0] for value in range(1, 6)],
+            dtype=np.complex128,
         )
-        self.assertEqual(chunked_result.heisenberg_kl_divergences.shape, (5,))
+        for state in heisenberg_states:
+            per_realization.add(None, heisenberg_state=state)
+        per_realization_result = per_realization.finalize()
+        np.testing.assert_allclose(
+            require(per_realization_result.heisenberg_kl_goe),
+            direct_heisenberg_kl(goe_heisenberg, heisenberg_states),
+            rtol=1e-13,
+            atol=1e-13,
+        )
+        np.testing.assert_allclose(
+            require(per_realization_result.heisenberg_kl_gue),
+            direct_heisenberg_kl(gue_heisenberg, heisenberg_states),
+            rtol=1e-13,
+            atol=1e-13,
+        )
 
         states_only = CDONumericalAccumulator(
             dimension=3,
@@ -384,18 +490,24 @@ class CDOAccumulatorTests(unittest.TestCase):
             retain_evolved_states=True,
         )
         self.assertEqual(states_only.accumulation_mode, "states")
-        self.assertIsNone(states_only._log_probability_sum)
-        self.assertIsNone(states_only._heisenberg_probabilities)
+        self.assertIsNone(states_only._kl_goe_sum)
+        self.assertIsNone(states_only._heisenberg_kl_goe)
         self.assertIsNone(states_only._lower_indices)
         self.assertEqual(states_only._state_buffer.dtype, np.dtype(np.complex64))
 
     def test_time_zero_rank_one_and_missing_support(self) -> None:
+        matching_estimate = np.array([[1.0, 0.0], [0.5, 0.5]], dtype=np.float64)
+        matching_heisenberg = np.array([1.0, 0.0], dtype=np.float64)
         rank_one = CDONumericalAccumulator(
             dimension=2,
             num_times=2,
             target_realizs=1,
             complex_dtype=np.complex128,
             time_chunk_size=1,
+            goe_estimate_probabilities=matching_estimate,
+            gue_estimate_probabilities=matching_estimate,
+            goe_heisenberg_estimate=matching_heisenberg,
+            gue_heisenberg_estimate=matching_heisenberg,
         )
         rank_one.add(
             np.array([[1.0, 0.0], [1.0, 1.0j]]),
@@ -406,15 +518,23 @@ class CDOAccumulatorTests(unittest.TestCase):
         np.testing.assert_allclose(result.dynamics.classical_purity, [1.0, 0.5])
         np.testing.assert_allclose(result.dynamics.quantum_purity, 1.0)
         np.testing.assert_allclose(result.dynamics.entropy, 0.0, atol=1e-15)
-        np.testing.assert_allclose(result.dynamics.kl_divergence, 0.0, atol=1e-15)
-        np.testing.assert_array_equal(result.heisenberg_kl_divergences, [0.0])
+        np.testing.assert_allclose(result.dynamics.kl_goe, 0.0, atol=1e-15)
+        np.testing.assert_allclose(result.dynamics.kl_gue, 0.0, atol=1e-15)
+        np.testing.assert_array_equal(result.heisenberg_kl_goe, [0.0])
+        np.testing.assert_array_equal(result.heisenberg_kl_gue, [0.0])
 
+        uniform = uniform_estimate(2, 1)
+        uniform_heisenberg = uniform_estimate(2)
         missing_support = CDONumericalAccumulator(
             dimension=2,
             num_times=1,
             target_realizs=2,
             complex_dtype=np.complex128,
             time_chunk_size=1,
+            goe_estimate_probabilities=uniform,
+            gue_estimate_probabilities=uniform,
+            goe_heisenberg_estimate=uniform_heisenberg,
+            gue_heisenberg_estimate=uniform_heisenberg,
         )
         missing_support.add(
             np.array([[1.0, 0.0]]),
@@ -426,10 +546,10 @@ class CDOAccumulatorTests(unittest.TestCase):
         )
         missing_result = missing_support.finalize()
         np.testing.assert_allclose(missing_result.dynamics.probabilities[0], [0.5, 0.5])
-        self.assertTrue(np.isposinf(missing_result.dynamics.kl_divergence[0]))
-        self.assertTrue(
-            np.all(np.isposinf(require(missing_result.heisenberg_kl_divergences)))
-        )
+        self.assertTrue(np.isposinf(missing_result.dynamics.kl_goe[0]))
+        self.assertTrue(np.isposinf(missing_result.dynamics.kl_gue[0]))
+        self.assertTrue(np.all(np.isposinf(require(missing_result.heisenberg_kl_goe))))
+        self.assertTrue(np.all(np.isposinf(require(missing_result.heisenberg_kl_gue))))
 
     def test_validation_is_atomic_and_capacity_is_enforced(self) -> None:
         def create() -> CDONumericalAccumulator:
@@ -439,6 +559,10 @@ class CDOAccumulatorTests(unittest.TestCase):
                 target_realizs=1,
                 complex_dtype=np.complex128,
                 time_chunk_size=1,
+                goe_estimate_probabilities=uniform_estimate(2, 2),
+                gue_estimate_probabilities=uniform_estimate(2, 2),
+                goe_heisenberg_estimate=uniform_estimate(2),
+                gue_heisenberg_estimate=uniform_estimate(2),
             )
 
         invalid_cases = (
@@ -456,8 +580,12 @@ class CDOAccumulatorTests(unittest.TestCase):
                     accumulator.add(states, heisenberg_state=heisenberg_state)
                 self.assertEqual(accumulator.realizs, 0)
                 np.testing.assert_array_equal(
-                    accumulator._log_probability_sum,
-                    np.zeros((2, 2)),
+                    require(accumulator._kl_goe_sum),
+                    np.zeros(2),
+                )
+                np.testing.assert_array_equal(
+                    require(accumulator._heisenberg_kl_goe),
+                    np.zeros(1),
                 )
 
         accumulator = create()
@@ -474,6 +602,8 @@ class CDOAccumulatorTests(unittest.TestCase):
             complex_dtype=np.complex128,
             time_chunk_size=1,
             include_dynamics=False,
+            goe_heisenberg_estimate=uniform_estimate(2),
+            gue_heisenberg_estimate=uniform_estimate(2),
         )
         with self.assertRaises(ValueError):
             histogram_only.add(np.ones((1, 2)), heisenberg_state=np.ones(2))
@@ -497,6 +627,10 @@ class CDOAccumulatorTests(unittest.TestCase):
             complex_dtype=np.complex128,
             time_chunk_size=1,
             retain_evolved_states=True,
+            goe_estimate_probabilities=uniform_estimate(2, 1),
+            gue_estimate_probabilities=uniform_estimate(2, 1),
+            goe_heisenberg_estimate=uniform_estimate(2),
+            gue_heisenberg_estimate=uniform_estimate(2),
         )
         first_state = np.array([[1.0, 1.0j]])
         second_state = np.array([[1.0, -1.0j]])
@@ -514,16 +648,17 @@ class CDOAccumulatorTests(unittest.TestCase):
         np.testing.assert_array_equal(partial.evolved_states, partial_states)
 
         state_buffer = accumulator._state_buffer
-        log_probability_sum = accumulator._log_probability_sum
-        heisenberg_probabilities = accumulator._heisenberg_probabilities
+        kl_goe_sum = accumulator._kl_goe_sum
+        heisenberg_kl_goe = accumulator._heisenberg_kl_goe
         accumulator.reset()
         self.assertEqual(accumulator.realizs, 0)
         self.assertIs(accumulator._state_buffer, state_buffer)
-        self.assertIs(accumulator._log_probability_sum, log_probability_sum)
-        self.assertIs(accumulator._heisenberg_probabilities, heisenberg_probabilities)
+        self.assertIs(accumulator._kl_goe_sum, kl_goe_sum)
+        self.assertIs(accumulator._heisenberg_kl_goe, heisenberg_kl_goe)
         empty = accumulator.finalize()
         np.testing.assert_array_equal(empty.dynamics.probabilities, np.zeros((1, 2)))
-        self.assertEqual(empty.heisenberg_kl_divergences.shape, (0,))
+        self.assertEqual(empty.heisenberg_kl_goe.shape, (0,))
+        self.assertEqual(empty.heisenberg_kl_gue.shape, (0,))
         self.assertEqual(empty.evolved_states.shape, (0, 1, 2))
         accumulator.add(second_state, heisenberg_state=second_state[0])
         refilled = accumulator.finalize()
@@ -605,6 +740,10 @@ class CDOAccumulatorTests(unittest.TestCase):
             complex_dtype=np.complex64,
             time_chunk_size=1,
             retain_evolved_states=True,
+            goe_estimate_probabilities=uniform_estimate(2, 1),
+            gue_estimate_probabilities=uniform_estimate(2, 1),
+            goe_heisenberg_estimate=uniform_estimate(2),
+            gue_heisenberg_estimate=uniform_estimate(2),
         )
         integer_input.add(
             np.array([[1, 0]], dtype=np.int64),
@@ -616,39 +755,63 @@ class CDOAccumulatorTests(unittest.TestCase):
 
         simulation = CDOEvolutionSimulation(
             ensemble=GOE(num_majoranas=4, dtype="float32", seed=1),
+            goe_ensemble=GOE(num_majoranas=4, dtype="float32", seed=2),
+            gue_ensemble=GUE(num_majoranas=4, dtype="float32", seed=3),
             realizs=1,
             num_times=2,
             request={"quantities": ("dynamics", "evolved_states")},
         )
         result = simulation.execute()
         self.assertEqual(result.dynamics.probabilities.dtype, np.dtype(np.float64))
-        self.assertEqual(result.dynamics.kl_divergence.dtype, np.dtype(np.float64))
+        self.assertEqual(result.dynamics.kl_goe.dtype, np.dtype(np.float64))
+        self.assertEqual(result.dynamics.kl_gue.dtype, np.dtype(np.float64))
         self.assertEqual(result.evolved_states.states.dtype, np.dtype(np.complex64))
-        np.testing.assert_array_equal(result.dynamics.kl_divergence, np.zeros(2))
 
 
 class CDOEvolutionTests(unittest.TestCase):
     def assert_histogram_matches_samples(
         self,
-        histogram: Histogram,
+        *,
+        bins: np.ndarray,
+        counts: np.ndarray,
+        histogram: np.ndarray,
         samples: np.ndarray,
+        realizs: int,
     ) -> None:
-        expected_counts = histogram_counts(samples, histogram.bins)
-        self.assertEqual(histogram.realizs, len(samples))
-        np.testing.assert_array_equal(histogram.counts, expected_counts)
+        expected_counts = histogram_counts(samples, bins)
+        self.assertEqual(realizs, len(samples))
+        np.testing.assert_array_equal(counts, expected_counts)
         if np.sum(expected_counts) == 0:
-            np.testing.assert_array_equal(
-                histogram.histogram,
-                np.zeros(histogram.num_bins),
-            )
+            np.testing.assert_array_equal(histogram, np.zeros(len(counts)))
             return
         expected_density = expected_counts / (
-            np.sum(expected_counts) * np.diff(histogram.bins)
+            np.sum(expected_counts) * np.diff(bins)
         )
-        np.testing.assert_allclose(histogram.histogram, expected_density)
+        np.testing.assert_allclose(histogram, expected_density)
         self.assertAlmostEqual(
-            float(np.sum(histogram.histogram * np.diff(histogram.bins))),
+            float(np.sum(histogram * np.diff(bins))),
             1.0,
+        )
+
+    def assert_kl_histogram_matches(
+        self,
+        data: KLDivergenceHistogramData,
+        goe_samples: np.ndarray,
+        gue_samples: np.ndarray,
+    ) -> None:
+        self.assert_histogram_matches_samples(
+            bins=data.bins,
+            counts=data.goe_counts,
+            histogram=data.goe_histogram,
+            samples=goe_samples,
+            realizs=data.realizs,
+        )
+        self.assert_histogram_matches_samples(
+            bins=data.bins,
+            counts=data.gue_counts,
+            histogram=data.gue_histogram,
+            samples=gue_samples,
+            realizs=data.realizs,
         )
 
     def test_request_is_canonical_and_rejects_legacy_selection(self) -> None:
@@ -760,6 +923,9 @@ class CDOEvolutionTests(unittest.TestCase):
         self.assertEqual(
             result.context.execution["accumulation_mode"], "density_operator"
         )
+        self.assertEqual(result.context.execution["estimate_realizs"], 2)
+        self.assertIn("goe_rng", result.context.execution)
+        self.assertIn("gue_rng", result.context.execution)
         self.assertEqual(result.context.rng["initial_state"], initial_rng_state)
         self.assertEqual(
             result.context.rng["final_state"],
@@ -804,14 +970,24 @@ class CDOEvolutionTests(unittest.TestCase):
         self,
     ) -> None:
         cases = (
-            ("density_operator", 4, 2, 11),
-            ("states", 6, 2, 10),
+            ("density_operator", 4, 2, 11, 101, 202),
+            ("states", 6, 2, 10, 303, 404),
         )
-        for expected_mode, num_majoranas, realizs, seed in cases:
+        for (
+            expected_mode,
+            num_majoranas,
+            realizs,
+            truth_seed,
+            goe_seed,
+            gue_seed,
+        ) in cases:
             with self.subTest(accumulation_mode=expected_mode):
                 simulation = CDOEvolutionSimulation(
-                    ensemble=GUE(num_majoranas=num_majoranas, seed=seed),
+                    ensemble=GUE(num_majoranas=num_majoranas, seed=truth_seed),
+                    goe_ensemble=GOE(num_majoranas=num_majoranas, seed=goe_seed),
+                    gue_ensemble=GUE(num_majoranas=num_majoranas, seed=gue_seed),
                     realizs=realizs,
+                    estimate_realizs=realizs,
                     num_times=4,
                     logD_time_support=(-1.0, 0.0),
                     time_chunk_size=2,
@@ -823,7 +999,7 @@ class CDOEvolutionTests(unittest.TestCase):
                     num_times=simulation.num_times,
                 )
                 self.assertFalse(np.any(np.isclose(times, simulation.heisenberg_time)))
-                reference_ensemble = GUE(num_majoranas=num_majoranas, seed=seed)
+                reference_ensemble = GUE(num_majoranas=num_majoranas, seed=truth_seed)
                 expected_states, expected_heisenberg_states = direct_evolution(
                     ensemble=reference_ensemble,
                     realizs=realizs,
@@ -832,8 +1008,25 @@ class CDOEvolutionTests(unittest.TestCase):
                     initial_state=simulation.initial_state,
                 )
                 expected_dynamics = direct_analysis(expected_states)
-                expected_divergences = direct_heisenberg_kl_divergences(
-                    expected_heisenberg_states
+                goe_grid, gue_grid, goe_heisenberg, gue_heisenberg = mixed_estimates(
+                    num_majoranas=num_majoranas,
+                    goe_seed=goe_seed,
+                    gue_seed=gue_seed,
+                    initial_state=simulation.initial_state,
+                    times=times,
+                    heisenberg_time=simulation.heisenberg_time,
+                    realizs=realizs,
+                    time_chunk_size=2,
+                )
+                expected_kl_goe = direct_mean_kl(require(goe_grid), expected_states)
+                expected_kl_gue = direct_mean_kl(require(gue_grid), expected_states)
+                expected_heisenberg_goe = direct_heisenberg_kl(
+                    require(goe_heisenberg),
+                    expected_heisenberg_states,
+                )
+                expected_heisenberg_gue = direct_heisenberg_kl(
+                    require(gue_heisenberg),
+                    expected_heisenberg_states,
                 )
 
                 with patch(
@@ -852,24 +1045,42 @@ class CDOEvolutionTests(unittest.TestCase):
                         result.dynamics.classical_purity,
                         result.dynamics.quantum_purity,
                         result.dynamics.entropy,
-                        result.dynamics.kl_divergence,
                     ),
                     expected_dynamics,
                     strict=True,
                 ):
                     np.testing.assert_allclose(actual, reference, rtol=1e-12, atol=1e-12)
+                np.testing.assert_allclose(
+                    result.dynamics.kl_goe,
+                    expected_kl_goe,
+                    rtol=1e-12,
+                    atol=1e-12,
+                )
+                np.testing.assert_allclose(
+                    result.dynamics.kl_gue,
+                    expected_kl_gue,
+                    rtol=1e-12,
+                    atol=1e-12,
+                )
                 self.assertEqual(result.dynamics.realizs, realizs)
                 self.assertEqual(
                     result.context.rng["final_state"],
                     reference_ensemble.rng_state,
                 )
-                self.assert_histogram_matches_samples(
+                self.assert_kl_histogram_matches(
                     result.kl_divergence_histogram,
-                    expected_divergences,
+                    expected_heisenberg_goe,
+                    expected_heisenberg_gue,
                 )
                 np.testing.assert_allclose(
-                    histogram_factory.call_args.kwargs["divergences"],
-                    expected_divergences,
+                    histogram_factory.call_args.kwargs["goe_divergences"],
+                    expected_heisenberg_goe,
+                    rtol=1e-12,
+                    atol=1e-12,
+                )
+                np.testing.assert_allclose(
+                    histogram_factory.call_args.kwargs["gue_divergences"],
+                    expected_heisenberg_gue,
                     rtol=1e-12,
                     atol=1e-12,
                 )
@@ -879,40 +1090,51 @@ class CDOEvolutionTests(unittest.TestCase):
                 )
 
                 _, nearest_states = direct_evolution(
-                    ensemble=GUE(num_majoranas=num_majoranas, seed=seed),
+                    ensemble=GUE(num_majoranas=num_majoranas, seed=truth_seed),
                     realizs=realizs,
                     times=times,
                     heisenberg_time=times[-1],
                     initial_state=simulation.initial_state,
                 )
                 nearest_probabilities = normalized_probabilities(nearest_states)
-                exact_probabilities = normalized_probabilities(expected_heisenberg_states)
+                exact_probabilities = normalized_probabilities(
+                    expected_heisenberg_states
+                )
                 self.assertFalse(np.allclose(nearest_probabilities, exact_probabilities))
-                nearest_divergences = direct_heisenberg_kl_divergences(nearest_states)
+                nearest_goe = direct_heisenberg_kl(require(goe_grid)[-1], nearest_states)
                 self.assertFalse(
                     np.array_equal(
-                        result.kl_divergence_histogram.counts,
+                        result.kl_divergence_histogram.goe_counts,
                         histogram_counts(
-                            nearest_divergences,
+                            nearest_goe,
                             result.kl_divergence_histogram.bins,
                         ),
                     )
                 )
 
     def test_reverse_kl_orientation_is_preserved(self) -> None:
+        estimate = np.array([0.7, 0.3])
         realization_probabilities = np.array([[0.9, 0.1], [0.2, 0.8]])
-        mixed_probabilities = np.mean(realization_probabilities, axis=0)
-        expected_reverse = np.array([0.405972764027759, 0.2974666440568037])
-        forward = compute_classical_kl_divergences(
-            realization_probabilities,
-            mixed_probabilities,
-        )
-        actual = compute_classical_kl_divergences(
-            mixed_probabilities,
+        estimate_first = compute_classical_kl_divergences(
+            estimate,
             realization_probabilities,
         )
-        np.testing.assert_allclose(actual, expected_reverse)
-        self.assertFalse(np.allclose(actual, forward))
+        realization_first = compute_classical_kl_divergences(
+            realization_probabilities,
+            estimate,
+        )
+        np.testing.assert_allclose(
+            estimate_first,
+            np.sum(
+                estimate * np.log(estimate / realization_probabilities),
+                axis=1,
+            ),
+        )
+        self.assertFalse(np.allclose(estimate_first, realization_first))
+        self.assertTrue(np.isfinite(classical_kl([0.0, 1.0], [0.5, 0.5])))
+        self.assertTrue(np.isposinf(classical_kl([0.5, 0.5], [1.0, 0.0])))
+        skipped_zero = classical_kl([0.0, 1.0], [0.0, 1.0])
+        self.assertEqual(skipped_zero, 0.0)
 
     def test_selective_results_keep_only_required_products(self) -> None:
         configurations = (
@@ -930,6 +1152,8 @@ class CDOEvolutionTests(unittest.TestCase):
             with self.subTest(quantities=quantities):
                 simulation = CDOEvolutionSimulation(
                     ensemble=GUE(num_majoranas=4, seed=29),
+                    goe_ensemble=GOE(num_majoranas=4, seed=101),
+                    gue_ensemble=GUE(num_majoranas=4, seed=202),
                     realizs=2,
                     num_times=5,
                     time_chunk_size=2,
@@ -957,21 +1181,27 @@ class CDOEvolutionTests(unittest.TestCase):
                 all_outputs.dynamics.classical_purity,
                 all_outputs.dynamics.quantum_purity,
                 all_outputs.dynamics.entropy,
-                all_outputs.dynamics.kl_divergence,
+                all_outputs.dynamics.kl_goe,
+                all_outputs.dynamics.kl_gue,
             ),
             (
                 dynamics_only.dynamics.probabilities,
                 dynamics_only.dynamics.classical_purity,
                 dynamics_only.dynamics.quantum_purity,
                 dynamics_only.dynamics.entropy,
-                dynamics_only.dynamics.kl_divergence,
+                dynamics_only.dynamics.kl_goe,
+                dynamics_only.dynamics.kl_gue,
             ),
             strict=True,
         ):
             np.testing.assert_allclose(actual, reference, rtol=1e-12, atol=1e-12)
         np.testing.assert_array_equal(
-            all_outputs.kl_divergence_histogram.counts,
-            results[("kl_divergence_histogram",)].kl_divergence_histogram.counts,
+            all_outputs.kl_divergence_histogram.goe_counts,
+            results[("kl_divergence_histogram",)].kl_divergence_histogram.goe_counts,
+        )
+        np.testing.assert_array_equal(
+            all_outputs.kl_divergence_histogram.gue_counts,
+            results[("kl_divergence_histogram",)].kl_divergence_histogram.gue_counts,
         )
         np.testing.assert_allclose(
             all_outputs.evolved_states.states,
@@ -1024,24 +1254,29 @@ class CDOEvolutionTests(unittest.TestCase):
             side_effect=AssertionError("scalar histogram loop used"),
         ):
             histogram = build_kl_divergence_histogram_data(
-                divergences=samples,
+                goe_divergences=samples,
+                gue_divergences=samples,
                 heisenberg_time=7.0,
             )
         self.assertEqual(histogram.support, (0.0, 5.0))
-        self.assertIsNone(histogram.log_base)
         self.assertEqual(histogram.realizs, 4)
-        self.assertEqual(int(np.sum(histogram.counts)), 2)
-        self.assertEqual(histogram.counts[0], 1)
-        self.assertEqual(histogram.counts[-1], 1)
+        self.assertEqual(int(np.sum(histogram.goe_counts)), 2)
+        self.assertEqual(histogram.goe_counts[0], 1)
+        self.assertEqual(histogram.goe_counts[-1], 1)
+        self.assertEqual(int(np.sum(histogram.gue_counts)), 2)
+        self.assertEqual(histogram.gue_counts[0], 1)
+        self.assertEqual(histogram.gue_counts[-1], 1)
         self.assertEqual(histogram.metadata["heisenberg_time"], 7.0)
         self.assertAlmostEqual(
-            float(np.sum(histogram.histogram * np.diff(histogram.bins))),
+            float(np.sum(histogram.goe_histogram * np.diff(histogram.bins))),
             1.0,
         )
 
     def test_persistence_round_trip_includes_retained_states(self) -> None:
         simulation = CDOEvolutionSimulation(
             ensemble=GOE(num_majoranas=4, seed=31),
+            goe_ensemble=GOE(num_majoranas=4, seed=41),
+            gue_ensemble=GUE(num_majoranas=4, seed=51),
             realizs=2,
             num_times=4,
             request={
@@ -1067,7 +1302,8 @@ class CDOEvolutionTests(unittest.TestCase):
             "classical_purity",
             "quantum_purity",
             "entropy",
-            "kl_divergence",
+            "kl_goe",
+            "kl_gue",
         ):
             np.testing.assert_array_equal(
                 getattr(restored_dynamics, name),
@@ -1086,12 +1322,20 @@ class CDOEvolutionTests(unittest.TestCase):
             result.kl_divergence_histogram.bins,
         )
         np.testing.assert_array_equal(
-            restored_histogram.counts,
-            result.kl_divergence_histogram.counts,
+            restored_histogram.goe_counts,
+            result.kl_divergence_histogram.goe_counts,
         )
         np.testing.assert_array_equal(
-            restored_histogram.histogram,
-            result.kl_divergence_histogram.histogram,
+            restored_histogram.gue_counts,
+            result.kl_divergence_histogram.gue_counts,
+        )
+        np.testing.assert_array_equal(
+            restored_histogram.goe_histogram,
+            result.kl_divergence_histogram.goe_histogram,
+        )
+        np.testing.assert_array_equal(
+            restored_histogram.gue_histogram,
+            result.kl_divergence_histogram.gue_histogram,
         )
         self.assertEqual(restored_histogram.realizs, simulation.realizs)
         self.assertEqual(
@@ -1110,6 +1354,8 @@ class CDOEvolutionTests(unittest.TestCase):
     def test_result_consumer_routes_all_and_selective_plot_views(self) -> None:
         result = CDOEvolutionSimulation(
             ensemble=GOE(num_majoranas=4, seed=7),
+            goe_ensemble=GOE(num_majoranas=4, seed=8),
+            gue_ensemble=GUE(num_majoranas=4, seed=9),
             realizs=2,
             num_times=3,
         ).execute()
@@ -1117,6 +1363,7 @@ class CDOEvolutionTests(unittest.TestCase):
             patch.object(CDOProbabilitiesPlot, "plot", autospec=True) as probabilities,
             patch.object(CDOPuritiesPlot, "plot", autospec=True) as purities,
             patch.object(CDOInformationPlot, "plot", autospec=True) as information,
+            patch.object(CDOKLRatioPlot, "plot", autospec=True) as ratio,
             patch.object(
                 KLDivergenceHistogramPlot,
                 "plot",
@@ -1128,9 +1375,14 @@ class CDOEvolutionTests(unittest.TestCase):
         probabilities.assert_called_once()
         purities.assert_called_once()
         information.assert_called_once()
+        ratio.assert_called_once()
         divergence_histogram.assert_called_once()
         self.assertEqual(
             probabilities.call_args.kwargs["path"],
+            Path("unused") / "cdo_dynamics",
+        )
+        self.assertEqual(
+            ratio.call_args.kwargs["path"],
             Path("unused") / "cdo_dynamics",
         )
         self.assertEqual(
@@ -1142,6 +1394,7 @@ class CDOEvolutionTests(unittest.TestCase):
             patch.object(CDOProbabilitiesPlot, "plot", autospec=True) as probabilities,
             patch.object(CDOPuritiesPlot, "plot", autospec=True) as purities,
             patch.object(CDOInformationPlot, "plot", autospec=True) as information,
+            patch.object(CDOKLRatioPlot, "plot", autospec=True) as ratio,
             patch.object(KLDivergenceHistogramPlot, "plot", autospec=True) as histogram,
         ):
             plot_cdo_evolution_result(
@@ -1152,7 +1405,20 @@ class CDOEvolutionTests(unittest.TestCase):
         probabilities.assert_not_called()
         purities.assert_called_once()
         information.assert_not_called()
+        ratio.assert_not_called()
         histogram.assert_not_called()
+
+        with (
+            patch.object(CDOKLRatioPlot, "plot", autospec=True) as ratio,
+            patch.object(CDOInformationPlot, "plot", autospec=True) as information,
+        ):
+            plot_cdo_evolution_result(
+                result,
+                out_dir=Path("unused"),
+                views="cdo_kl_ratio",
+            )
+        ratio.assert_called_once()
+        information.assert_not_called()
 
         for invalid_views in ((), ("missing",)):
             with (
@@ -1181,16 +1447,14 @@ class CDOEvolutionTests(unittest.TestCase):
         result = simulation.execute()
         control.execute()
         runtime_args = result.context.simulation_config["parameters"]
-        form_factor_plot = FormFactorsPlot(
-            data=FormFactorsData(
-                dimension=simulation.ensemble.dimension,
-                logD_time_support=(-0.5, 1.5),
-                scale=simulation.time_scale,
-                num_times=7,
-            ),
+        reference_axes = CDOProbabilitiesPlot(
+            data=result.dynamics,
             simulation_parameters=runtime_args.copy(),
+        ).axes
+        expected_xlim = tuple(
+            simulation.time_scale * simulation.ensemble.dimension**value
+            for value in LOG_D_TIME_SUPPORT
         )
-        form_factor_plot.set_derived_attributes()
 
         time_plots = (
             CDOProbabilitiesPlot(
@@ -1210,10 +1474,13 @@ class CDOEvolutionTests(unittest.TestCase):
         for plot in time_plots:
             with patch.object(plot, "finish_plot"):
                 plot.plot(path="unused")
-            self.assertEqual(plot.axes.xlabel, form_factor_plot.axes.xlabel)
-            self.assertEqual(plot.axes.xtick_labels, form_factor_plot.axes.xtick_labels)
-            np.testing.assert_allclose(plot.xlim, form_factor_plot.xlim)
-            np.testing.assert_allclose(plot.axes.xticks, form_factor_plot.axes.xticks)
+            self.assertEqual(plot.axes.xlabel, reference_axes.xlabel)
+            self.assertEqual(plot.axes.xtick_labels, reference_axes.xtick_labels)
+            np.testing.assert_allclose(plot.xlim, expected_xlim)
+            np.testing.assert_allclose(
+                plot.axes.xticks,
+                simulation.time_scale * dimension ** np.array([0.0, 0.5, 1.0]),
+            )
             self.assertEqual(plot.ax.get_xscale(), "log")
             self.assertEqual(
                 cast(Any, plot.ax.xaxis.get_major_locator())._base,
@@ -1254,10 +1521,24 @@ class CDOEvolutionTests(unittest.TestCase):
             len(probability_plot.ax.lines), simulation.ensemble.dimension + 1
         )
         self.assertEqual(len(purity_plot.ax.lines), 2)
-        self.assertEqual(len(information_plot.ax.lines), 2)
+        self.assertEqual(len(information_plot.ax.lines), 3)
         self.assertEqual(probability_plot.file_name, "cdo_probabilities_plot")
         self.assertEqual(purity_plot.file_name, "cdo_purities_plot")
         self.assertEqual(information_plot.file_name, "cdo_information_plot")
+
+        ratio_plot = CDOKLRatioPlot(
+            data=result.dynamics,
+            simulation_parameters=runtime_args.copy(),
+        )
+        with patch.object(ratio_plot, "finish_plot"):
+            ratio_plot.plot(path="unused")
+        self.assertEqual(ratio_plot.axes.xlabel, reference_axes.xlabel)
+        self.assertEqual(ratio_plot.ax.get_xscale(), "log")
+        self.assertEqual(ratio_plot.ax.get_yscale(), "linear")
+        self.assertIsNone(ratio_plot.ylim)
+        self.assertEqual(len(ratio_plot.ax.lines), 2)
+        np.testing.assert_allclose(ratio_plot.ax.lines[1].get_ydata(), 1.0)
+        self.assertEqual(ratio_plot.file_name, "cdo_kl_ratio_plot")
 
         histogram_plot = KLDivergenceHistogramPlot(
             data=result.kl_divergence_histogram,
@@ -1266,7 +1547,7 @@ class CDOEvolutionTests(unittest.TestCase):
         with patch.object(histogram_plot, "finish_plot") as finish_plot:
             histogram_plot.plot(path="unused")
         finish_plot.assert_called_once_with(path="unused")
-        self.assertIn(r"\bar p(t_{\mathrm{H}})", histogram_plot.axes.xlabel)
+        self.assertIn(r"q(t_{\mathrm{H}})", histogram_plot.axes.xlabel)
         self.assertIn(r"p_r(t_{\mathrm{H}})", histogram_plot.axes.xlabel)
         self.assertEqual(histogram_plot.axes.ylabel, r"$P(D_{\mathrm{KL}})$")
         self.assertEqual(histogram_plot.xlim, (0.0, 5.0))
@@ -1274,11 +1555,17 @@ class CDOEvolutionTests(unittest.TestCase):
         self.assertEqual(histogram_plot.ax.get_yscale(), "linear")
         self.assertEqual(
             len(histogram_plot.ax.patches),
-            result.kl_divergence_histogram.num_bins,
+            2 * result.kl_divergence_histogram.num_bins,
+        )
+        expected_edges = np.concatenate(
+            (
+                result.kl_divergence_histogram.bins[:-1],
+                result.kl_divergence_histogram.bins[:-1],
+            )
         )
         np.testing.assert_allclose(
             [cast(Any, bar).get_x() for bar in histogram_plot.ax.patches],
-            result.kl_divergence_histogram.bins[:-1],
+            expected_edges,
             atol=1e-15,
         )
         self.assertEqual(histogram_plot.legend.title, simulation.ensemble.to_latex)
@@ -1288,12 +1575,13 @@ class CDOEvolutionTests(unittest.TestCase):
             patch.object(CDOProbabilitiesPlot, "finish_plot"),
             patch.object(CDOPuritiesPlot, "finish_plot"),
             patch.object(CDOInformationPlot, "finish_plot"),
+            patch.object(CDOKLRatioPlot, "finish_plot"),
             patch.object(KLDivergenceHistogramPlot, "finish_plot"),
         ):
             plot_cdo_evolution_result(result, out_dir=Path("unused"))
-        np.testing.assert_allclose(
-            next(simulation.ensemble.eigvals_stream(1)),
-            next(control.ensemble.eigvals_stream(1)),
+        self.assertEqual(
+            simulation.ensemble.rng_state,
+            control.ensemble.rng_state,
         )
 
     def test_execute_is_data_only_and_convenience_runner_returns_result(self) -> None:
