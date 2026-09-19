@@ -1,9 +1,9 @@
-from .base import Compound
-from .poisson_compound import PoissonCompound
-from .syk_compound import SYKCompound
+from .base_compound import CompoundEnsemble
+from .poisson_compound import PoissonCompoundEnsemble
+from .syk_compound import SYKCompoundEnsemble
 
 __all__ = [
-    "Compound",
-    "PoissonCompound",
-    "SYKCompound",
+    "CompoundEnsemble",
+    "PoissonCompoundEnsemble",
+    "SYKCompoundEnsemble",
 ]
