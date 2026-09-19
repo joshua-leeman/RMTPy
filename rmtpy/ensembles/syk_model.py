@@ -63,7 +63,9 @@ def _build_syk_matrix_without_imaginary_prefactor(
 
 
 def _are_num_majoranas_within_limit(
-    syk: SachdevYeKitaevEnsemble, _: attrs.Attribute[int], q: int
+    syk: SachdevYeKitaevEnsemble,
+    _: attrs.Attribute[int],
+    q: int,
 ) -> None:
     if q not in NUM_MAJORANAS_LIMIT_BY_Q:
         raise ValueError(
