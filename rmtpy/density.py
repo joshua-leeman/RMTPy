@@ -22,6 +22,13 @@ class SpectrumStream(Protocol):
     ) -> Iterator[NDArray[np.floating]]: ...
 
 
+class ResonanceStream(Protocol):
+    def __call__(
+        self,
+        realizs: int,
+    ) -> Iterator[NDArray[np.floating]]: ...
+
+
 MAX_POLYNOMIAL_DEGREE: int = 6
 
 SUPPORT_SCALE_FACTOR: float = 1.2
@@ -169,7 +176,7 @@ class DensityModel:
         default=None,
         validator=attrs.validators.optional(attrs.validators.is_callable()),
     )
-    sample_stream: SpectrumStream = attrs.field(
+    sample_stream: SpectrumStream | ResonanceStream = attrs.field(
         validator=attrs.validators.is_callable(),
         repr=False,
     )
