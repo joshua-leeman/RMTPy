@@ -59,8 +59,8 @@ def _validate_histogram(hist: Histogram, _: object, values: NDArray[np.float64])
 
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
 class Histogram(Data):
-    support: tuple[np.float64, np.float64] = attrs.field(
-        converter=cast(Callable[[object], tuple[np.float64, np.float64]], tuple),
+    support: tuple[float, float] = attrs.field(
+        converter=cast(Callable[[object], tuple[float, float]], tuple),
         validator=is_valid_support,
     )
     log_base: float | None = attrs.field(
