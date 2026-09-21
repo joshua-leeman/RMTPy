@@ -111,7 +111,7 @@ def _compute_spectral_radius(syk: SachdevYeKitaevEnsemble) -> float:
     return cast(float, (2 * syk.std_dev) * np.sqrt(radius_numerical_factor))
 
 
-def _createmajorana_fermion_basis(syk: SachdevYeKitaevEnsemble) -> MajoranaFermionBasis:
+def _create_majorana_fermion_basis(syk: SachdevYeKitaevEnsemble) -> MajoranaFermionBasis:
     return MajoranaFermionBasis(
         num_majoranas=syk.num_majoranas,
         in_real_basis=syk.dyson_index == 1,
@@ -154,7 +154,7 @@ class SachdevYeKitaevEnsemble(ManyBodyEnsemble):
     )
 
     majorana_fermion_basis: MajoranaFermionBasis = attrs.field(
-        default=attrs.Factory(_createmajorana_fermion_basis, takes_self=True),
+        default=attrs.Factory(_create_majorana_fermion_basis, takes_self=True),
         init=False,
         repr=False,
     )
