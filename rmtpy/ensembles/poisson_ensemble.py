@@ -203,6 +203,7 @@ class PoissonEnsemble(ManyBodyEnsemble):
     def porter_thomas_distribution(
         self,
         widths: NDArray[np.float64],
+        /,
         *,
         num_channels: int = 1,
     ) -> NDArray[np.float64]:
@@ -216,6 +217,7 @@ class PoissonEnsemble(ManyBodyEnsemble):
     def assign_spectral_polynomials(self) -> OrthogonalPolynomials:
         def poisson_spectral_polynomials(
             x: NDArray[np.float64],
+            /,
             *,
             degree: int,
         ) -> NDArray[np.float64]:
@@ -227,6 +229,7 @@ class PoissonEnsemble(ManyBodyEnsemble):
     def assign_spectral_weight(self) -> Float64Function:
         def poisson_spectral_weight(
             energies: NDArray[np.float64],
+            /,
         ) -> NDArray[np.float64]:
             return legendre_polynomial_weight(
                 energies,

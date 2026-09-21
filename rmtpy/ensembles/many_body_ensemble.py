@@ -177,6 +177,7 @@ class ManyBodyEnsemble(RandomMatrixEnsemble, ABC):
     def porter_thomas_distribution(
         self,
         widths: NDArray[np.float64],
+        /,
         *,
         num_channels: int = 1,
     ) -> NDArray[np.float64]:
@@ -186,11 +187,12 @@ class ManyBodyEnsemble(RandomMatrixEnsemble, ABC):
             num_channels=num_channels,
         )
 
-    def wigner_surmise(self, spacings: NDArray[np.float64]) -> NDArray[np.float64]:
+    def wigner_surmise(self, spacings: NDArray[np.float64], /) -> NDArray[np.float64]:
         return wigner_surmise(spacings, dyson_index=self.dyson_index)
 
     def universal_connected_sff(
         self,
+        /,
         times: NDArray[np.float64],
     ) -> NDArray[np.float64]:
         return connected_sff(

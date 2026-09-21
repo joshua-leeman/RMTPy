@@ -237,6 +237,7 @@ class SachdevYeKitaevEnsemble(ManyBodyEnsemble):
     def assign_spectral_polynomials(self) -> OrthogonalPolynomials:
         def syk_model_spectral_polynomials(
             x: NDArray[np.float64],
+            /,
             *,
             degree: int,
         ) -> NDArray[np.float64]:
@@ -248,6 +249,7 @@ class SachdevYeKitaevEnsemble(ManyBodyEnsemble):
     def assign_spectral_weight(self) -> Float64Function:
         def syk_model_spectral_weight(
             energies: NDArray[np.float64],
+            /,
         ) -> NDArray[np.float64]:
             return q_hermite_polynomial_weight(
                 energies,
