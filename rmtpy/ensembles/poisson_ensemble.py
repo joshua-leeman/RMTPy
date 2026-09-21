@@ -14,6 +14,7 @@ from ..polynomials import (
     legendre_polynomials,
 )
 from ..universal import porter_thomas_distribution
+from .base_ensemble import RandomMatrixEnsemble
 from .many_body_ensemble import (
     HermitianMatrix,
     ManyBodyEnsemble,
@@ -102,6 +103,14 @@ class PoissonEnsemble(ManyBodyEnsemble):
         repr=False,
     )
 
+    @classmethod
+    @override
+    def create(
+        cls,
+        src: SourceDict | RandomMatrixEnsemble,
+    ) -> PoissonEnsemble:
+        return RMT_CONVERTER.structure(src, cls)
+
     @override
     def generate_matrix(
         self,
@@ -122,7 +131,7 @@ class PoissonEnsemble(ManyBodyEnsemble):
                 overwrite_a=True,
             )[1],
         )
-        eigvals = self._generate_eigenvalues()
+        eigvals = self.generate_eigenvalues()
 
         if use_complex_dtype or self.eigvec_ensemble.dyson_index != 1:
             matrix = self._allocate_complex_hermitian_matrix_memory()
@@ -140,7 +149,10 @@ class PoissonEnsemble(ManyBodyEnsemble):
 
     @override
     def matrix_stream(
-        self, realizs: int, *, use_complex_dtype: bool = False
+        self,
+        realizs: int,
+        *,
+        use_complex_dtype: bool = False,
     ) -> Iterator[RealSymmetricMatrix | HermitianMatrix]:
         symmetrizer = self._pick_symmetrizer(use_complex_dtype=use_complex_dtype)
 
@@ -175,7 +187,7 @@ class PoissonEnsemble(ManyBodyEnsemble):
         for _, eigvecs in self.eigvec_ensemble.eigsys_stream(
             realizs, use_complex_dtype=use_complex_dtype
         ):
-            yield self._generate_eigenvalues(), eigvecs
+            yield self.generate_eigenvalues(), eigvecs
 
     @override
     def eigvals_stream(
@@ -185,7 +197,7 @@ class PoissonEnsemble(ManyBodyEnsemble):
         use_complex_dtype: bool = False,
     ) -> Iterator[RealEigenvalues]:
         for _ in range(realizs):
-            yield self._generate_eigenvalues()
+            yield self.generate_eigenvalues()
 
     @override
     def porter_thomas_distribution(
@@ -223,7 +235,7 @@ class PoissonEnsemble(ManyBodyEnsemble):
 
         return poisson_spectral_weight
 
-    def _generate_eigenvalues(self) -> RealEigenvalues:
+    def generate_eigenvalues(self) -> RealEigenvalues:
         eigvals = self.rng.random(self.dimension, self.real_dtype.type)
         eigvals -= 0.5
         eigvals *= self.std_dev
