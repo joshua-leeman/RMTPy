@@ -15,7 +15,7 @@ class Data:
         repr=False,
     )
 
-    def attach_metadata(self, metadata: dict[str, int | float | str]) -> None:
+    def attach_metadata(self, metadata: dict[str, object]) -> None:
         self.metadata.update(metadata)
 
     def build_data_path(self) -> Path:
