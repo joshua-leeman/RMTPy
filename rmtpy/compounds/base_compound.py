@@ -487,7 +487,7 @@ class CompoundEnsemble:
         ):
             yield np.linalg.eigvalsh(delay_matrix), eigvals
 
-    def time_delay_pdf(self, times: NDArray[np.float64]) -> NDArray[np.float64]:
+    def time_delay_pdf(self, times: NDArray[np.float64], /) -> NDArray[np.float64]:
         global_mean_spacing = 2 * self.ensemble.spectral_radius / self.ensemble.dimension
         j_1_1 = cast(float, jn_zeros(1, 1)[0])
         heisenberg_time = 2 * j_1_1 / global_mean_spacing

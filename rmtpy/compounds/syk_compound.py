@@ -43,7 +43,9 @@ class SYKCompoundEnsemble(CompoundEnsemble):
 
     @cached_property
     def decomposed_width_matrix(self) -> DecomposedSparseArray:
-        return build_decomposed_width_matrix(self.coupling_matrix_conj)
+        return build_decomposed_width_matrix(
+            coupling_matrix_conj=self.coupling_matrix_conj
+        )
 
     @override
     def _add_width_matrix_to_hamiltonian(self, hamiltonian: HermitianMatrix) -> None:
