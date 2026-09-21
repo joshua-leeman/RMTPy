@@ -13,11 +13,11 @@ from .base_data import Data
 NUM_BINS: int = 100
 
 
-def build_empty_histogram2D(hist: Histogram2D) -> NDArray[np.float64]:
+def _build_empty_histogram2D(hist: Histogram2D) -> NDArray[np.float64]:
     return np.zeros((hist.x_num_bins, hist.y_num_bins), dtype=np.float64)
 
 
-def build_histogram2D_bins(hist: Histogram2D, axis: str) -> NDArray[np.float64]:
+def _build_histogram2D_bins(hist: Histogram2D, axis: str) -> NDArray[np.float64]:
     if axis.strip().lower() == "x":
         return array_of_floats(
             support=hist.x_support,
@@ -36,7 +36,7 @@ def build_histogram2D_bins(hist: Histogram2D, axis: str) -> NDArray[np.float64]:
         raise ValueError("`axis` must be either 'x' and 'y'.")
 
 
-def build_zeroed_histogram2D_counts(hist: Histogram2D) -> NDArray[np.int64]:
+def _build_zeroed_histogram2D_counts(hist: Histogram2D) -> NDArray[np.int64]:
     return np.zeros((hist.x_num_bins, hist.y_num_bins), dtype=np.int64)
 
 
@@ -121,7 +121,7 @@ class Histogram2D(Data):
 
     x_bins: NDArray[np.float64] = attrs.field(
         default=attrs.Factory(
-            partial(build_histogram2D_bins, axis="x"),
+            partial(_build_histogram2D_bins, axis="x"),
             takes_self=True,
         ),
         converter=np.asarray,
@@ -130,7 +130,7 @@ class Histogram2D(Data):
     )
     y_bins: NDArray[np.float64] = attrs.field(
         default=attrs.Factory(
-            partial(build_histogram2D_bins, axis="y"),
+            partial(_build_histogram2D_bins, axis="y"),
             takes_self=True,
         ),
         converter=np.asarray,
@@ -138,14 +138,14 @@ class Histogram2D(Data):
         repr=False,
     )
     counts: NDArray[np.int64] = attrs.field(
-        default=attrs.Factory(build_zeroed_histogram2D_counts, takes_self=True),
+        default=attrs.Factory(_build_zeroed_histogram2D_counts, takes_self=True),
         converter=np.asarray,
         validator=_validate_counts,
         repr=False,
     )
 
     histogram: NDArray[np.float64] = attrs.field(
-        default=attrs.Factory(build_empty_histogram2D, takes_self=True),
+        default=attrs.Factory(_build_empty_histogram2D, takes_self=True),
         converter=np.asarray,
         validator=_validate_histogram,
         repr=False,

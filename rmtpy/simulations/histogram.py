@@ -12,11 +12,11 @@ from .base_data import Data
 NUM_BINS: int = 100
 
 
-def build_empty_histogram(hist: Histogram) -> NDArray[np.float64]:
+def _build_empty_histogram(hist: Histogram) -> NDArray[np.float64]:
     return np.zeros(hist.num_bins, dtype=np.float64)
 
 
-def build_histogram_bins(hist: Histogram) -> NDArray[np.float64]:
+def _build_histogram_bins(hist: Histogram) -> NDArray[np.float64]:
     return array_of_floats(
         support=hist.support,
         num_pts=hist.num_bins + 1,
@@ -24,7 +24,7 @@ def build_histogram_bins(hist: Histogram) -> NDArray[np.float64]:
     )
 
 
-def build_zeroed_histogram_counts(hist: Histogram) -> NDArray[np.int64]:
+def _build_zeroed_histogram_counts(hist: Histogram) -> NDArray[np.int64]:
     return np.zeros(hist.num_bins, dtype=np.int64)
 
 
@@ -78,19 +78,19 @@ class Histogram(Data):
     )
 
     bins: NDArray[np.float64] = attrs.field(
-        default=attrs.Factory(build_histogram_bins, takes_self=True),
+        default=attrs.Factory(_build_histogram_bins, takes_self=True),
         converter=np.asarray,
         validator=_validate_bins,
         repr=False,
     )
     counts: NDArray[np.int64] = attrs.field(
-        default=attrs.Factory(build_zeroed_histogram_counts, takes_self=True),
+        default=attrs.Factory(_build_zeroed_histogram_counts, takes_self=True),
         converter=np.asarray,
         validator=_validate_counts,
         repr=False,
     )
     histogram: NDArray[np.float64] = attrs.field(
-        default=attrs.Factory(build_empty_histogram, takes_self=True),
+        default=attrs.Factory(_build_empty_histogram, takes_self=True),
         converter=np.asarray,
         validator=_validate_histogram,
         repr=False,
