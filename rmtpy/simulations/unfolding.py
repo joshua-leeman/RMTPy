@@ -16,12 +16,13 @@ from ..density import (
 from ..polynomials import Float64Function
 
 
-def normalize_degrees(degrees: Iterable[int]) -> tuple[int, ...]:
+def normalize_degrees(degrees: Iterable[int], /) -> tuple[int, ...]:
     return tuple(sorted(int(degree) for degree in degrees))
 
 
 def unfold_values(
     values: NDArray[np.float64],
+    /,
     *,
     cdf: Float64Function,
     dimension: int,
@@ -31,8 +32,9 @@ def unfold_values(
 
 def unfold_widths(
     widths: NDArray[np.float64],
-    centers: NDArray[np.float64],
+    /,
     *,
+    centers: NDArray[np.float64],
     cdf: Float64Function,
     dimension: int,
 ) -> NDArray[np.float64]:
@@ -126,13 +128,14 @@ class TruncatedPolynomialCdfFactory:
         coeffs = self.density.average_coeffs
         return self.interpolators_from_coeffs(coeffs)
 
-    def build_interpolator(self, pdf_values: NDArray[np.float64]) -> PchipInterpolator:
+    def build_interpolator(self, *, pdf_values: NDArray[np.float64]) -> PchipInterpolator:
         cdf_values = cumulative_trapezoid(y=pdf_values, x=self.grid, initial=0)
         return PchipInterpolator(x=self.grid, y=cdf_values, extrapolate=True)
 
     def interpolators_from_coeffs(
         self,
         coeffs: NDArray[np.float64],
+        /,
     ) -> tuple[PchipInterpolator, ...]:
         coeffs = np.asarray(coeffs)
         if self.degrees and len(coeffs) <= max(self.degrees):
@@ -152,6 +155,8 @@ class TruncatedPolynomialCdfFactory:
                 ),
             )
             next_degree = degree + 1
-            interpolators.append(self.build_interpolator(self.weight * polynomial_sum))
+            interpolators.append(
+                self.build_interpolator(pdf_values=self.weight * polynomial_sum)
+            )
 
         return tuple(interpolators)

@@ -159,6 +159,7 @@ class Histogram2D(Data):
 
     def add_histogram_contribution(
         self,
+        *,
         x_data: NDArray[np.float64],
         y_data: NDArray[np.float64],
     ) -> None:

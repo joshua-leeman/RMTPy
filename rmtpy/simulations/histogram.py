@@ -101,7 +101,7 @@ class Histogram(Data):
         validator=attrs.validators.ge(0),
     )
 
-    def add_histogram_contribution(self, data: NDArray[np.float64]) -> None:
+    def add_histogram_contribution(self, data: NDArray[np.float64], /) -> None:
         if isinstance(data, (int, float)):
             data = np.array([data], dtype=np.float64)
 

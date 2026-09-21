@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from pathlib import Path
 
 import attrs
@@ -15,8 +16,8 @@ class Data:
         repr=False,
     )
 
-    def attach_metadata(self, metadata: dict[str, object]) -> None:
-        self.metadata.update(metadata)
+    def attach_metadata(self, new_metadata: Mapping[str, object], /) -> None:
+        self.metadata.update(new_metadata)
 
     def build_data_path(self) -> Path:
         stem = self.file_name.removesuffix("_data")
