@@ -8,6 +8,7 @@ import numba
 import numpy as np
 from numpy.typing import NDArray
 
+from ..conversion import RMT_CONVERTER, SourceDict
 from ..fermions import DecomposedSparseArray, MajoranaFermionBasis
 from ..polynomials import (
     Float64Function,
@@ -15,6 +16,7 @@ from ..polynomials import (
     q_hermite_polynomial_weight,
     q_hermite_polynomials,
 )
+from .base_ensemble import RandomMatrixEnsemble
 from .many_body_ensemble import HermitianMatrix, ManyBodyEnsemble, RealSymmetricMatrix
 
 INITIALISM: str = "SYK"
@@ -109,7 +111,7 @@ def _compute_spectral_radius(syk: SachdevYeKitaevEnsemble) -> float:
     return cast(float, (2 * syk.std_dev) * np.sqrt(radius_numerical_factor))
 
 
-def _create_majorana_fermion_basis(syk: SachdevYeKitaevEnsemble) -> MajoranaFermionBasis:
+def _createmajorana_fermion_basis(syk: SachdevYeKitaevEnsemble) -> MajoranaFermionBasis:
     return MajoranaFermionBasis(
         num_majoranas=syk.num_majoranas,
         in_real_basis=syk.dyson_index == 1,
@@ -151,8 +153,8 @@ class SachdevYeKitaevEnsemble(ManyBodyEnsemble):
         repr=False,
     )
 
-    _majorana_fermion_basis: MajoranaFermionBasis = attrs.field(
-        default=attrs.Factory(_create_majorana_fermion_basis, takes_self=True),
+    majorana_fermion_basis: MajoranaFermionBasis = attrs.field(
+        default=attrs.Factory(_createmajorana_fermion_basis, takes_self=True),
         init=False,
         repr=False,
     )
@@ -175,10 +177,22 @@ class SachdevYeKitaevEnsemble(ManyBodyEnsemble):
 
     @cached_property
     def _decomposed_q_monomials(self) -> DecomposedSparseArray:
-        return self._majorana_fermion_basis.build_decomposed_q_monomials(q=self.q)
+        return self.majorana_fermion_basis.build_decomposed_q_monomials(q=self.q)
+
+    @classmethod
+    @override
+    def create(
+        cls,
+        src: SourceDict | RandomMatrixEnsemble,
+    ) -> SachdevYeKitaevEnsemble:
+        return RMT_CONVERTER.structure(src, cls)
 
     @override
-    def generate_matrix(self, *, use_complex_dtype: bool = False) -> np.ndarray:
+    def generate_matrix(
+        self,
+        *,
+        use_complex_dtype: bool = False,
+    ) -> RealSymmetricMatrix | HermitianMatrix:
         if use_complex_dtype or self.dyson_index != 1:
             matrix = self._allocate_complex_hermitian_matrix_memory()
         else:
@@ -197,8 +211,11 @@ class SachdevYeKitaevEnsemble(ManyBodyEnsemble):
 
     @override
     def matrix_stream(
-        self, realizs: int, *, use_complex_dtype: bool = False
-    ) -> Iterator[np.ndarray]:
+        self,
+        realizs: int,
+        *,
+        use_complex_dtype: bool = False,
+    ) -> Iterator[RealSymmetricMatrix | HermitianMatrix]:
         if use_complex_dtype or self.dyson_index != 1:
             matrix = self._allocate_complex_hermitian_matrix_memory()
         else:
