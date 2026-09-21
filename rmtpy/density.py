@@ -249,19 +249,19 @@ class DensityModel:
     def _weight_cdf_interpolator(self) -> PchipInterpolator:
         return self._build_weight_cdf_interpolator()
 
-    def average_cdf(self, points: NDArray[np.float64]) -> NDArray[np.float64]:
+    def average_cdf(self, inputs: NDArray[np.float64], /) -> NDArray[np.float64]:
         if not self.has_polynomial_expansion:
-            return self._average_cdf_from_samples(points)
+            return self._average_cdf_from_samples(inputs)
 
-        return self._average_cdf_from_polynomials(points)
+        return self._average_cdf_from_polynomials(inputs)
 
-    def average_pdf(self, points: NDArray[np.float64]) -> NDArray[np.float64]:
+    def average_pdf(self, inputs: NDArray[np.float64], /) -> NDArray[np.float64]:
         if not self.has_polynomial_expansion:
-            return self._average_pdf_from_samples(points)
+            return self._average_pdf_from_samples(inputs)
 
-        return self._average_pdf_from_polynomials(points)
+        return self._average_pdf_from_polynomials(inputs)
 
-    def compute_polynomials(self, inputs: NDArray[np.float64]) -> NDArray[np.float64]:
+    def compute_polynomials(self, inputs: NDArray[np.float64], /) -> NDArray[np.float64]:
         if self.polynomials is None:
             raise NotImplementedError()
 
@@ -273,6 +273,7 @@ class DensityModel:
     def compute_polynomial_weight(
         self,
         inputs: NDArray[np.float64],
+        /,
     ) -> NDArray[np.float64]:
         if self.weight_function is None:
             raise NotImplementedError()
@@ -298,8 +299,8 @@ class DensityModel:
         else:
             validate_support(interval)
 
-        def pdf(points: NDArray[np.float64]) -> NDArray[np.float64]:
-            return self.variate_pdf(points, coeffs=coeffs, sample=sample)
+        def pdf(inputs: NDArray[np.float64]) -> NDArray[np.float64]:
+            return self.variate_pdf(inputs, coeffs=coeffs, sample=sample)
 
         if interval[0] > self.plot_range[0]:
             left_support = (self.plot_range[0], interval[0])
@@ -318,21 +319,23 @@ class DensityModel:
 
     def variate_pdf(
         self,
-        points: NDArray[np.float64],
+        inputs: NDArray[np.float64],
+        /,
         *,
         coeffs: NDArray[np.float64] | None = None,
         sample: NDArray[np.float64] | None = None,
     ) -> NDArray[np.float64]:
         if self.has_polynomial_expansion:
             return self._variate_pdf_from_polynomials(
-                points, coeffs=coeffs, sample=sample
+                inputs, coeffs=coeffs, sample=sample
             )
 
-        return self._variate_pdf_from_sample(points, sample=sample)
+        return self._variate_pdf_from_sample(inputs, sample=sample)
 
     def variate_cdf(
         self,
-        points: NDArray[np.float64],
+        inputs: NDArray[np.float64],
+        /,
         *,
         coeffs: NDArray[np.float64] | None = None,
         sample: NDArray[np.float64] | None = None,
@@ -340,39 +343,39 @@ class DensityModel:
         cdf_interpolator = self.build_variate_cdf_interpolator(
             coeffs=coeffs, sample=sample
         )
-        return cdf_interpolator(points)
+        return cdf_interpolator(inputs)
 
-    def weight_pdf(self, points: NDArray[np.float64]) -> NDArray[np.float64]:
+    def weight_pdf(self, inputs: NDArray[np.float64], /) -> NDArray[np.float64]:
         if not self.has_polynomial_expansion:
-            return self._average_pdf_from_samples(points)
+            return self._average_pdf_from_samples(inputs)
 
-        return self.compute_polynomial_weight(points)
+        return self.compute_polynomial_weight(inputs)
 
-    def weight_cdf(self, points: NDArray[np.float64]) -> NDArray[np.float64]:
+    def weight_cdf(self, inputs: NDArray[np.float64], /) -> NDArray[np.float64]:
         if not self.has_polynomial_expansion:
-            return self._average_cdf_from_samples(points)
+            return self._average_cdf_from_samples(inputs)
 
-        return self._weight_cdf_interpolator(points)
+        return self._weight_cdf_interpolator(inputs)
 
     def _average_cdf_from_polynomials(
-        self, points: NDArray[np.float64]
+        self, inputs: NDArray[np.float64]
     ) -> NDArray[np.float64]:
-        return self.build_variate_cdf_interpolator(coeffs=self.average_coeffs)(points)
+        return self.build_variate_cdf_interpolator(coeffs=self.average_coeffs)(inputs)
 
     def _average_cdf_from_samples(
-        self, points: NDArray[np.float64]
+        self, inputs: NDArray[np.float64]
     ) -> NDArray[np.float64]:
-        return self._average_cdf_interpolator(points)
+        return self._average_cdf_interpolator(inputs)
 
     def _average_pdf_from_polynomials(
-        self, points: NDArray[np.float64]
+        self, inputs: NDArray[np.float64]
     ) -> NDArray[np.float64]:
-        return self._variate_pdf_from_polynomials(points, coeffs=self.average_coeffs)
+        return self._variate_pdf_from_polynomials(inputs, coeffs=self.average_coeffs)
 
     def _average_pdf_from_samples(
-        self, points: NDArray[np.float64]
+        self, inputs: NDArray[np.float64]
     ) -> NDArray[np.float64]:
-        return self._average_pdf_interpolator(points)
+        return self._average_pdf_interpolator(inputs)
 
     def _compute_average_coeffs(self) -> NDArray[np.float64]:
         average_coeffs = np.zeros(self.max_polynomial_degree + 1)
@@ -422,7 +425,7 @@ class DensityModel:
 
     def _variate_pdf_from_polynomials(
         self,
-        points: NDArray[np.float64],
+        inputs: NDArray[np.float64],
         *,
         coeffs: NDArray[np.float64] | None = None,
         sample: NDArray[np.float64] | None = None,
@@ -435,8 +438,8 @@ class DensityModel:
         else:
             expansion_coeffs = cast(NDArray[np.float64], coeffs)
 
-        weight_function = self.compute_polynomial_weight(points)
-        polynomials = self.compute_polynomials(points)
+        weight_function = self.compute_polynomial_weight(inputs)
+        polynomials = self.compute_polynomials(inputs)
 
         expansion_factor = cast(
             NDArray[np.float64], np.sum(expansion_coeffs[:, None] * polynomials, axis=0)
@@ -445,7 +448,7 @@ class DensityModel:
 
     def _variate_pdf_from_sample(
         self,
-        points: NDArray[np.float64],
+        inputs: NDArray[np.float64],
         *,
         sample: NDArray[np.float64] | None = None,
     ) -> NDArray[np.float64]:
@@ -453,4 +456,4 @@ class DensityModel:
             raise ValueError("`sample` must be provided for sample-based PDFs.")
 
         pdf_interpolator = self._build_variate_pdf_interpolator_from_sample(sample)
-        return pdf_interpolator(points)
+        return pdf_interpolator(inputs)

@@ -30,7 +30,7 @@ RMT_CONVERTER.register_unstructure_hook(np.dtype, _unstructure_dtype)
 
 class StringEnum(StrEnum):
     @classmethod
-    def has_value(cls, value: object) -> bool:
+    def has_value(cls, value: object, /) -> bool:
         return value in cls._value2member_map_
 
     @classmethod
@@ -39,13 +39,14 @@ class StringEnum(StrEnum):
 
 
 def canonicalize_string_selection(
-    values: str | Iterable[str],
+    str_values: str | Iterable[str],
+    /,
     *,
     allowed: type[StringEnum],
     name: str,
 ) -> tuple[str, ...]:
     try:
-        source = {values} if isinstance(values, str) else set(values)
+        source = {str_values} if isinstance(str_values, str) else set(str_values)
     except TypeError as exc:
         raise TypeError(f"`{name}` must be a string or iterable of strings.") from exc
 
@@ -66,16 +67,16 @@ def canonicalize_string_selection(
     return tuple(value for value in allowed.to_tuple() if value in normalized_set)
 
 
-def insert_underscores(string: str) -> str:
+def insert_underscores(string: str, /) -> str:
     string = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", string)
     return re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", string)
 
 
-def to_key_of_registry(string: str) -> str:
+def to_key_of_registry(string: str, /) -> str:
     return re.sub(r"[_ ]", "", string).lower()
 
 
-def to_latex(instance: attrs.AttrsInstance, *, latex_name: str = "") -> str:
+def to_latex(instance: attrs.AttrsInstance, /, *, latex_name: str = "") -> str:
     latex_str = "$" + latex_name
     for label, attr in attrs.fields_dict(type(instance)).items():
         if attr.metadata.get("latex_name") is not None:
@@ -83,7 +84,7 @@ def to_latex(instance: attrs.AttrsInstance, *, latex_name: str = "") -> str:
     return latex_str + "$"
 
 
-def to_path(instance: attrs.AttrsInstance, *, root: Path) -> Path:
+def to_path(instance: attrs.AttrsInstance, /, *, root: Path) -> Path:
     for name, attr in attrs.fields_dict(type(instance)).items():
         dir_name = attr.metadata.get("dir_name")
         if isinstance(dir_name, str):
@@ -95,6 +96,7 @@ def to_path(instance: attrs.AttrsInstance, *, root: Path) -> Path:
 
 def canonicalize_source_dict(
     src: SourceDict,
+    /,
     *,
     registry: dict[str, type[attrs.AttrsInstance]],
 ) -> dict[str, object]:
@@ -130,7 +132,7 @@ def canonicalize_source_dict(
     return {"type": registered_cls.__name__, "parameters": parameters}
 
 
-def to_source_dict(instance: attrs.AttrsInstance) -> SourceDict:
+def to_source_dict(instance: attrs.AttrsInstance, /) -> SourceDict:
     fields = cast(tuple[attrs.Attribute[object], ...], attrs.fields(type(instance)))
     return {
         "type": type(instance).__name__,
@@ -142,7 +144,7 @@ def to_source_dict(instance: attrs.AttrsInstance) -> SourceDict:
     }
 
 
-def to_json_compatible(value: object) -> object:
+def to_json_compatible(value: object, /) -> object:
     if value is None or isinstance(value, bool | int | str):
         return value
 
@@ -213,7 +215,7 @@ def to_json_compatible(value: object) -> object:
     )
 
 
-def build_hashed_id(array: NDArray[np.generic], *, num_hex: int = 16) -> str:
+def build_hashed_id(array: NDArray[np.generic], /, *, num_hex: int = 16) -> str:
     hash_object = hashlib.sha256()
     hash_object.update(str(array.dtype).encode())
     hash_object.update(str(array.shape).encode())

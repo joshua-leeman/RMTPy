@@ -12,6 +12,7 @@ class OrthogonalPolynomials(Protocol):
     def __call__(
         self,
         x: NDArray[np.float64],
+        /,
         *,
         degree: int,
     ) -> NDArray[np.float64]: ...
@@ -19,6 +20,7 @@ class OrthogonalPolynomials(Protocol):
 
 def chebyshev_polynomial_2_weight(
     energies: NDArray[np.float64],
+    /,
     *,
     support_radius: float,
 ) -> NDArray[np.float64]:
@@ -34,6 +36,7 @@ def chebyshev_polynomial_2_weight(
 @numba.njit(boundscheck=False, cache=True, fastmath=True)
 def chebyshev_polynomials_2(
     x: NDArray[np.float64],
+    /,
     *,
     degree: int,
 ) -> NDArray[np.float64]:
@@ -51,6 +54,7 @@ def chebyshev_polynomials_2(
 
 def legendre_polynomial_weight(
     energies: NDArray[np.float64],
+    /,
     *,
     support_radius: float,
 ) -> NDArray[np.float64]:
@@ -66,6 +70,7 @@ def legendre_polynomial_weight(
 @numba.njit(boundscheck=False, cache=True, fastmath=True)
 def legendre_polynomials(
     x: NDArray[np.float64],
+    /,
     *,
     degree: int,
 ) -> NDArray[np.float64]:
@@ -86,6 +91,7 @@ def legendre_polynomials(
 
 def q_hermite_polynomial_weight(
     energies: NDArray[np.float64],
+    /,
     *,
     support_radius: float,
     eta: float,
@@ -112,6 +118,7 @@ def q_hermite_polynomial_weight(
 @numba.njit(boundscheck=False, cache=True, fastmath=True)
 def q_hermite_polynomials(
     x: NDArray[np.float64],
+    /,
     *,
     eta: float,
     degree: int,

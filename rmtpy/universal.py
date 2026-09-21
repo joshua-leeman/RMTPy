@@ -15,6 +15,7 @@ def universality_class(*, dyson_index: int) -> str | None:
 
 def wigner_surmise(
     spacings: NDArray[np.float64],
+    /,
     *,
     dyson_index: int,
 ) -> NDArray[np.float64]:
@@ -33,6 +34,7 @@ def wigner_surmise(
 
 def porter_thomas_distribution(
     widths: NDArray[np.float64],
+    /,
     *,
     dyson_index: int,
     num_channels: int,
@@ -44,6 +46,7 @@ def porter_thomas_distribution(
 
 def connected_sff(
     times: NDArray[np.float64],
+    /,
     *,
     dyson_index: int,
     dimension: int,
@@ -79,6 +82,7 @@ def connected_sff(
 
 def time_delay_pdf(
     times: NDArray[np.float64],
+    /,
     *,
     num_channels: int,
     heisenberg_time: float,

@@ -57,6 +57,7 @@ def build_majorana_fermions(*, num_majoranas: int) -> MajoranaFermions:
 
 def build_charge_conj_unitary_from_majoranas(
     majorana_fermions: MajoranaFermions,
+    /,
 ) -> sparse.csr_array:
     dimension = cast(int, pow(2, len(majorana_fermions) // 2))
     running_product = sparse.eye_array(dimension, format="csr")
@@ -86,6 +87,7 @@ def rotate_majorana_fermions_to_real_basis(
 
 def build_complex_fermions_from_majoranas(
     majorana_fermions: MajoranaFermions,
+    /,
 ) -> ComplexFermions:
     num_complex_fermions = len(majorana_fermions) // 2
     annihilation_operators: list[sparse.csr_array] = [
@@ -101,6 +103,7 @@ def build_complex_fermions_from_majoranas(
 
 def build_vacuum_from_complex_fermions(
     complex_fermions: ComplexFermions,
+    /,
 ) -> sparse.csr_array:
     num_complex_fermions = len(complex_fermions[0])
     dimension = cast(int, pow(2, num_complex_fermions))
@@ -120,7 +123,7 @@ def build_vacuum_from_complex_fermions(
     return vacuum_state
 
 
-def build_vacuum_from_number_of_majoranas(num_majoranas: int) -> sparse.csr_array:
+def build_vacuum_from_number_of_majoranas(num_majoranas: int, /) -> sparse.csr_array:
     majorana_fermions = build_majorana_fermions(num_majoranas=num_majoranas)
     complex_fermions = build_complex_fermions_from_majoranas(majorana_fermions)
     return build_vacuum_from_complex_fermions(complex_fermions)
@@ -258,6 +261,7 @@ def build_conjugated_compound_coupling_matrix(
 
 
 def build_decomposed_width_matrix(
+    *,
     coupling_matrix_conj: sparse.csc_array,
 ) -> DecomposedSparseArray:
     width_matrix = coupling_matrix_conj.transpose() @ coupling_matrix_conj
