@@ -28,6 +28,7 @@ from ..ensembles.many_body_ensemble import (
     RealEigenvalues,
     UnitaryMatrix,
 )
+from ..ensembles.poisson_ensemble import PoissonEnsemble
 from ..universal import time_delay_pdf
 
 type ComplexEigenvalues = NDArray[np.complexfloating]
@@ -182,6 +183,10 @@ def _register_compound_hooks(
 class CompoundEnsemble:
     ensemble: ManyBodyEnsemble = attrs.field(
         converter=ManyBodyEnsemble.create,
+        validator=(
+            attrs.validators.instance_of(ManyBodyEnsemble),
+            attrs.validators.not_(attrs.validators.instance_of(PoissonEnsemble)),
+        ),
     )
     num_free_complex_fermions: int = attrs.field(
         default=NUM_FREE_COMPLEX_FERMIONS,
@@ -261,25 +266,25 @@ class CompoundEnsemble:
             sample_stream=self.resonance_real_parts_stream,
         )
 
-    def generate_effective_hamiltonian(self) -> NDArray[np.floating]:
+    def generate_effective_hamiltonian(self) -> NDArray[np.complexfloating]:
         hamiltonian = self.ensemble.generate_matrix(use_complex_dtype=True)
         self._add_width_matrix_to_hamiltonian(cast(HermitianMatrix, hamiltonian))
-        return cast(NDArray[np.floating], hamiltonian)
+        return cast(NDArray[np.complexfloating], hamiltonian)
 
     def effective_hamiltonian_stream(
         self,
         realizs: int,
-    ) -> Iterator[NDArray[np.floating]]:
+    ) -> Iterator[NDArray[np.complexfloating]]:
         for hamiltonian in self.ensemble.matrix_stream(realizs, use_complex_dtype=True):
             self._add_width_matrix_to_hamiltonian(cast(HermitianMatrix, hamiltonian))
 
-            yield cast(NDArray[np.floating], hamiltonian)
+            yield cast(NDArray[np.complexfloating], hamiltonian)
 
     def resonances_stream(self, realizs: int) -> Iterator[ComplexEigenvalues]:
         lapack_geev = self._pick_lapack_geev(use_complex_dtype=True)
 
         for effective_hamiltonian in self.effective_hamiltonian_stream(realizs):
-            resonances, _info = cast(
+            resonances, _ = cast(
                 tuple[ComplexEigenvalues, object],
                 lapack_geev(
                     effective_hamiltonian, compute_vl=0, compute_vr=0, overwrite_a=True
@@ -290,23 +295,6 @@ class CompoundEnsemble:
     def resonance_real_parts_stream(self, realizs: int) -> Iterator[RealEigenvalues]:
         for resonances in self.resonances_stream(realizs=realizs):
             yield np.real(resonances)
-
-    def _rotate_coupling_matrix_by_eigvecs(
-        self,
-        eigvecs: OrthogonalMatrix | UnitaryMatrix,
-    ) -> tuple[
-        NDArray[np.floating] | NDArray[np.complexfloating],
-        NDArray[np.floating] | NDArray[np.complexfloating],
-    ]:
-        rotated_coupling_matrix = eigvecs[:, : self.num_channels].copy()
-        rotated_coupling_matrix *= self.couplings[None, :]
-
-        if np.isrealobj(rotated_coupling_matrix):
-            rotated_coupling_matrix_conj = rotated_coupling_matrix
-        else:
-            rotated_coupling_matrix_conj = np.conjugate(rotated_coupling_matrix)
-
-        return rotated_coupling_matrix, rotated_coupling_matrix_conj
 
     def partial_widths_stream(self, realizs: int) -> Iterator[NDArray[np.floating]]:
         for _, eigvecs in self.ensemble.eigsys_stream(realizs=realizs):
@@ -323,8 +311,6 @@ class CompoundEnsemble:
         *,
         energies: NDArray[np.float64],
     ) -> Iterator[tuple[NDArray[np.complexfloating], RealEigenvalues]]:
-        energies = np.asarray(energies)
-
         resolvent = np.empty(
             (energies.size, self.ensemble.dimension),
             self.ensemble.real_dtype.type,
@@ -364,8 +350,6 @@ class CompoundEnsemble:
     ) -> Iterator[
         tuple[NDArray[np.complexfloating], NDArray[np.complexfloating], RealEigenvalues]
     ]:
-        energies = np.asarray(energies)
-
         resolvent = np.empty(
             (energies.size, self.ensemble.dimension),
             self.ensemble.real_dtype.type,
@@ -427,7 +411,7 @@ class CompoundEnsemble:
         )
 
         for reaction_matrix, eigvals in self.reaction_matrix_stream(
-            realizs, energies=np.asarray(energies)
+            realizs, energies=energies
         ):
             diag_indices = np.arange(self.num_channels)
             reaction_matrix *= 1j
@@ -462,7 +446,7 @@ class CompoundEnsemble:
             reaction_matrix,
             reaction_matrix_2,
             eigvals,
-        ) in self.reaction_matrix_pair_stream(realizs, energies=np.asarray(energies)):
+        ) in self.reaction_matrix_pair_stream(realizs, energies=energies):
             diag_indices = np.arange(self.num_channels)
             reaction_matrix *= -1j
             reaction_matrix[:, diag_indices, diag_indices] += 1
@@ -499,7 +483,7 @@ class CompoundEnsemble:
         energies: NDArray[np.float64],
     ) -> Iterator[tuple[RealEigenvalues, RealEigenvalues]]:
         for delay_matrix, eigvals in self.wigner_smith_matrix_stream(
-            realizs, energies=np.asarray(energies)
+            realizs, energies=energies
         ):
             yield np.linalg.eigvalsh(delay_matrix), eigvals
 
@@ -509,7 +493,7 @@ class CompoundEnsemble:
         heisenberg_time = 2 * j_1_1 / global_mean_spacing
 
         return time_delay_pdf(
-            np.asarray(times),
+            times,
             num_channels=self.num_channels,
             heisenberg_time=heisenberg_time,
         )
@@ -517,6 +501,23 @@ class CompoundEnsemble:
     def _add_width_matrix_to_hamiltonian(self, hamiltonian: HermitianMatrix) -> None:
         diag_indices = np.diag_indices(self.num_channels)
         hamiltonian[diag_indices] -= 0.5j * (self.couplings**2)
+
+    def _rotate_coupling_matrix_by_eigvecs(
+        self,
+        eigvecs: OrthogonalMatrix | UnitaryMatrix,
+    ) -> tuple[
+        NDArray[np.floating] | NDArray[np.complexfloating],
+        NDArray[np.floating] | NDArray[np.complexfloating],
+    ]:
+        rotated_coupling_matrix = eigvecs[:, : self.num_channels].copy()
+        rotated_coupling_matrix *= self.couplings[None, :]
+
+        if np.isrealobj(rotated_coupling_matrix):
+            rotated_coupling_matrix_conj = rotated_coupling_matrix
+        else:
+            rotated_coupling_matrix_conj = np.conjugate(rotated_coupling_matrix)
+
+        return rotated_coupling_matrix, rotated_coupling_matrix_conj
 
     def _pick_linalg_dtype(self, use_complex_dtype: bool = False) -> np.dtype:
         if use_complex_dtype or self.ensemble.dyson_index != 1:
