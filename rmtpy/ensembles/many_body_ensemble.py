@@ -9,8 +9,7 @@ import scipy.linalg.blas
 import scipy.linalg.lapack
 from numpy.typing import NDArray
 
-from rmtpy.conversion import RMT_CONVERTER, SourceDict
-
+from ..conversion import RMT_CONVERTER, SourceDict
 from ..density import MAX_POLYNOMIAL_DEGREE, DensityModel
 from ..polynomials import Float64Function, OrthogonalPolynomials
 from ..universal import (
@@ -155,7 +154,7 @@ class ManyBodyEnsemble(RandomMatrixEnsemble, ABC):
     ) -> Iterator[tuple[RealEigenvalues, OrthogonalMatrix | UnitaryMatrix]]:
         lapack_heev = self._pick_lapack_heev(use_complex_dtype=use_complex_dtype)
         for matrix in self.matrix_stream(realizs, use_complex_dtype=use_complex_dtype):
-            eigvals, eigvecs, _info = cast(
+            eigvals, eigvecs, _ = cast(
                 tuple[RealEigenvalues, OrthogonalMatrix | UnitaryMatrix, object],
                 lapack_heev(matrix, compute_v=1, overwrite_a=True),
             )
@@ -169,7 +168,7 @@ class ManyBodyEnsemble(RandomMatrixEnsemble, ABC):
     ) -> Iterator[RealEigenvalues]:
         lapack_heev = self._pick_lapack_heev(use_complex_dtype=use_complex_dtype)
         for matrix in self.matrix_stream(realizs, use_complex_dtype=use_complex_dtype):
-            eigvals, _info = cast(
+            eigvals, _ = cast(
                 tuple[RealEigenvalues, object],
                 lapack_heev(matrix, compute_v=0, overwrite_a=True),
             )
@@ -220,7 +219,7 @@ class ManyBodyEnsemble(RandomMatrixEnsemble, ABC):
 
     def _pick_blas_gemm(self, *, use_complex_dtype: bool = False):
         matrix_dtype = self._pick_linalg_dtype(use_complex_dtype=use_complex_dtype)
-        return scipy.linalg.get_blas_funcs("gemm", dtype=matrix_dtype)
+        return scipy.linalg.blas.get_blas_funcs("gemm", dtype=matrix_dtype)
 
     def _pick_blas_her(self, *, use_complex_dtype: bool = False):
         matrix_dtype = self._pick_linalg_dtype(use_complex_dtype=use_complex_dtype)
@@ -229,7 +228,7 @@ class ManyBodyEnsemble(RandomMatrixEnsemble, ABC):
 
     def _pick_lapack_geev(self, *, use_complex_dtype: bool = False):
         matrix_dtype = self._pick_linalg_dtype(use_complex_dtype=use_complex_dtype)
-        return scipy.linalg.get_lapack_funcs("geev", dtype=matrix_dtype)
+        return scipy.linalg.lapack.get_lapack_funcs("geev", dtype=matrix_dtype)
 
     def _pick_lapack_heev(self, *, use_complex_dtype: bool = False):
         matrix_dtype = self._pick_linalg_dtype(use_complex_dtype=use_complex_dtype)
