@@ -1,43 +1,67 @@
-from __future__ import annotations
+from collections.abc import Callable
+from typing import cast
 
 import attrs
 import numpy as np
+from numpy.typing import NDArray
 
-import rmtpy.density
-import rmtpy.validators
-
-from .data import Data
+from ..density import array_of_floats, compute_histogram
+from ..validators import is_valid_support
+from .base_data import Data
 
 NUM_BINS: int = 100
 
 
-def create_empty_histogram(hist: Histogram) -> np.ndarray:
-    return np.empty(hist.num_bins, dtype=np.float64)
+def build_empty_histogram(hist: Histogram) -> NDArray[np.float64]:
+    return np.zeros(hist.num_bins, dtype=np.float64)
 
 
-def create_histogram_bins(hist: Histogram) -> np.ndarray:
-    return rmtpy.density.array_of_floats(
+def build_histogram_bins(hist: Histogram) -> NDArray[np.float64]:
+    return array_of_floats(
         support=hist.support,
         num_pts=hist.num_bins + 1,
         log_base=hist.log_base,
     )
 
 
-def create_zeroed_histogram_counts(hist: Histogram) -> np.ndarray:
+def build_zeroed_histogram_counts(hist: Histogram) -> NDArray[np.int64]:
     return np.zeros(hist.num_bins, dtype=np.int64)
 
 
-def finalize_histogram(hist: Histogram) -> None:
-    hist.compute_histogram()
+def _validate_bins(hist: Histogram, _: object, values: NDArray[np.float64]) -> None:
+    if (
+        values.shape != (hist.num_bins + 1,)
+        or not np.issubdtype(values.dtype, np.floating)
+        or not np.all(np.isfinite(values))
+        or np.any(np.diff(values) <= 0.0)
+    ):
+        raise ValueError("Histogram bins do not match the declared bin count.")
+
+
+def _validate_counts(hist: Histogram, _: object, values: NDArray[np.int64]) -> None:
+    if (
+        values.shape != (hist.num_bins,)
+        or not np.issubdtype(values.dtype, np.integer)
+        or np.any(values < 0)
+    ):
+        raise ValueError("Histogram counts do not match the declared bin count.")
+
+
+def _validate_histogram(hist: Histogram, _: object, values: NDArray[np.float64]) -> None:
+    if (
+        values.shape != (hist.num_bins,)
+        or not np.issubdtype(values.dtype, np.floating)
+        or not np.all(np.isfinite(values))
+        or np.any(values < 0.0)
+    ):
+        raise ValueError("Histogram values do not match the declared bin count.")
 
 
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
 class Histogram(Data):
-    """Streaming one-dimensional histogram with fixed half-open support."""
-
-    support: rmtpy.density.Support = attrs.field(
-        converter=tuple,
-        validator=lambda _, __, support: rmtpy.validators.validate_support(support),
+    support: tuple[np.float64, np.float64] = attrs.field(
+        converter=cast(Callable[[object], tuple[np.float64, np.float64]], tuple),
+        validator=is_valid_support,
     )
     log_base: float | None = attrs.field(
         default=None,
@@ -46,52 +70,52 @@ class Histogram(Data):
     )
     num_bins: int = attrs.field(
         default=NUM_BINS,
-        validator=[
+        validator=(
             attrs.validators.instance_of(int),
             attrs.validators.gt(0),
-        ],
+        ),
         repr=False,
     )
 
-    bins: np.ndarray = attrs.field(
-        default=attrs.Factory(create_histogram_bins, takes_self=True),
-        init=False,
+    bins: NDArray[np.float64] = attrs.field(
+        default=attrs.Factory(build_histogram_bins, takes_self=True),
+        converter=np.asarray,
+        validator=_validate_bins,
         repr=False,
     )
-    counts: np.ndarray = attrs.field(
-        default=attrs.Factory(create_zeroed_histogram_counts, takes_self=True),
-        init=False,
+    counts: NDArray[np.int64] = attrs.field(
+        default=attrs.Factory(build_zeroed_histogram_counts, takes_self=True),
+        converter=np.asarray,
+        validator=_validate_counts,
         repr=False,
     )
-    histogram: np.ndarray = attrs.field(
-        default=attrs.Factory(create_empty_histogram, takes_self=True),
-        init=False,
+    histogram: NDArray[np.float64] = attrs.field(
+        default=attrs.Factory(build_empty_histogram, takes_self=True),
+        converter=np.asarray,
+        validator=_validate_histogram,
         repr=False,
     )
-
-    _realizs_count: int = attrs.field(
-        init=False, factory=lambda: np.zeros((1,), dtype=np.int64)
+    realizs: int = attrs.field(
+        default=0,
+        converter=int,
+        validator=attrs.validators.ge(0),
     )
 
-    @property
-    def realizs(self) -> int:
-        return self._realizs_count[0]
-
-    def add_histogram_contribution(self, data: np.ndarray) -> None:
+    def add_histogram_contribution(self, data: NDArray[np.float64]) -> None:
         if isinstance(data, (int, float)):
             data = np.array([data], dtype=np.float64)
 
         indices = np.searchsorted(self.bins, data, side="right") - 1
         valid = (indices >= 0) & (indices < len(self.counts))
         np.add.at(self.counts, indices[valid], 1)
-        self._realizs_count[0] += 1
+        object.__setattr__(self, "realizs", self.realizs + 1)
 
     def compute_histogram(self) -> None:
         if np.sum(self.counts) == 0:
             self.histogram.fill(0.0)
             return
 
-        self.histogram[:] = rmtpy.density.compute_histogram(self.counts, bins=self.bins)
+        self.histogram[:] = compute_histogram(self.counts, bins=self.bins)
 
     def compute_histogram_as_probabilities(self) -> None:
         total = np.sum(self.counts)
