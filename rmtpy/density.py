@@ -70,27 +70,6 @@ def compute_bin_centers(bins: NDArray[np.float64]) -> NDArray[np.float64]:
     return (bins[:-1] + bins[1:]) / 2
 
 
-def compute_histogram(
-    counts: NDArray[np.intp],
-    *,
-    bins: NDArray[np.float64],
-) -> NDArray[np.float64]:
-    if bins.ndim != 1 or counts.ndim != 1:
-        raise ValueError("`bins` and `counts` must be one-dimensional.")
-    if len(bins) != len(counts) + 1:
-        raise ValueError("`bins` must have exactly one more entry than `counts`.")
-    if np.any(np.diff(bins) <= 0):
-        raise ValueError("`bins` must be strictly increasing.")
-    if np.any(counts < 0):
-        raise ValueError("`counts` must be non-negative.")
-
-    total_counts = np.sum(counts)
-    if total_counts == 0:
-        raise ValueError("Cannot normalize histogram with zero total counts.")
-
-    return counts / (total_counts * np.diff(bins))
-
-
 def build_pdf_interpolator_from_histogram(
     histogram: NDArray[np.float64],
     *,
@@ -98,9 +77,9 @@ def build_pdf_interpolator_from_histogram(
     kernel_std_dev: float = GAUSSIAN_KERNEL_STANDARD_DEVIATION,
 ) -> PchipInterpolator:
     centers = compute_bin_centers(bins)
-    pdf_values = gaussian_filter1d(histogram, kernel_std_dev)
+    pdf_values = gaussian_filter1d(histogram, sigma=kernel_std_dev)
 
-    return PchipInterpolator(centers, pdf_values, extrapolate=True)
+    return PchipInterpolator(x=centers, y=pdf_values, extrapolate=True)
 
 
 def build_cdf_interpolator_from_pdf(
@@ -120,10 +99,31 @@ def build_cdf_interpolator_from_pdf(
     if not np.isfinite(left_tail_mass) or left_tail_mass < 0.0:
         raise ValueError("`left_tail_mass` must be a finite non-negative number.")
 
-    integral = cumulative_trapezoid(pdf(inputs), inputs, initial=0)
+    integral = cumulative_trapezoid(y=pdf(inputs), x=inputs, initial=0)
     cdf_values = left_tail_mass + integral
 
-    return PchipInterpolator(inputs, cdf_values, extrapolate=True)
+    return PchipInterpolator(x=inputs, y=cdf_values, extrapolate=True)
+
+
+def compute_histogram(
+    counts: NDArray[np.intp],
+    *,
+    bins: NDArray[np.float64],
+) -> NDArray[np.float64]:
+    if bins.ndim != 1 or counts.ndim != 1:
+        raise ValueError("`bins` and `counts` must be one-dimensional.")
+    if len(bins) != len(counts) + 1:
+        raise ValueError("`bins` must have exactly one more entry than `counts`.")
+    if np.any(np.diff(bins) <= 0):
+        raise ValueError("`bins` must be strictly increasing.")
+    if np.any(counts < 0):
+        raise ValueError("`counts` must be non-negative.")
+
+    total_counts = np.sum(counts)
+    if total_counts == 0:
+        raise ValueError("Cannot normalize histogram with zero total counts.")
+
+    return counts / (total_counts * np.diff(bins))
 
 
 def unfold_values_with_cdf(
@@ -304,7 +304,9 @@ class DensityModel:
         if interval[0] > self.plot_range[0]:
             left_support = (self.plot_range[0], interval[0])
             left_tail = array_of_floats(support=left_support, num_pts=self.num_pts)
-            left_mass = cast(float, cumulative_trapezoid(pdf(left_tail), left_tail)[-1])
+            left_mass = cast(
+                float, cumulative_trapezoid(y=pdf(left_tail), x=left_tail)[-1]
+            )
         else:
             left_mass = 0.0
 
