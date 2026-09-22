@@ -36,8 +36,8 @@ INITIALISM: str = "Poisson"
 
 DYSON_INDEX: int = 0
 
-eigvec_ensemble_FLAG: str = "GUE"
-eigvec_ensemble_FLAG_METADATA: dict[str, str] = {
+EIGVEC_ENSEMBLE_FLAG: str = "GUE"
+EIGVEC_ENSEMBLE_FLAG_METADATA: dict[str, str] = {
     "dir_name": "eigvecs",
 }
 
@@ -81,10 +81,10 @@ class PoissonEnsemble(ManyBodyEnsemble):
     initialism: ClassVar[str] = INITIALISM
 
     eigvec_ensemble_flag: str = attrs.field(
-        default=eigvec_ensemble_FLAG,
+        default=EIGVEC_ENSEMBLE_FLAG,
         converter=(str.lower, _cast_eigvec_ensemble_fag),
         validator=attrs.validators.in_(WIGNER_DYSON_ENSEMBLE_NAMES_BY_INITIALISM),
-        metadata=eigvec_ensemble_FLAG_METADATA,
+        metadata=EIGVEC_ENSEMBLE_FLAG_METADATA,
     )
 
     std_dev: float = attrs.field(
