@@ -1,5 +1,5 @@
 from copy import deepcopy
-from typing import ClassVar, cast
+from typing import cast
 
 import attrs
 
@@ -44,8 +44,6 @@ class Result:
 
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
 class Simulation:
-    ExecutionState: ClassVar[type[SimulationExecutionState]] = SimulationExecutionState
-
     _execution_state: SimulationExecutionState = attrs.field(
         default=SimulationExecutionState.NEW,
         init=False,
@@ -152,5 +150,5 @@ class Simulation:
 
     def _execute(self) -> Result:
         raise NotImplementedError(
-            f"{type(self).__name__} has not implemented the execution contract."
+            f"{type(self).__name__} has not implemented the execution program."
         )
