@@ -1,12 +1,9 @@
-from collections.abc import Callable
-from typing import cast
-
 import attrs
 import numpy as np
 from numpy.typing import NDArray
 
-from ..density import array_of_floats, compute_histogram
-from ..validators import is_valid_support
+from ..density import Support, array_of_floats, compute_histogram
+from ..validators import is_valid_support, to_support_pair
 from .base_data import Data
 
 NUM_BINS: int = 100
@@ -59,8 +56,8 @@ def _validate_histogram(hist: Histogram, _: object, values: NDArray[np.float64])
 
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
 class Histogram(Data):
-    support: tuple[float, float] = attrs.field(
-        converter=cast(Callable[[object], tuple[float, float]], tuple),
+    support: Support = attrs.field(
+        converter=to_support_pair,
         validator=is_valid_support,
     )
     log_base: float | None = attrs.field(

@@ -1,4 +1,4 @@
-from collections.abc import Callable, Iterator
+from collections.abc import Iterator
 from functools import cached_property
 from typing import Protocol, cast
 
@@ -10,7 +10,9 @@ from scipy.interpolate import PchipInterpolator
 from scipy.ndimage import gaussian_filter1d
 
 from .polynomials import Float64Function, OrthogonalPolynomials
-from .validators import is_valid_support, validate_support
+from .validators import is_valid_support, to_support_pair, validate_support
+
+type Support = tuple[float, float]
 
 
 class SpectrumStream(Protocol):
@@ -44,7 +46,7 @@ NUM_POINTS: int = 1000
 
 def array_of_floats(
     *,
-    support: tuple[float, float],
+    support: Support,
     num_pts: int,
     log_base: float | None = None,
 ) -> NDArray[np.float64]:
@@ -184,8 +186,8 @@ class DensityModel:
         converter=int,
         validator=attrs.validators.gt(0),
     )
-    support: tuple[float, float] = attrs.field(
-        converter=cast(Callable[[object], tuple[float, float]], tuple),
+    support: Support = attrs.field(
+        converter=to_support_pair,
         validator=is_valid_support,
     )
 
@@ -228,7 +230,7 @@ class DensityModel:
         return (self.support[1] - self.support[0]) / 2
 
     @property
-    def plot_range(self) -> tuple[float, float]:
+    def plot_range(self) -> Support:
         center = sum(self.support) / 2
         radius = self.support_scale_factor * self.support_radius
         return center - radius, center + radius
@@ -290,7 +292,7 @@ class DensityModel:
     def build_variate_cdf_interpolator(
         self,
         *,
-        interval: tuple[float, float] | None = None,
+        interval: Support | None = None,
         coeffs: NDArray[np.float64] | None = None,
         sample: NDArray[np.float64] | None = None,
     ) -> PchipInterpolator:

@@ -12,6 +12,8 @@ import numpy as np
 from numpy.typing import DTypeLike, NDArray
 
 type SourceDict = dict[str, str | dict[str, object]]
+type AttrsField = attrs.Attribute[object]
+type AttrsFields = dict[str, AttrsField]
 
 RMT_CONVERTER: cattrs.Converter = cattrs.Converter()
 
@@ -67,6 +69,14 @@ def canonicalize_string_selection(
     return tuple(value for value in allowed.to_tuple() if value in normalized_set)
 
 
+def get_attrs_fields[T: attrs.AttrsInstance](cls: type[T], /) -> tuple[AttrsField, ...]:
+    return cast(tuple[AttrsField, ...], attrs.fields(cls))
+
+
+def get_attrs_fields_dict[T: attrs.AttrsInstance](cls: type[T], /) -> AttrsFields:
+    return cast(AttrsFields, attrs.fields_dict(cls))
+
+
 def insert_underscores(string: str, /) -> str:
     string = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", string)
     return re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", string)
@@ -117,7 +127,7 @@ def canonicalize_source_dict(
     except KeyError as exc:
         raise ValueError(f"Unknown configuration type {type_name!r}.") from exc
 
-    fields = cast(tuple[attrs.Attribute[object], ...], attrs.fields(registered_cls))
+    fields = get_attrs_fields(registered_cls)
     init_field_names = {field.name for field in fields if field.init}
     parameter_names = set(parameters)
 
@@ -133,7 +143,7 @@ def canonicalize_source_dict(
 
 
 def to_source_dict(instance: attrs.AttrsInstance, /) -> SourceDict:
-    fields = cast(tuple[attrs.Attribute[object], ...], attrs.fields(type(instance)))
+    fields = get_attrs_fields(type(instance))
     return {
         "type": type(instance).__name__,
         "parameters": {

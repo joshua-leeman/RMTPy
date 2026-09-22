@@ -1,5 +1,14 @@
 import math
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
+
+
+def to_support_pair(support: Iterable[float], /) -> tuple[float, float]:
+    values = tuple(support)
+    if len(values) != 2:
+        raise ValueError("`support` must have length 2.")
+
+    first, second = values
+    return (float(first), float(second))
 
 
 def validate_even_number(number: int) -> None:

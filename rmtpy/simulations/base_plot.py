@@ -5,7 +5,7 @@ import uuid
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
-from typing import Literal, Protocol, TypeVar, cast
+from typing import Literal, Protocol, cast
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -34,8 +34,6 @@ type LegendLocation = Literal[
     "upper center",
     "center",
 ]
-
-_T = TypeVar("_T")
 
 
 class Spine(Protocol):
@@ -87,13 +85,21 @@ def _configure_matplotlib() -> None:
         )
 
 
+def _axis_limits(limits: tuple[float, ...], /) -> tuple[float, float]:
+    if len(limits) != 2:
+        raise ValueError("`xlim` and `ylim` must contain exactly two values.")
+
+    return (limits[0], limits[1])
+
+
 def _plot_configuration(value: object) -> object:
     if not isinstance(value, dict):
         return value
 
     mapping = cast(dict[object, object], value)
-    if set(mapping) == {"type", "parameters"} and isinstance(mapping["parameters"], dict):
-        parameters = cast(dict[object, object], mapping["parameters"])
+    parameters_value = mapping.get("parameters")
+    if set(mapping) == {"type", "parameters"} and isinstance(parameters_value, dict):
+        parameters = cast(dict[object, object], parameters_value)
         if "seed" in parameters:
             parameters["seed"] = 0
 
@@ -178,6 +184,9 @@ class LogDimensionTimeAxes(PlotAxes):
     )
 
 
+DimensionTimeAxes = LogDimensionTimeAxes
+
+
 @dataclasses.dataclass(slots=True, kw_only=True, eq=False, weakref_slot=False)
 class LogDimensionUnfoldedTimeAxes(PlotAxes):
     xticks: tuple[float, ...] = (-1.0, -0.5, 0.0)  # log scale base dimension
@@ -189,6 +198,9 @@ class LogDimensionUnfoldedTimeAxes(PlotAxes):
         r"$D^{-1/2}$",
         r"$1$",
     )
+
+
+UnfoldedDimensionTimeAxes = LogDimensionUnfoldedTimeAxes
 
 
 @dataclasses.dataclass(slots=True, kw_only=True, eq=False, weakref_slot=False)
@@ -274,11 +286,11 @@ class Plot(ABC):
         if not isinstance(calibration, Mapping):
             raise ValueError("Run calibration information is malformed.")
 
-        calibration = cast(Mapping[str, object], calibration)
-        if calibration.get("density") != density:
+        calibration_mapping = cast(Mapping[str, object], calibration)
+        if calibration_mapping.get("density") != density:
             return None
 
-        coefficients = calibration.get("average_coefficients")
+        coefficients = calibration_mapping.get("average_coefficients")
         if coefficients is None:
             raise ValueError("Run calibration coefficients are missing.")
 
@@ -298,7 +310,7 @@ class Plot(ABC):
         histogram = cast(Callable[..., object], self.ax.hist)
         _ = histogram(
             self.data.bins[:-1],
-            bins=cast(list[float], self.data.bins.tolist()),
+            bins=self.data.bins.tolist(),
             weights=self.data.histogram,
             color=color,
             alpha=alpha,
@@ -331,9 +343,9 @@ class Plot(ABC):
 
         try:
             if self.xlim:
-                _ = self.ax.set_xlim(cast(tuple[float, float], self.xlim))
+                _ = self.ax.set_xlim(_axis_limits(self.xlim))
             if self.ylim:
-                _ = self.ax.set_ylim(cast(tuple[float, float], self.ylim))
+                _ = self.ax.set_ylim(_axis_limits(self.ylim))
 
             self.axes.configure(axes=cast(ConfigurableAxes, cast(object, self.ax)))
             self.legend.configure(ax=self.ax)
@@ -370,10 +382,10 @@ class Plot(ABC):
             if isinstance(figure, Figure):
                 plt.close(figure)
 
-    def structure_simulation_arg(self, key: str, cls: type[_T]) -> _T:
+    def structure_simulation_arg[T](self, key: str, cls: type[T]) -> T:
         cache_key = (key, f"{cls.__module__}.{cls.__qualname__}")
         if cache_key in self._structured_args:
-            return cast(_T, self._structured_args[cache_key])
+            return cast(T, self._structured_args[cache_key])
 
         parameters = self.context.simulation_config["parameters"]
         if not isinstance(parameters, dict):

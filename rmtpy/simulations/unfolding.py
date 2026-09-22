@@ -15,6 +15,8 @@ from ..density import (
 )
 from ..polynomials import Float64Function
 
+type CDF = Float64Function
+
 
 def normalize_degrees(degrees: Iterable[int], /) -> tuple[int, ...]:
     return tuple(sorted(int(degree) for degree in degrees))

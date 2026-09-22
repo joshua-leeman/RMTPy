@@ -1,13 +1,11 @@
-from collections.abc import Callable
 from functools import partial
-from typing import cast
 
 import attrs
 import numpy as np
 from numpy.typing import NDArray
 
-from ..density import array_of_floats, compute_bin_centers
-from ..validators import is_valid_support
+from ..density import Support, array_of_floats, compute_bin_centers
+from ..validators import is_valid_support, to_support_pair
 from .base_data import Data
 
 NUM_BINS: int = 100
@@ -83,8 +81,8 @@ def _validate_histogram(
 
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
 class Histogram2D(Data):
-    x_support: tuple[float, float] = attrs.field(
-        converter=cast(Callable[[object], tuple[float, float]], tuple),
+    x_support: Support = attrs.field(
+        converter=to_support_pair,
         validator=is_valid_support,
     )
     x_log_base: float | None = attrs.field(
@@ -101,8 +99,8 @@ class Histogram2D(Data):
         repr=False,
     )
 
-    y_support: tuple[float, float] = attrs.field(
-        converter=cast(Callable[[object], tuple[float, float]], tuple),
+    y_support: Support = attrs.field(
+        converter=to_support_pair,
         validator=is_valid_support,
     )
     y_log_base: float | None = attrs.field(
@@ -166,12 +164,12 @@ class Histogram2D(Data):
         x_indices = np.searchsorted(self.x_bins, x_data, side="right") - 1
         y_indices = np.searchsorted(self.y_bins, y_data, side="right") - 1
 
-        valid = cast(
-            NDArray[np.bool_],
+        valid = np.asarray(
             (x_indices >= 0)
             & (x_indices < self.counts.shape[0])
             & (y_indices >= 0)
             & (y_indices < self.counts.shape[1]),
+            dtype=np.bool_,
         )
 
         np.add.at(self.counts, (x_indices[valid], y_indices[valid]), 1)
@@ -201,7 +199,7 @@ class Histogram2D(Data):
         else:
             prob_x_and_y = self.counts / total
 
-        prob_x = cast(NDArray[np.float64], np.sum(prob_x_and_y, axis=1))
+        prob_x = np.asarray(np.sum(prob_x_and_y, axis=1), dtype=np.float64)
         prob_y_cnd_x = np.divide(
             prob_x_and_y,
             prob_x[:, None],
@@ -210,7 +208,10 @@ class Histogram2D(Data):
         )
 
         y = compute_bin_centers(self.y_bins)
-        ave_y_cnd_x = cast(NDArray[np.float64], np.sum(prob_y_cnd_x * y[None, :], axis=1))
+        ave_y_cnd_x = np.asarray(
+            np.sum(prob_y_cnd_x * y[None, :], axis=1),
+            dtype=np.float64,
+        )
 
         x = compute_bin_centers(self.x_bins)
         return x, ave_y_cnd_x

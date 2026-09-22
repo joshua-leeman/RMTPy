@@ -1,5 +1,5 @@
 from functools import cached_property
-from typing import cast, override
+from typing import override
 
 import attrs
 import numpy as np
@@ -49,9 +49,9 @@ class SYKCompoundEnsemble(CompoundEnsemble):
 
     @override
     def _add_width_matrix_to_hamiltonian(self, hamiltonian: HermitianMatrix) -> None:
-        row_idxs = cast(NDArray[np.int32], self.decomposed_width_matrix[0][0])
-        col_idxs = cast(NDArray[np.int32], self.decomposed_width_matrix[0][1])
-        width_matrix_data = self.decomposed_width_matrix[1]
+        idxs, width_matrix_data = self.decomposed_width_matrix
+        row_idxs = np.asarray(idxs[0], dtype=np.int32)
+        col_idxs = np.asarray(idxs[1], dtype=np.int32)
 
         hamiltonian[row_idxs, col_idxs] -= 0.5j * width_matrix_data
 

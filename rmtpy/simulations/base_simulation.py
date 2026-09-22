@@ -1,10 +1,30 @@
 from copy import deepcopy
-from typing import cast
+from typing import Protocol, cast
 
 import attrs
 
-from ..conversion import SourceDict, StringEnum, insert_underscores, to_json_compatible
+from ..conversion import (
+    SourceDict,
+    StringEnum,
+    get_attrs_fields,
+    insert_underscores,
+    to_json_compatible,
+)
 from ..ensembles.base_ensemble import RandomMatrixEnsemble, SeedLike
+
+
+class _EnsembleRngOwner(Protocol):
+    ensemble: RandomMatrixEnsemble
+
+
+def _resolve_rng_ensemble(
+    rng_owner: RandomMatrixEnsemble | _EnsembleRngOwner,
+    /,
+) -> RandomMatrixEnsemble:
+    if isinstance(rng_owner, RandomMatrixEnsemble):
+        return rng_owner
+
+    return cast(_EnsembleRngOwner, rng_owner).ensemble
 
 
 class SimulationExecutionState(StringEnum):
@@ -86,7 +106,7 @@ class Simulation:
         *,
         output_fields: tuple[str, ...] = (),
     ) -> SourceDict:
-        fields = cast(tuple[attrs.Attribute[object], ...], attrs.fields(type(self)))
+        fields = get_attrs_fields(type(self))
         return {
             "type": type(self).__name__,
             "parameters": {
@@ -99,13 +119,13 @@ class Simulation:
     def _capture_run_activation(
         self,
         *,
-        rng_owner: object,
+        rng_owner: RandomMatrixEnsemble | _EnsembleRngOwner,
         output_fields: tuple[str, ...] = (),
     ) -> RunActivation:
         if self._execution_state is not SimulationExecutionState.RUNNING:
             raise RuntimeError("The simulation must be running.")
 
-        ensemble = cast(RandomMatrixEnsemble, getattr(rng_owner, "ensemble", rng_owner))
+        ensemble = _resolve_rng_ensemble(rng_owner)
         return RunActivation(
             simulation_config=self._assemble_configuration(output_fields=output_fields),
             rng_seed=cast(SeedLike, to_json_compatible(ensemble.seed)),
@@ -116,7 +136,7 @@ class Simulation:
         self,
         *,
         result_type: str,
-        rng_owner: object,
+        rng_owner: RandomMatrixEnsemble | _EnsembleRngOwner,
         run_start: RunActivation,
         output_request: dict[str, object],
         execution: dict[str, object] | None = None,
@@ -124,7 +144,7 @@ class Simulation:
         if self._execution_state is not SimulationExecutionState.RUNNING:
             raise RuntimeError("The simulation must be running.")
 
-        ensemble = cast(RandomMatrixEnsemble, getattr(rng_owner, "ensemble", rng_owner))
+        ensemble = _resolve_rng_ensemble(rng_owner)
         bit_generator = ensemble.rng.bit_generator
         output_request = cast(dict[str, object], to_json_compatible(output_request))
         return RunContext(
