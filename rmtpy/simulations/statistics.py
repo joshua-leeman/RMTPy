@@ -10,7 +10,7 @@ REALIZATIONS_METADATA: dict[str, str] = {
 
 LOG_D_TIME_SUPPORT: tuple[float, float] = (-0.5, 1.5)
 
-UNFOLDED_LOG_D_TIME_SUPPORT: tuple[float, float] = (-1.5, 0.5)
+LOG_D_UNFOLDED_TIME_SUPPORT: tuple[float, float] = (-1.5, 0.5)
 
 
 def nearest_neighbor_spacings(

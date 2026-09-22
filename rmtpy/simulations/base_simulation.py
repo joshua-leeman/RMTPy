@@ -68,6 +68,21 @@ class Simulation:
 
         return self._result
 
+    def execute(self) -> Result:
+        if self._execution_state is not SimulationExecutionState.NEW:
+            raise RuntimeError("A simulation instance may be executed only once.")
+        else:
+            object.__setattr__(self, "_execution_state", SimulationExecutionState.RUNNING)
+
+        try:
+            object.__setattr__(self, "_result", self._execute())
+        except BaseException:
+            object.__setattr__(self, "_execution_state", SimulationExecutionState.FAILED)
+            raise
+
+        object.__setattr__(self, "_execution_state", SimulationExecutionState.COMPLETE)
+        return self._result
+
     def _assemble_configuration(
         self,
         *,
@@ -89,8 +104,8 @@ class Simulation:
         rng_owner: object,
         output_fields: tuple[str, ...] = (),
     ) -> RunActivation:
-        if self._execution_state is not SimulationExecutionState.NEW:
-            raise RuntimeError("The simulation must be newly created.")
+        if self._execution_state is not SimulationExecutionState.RUNNING:
+            raise RuntimeError("The simulation must be running.")
 
         ensemble = cast(RandomMatrixEnsemble, getattr(rng_owner, "ensemble", rng_owner))
         return RunActivation(
@@ -108,8 +123,8 @@ class Simulation:
         output_request: dict[str, object],
         execution: dict[str, object] | None = None,
     ) -> RunContext:
-        if self._execution_state is not SimulationExecutionState.COMPLETE:
-            raise RuntimeError("The simulation must be complete.")
+        if self._execution_state is not SimulationExecutionState.RUNNING:
+            raise RuntimeError("The simulation must be running.")
 
         ensemble = cast(RandomMatrixEnsemble, getattr(rng_owner, "ensemble", rng_owner))
         bit_generator = ensemble.rng.bit_generator
@@ -132,24 +147,10 @@ class Simulation:
                 "real": ensemble.real_dtype.name,
                 "complex": ensemble.complex_dtype.name,
             },
-            execution=({} if execution is None else output_request),
+            execution=({} if execution is None else execution),
         )
 
     def _execute(self) -> Result:
         raise NotImplementedError(
             f"{type(self).__name__} has not implemented the execution contract."
         )
-
-    def execute(self) -> Result:
-        if self._execution_state is not SimulationExecutionState.NEW:
-            raise RuntimeError("A simulation instance may be executed only once.")
-
-        object.__setattr__(self, "_execution_state", SimulationExecutionState.RUNNING)
-        try:
-            object.__setattr__(self, "_result", self._execute())
-        except BaseException:
-            object.__setattr__(self, "_execution_state", SimulationExecutionState.FAILED)
-            raise
-
-        object.__setattr__(self, "_execution_state", SimulationExecutionState.COMPLETE)
-        return self._result
