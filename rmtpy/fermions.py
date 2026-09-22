@@ -279,7 +279,7 @@ def build_decomposed_width_matrix(
     return width_matrix_idxs, width_matrix_data
 
 
-@attrs.frozen(kw_only=True, eq=False, slots=False)
+@attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
 class MajoranaFermionBasis:
     num_majoranas: int = attrs.field(
         validator=(
