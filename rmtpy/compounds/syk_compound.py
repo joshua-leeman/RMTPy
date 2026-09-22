@@ -28,7 +28,7 @@ def _build_conjugated_coupling_matrix(compound: SYKCompoundEnsemble) -> csc_arra
     )
 
 
-@attrs.frozen(kw_only=True, eq=False, weakref_slot=True)
+@attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
 class SYKCompoundEnsemble(CompoundEnsemble):
     ensemble: SachdevYeKitaevEnsemble = attrs.field(
         converter=SachdevYeKitaevEnsemble.create,
