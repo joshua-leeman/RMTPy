@@ -2,6 +2,7 @@
 
 import tempfile
 import unittest
+from copy import deepcopy
 from pathlib import Path
 from typing import Any, cast
 from unittest.mock import patch
@@ -1445,11 +1446,11 @@ class CDOEvolutionTests(unittest.TestCase):
             time_chunk_size=2,
         )
         result = simulation.execute()
+        simulation_config = deepcopy(result.context.simulation_config)
         control.execute()
-        runtime_args = result.context.simulation_config["parameters"]
         reference_axes = CDOProbabilitiesPlot(
             data=result.dynamics,
-            simulation_parameters=runtime_args.copy(),
+            context=result.context,
         ).axes
         expected_xlim = tuple(
             simulation.time_scale * simulation.ensemble.dimension**value
@@ -1459,20 +1460,20 @@ class CDOEvolutionTests(unittest.TestCase):
         time_plots = (
             CDOProbabilitiesPlot(
                 data=result.dynamics,
-                simulation_parameters=runtime_args.copy(),
+                context=result.context,
             ),
             CDOPuritiesPlot(
                 data=result.dynamics,
-                simulation_parameters=runtime_args.copy(),
+                context=result.context,
             ),
             CDOInformationPlot(
                 data=result.dynamics,
-                simulation_parameters=runtime_args.copy(),
+                context=result.context,
             ),
         )
         dimension = simulation.ensemble.dimension
         for plot in time_plots:
-            with patch.object(plot, "finish_plot"):
+            with patch.object(type(plot), "finish_plot"):
                 plot.plot(path="unused")
             self.assertEqual(plot.axes.xlabel, reference_axes.xlabel)
             self.assertEqual(plot.axes.xtick_labels, reference_axes.xtick_labels)
@@ -1528,9 +1529,9 @@ class CDOEvolutionTests(unittest.TestCase):
 
         ratio_plot = CDOKLRatioPlot(
             data=result.dynamics,
-            simulation_parameters=runtime_args.copy(),
+            context=result.context,
         )
-        with patch.object(ratio_plot, "finish_plot"):
+        with patch.object(type(ratio_plot), "finish_plot"):
             ratio_plot.plot(path="unused")
         self.assertEqual(ratio_plot.axes.xlabel, reference_axes.xlabel)
         self.assertEqual(ratio_plot.ax.get_xscale(), "log")
@@ -1542,9 +1543,9 @@ class CDOEvolutionTests(unittest.TestCase):
 
         histogram_plot = KLDivergenceHistogramPlot(
             data=result.kl_divergence_histogram,
-            simulation_parameters=runtime_args.copy(),
+            context=result.context,
         )
-        with patch.object(histogram_plot, "finish_plot") as finish_plot:
+        with patch.object(type(histogram_plot), "finish_plot") as finish_plot:
             histogram_plot.plot(path="unused")
         finish_plot.assert_called_once_with(path="unused")
         self.assertIn(r"q(t_{\mathrm{H}})", histogram_plot.axes.xlabel)
@@ -1583,6 +1584,7 @@ class CDOEvolutionTests(unittest.TestCase):
             simulation.ensemble.rng_state,
             control.ensemble.rng_state,
         )
+        self.assertEqual(result.context.simulation_config, simulation_config)
 
     def test_execute_is_data_only_and_convenience_runner_returns_result(self) -> None:
         simulation = CDOEvolutionSimulation(

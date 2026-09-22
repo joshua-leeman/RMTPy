@@ -11,6 +11,7 @@ import numpy as np
 from rmtpy.compounds import CompoundEnsemble
 from rmtpy.conversion import to_json_compatible
 from rmtpy.ensembles import GOE
+from rmtpy.simulations.base_simulation import RunContext
 from rmtpy.simulations.histogram import Histogram
 from rmtpy.simulations.histogram2D import Histogram2D
 from rmtpy.simulations.partial_widths_statistics import (
@@ -68,8 +69,13 @@ class SimulationLifecycleTests(unittest.TestCase):
 
         result = simulation.execute()
         args = result.context.simulation_config["parameters"]
+        self.assertNotIn("request", args)
         self.assertEqual(args["realizs"], 2)
         self.assertEqual(args["energies"], [-0.25, 0.125])
+        self.assertEqual(
+            result.context.output_request["unfolding_modes"],
+            ["raw", "weight", "average", "variate"],
+        )
         self.assertEqual(args["compound"]["type"], "CompoundEnsemble")
         self.assertEqual(
             args["compound"]["parameters"]["coupling_strengths"],
@@ -228,7 +234,21 @@ class SimulationLifecycleTests(unittest.TestCase):
         histogram.compute_histogram_probabilities()
         plot = ComplexEnergyHistogramPlot(
             data=histogram,
-            simulation_parameters={"compound": to_json_compatible(compound)},
+            context=RunContext(
+                simulation_type="resonance_statistics_simulation",
+                result_type="ResonanceStatisticsResult",
+                simulation_config={
+                    "type": "ResonanceStatisticsSimulation",
+                    "parameters": {"compound": to_json_compatible(compound)},
+                },
+                output_request={},
+                rng={},
+                dtype={
+                    "configured": compound.ensemble.dtype.name,
+                    "real": compound.ensemble.real_dtype.name,
+                    "complex": compound.ensemble.complex_dtype.name,
+                },
+            ),
         )
 
         with patch.object(ComplexEnergyHistogramPlot, "finish_plot"):

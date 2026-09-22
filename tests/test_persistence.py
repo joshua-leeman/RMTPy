@@ -16,7 +16,7 @@ import numpy as np
 import rmtpy.simulations as simulations
 from rmtpy.compounds import CompoundEnsemble
 from rmtpy.density import DensityModel
-from rmtpy.ensembles import GOE
+from rmtpy.ensembles import GOE, ManyBodyEnsemble
 from rmtpy.simulations.base_data import Data
 from rmtpy.simulations.base_plot import Plot
 from rmtpy.simulations.base_simulation import RunContext, Simulation
@@ -132,7 +132,7 @@ class _FailingFigure:
         raise OSError("injected plot failure")
 
 
-@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
+@dataclasses.dataclass(slots=True, kw_only=True, eq=False, weakref_slot=False)
 class _ConcretePlot(Plot):
     def plot(self, path: str | Path) -> None:
         self.build_figure()
@@ -359,13 +359,13 @@ class PersistenceTests(unittest.TestCase):
         self.assertNotIn(str(repository), json.dumps(dirty))
 
     def test_plot_output_collision_does_not_overwrite(self) -> None:
-        plot = _ConcretePlot(data=Data(file_name="example"), simulation_parameters={})
+        plot = _ConcretePlot(data=Data(file_name="example"), context=example_context())
         cast(Any, plot).fig = _FakeFigure()
         cast(Any, plot).ax = object()
         with tempfile.TemporaryDirectory() as tmp_dir:
             with (
-                patch.object(plot.axes, "configure"),
-                patch.object(plot.legend, "configure"),
+                patch.object(type(plot.axes), "configure"),
+                patch.object(type(plot.legend), "configure"),
             ):
                 plot.finish_plot(tmp_dir)
                 destination = Path(tmp_dir) / "example_plot.png"
@@ -376,13 +376,13 @@ class PersistenceTests(unittest.TestCase):
             self.assertEqual(tuple(Path(tmp_dir).glob("*.partial.png")), ())
 
     def test_failed_plot_write_leaves_no_current_or_partial_file(self) -> None:
-        plot = _ConcretePlot(data=Data(file_name="example"), simulation_parameters={})
+        plot = _ConcretePlot(data=Data(file_name="example"), context=example_context())
         cast(Any, plot).fig = _FailingFigure()
         cast(Any, plot).ax = object()
         with tempfile.TemporaryDirectory() as tmp_dir:
             with (
-                patch.object(plot.axes, "configure"),
-                patch.object(plot.legend, "configure"),
+                patch.object(type(plot.axes), "configure"),
+                patch.object(type(plot.legend), "configure"),
                 self.assertRaisesRegex(OSError, "injected plot failure"),
             ):
                 plot.finish_plot(tmp_dir)
@@ -463,6 +463,19 @@ class PersistenceTests(unittest.TestCase):
             resonance_loaded.context.execution["calibration"]["timing"],
             "after_first_primary_sample",
         )
+
+    def test_plot_structuring_does_not_mutate_run_context(self) -> None:
+        result = small_spectral_result()
+        before = deepcopy(result.context.simulation_config)
+        plot = SpectralHistogramPlot(
+            data=result.raw.levels,
+            context=result.context,
+        )
+
+        ensemble = plot.structure_simulation_arg("ensemble", ManyBodyEnsemble)
+
+        self.assertIsInstance(ensemble, ManyBodyEnsemble)
+        self.assertEqual(result.context.simulation_config, before)
 
     def test_generator_seed_result_loads_and_plots_without_a_live_rng(self) -> None:
         source_rng = np.random.default_rng(12345)

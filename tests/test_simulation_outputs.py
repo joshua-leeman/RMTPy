@@ -24,7 +24,7 @@ from rmtpy.simulations.spectral_statistics.spectral_form_factors.spectral_form_f
     UnfoldedFormFactorsAxes,
     UnfoldedFormFactorsPlot,
 )
-from rmtpy.simulations.statistics import LOG_D_TIME_SUPPORT, UNFOLDED_LOG_D_TIME_SUPPORT
+from rmtpy.simulations.statistics import LOG_D_TIME_SUPPORT, LOG_D_UNFOLDED_TIME_SUPPORT
 from rmtpy.simulations.time_delay_statistics.time_delay_histograms.time_delay_histograms_plot import (
     TimeDelayHistogramAxes,
     TimeDelayHistogramPlot,
@@ -99,12 +99,12 @@ class SharedDimensionTimePlotTests(unittest.TestCase):
             with self.subTest(plot_cls=plot_cls):
                 self.assertEqual(
                     plot_cls.xlim,
-                    UNFOLDED_LOG_D_TIME_SUPPORT,
+                    LOG_D_UNFOLDED_TIME_SUPPORT,
                 )
 
         self.assertEqual(
             UNFOLDED_RESONANCE_FORM_FACTOR_LOG_D_TIME_SUPPORT,
-            UNFOLDED_LOG_D_TIME_SUPPORT,
+            LOG_D_UNFOLDED_TIME_SUPPORT,
         )
 
 
