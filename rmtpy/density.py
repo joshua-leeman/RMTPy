@@ -235,6 +235,15 @@ class DensityModel:
         radius = self.support_scale_factor * self.support_radius
         return center - radius, center + radius
 
+    @property
+    def has_average_coeffs(self) -> bool:
+        try:
+            object.__getattribute__(self, "average_coeffs")
+        except AttributeError:
+            return False
+
+        return True
+
     @cached_property
     def average_coeffs(self) -> NDArray[np.float64]:
         return self._compute_average_coeffs()

@@ -48,7 +48,7 @@ def canonicalize_string_selection(
     name: str,
 ) -> tuple[str, ...]:
     try:
-        source = {str_values} if isinstance(str_values, str) else set(str_values)
+        source = (str_values,) if isinstance(str_values, str) else tuple(str_values)
     except TypeError as exc:
         raise TypeError(f"`{name}` must be a string or iterable of strings.") from exc
 
@@ -59,6 +59,8 @@ def canonicalize_string_selection(
             raise ValueError(
                 f"Unknown {name} value {value!r}: Expected one of {allowed.to_tuple()}."
             )
+        if token in normalized:
+            raise ValueError(f"`{name}` must not contain duplicate values.")
 
         normalized.append(token)
 
