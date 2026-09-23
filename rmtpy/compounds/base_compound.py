@@ -71,6 +71,8 @@ def _compute_couplings_array(
             raise ValueError("Coupling strength must be a positive, finite scalar.")
 
         couplings = np.full(compound.num_channels, input)
+        couplings.flags.writeable = False
+        return couplings
 
     couplings = np.array(input, copy=True, order="C")
     couplings.flags.writeable = False
@@ -175,6 +177,7 @@ def _register_compound_hooks(
 ) -> type[CompoundEnsemble]:
     RMT_CONVERTER.register_structure_hook(compound_cls, _structure_hook_for_compound)
     RMT_CONVERTER.register_unstructure_hook(compound_cls, _unstructure_hook_for_compound)
+    REGISTRY[to_key_of_registry(compound_cls.__name__)] = compound_cls
 
     return compound_cls
 
@@ -285,8 +288,8 @@ class CompoundEnsemble:
         lapack_geev = self._pick_lapack_geev(use_complex_dtype=True)
 
         for effective_hamiltonian in self.effective_hamiltonian_stream(realizs):
-            resonances, _ = cast(
-                tuple[ComplexEigenvalues, object],
+            resonances, _, _, _ = cast(
+                tuple[ComplexEigenvalues, object, object, object],
                 lapack_geev(
                     effective_hamiltonian, compute_vl=0, compute_vr=0, overwrite_a=True
                 ),

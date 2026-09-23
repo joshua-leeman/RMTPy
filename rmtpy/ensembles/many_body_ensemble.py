@@ -168,8 +168,8 @@ class ManyBodyEnsemble(RandomMatrixEnsemble, ABC):
     ) -> Iterator[RealEigenvalues]:
         lapack_heev = self._pick_lapack_heev(use_complex_dtype=use_complex_dtype)
         for matrix in self.matrix_stream(realizs, use_complex_dtype=use_complex_dtype):
-            eigvals, _ = cast(
-                tuple[RealEigenvalues, object],
+            eigvals, _, _ = cast(
+                tuple[RealEigenvalues, object, object],
                 lapack_heev(matrix, compute_v=0, overwrite_a=True),
             )
             yield eigvals
