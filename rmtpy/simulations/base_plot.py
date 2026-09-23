@@ -185,9 +185,6 @@ class LogDimensionTimeAxes(PlotAxes):
     )
 
 
-DimensionTimeAxes = LogDimensionTimeAxes
-
-
 @dataclasses.dataclass(slots=True, kw_only=True, eq=False, weakref_slot=False)
 class LogDimensionUnfoldedTimeAxes(PlotAxes):
     xticks: tuple[float, ...] = (-1.0, -0.5, 0.0)  # log scale base dimension
@@ -199,9 +196,6 @@ class LogDimensionUnfoldedTimeAxes(PlotAxes):
         r"$D^{-1/2}$",
         r"$1$",
     )
-
-
-UnfoldedDimensionTimeAxes = LogDimensionUnfoldedTimeAxes
 
 
 @dataclasses.dataclass(slots=True, kw_only=True, eq=False, weakref_slot=False)
