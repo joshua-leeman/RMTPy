@@ -11,11 +11,11 @@ from .base_data import Data
 NUM_BINS: int = 100
 
 
-def _build_empty_histogram(hist: Histogram) -> NDArray[np.float64]:
+def _build_empty_histogram(hist: Histogram) -> NDArray[np.floating]:
     return np.zeros(hist.num_bins, dtype=np.float64)
 
 
-def _build_histogram_bins(hist: Histogram) -> NDArray[np.float64]:
+def _build_histogram_bins(hist: Histogram) -> NDArray[np.floating]:
     return array_of_floats(
         support=hist.support,
         num_pts=hist.num_bins + 1,
@@ -27,7 +27,7 @@ def _build_zeroed_histogram_counts(hist: Histogram) -> NDArray[np.int64]:
     return np.zeros(hist.num_bins, dtype=np.int64)
 
 
-def _validate_bins(hist: Histogram, _: object, values: NDArray[np.float64]) -> None:
+def _validate_bins(hist: Histogram, _: object, values: NDArray[np.floating]) -> None:
     if (
         values.shape != (hist.num_bins + 1,)
         or not np.issubdtype(values.dtype, np.floating)
@@ -46,7 +46,7 @@ def _validate_counts(hist: Histogram, _: object, values: NDArray[np.int64]) -> N
         raise ValueError("Histogram counts do not match the declared bin count.")
 
 
-def _validate_histogram(hist: Histogram, _: object, values: NDArray[np.float64]) -> None:
+def _validate_histogram(hist: Histogram, _: object, values: NDArray[np.floating]) -> None:
     if (
         values.shape != (hist.num_bins,)
         or not np.issubdtype(values.dtype, np.floating)
@@ -78,7 +78,7 @@ class Histogram(Data):
         repr=False,
     )
 
-    bins: NDArray[np.float64] = attrs.field(
+    bins: NDArray[np.floating] = attrs.field(
         default=attrs.Factory(_build_histogram_bins, takes_self=True),
         converter=np.asarray,
         validator=_validate_bins,
@@ -90,7 +90,7 @@ class Histogram(Data):
         validator=_validate_counts,
         repr=False,
     )
-    histogram: NDArray[np.float64] = attrs.field(
+    histogram: NDArray[np.floating] = attrs.field(
         default=attrs.Factory(_build_empty_histogram, takes_self=True),
         converter=np.asarray,
         validator=_validate_histogram,
@@ -102,7 +102,7 @@ class Histogram(Data):
         validator=attrs.validators.ge(0),
     )
 
-    def add_histogram_contribution(self, data: NDArray[np.float64], /) -> None:
+    def add_histogram_contribution(self, data: NDArray[np.floating], /) -> None:
         if isinstance(data, (int, float)):
             data = np.array([data], dtype=np.float64)
 

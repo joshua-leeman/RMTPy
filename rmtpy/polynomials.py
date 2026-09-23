@@ -5,25 +5,25 @@ import numba
 import numpy as np
 from numpy.typing import NDArray
 
-type Float64Function = Callable[[NDArray[np.float64]], NDArray[np.float64]]
+type FloatFunction = Callable[[NDArray[np.floating]], NDArray[np.floating]]
 
 
 class OrthogonalPolynomials(Protocol):
     def __call__(
         self,
-        x: NDArray[np.float64],
+        x: NDArray[np.floating],
         /,
         *,
         degree: int,
-    ) -> NDArray[np.float64]: ...
+    ) -> NDArray[np.floating]: ...
 
 
 def chebyshev_polynomial_2_weight(
-    energies: NDArray[np.float64],
+    energies: NDArray[np.floating],
     /,
     *,
     support_radius: float,
-) -> NDArray[np.float64]:
+) -> NDArray[np.floating]:
     x = energies / support_radius
 
     in_support = np.abs(energies) < support_radius
@@ -35,11 +35,11 @@ def chebyshev_polynomial_2_weight(
 
 @numba.njit(boundscheck=False, cache=True, fastmath=True)
 def chebyshev_polynomials_2(
-    x: NDArray[np.float64],
+    x: NDArray[np.floating],
     /,
     *,
     degree: int,
-) -> NDArray[np.float64]:
+) -> NDArray[np.floating]:
     polynomials = np.empty((degree + 1, x.size), dtype=np.float64)
 
     polynomials[0, :] = 1.0
@@ -53,11 +53,11 @@ def chebyshev_polynomials_2(
 
 
 def legendre_polynomial_weight(
-    energies: NDArray[np.float64],
+    energies: NDArray[np.floating],
     /,
     *,
     support_radius: float,
-) -> NDArray[np.float64]:
+) -> NDArray[np.floating]:
     x = energies / support_radius
 
     in_support = np.abs(energies) < support_radius
@@ -69,11 +69,11 @@ def legendre_polynomial_weight(
 
 @numba.njit(boundscheck=False, cache=True, fastmath=True)
 def legendre_polynomials(
-    x: NDArray[np.float64],
+    x: NDArray[np.floating],
     /,
     *,
     degree: int,
-) -> NDArray[np.float64]:
+) -> NDArray[np.floating]:
     polynomials = np.empty((degree + 1, x.size), dtype=np.float64)
 
     polynomials[0, :] = 1.0
@@ -90,13 +90,13 @@ def legendre_polynomials(
 
 
 def q_hermite_polynomial_weight(
-    energies: NDArray[np.float64],
+    energies: NDArray[np.floating],
     /,
     *,
     support_radius: float,
     eta: float,
     partial_product_order: int = 100,
-) -> NDArray[np.float64]:
+) -> NDArray[np.floating]:
     x = energies / support_radius
 
     index_range = np.arange(partial_product_order)
@@ -110,19 +110,18 @@ def q_hermite_polynomial_weight(
     log_terms = np.log(term1) + np.log(term2)[None, :]
     prefactor[in_support] = np.exp(cast(NDArray[np.float64], np.sum(log_terms, axis=1)))
 
-    return prefactor * chebyshev_polynomial_2_weight(
-        energies, support_radius=support_radius
-    )
+    weight = chebyshev_polynomial_2_weight(energies, support_radius=support_radius)
+    return prefactor * weight
 
 
 @numba.njit(boundscheck=False, cache=True, fastmath=True)
 def q_hermite_polynomials(
-    x: NDArray[np.float64],
+    x: NDArray[np.floating],
     /,
     *,
     eta: float,
     degree: int,
-) -> NDArray[np.float64]:
+) -> NDArray[np.floating]:
     polynomials = np.empty((degree + 1, x.size), dtype=np.float64)
 
     polynomials[0, :] = 1.0

@@ -13,9 +13,9 @@ from ..density import (
     unfold_values_with_cdf,
     unfold_widths_with_cdf,
 )
-from ..polynomials import Float64Function
+from ..polynomials import FloatFunction
 
-type CDF = Float64Function
+type CDF = FloatFunction
 
 
 def normalize_degrees(degrees: Iterable[int], /) -> tuple[int, ...]:
@@ -23,23 +23,23 @@ def normalize_degrees(degrees: Iterable[int], /) -> tuple[int, ...]:
 
 
 def unfold_values(
-    values: NDArray[np.float64],
+    values: NDArray[np.floating],
     /,
     *,
-    cdf: Float64Function,
+    cdf: FloatFunction,
     dimension: int,
-) -> NDArray[np.float64]:
+) -> NDArray[np.floating]:
     return unfold_values_with_cdf(values, cdf=cdf, dimension=dimension)
 
 
 def unfold_widths(
-    widths: NDArray[np.float64],
+    widths: NDArray[np.floating],
     /,
     *,
-    centers: NDArray[np.float64],
-    cdf: Float64Function,
+    centers: NDArray[np.floating],
+    cdf: FloatFunction,
     dimension: int,
-) -> NDArray[np.float64]:
+) -> NDArray[np.floating]:
     return unfold_widths_with_cdf(
         widths=widths,
         centers=centers,
@@ -48,7 +48,7 @@ def unfold_widths(
     )
 
 
-def _build_grid(factory: TruncatedPolynomialCdfFactory) -> NDArray[np.float64]:
+def _build_grid(factory: TruncatedPolynomialCdfFactory) -> NDArray[np.floating]:
     if not factory.degrees:
         return np.empty(0, dtype=np.float64)
 
@@ -58,14 +58,14 @@ def _build_grid(factory: TruncatedPolynomialCdfFactory) -> NDArray[np.float64]:
     )
 
 
-def _compute_polynomials(factory: TruncatedPolynomialCdfFactory) -> NDArray[np.float64]:
+def _compute_polynomials(factory: TruncatedPolynomialCdfFactory) -> NDArray[np.floating]:
     if not factory.degrees:
         return np.empty((0, 0), dtype=np.float64)
 
     return factory.density.compute_polynomials(factory.grid)
 
 
-def _compute_weight(factory: TruncatedPolynomialCdfFactory) -> NDArray[np.float64]:
+def _compute_weight(factory: TruncatedPolynomialCdfFactory) -> NDArray[np.floating]:
     if not factory.degrees:
         return np.empty(0, dtype=np.float64)
 
@@ -93,17 +93,17 @@ class TruncatedPolynomialCdfFactory:
         repr=False,
     )
 
-    grid: NDArray[np.float64] = attrs.field(
+    grid: NDArray[np.floating] = attrs.field(
         default=attrs.Factory(_build_grid, takes_self=True),
         init=False,
         repr=False,
     )
-    polynomials: NDArray[np.float64] = attrs.field(
+    polynomials: NDArray[np.floating] = attrs.field(
         default=attrs.Factory(_compute_polynomials, takes_self=True),
         init=False,
         repr=False,
     )
-    weight: NDArray[np.float64] = attrs.field(
+    weight: NDArray[np.floating] = attrs.field(
         default=attrs.Factory(_compute_weight, takes_self=True),
         init=False,
         repr=False,
@@ -130,13 +130,15 @@ class TruncatedPolynomialCdfFactory:
         coeffs = self.density.average_coeffs
         return self.interpolators_from_coeffs(coeffs)
 
-    def build_interpolator(self, *, pdf_values: NDArray[np.float64]) -> PchipInterpolator:
+    def build_interpolator(
+        self, *, pdf_values: NDArray[np.floating]
+    ) -> PchipInterpolator:
         cdf_values = cumulative_trapezoid(y=pdf_values, x=self.grid, initial=0)
         return PchipInterpolator(x=self.grid, y=cdf_values, extrapolate=True)
 
     def interpolators_from_coeffs(
         self,
-        coeffs: NDArray[np.float64],
+        coeffs: NDArray[np.floating],
         /,
     ) -> tuple[PchipInterpolator, ...]:
         coeffs = np.asarray(coeffs)
