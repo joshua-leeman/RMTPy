@@ -19,7 +19,7 @@ def nearest_neighbor_spacings(
     /,
     *,
     degeneracy: int = 1,
-) -> np.ndarray:
+) -> NDArray[np.floating]:
     spacings = np.diff(np.sort(values))
     if degeneracy > 1:
         spacings = np.repeat(spacings[1::degeneracy], degeneracy)
