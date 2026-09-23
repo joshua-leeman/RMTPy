@@ -1,4 +1,4 @@
-from .base_simulation import Simulation
+from .base_simulation import RunContext, Simulation
 from .cdo_evolution import (
     CDOEvolutionRequest,
     CDOEvolutionResult,
@@ -61,6 +61,7 @@ from .transmission_coefficients_simulation import (
 
 __all__ = [
     "Simulation",
+    "RunContext",
     "CDOEvolutionRequest",
     "CDOEvolutionResult",
     "CDOEvolutionSimulation",
