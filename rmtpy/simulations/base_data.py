@@ -1,11 +1,14 @@
 from collections.abc import Mapping
 from pathlib import Path
+from typing import ClassVar
 
 import attrs
 
 
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
 class Data:
+    data_type: ClassVar[str] = "data"
+
     file_name: str = attrs.field(
         default="simulation_data",
         converter=str,

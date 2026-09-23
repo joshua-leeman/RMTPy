@@ -1,4 +1,5 @@
 from functools import partial
+from typing import ClassVar
 
 import attrs
 import numpy as np
@@ -81,6 +82,8 @@ def _validate_histogram(
 
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
 class Histogram2D(Data):
+    data_type: ClassVar[str] = "histogram2D"
+
     x_support: Support = attrs.field(
         converter=to_support_pair,
         validator=is_valid_support,

@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 import attrs
 import numpy as np
 from numpy.typing import NDArray
@@ -56,6 +58,8 @@ def _validate_histogram(hist: Histogram, _: object, values: NDArray[np.float64])
 
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
 class Histogram(Data):
+    data_type: ClassVar[str] = "histogram"
+
     support: Support = attrs.field(
         converter=to_support_pair,
         validator=is_valid_support,
