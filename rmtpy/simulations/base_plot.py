@@ -106,6 +106,7 @@ def _plot_configuration(value: object) -> object:
         for key, item in parameters.items():
             parameters[key] = _plot_configuration(item)
 
+        mapping["parameters"] = parameters
         return mapping
 
     return {key: _plot_configuration(item) for key, item in mapping.items()}
