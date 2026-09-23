@@ -3,7 +3,6 @@
 import tempfile
 import unittest
 from copy import deepcopy
-from typing import Any, cast
 from unittest.mock import patch
 
 import numpy as np
@@ -51,7 +50,7 @@ def form_factor_moments(
 
 
 class SpectralStatisticsTests(unittest.TestCase):
-    def test_default_result_schema_at_zero_one_and_even_degree(self) -> None:
+    def test_default_result_schema_at_zero_one_and_all_degrees(self) -> None:
         expected = {
             0: (
                 (),
@@ -65,7 +64,7 @@ class SpectralStatisticsTests(unittest.TestCase):
                 ),
             ),
             1: (
-                (),
+                (1,),
                 (
                     "spectral_coeff_1_histogram_data",
                     "spectral_histogram_data",
@@ -74,10 +73,16 @@ class SpectralStatisticsTests(unittest.TestCase):
                     "spectral_histogram_weight_unfolded_data",
                     "spacings_histogram_weight_unfolded_data",
                     "spectral_form_factors_weight_unfolded_data",
+                    "spectral_histogram_average_unfolded_degree_1_data",
+                    "spacings_histogram_average_unfolded_degree_1_data",
+                    "spectral_form_factors_average_unfolded_degree_1_data",
+                    "spectral_histogram_variate_unfolded_degree_1_data",
+                    "spacings_histogram_variate_unfolded_degree_1_data",
+                    "spectral_form_factors_variate_unfolded_degree_1_data",
                 ),
             ),
             4: (
-                (2, 4),
+                (1, 2, 3, 4),
                 (
                     "spectral_coeff_1_histogram_data",
                     "spectral_coeff_2_histogram_data",
@@ -89,15 +94,27 @@ class SpectralStatisticsTests(unittest.TestCase):
                     "spectral_histogram_weight_unfolded_data",
                     "spacings_histogram_weight_unfolded_data",
                     "spectral_form_factors_weight_unfolded_data",
+                    "spectral_histogram_average_unfolded_degree_1_data",
+                    "spacings_histogram_average_unfolded_degree_1_data",
+                    "spectral_form_factors_average_unfolded_degree_1_data",
                     "spectral_histogram_average_unfolded_degree_2_data",
                     "spacings_histogram_average_unfolded_degree_2_data",
                     "spectral_form_factors_average_unfolded_degree_2_data",
+                    "spectral_histogram_average_unfolded_degree_3_data",
+                    "spacings_histogram_average_unfolded_degree_3_data",
+                    "spectral_form_factors_average_unfolded_degree_3_data",
                     "spectral_histogram_average_unfolded_degree_4_data",
                     "spacings_histogram_average_unfolded_degree_4_data",
                     "spectral_form_factors_average_unfolded_degree_4_data",
+                    "spectral_histogram_variate_unfolded_degree_1_data",
+                    "spacings_histogram_variate_unfolded_degree_1_data",
+                    "spectral_form_factors_variate_unfolded_degree_1_data",
                     "spectral_histogram_variate_unfolded_degree_2_data",
                     "spacings_histogram_variate_unfolded_degree_2_data",
                     "spectral_form_factors_variate_unfolded_degree_2_data",
+                    "spectral_histogram_variate_unfolded_degree_3_data",
+                    "spacings_histogram_variate_unfolded_degree_3_data",
+                    "spectral_form_factors_variate_unfolded_degree_3_data",
                     "spectral_histogram_variate_unfolded_degree_4_data",
                     "spacings_histogram_variate_unfolded_degree_4_data",
                     "spectral_form_factors_variate_unfolded_degree_4_data",
@@ -153,24 +170,20 @@ class SpectralStatisticsTests(unittest.TestCase):
         initial_rng_state = deepcopy(simulation.ensemble.rng_state)
 
         self.assertEqual(initial_rng_state, control.rng_state)
-        self.assertIsNone(
-            cast(Any, simulation.ensemble.spectral_density)._average_coeffs
-        )
+        self.assertFalse(simulation.ensemble.spectral_density.has_average_coeffs)
 
         control_factory = TruncatedPolynomialCdfFactory(
             density=control.spectral_density,
-            degrees=(2,),
+            degrees=(1, 2),
             density_name="spectral",
         )
-        average_cdf = control_factory.average_interpolators()[0]
+        average_cdfs = control_factory.average_interpolators()
         samples = list(control.eigvals_stream(realizs=2))
         result = simulation.execute()
 
         self.assertEqual(simulation.ensemble.rng_state, control.rng_state)
         self.assertNotEqual(simulation.ensemble.rng_state, initial_rng_state)
-        self.assertIsNotNone(
-            cast(Any, simulation.ensemble.spectral_density)._average_coeffs
-        )
+        self.assertTrue(simulation.ensemble.spectral_density.has_average_coeffs)
 
         raw = result.raw
         spacings = [nearest_neighbor_spacings(sample, degeneracy=1) for sample in samples]
@@ -215,31 +228,43 @@ class SpectralStatisticsTests(unittest.TestCase):
             histogram_counts(weight_samples, result.weight.levels.bins),
         )
 
-        average_samples = [
-            unfold_values(sample, cdf=average_cdf, dimension=control.dimension)
-            for sample in samples
-        ]
-        average = result.average_by_degree[0].statistics
-        np.testing.assert_array_equal(
-            average.levels.counts,
-            histogram_counts(average_samples, average.levels.bins),
-        )
-
-        variate_samples = [
-            unfold_values(
-                sample,
-                cdf=control_factory.interpolators_from_coeffs(
-                    control.spectral_density.compute_variate_coeffs(sample)
-                )[0],
-                dimension=control.dimension,
+        for average_cdf, item in zip(
+            average_cdfs,
+            result.average_by_degree,
+            strict=True,
+        ):
+            average_samples = [
+                unfold_values(sample, cdf=average_cdf, dimension=control.dimension)
+                for sample in samples
+            ]
+            np.testing.assert_array_equal(
+                item.statistics.levels.counts,
+                histogram_counts(average_samples, item.statistics.levels.bins),
             )
-            for sample in samples
-        ]
-        variate = result.variate_by_degree[0].statistics
-        np.testing.assert_array_equal(
-            variate.levels.counts,
-            histogram_counts(variate_samples, variate.levels.bins),
-        )
+
+        variate_samples: list[list[np.ndarray]] = [[] for _ in result.variate_by_degree]
+        for sample in samples:
+            variate_cdfs = control_factory.interpolators_from_coeffs(
+                control.spectral_density.compute_variate_coeffs(sample)
+            )
+            for position, variate_cdf in enumerate(variate_cdfs):
+                variate_samples[position].append(
+                    unfold_values(
+                        sample,
+                        cdf=variate_cdf,
+                        dimension=control.dimension,
+                    )
+                )
+
+        for item, unfolded_samples in zip(
+            result.variate_by_degree,
+            variate_samples,
+            strict=True,
+        ):
+            np.testing.assert_array_equal(
+                item.statistics.levels.counts,
+                histogram_counts(unfolded_samples, item.statistics.levels.bins),
+            )
 
         for data in result.iterate_data():
             if isinstance(data, Histogram) and np.sum(data.counts):
@@ -275,7 +300,8 @@ class SpectralStatisticsTests(unittest.TestCase):
                     "form_factors",
                 ],
                 "unfolding_modes": ["raw", "weight", "average", "variate"],
-                "degrees": [2],
+                "degrees": [1, 2],
+                "max_degree": 2,
             },
         )
         self.assertEqual(simulation.execution_state, ExecutionState.COMPLETE)

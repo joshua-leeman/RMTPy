@@ -139,7 +139,7 @@ class CompoundEnsembleRegressionTests(unittest.TestCase):
             ]
         )
         original = eigvecs.copy()
-        rotated, rotated_conj = compound.rotate_coupling_matrix_by_eigvecs(eigvecs)
+        rotated, rotated_conj = compound._rotate_coupling_matrix_by_eigvecs(eigvecs)
 
         np.testing.assert_array_equal(eigvecs, original)
         np.testing.assert_allclose(rotated_conj, rotated.conj())
@@ -162,20 +162,20 @@ class CompoundEnsembleRegressionTests(unittest.TestCase):
         source = np.array([1.0, 2.0])
         compound = CompoundEnsemble(
             ensemble=GOE(num_majoranas=4),
-            coupling_strengths=source,
+            couplings=source,
         )
         source[0] = 9.0
 
-        np.testing.assert_array_equal(compound.coupling_strengths, np.array([1.0, 2.0]))
-        self.assertFalse(np.shares_memory(source, compound.coupling_strengths))
-        self.assertFalse(compound.coupling_strengths.flags.writeable)
+        np.testing.assert_array_equal(compound.couplings, np.array([1.0, 2.0]))
+        self.assertFalse(np.shares_memory(source, compound.couplings))
+        self.assertFalse(compound.couplings.flags.writeable)
 
         for invalid_value in (np.nan, np.inf):
             self.assertRaises(
                 ValueError,
                 CompoundEnsemble,
                 ensemble=GOE(num_majoranas=4),
-                coupling_strengths=np.array([1.0, invalid_value]),
+                couplings=np.array([1.0, invalid_value]),
             )
 
 

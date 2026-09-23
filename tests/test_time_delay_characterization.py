@@ -35,7 +35,7 @@ def build_compound(*, max_degree: int = 0, seed: int = 123) -> CompoundEnsemble:
             max_spectral_polynomial_degree=max_degree,
             seed=seed,
         ),
-        coupling_strengths=np.array([0.75, 1.25]),
+        couplings=np.array([0.75, 1.25]),
     )
 
 
@@ -107,12 +107,12 @@ class TimeDelayStatisticsTests(unittest.TestCase):
         self.assertIsInstance(result, TimeDelayStatisticsResult)
         self.assertIs(result.energies, simulation.energies)
         self.assertFalse(hasattr(simulation, "outputs"))
-        self.assertEqual(simulation.truncated_degrees, (2,))
+        self.assertEqual(simulation.truncated_degrees, (1, 2))
         self.assertEqual(len(result.raw), 3)
         self.assertEqual(len(result.weight), 3)
-        self.assertEqual(len(result.average_by_degree), 1)
-        self.assertEqual(len(result.variate_by_degree), 1)
-        self.assertEqual(len(tuple(result.iterate_data())), 12)
+        self.assertEqual(len(result.average_by_degree), 2)
+        self.assertEqual(len(result.variate_by_degree), 2)
+        self.assertEqual(len(tuple(result.iterate_data())), 18)
 
         for mode, group in (("raw", result.raw), ("weight", result.weight)):
             for energy_index, energy_result in enumerate(group):
@@ -126,10 +126,16 @@ class TimeDelayStatisticsTests(unittest.TestCase):
             ("average", result.average_by_degree),
             ("variate", result.variate_by_degree),
         ):
-            self.assertEqual(degree_results[0].degree, 2)
-            for energy_result in degree_results[0].by_energy:
-                self.assertEqual(energy_result.histogram.metadata["unfolding"], mode)
-                self.assertEqual(energy_result.histogram.metadata["degree"], 2)
+            self.assertEqual(
+                tuple(item.degree for item in degree_results),
+                (1, 2),
+            )
+            for item in degree_results:
+                for energy_result in item.by_energy:
+                    self.assertEqual(energy_result.histogram.metadata["unfolding"], mode)
+                    self.assertEqual(
+                        energy_result.histogram.metadata["degree"], item.degree
+                    )
 
         self.assertEqual(
             tuple(item.energy_index for item in result.raw),
@@ -235,7 +241,7 @@ class TimeDelayStatisticsTests(unittest.TestCase):
         initial_rng_state = deepcopy(simulation.compound.rng_state)
         factory = TruncatedPolynomialCdfFactory(
             density=control.ensemble.spectral_density,
-            degrees=(2,),
+            degrees=(1, 2),
             density_name="spectral",
         )
         average_cdf = factory.average_interpolators()[0]

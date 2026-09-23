@@ -50,9 +50,9 @@ class SmokeTests(unittest.TestCase):
         )
 
         pdf = time_delay_pdf(
+            times,
             num_channels=num_channels,
             heisenberg_time=heisenberg_time,
-            times=times,
         )
 
         self.assertAlmostEqual(np.trapezoid(pdf, times), 1.0, places=4)

@@ -36,7 +36,7 @@ def build_compound(*, max_degree: int = 0, seed: int = 123) -> CompoundEnsemble:
             max_spectral_polynomial_degree=max_degree,
             seed=seed,
         ),
-        coupling_strengths=np.array([0.75, 1.25]),
+        couplings=np.array([0.75, 1.25]),
     )
 
 
@@ -127,7 +127,7 @@ class ResonanceStatisticsTests(unittest.TestCase):
         )
         weight_widths = unfold_widths(
             widths,
-            centers,
+            centers=centers,
             cdf=simulation.compound.resonance_density.weight_cdf,
             dimension=simulation.compound.ensemble.dimension,
         )
@@ -152,7 +152,7 @@ class ResonanceStatisticsTests(unittest.TestCase):
         self.assertEqual(float(np.sum(weight.complex_energies.histogram)), 1.0)
 
     def test_schema_degree_order_and_canonical_metadata(self) -> None:
-        expected = {0: ((), 10), 2: ((2,), 22)}
+        expected = {0: ((), 10), 2: ((1, 2), 32)}
         for max_degree, (degrees, data_count) in expected.items():
             with self.subTest(max_degree=max_degree):
                 simulation = ResonanceStatisticsSimulation(
@@ -259,7 +259,7 @@ class ResonanceStatisticsTests(unittest.TestCase):
         initial_rng_state = deepcopy(simulation.compound.rng_state)
         factory = TruncatedPolynomialCdfFactory(
             density=control.resonance_density,
-            degrees=(2,),
+            degrees=(1, 2),
             density_name="resonance",
         )
         stream = control.resonances_stream(realizs=2)

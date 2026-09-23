@@ -785,9 +785,7 @@ class CDOEvolutionTests(unittest.TestCase):
         if np.sum(expected_counts) == 0:
             np.testing.assert_array_equal(histogram, np.zeros(len(counts)))
             return
-        expected_density = expected_counts / (
-            np.sum(expected_counts) * np.diff(bins)
-        )
+        expected_density = expected_counts / (np.sum(expected_counts) * np.diff(bins))
         np.testing.assert_allclose(histogram, expected_density)
         self.assertAlmostEqual(
             float(np.sum(histogram * np.diff(bins))),
@@ -1098,9 +1096,7 @@ class CDOEvolutionTests(unittest.TestCase):
                     initial_state=simulation.initial_state,
                 )
                 nearest_probabilities = normalized_probabilities(nearest_states)
-                exact_probabilities = normalized_probabilities(
-                    expected_heisenberg_states
-                )
+                exact_probabilities = normalized_probabilities(expected_heisenberg_states)
                 self.assertFalse(np.allclose(nearest_probabilities, exact_probabilities))
                 nearest_goe = direct_heisenberg_kl(require(goe_grid)[-1], nearest_states)
                 self.assertFalse(

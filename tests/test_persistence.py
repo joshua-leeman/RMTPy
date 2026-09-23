@@ -271,7 +271,7 @@ class PersistenceTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             with (
                 patch(
-                    "rmtpy.simulations.persistence._write_manifest",
+                    "rmtpy.simulations.persistence.runs.write_manifest",
                     side_effect=OSError("injected failure"),
                 ),
                 self.assertRaisesRegex(OSError, "injected failure"),

@@ -1,5 +1,6 @@
 # pyright: reportAny=false, reportUnknownMemberType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownParameterType=false, reportUnknownLambdaType=false, reportUnusedCallResult=false, reportPrivateUsage=false, reportImplicitStringConcatenation=false, reportMissingParameterType=false, reportUnnecessaryIsInstance=false, reportImplicitOverride=false, reportExplicitAny=false, reportOptionalMemberAccess=false, reportOptionalSubscript=false
 
+import dataclasses
 import unittest
 
 from rmtpy.compounds import CompoundEnsemble
@@ -50,6 +51,14 @@ def build_compound(
     )
 
 
+def _xlim_default(plot_cls: type[object]) -> object:
+    for field in dataclasses.fields(plot_cls):
+        if field.name == "xlim":
+            return field.default
+
+    raise AssertionError(f"{plot_cls.__name__} has no xlim field")
+
+
 class SharedDimensionTimePlotTests(unittest.TestCase):
     def test_raw_time_plots_share_axes_and_support(self) -> None:
         for axes_cls in (
@@ -70,7 +79,7 @@ class SharedDimensionTimePlotTests(unittest.TestCase):
             TimeDelayHistogramPlot,
         ):
             with self.subTest(plot_cls=plot_cls):
-                self.assertEqual(plot_cls.xlim, LOG_D_TIME_SUPPORT)
+                self.assertEqual(_xlim_default(plot_cls), LOG_D_TIME_SUPPORT)
 
         self.assertEqual(
             RESONANCE_FORM_FACTOR_LOG_D_TIME_SUPPORT,
@@ -98,7 +107,7 @@ class SharedDimensionTimePlotTests(unittest.TestCase):
         ):
             with self.subTest(plot_cls=plot_cls):
                 self.assertEqual(
-                    plot_cls.xlim,
+                    _xlim_default(plot_cls),
                     LOG_D_UNFOLDED_TIME_SUPPORT,
                 )
 

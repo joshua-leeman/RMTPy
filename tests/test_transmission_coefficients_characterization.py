@@ -28,7 +28,7 @@ from rmtpy.simulations.transmission_coefficients_simulation.weisskopf_estimate i
 def build_compound(*, seed: int = 123) -> CompoundEnsemble:
     return CompoundEnsemble(
         ensemble=GOE(num_majoranas=4, seed=seed),
-        coupling_strengths=np.array([0.75, 1.25]),
+        couplings=np.array([0.75, 1.25]),
     )
 
 

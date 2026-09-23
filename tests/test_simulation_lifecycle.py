@@ -57,8 +57,9 @@ class SimulationLifecycleTests(unittest.TestCase):
                 "spectral_form_factors_data",
             ),
         )
-        self.assertEqual(len(result.average_by_degree), 1)
-        self.assertEqual(result.average_by_degree[0].degree, 2)
+        self.assertEqual(len(result.average_by_degree), 2)
+        self.assertEqual(result.average_by_degree[0].degree, 1)
+        self.assertEqual(result.average_by_degree[1].degree, 2)
 
     def test_run_context_is_derived_from_attrs_init_fields(self) -> None:
         simulation = TimeDelayStatisticsSimulation(
@@ -78,8 +79,8 @@ class SimulationLifecycleTests(unittest.TestCase):
         )
         self.assertEqual(args["compound"]["type"], "CompoundEnsemble")
         self.assertEqual(
-            args["compound"]["parameters"]["coupling_strengths"],
-            simulation.compound.coupling_strengths.tolist(),
+            args["compound"]["parameters"]["couplings"],
+            simulation.compound.couplings.tolist(),
         )
 
     def test_exact_energy_identity_rejects_only_duplicates(self) -> None:
@@ -150,8 +151,8 @@ class SimulationLifecycleTests(unittest.TestCase):
             y_num_bins=2,
         )
         histogram2d.add_histogram_contribution(
-            np.array([0.0, 0.5, 1.0]),
-            np.array([0.0, 0.5, 1.0]),
+            x_data=np.array([0.0, 0.5, 1.0]),
+            y_data=np.array([0.0, 0.5, 1.0]),
         )
         self.assertEqual(int(np.sum(histogram2d.counts)), 2)
         self.assertEqual(histogram2d.counts[0, 0], 1)
