@@ -9,7 +9,7 @@ import numpy as np
 
 from rmtpy.compounds import CompoundEnsemble
 from rmtpy.ensembles import GOE
-from rmtpy.simulations.base_simulation import SimulationExecutionState as ExecutionState
+from rmtpy.simulations.base_simulation import ExecutionState as ExecutionState
 from rmtpy.simulations.transmission_coefficients_simulation import (
     TransmissionCoefficientsResult,
     TransmissionCoefficientsSimulation,

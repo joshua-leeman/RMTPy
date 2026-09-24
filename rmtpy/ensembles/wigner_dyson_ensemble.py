@@ -4,11 +4,10 @@ from typing import ClassVar, override
 
 import attrs
 import numpy as np
-from numpy.typing import NDArray
 
 from ..conversion import to_key_of_registry
 from ..polynomials import (
-    Float64Function,
+    FloatFunction,
     OrthogonalPolynomials,
     chebyshev_polynomial_2_weight,
     chebyshev_polynomials_2,
@@ -39,19 +38,19 @@ class WignerDysonEnsemble(ManyBodyEnsemble, ABC):
     @override
     def assign_spectral_polynomials(self) -> OrthogonalPolynomials:
         def wigner_dyson_spectral_polynomials(
-            x: NDArray[np.float64],
+            x: np.ndarray[tuple[int], np.dtype[np.floating]],
             *,
             degree: int,
-        ) -> NDArray[np.float64]:
+        ) -> np.ndarray[tuple[int, int], np.dtype[np.floating]]:
             return chebyshev_polynomials_2(x, degree=degree)
 
         return wigner_dyson_spectral_polynomials
 
     @override
-    def assign_spectral_weight(self) -> Float64Function:
+    def assign_spectral_weight(self) -> FloatFunction:
         def wigner_semicircle_distribution(
-            energies: NDArray[np.float64],
-        ) -> NDArray[np.float64]:
+            energies: np.ndarray[tuple[int], np.dtype[np.floating]],
+        ) -> np.ndarray[tuple[int], np.dtype[np.floating]]:
             return chebyshev_polynomial_2_weight(
                 energies,
                 support_radius=self.spectral_radius,

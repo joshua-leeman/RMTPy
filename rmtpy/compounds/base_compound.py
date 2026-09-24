@@ -7,7 +7,6 @@ from typing import cast
 
 import attrs
 import numpy as np
-from numpy.typing import NDArray
 from scipy.linalg import get_lapack_funcs, solve
 from scipy.special import jn_zeros
 
@@ -32,7 +31,10 @@ from ..ensembles.many_body_ensemble import (
 from ..ensembles.poisson_ensemble import PoissonEnsemble
 from ..universal import time_delay_pdf
 
-type ComplexEigenvalues = NDArray[np.complexfloating]
+type ComplexEigenvalues = np.ndarray[tuple[int], np.dtype[np.complexfloating]]
+type ComplexHamiltonian = np.ndarray[tuple[int, int], np.dtype[np.complexfloating]]
+type CouplingMatrix = np.ndarray[tuple[int], np.dtype[np.floating | np.complexfloating]]
+type MatrixFloatFunction = np.ndarray[tuple[int, int, int], np.dtype[np.complexfloating]]
 
 MAX_SPECTRAL_POLYNOMIAL_DEGREE_METADATA: dict[str, str] = {
     "dir_name": "max_polydeg",
@@ -47,7 +49,9 @@ NUM_FREE_COMPLEX_FERMIONS_METADATA: dict[str, str] = {
 REGISTRY: dict[str, type[attrs.AttrsInstance]] = {}
 
 
-def _compute_default_couplings(compound: CompoundEnsemble) -> NDArray[np.floating]:
+def _compute_default_couplings(
+    compound: CompoundEnsemble,
+) -> np.ndarray[tuple[int], np.dtype[np.floating]]:
     uniform_strength = cast(float, np.sqrt(compound.ensemble.spectral_radius))
     couplings = np.full(compound.num_channels, uniform_strength)
     couplings.flags.writeable = False
@@ -55,14 +59,9 @@ def _compute_default_couplings(compound: CompoundEnsemble) -> NDArray[np.floatin
 
 
 def _compute_couplings_array(
-    input: int
-    | float
-    | Sequence[int]
-    | Sequence[float]
-    | NDArray[np.integer]
-    | NDArray[np.floating],
+    input: int | float | Sequence[int | float],
     compound: attrs.AttrsInstance,
-) -> NDArray[np.floating]:
+) -> np.ndarray[tuple[int], np.dtype[np.floating]]:
     if not isinstance(compound, CompoundEnsemble):
         raise TypeError(f"Expected CompoundEnsemble instance, got {type(compound)}.")
 
@@ -87,8 +86,8 @@ def _compute_number_of_open_channels(compound: CompoundEnsemble) -> int:
 
 def _is_couplings_array_valid(
     compound: CompoundEnsemble,
-    _: attrs.Attribute[NDArray[np.floating]],
-    couplings: NDArray[np.floating],
+    _: attrs.Attribute[np.ndarray[tuple[int], np.dtype[np.floating]]],
+    couplings: np.ndarray[tuple[int], np.dtype[np.floating]],
 ) -> None:
     if couplings.shape != (compound.num_channels,):
         raise ValueError(
@@ -206,7 +205,7 @@ class CompoundEnsemble:
         init=False,
         validator=_is_num_channels_valid,
     )
-    couplings: NDArray[np.floating] = attrs.field(
+    couplings: np.ndarray[tuple[int], np.dtype[np.floating]] = attrs.field(
         default=attrs.Factory(_compute_default_couplings, takes_self=True),
         converter=attrs.Converter(_compute_couplings_array, takes_self=True),
         validator=_is_couplings_array_valid,
@@ -247,7 +246,10 @@ class CompoundEnsemble:
         path = to_path(self, root=root)
 
         couplings_is_constant_array = np.all(
-            cast(NDArray[np.bool_], self.couplings == self.couplings[0])
+            cast(
+                np.ndarray[tuple[int], np.dtype[np.bool_]],
+                self.couplings == self.couplings[0],
+            )
         )
         if not couplings_is_constant_array:
             coupling_strengths_id = build_hashed_id(self.couplings)
@@ -270,19 +272,15 @@ class CompoundEnsemble:
             sample_stream=self.resonance_real_parts_stream,
         )
 
-    def generate_effective_hamiltonian(self) -> NDArray[np.complexfloating]:
+    def generate_effective_hamiltonian(self) -> ComplexHamiltonian:
         hamiltonian = self.ensemble.generate_matrix(use_complex_dtype=True)
         self._add_width_matrix_to_hamiltonian(cast(HermitianMatrix, hamiltonian))
-        return cast(NDArray[np.complexfloating], hamiltonian)
+        return cast(ComplexHamiltonian, hamiltonian)
 
-    def effective_hamiltonian_stream(
-        self,
-        realizs: int,
-    ) -> Iterator[NDArray[np.complexfloating]]:
+    def effective_hamiltonian_stream(self, realizs: int) -> Iterator[ComplexHamiltonian]:
         for hamiltonian in self.ensemble.matrix_stream(realizs, use_complex_dtype=True):
             self._add_width_matrix_to_hamiltonian(cast(HermitianMatrix, hamiltonian))
-
-            yield cast(NDArray[np.complexfloating], hamiltonian)
+            yield cast(ComplexHamiltonian, hamiltonian)
 
     def resonances_stream(self, realizs: int) -> Iterator[ComplexEigenvalues]:
         lapack_geev = self._pick_lapack_geev(use_complex_dtype=True)
@@ -300,7 +298,9 @@ class CompoundEnsemble:
         for resonances in self.resonances_stream(realizs=realizs):
             yield np.real(resonances)
 
-    def partial_widths_stream(self, realizs: int) -> Iterator[NDArray[np.floating]]:
+    def partial_widths_stream(
+        self, realizs: int
+    ) -> Iterator[np.ndarray[tuple[int], np.dtype[np.floating]]]:
         for _, eigvecs in self.ensemble.eigsys_stream(realizs=realizs):
             rotated_coupling_matrix, rotated_coupling_matrix_conj = (
                 self._rotate_coupling_matrix_by_eigvecs(eigvecs)
@@ -313,8 +313,8 @@ class CompoundEnsemble:
         self,
         realizs: int,
         *,
-        energies: NDArray[np.float64],
-    ) -> Iterator[tuple[NDArray[np.complexfloating], RealEigenvalues]]:
+        energies: np.ndarray[tuple[int], np.dtype[np.floating]],
+    ) -> Iterator[tuple[MatrixFloatFunction, RealEigenvalues]]:
         resolvent = np.empty(
             (energies.size, self.ensemble.dimension),
             self.ensemble.real_dtype.type,
@@ -350,10 +350,8 @@ class CompoundEnsemble:
         self,
         realizs: int,
         *,
-        energies: NDArray[np.float64],
-    ) -> Iterator[
-        tuple[NDArray[np.complexfloating], NDArray[np.complexfloating], RealEigenvalues]
-    ]:
+        energies: np.ndarray[tuple[int], np.dtype[np.floating]],
+    ) -> Iterator[tuple[MatrixFloatFunction, MatrixFloatFunction, RealEigenvalues]]:
         resolvent = np.empty(
             (energies.size, self.ensemble.dimension),
             self.ensemble.real_dtype.type,
@@ -406,8 +404,8 @@ class CompoundEnsemble:
         self,
         realizs: int,
         *,
-        energies: NDArray[np.float64],
-    ) -> Iterator[tuple[NDArray[np.complexfloating], RealEigenvalues]]:
+        energies: np.ndarray[tuple[int], np.dtype[np.floating]],
+    ) -> Iterator[tuple[MatrixFloatFunction, RealEigenvalues]]:
         numerator = np.empty(
             (energies.size, self.num_channels, self.num_channels),
             self.ensemble.complex_dtype.type,
@@ -438,8 +436,8 @@ class CompoundEnsemble:
         self,
         realizs: int,
         *,
-        energies: NDArray[np.float64],
-    ) -> Iterator[tuple[NDArray[np.complexfloating], RealEigenvalues]]:
+        energies: np.ndarray[tuple[int], np.dtype[np.floating]],
+    ) -> Iterator[tuple[MatrixFloatFunction, RealEigenvalues]]:
         reaction_matrix_adjoint = np.empty(
             (energies.size, self.num_channels, self.num_channels),
             self.ensemble.complex_dtype.type,
@@ -484,14 +482,18 @@ class CompoundEnsemble:
         self,
         realizs: int,
         *,
-        energies: NDArray[np.float64],
+        energies: np.ndarray[tuple[int], np.dtype[np.floating]],
     ) -> Iterator[tuple[RealEigenvalues, RealEigenvalues]]:
         for delay_matrix, eigvals in self.wigner_smith_matrix_stream(
             realizs, energies=energies
         ):
             yield np.linalg.eigvalsh(delay_matrix), eigvals
 
-    def time_delay_pdf(self, times: NDArray[np.float64], /) -> NDArray[np.float64]:
+    def time_delay_pdf(
+        self,
+        times: np.ndarray[tuple[int], np.dtype[np.floating]],
+        /,
+    ) -> np.ndarray[tuple[int], np.dtype[np.floating]]:
         global_mean_spacing = 2 * self.ensemble.spectral_radius / self.ensemble.dimension
         j_1_1 = cast(float, jn_zeros(1, 1)[0])
         heisenberg_time = 2 * j_1_1 / global_mean_spacing
@@ -509,10 +511,7 @@ class CompoundEnsemble:
     def _rotate_coupling_matrix_by_eigvecs(
         self,
         eigvecs: OrthogonalMatrix | UnitaryMatrix,
-    ) -> tuple[
-        NDArray[np.floating] | NDArray[np.complexfloating],
-        NDArray[np.floating] | NDArray[np.complexfloating],
-    ]:
+    ) -> tuple[CouplingMatrix, CouplingMatrix]:
         rotated_coupling_matrix = eigvecs[:, : self.num_channels].copy()
         rotated_coupling_matrix *= self.couplings[None, :]
 

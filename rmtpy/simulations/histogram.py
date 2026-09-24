@@ -2,7 +2,6 @@ from typing import ClassVar
 
 import attrs
 import numpy as np
-from numpy.typing import NDArray
 
 from ..density import Support, array_of_floats, compute_histogram
 from ..validators import is_valid_support, to_support_pair
@@ -11,11 +10,15 @@ from .base_data import Data
 NUM_BINS: int = 100
 
 
-def _build_empty_histogram(hist: Histogram) -> NDArray[np.floating]:
+def _build_empty_histogram(
+    hist: Histogram,
+) -> np.ndarray[tuple[int], np.dtype[np.floating]]:
     return np.zeros(hist.num_bins, dtype=np.float64)
 
 
-def _build_histogram_bins(hist: Histogram) -> NDArray[np.floating]:
+def _build_histogram_bins(
+    hist: Histogram,
+) -> np.ndarray[tuple[int], np.dtype[np.floating]]:
     return array_of_floats(
         support=hist.support,
         num_pts=hist.num_bins + 1,
@@ -23,11 +26,17 @@ def _build_histogram_bins(hist: Histogram) -> NDArray[np.floating]:
     )
 
 
-def _build_zeroed_histogram_counts(hist: Histogram) -> NDArray[np.int64]:
+def _build_zeroed_histogram_counts(
+    hist: Histogram,
+) -> np.ndarray[tuple[int], np.dtype[np.int64]]:
     return np.zeros(hist.num_bins, dtype=np.int64)
 
 
-def _validate_bins(hist: Histogram, _: object, values: NDArray[np.floating]) -> None:
+def _validate_bins(
+    hist: Histogram,
+    _: object,
+    values: np.ndarray[tuple[int], np.dtype[np.floating]],
+) -> None:
     if (
         values.shape != (hist.num_bins + 1,)
         or not np.issubdtype(values.dtype, np.floating)
@@ -37,7 +46,11 @@ def _validate_bins(hist: Histogram, _: object, values: NDArray[np.floating]) -> 
         raise ValueError("Histogram bins do not match the declared bin count.")
 
 
-def _validate_counts(hist: Histogram, _: object, values: NDArray[np.int64]) -> None:
+def _validate_counts(
+    hist: Histogram,
+    _: object,
+    values: np.ndarray[tuple[int], np.dtype[np.int64]],
+) -> None:
     if (
         values.shape != (hist.num_bins,)
         or not np.issubdtype(values.dtype, np.integer)
@@ -46,7 +59,11 @@ def _validate_counts(hist: Histogram, _: object, values: NDArray[np.int64]) -> N
         raise ValueError("Histogram counts do not match the declared bin count.")
 
 
-def _validate_histogram(hist: Histogram, _: object, values: NDArray[np.floating]) -> None:
+def _validate_histogram(
+    hist: Histogram,
+    _: object,
+    values: np.ndarray[tuple[int], np.dtype[np.floating]],
+) -> None:
     if (
         values.shape != (hist.num_bins,)
         or not np.issubdtype(values.dtype, np.floating)
@@ -78,19 +95,19 @@ class Histogram(Data):
         repr=False,
     )
 
-    bins: NDArray[np.floating] = attrs.field(
+    bins: np.ndarray[tuple[int], np.dtype[np.floating]] = attrs.field(
         default=attrs.Factory(_build_histogram_bins, takes_self=True),
         converter=np.asarray,
         validator=_validate_bins,
         repr=False,
     )
-    counts: NDArray[np.int64] = attrs.field(
+    counts: np.ndarray[tuple[int], np.dtype[np.int64]] = attrs.field(
         default=attrs.Factory(_build_zeroed_histogram_counts, takes_self=True),
         converter=np.asarray,
         validator=_validate_counts,
         repr=False,
     )
-    histogram: NDArray[np.floating] = attrs.field(
+    histogram: np.ndarray[tuple[int], np.dtype[np.floating]] = attrs.field(
         default=attrs.Factory(_build_empty_histogram, takes_self=True),
         converter=np.asarray,
         validator=_validate_histogram,
@@ -102,7 +119,11 @@ class Histogram(Data):
         validator=attrs.validators.ge(0),
     )
 
-    def add_histogram_contribution(self, data: NDArray[np.floating], /) -> None:
+    def add_histogram_contribution(
+        self,
+        data: np.ndarray[tuple[int], np.dtype[np.floating]],
+        /,
+    ) -> None:
         if isinstance(data, (int, float)):
             data = np.array([data], dtype=np.float64)
 

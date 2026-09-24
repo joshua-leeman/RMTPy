@@ -4,7 +4,6 @@ from typing import Protocol, cast
 
 import attrs
 import numpy as np
-from numpy.typing import NDArray
 from scipy.integrate import cumulative_trapezoid
 from scipy.interpolate import PchipInterpolator
 from scipy.ndimage import gaussian_filter1d
@@ -21,14 +20,14 @@ class SpectrumStream(Protocol):
         realizs: int,
         *,
         use_complex_dtype: bool = False,
-    ) -> Iterator[NDArray[np.floating]]: ...
+    ) -> Iterator[np.ndarray[tuple[int], np.dtype[np.floating]]]: ...
 
 
-class ResonanceStream(Protocol):
+class ResonancesStream(Protocol):
     def __call__(
         self,
         realizs: int,
-    ) -> Iterator[NDArray[np.floating]]: ...
+    ) -> Iterator[np.ndarray[tuple[int], np.dtype[np.floating]]]: ...
 
 
 MAX_POLYNOMIAL_DEGREE: int = 6
@@ -49,7 +48,7 @@ def array_of_floats(
     support: Support,
     num_pts: int,
     log_base: float | None = None,
-) -> NDArray[np.floating]:
+) -> np.ndarray[tuple[int], np.dtype[np.floating]]:
     validate_support(support)
     if log_base is None:
         return np.linspace(*support, num_pts)
@@ -57,7 +56,9 @@ def array_of_floats(
         return np.logspace(*support, num_pts, base=log_base)
 
 
-def compute_bin_centers(bins: NDArray[np.floating]) -> NDArray[np.floating]:
+def compute_bin_centers(
+    bins: np.ndarray[tuple[int], np.dtype[np.floating]],
+) -> np.ndarray[tuple[int], np.dtype[np.floating]]:
     if bins.ndim != 1:
         raise ValueError("`bins` must be one-dimensional.")
     if len(bins) < 2:
@@ -73,9 +74,9 @@ def compute_bin_centers(bins: NDArray[np.floating]) -> NDArray[np.floating]:
 
 
 def build_pdf_interpolator_from_histogram(
-    histogram: NDArray[np.floating],
+    histogram: np.ndarray[tuple[int], np.dtype[np.floating]],
     *,
-    bins: NDArray[np.floating],
+    bins: np.ndarray[tuple[int], np.dtype[np.floating]],
     kernel_std_dev: float = GAUSSIAN_KERNEL_STANDARD_DEVIATION,
 ) -> PchipInterpolator:
     centers = compute_bin_centers(bins)
@@ -87,7 +88,7 @@ def build_pdf_interpolator_from_histogram(
 def build_cdf_interpolator_from_pdf(
     pdf: FloatFunction,
     *,
-    inputs: NDArray[np.floating],
+    inputs: np.ndarray[tuple[int], np.dtype[np.floating]],
     left_tail_mass: float = 0.0,
 ) -> PchipInterpolator:
     if inputs.ndim != 1:
@@ -108,10 +109,10 @@ def build_cdf_interpolator_from_pdf(
 
 
 def compute_histogram(
-    counts: NDArray[np.intp],
+    counts: np.ndarray[tuple[int], np.dtype[np.intp]],
     *,
-    bins: NDArray[np.floating],
-) -> NDArray[np.floating]:
+    bins: np.ndarray[tuple[int], np.dtype[np.floating]],
+) -> np.ndarray[tuple[int], np.dtype[np.floating]]:
     if bins.ndim != 1 or counts.ndim != 1:
         raise ValueError("`bins` and `counts` must be one-dimensional.")
     if len(bins) != len(counts) + 1:
@@ -129,11 +130,11 @@ def compute_histogram(
 
 
 def unfold_values_with_cdf(
-    values: NDArray[np.floating],
+    values: np.ndarray[tuple[int], np.dtype[np.floating]],
     *,
     cdf: FloatFunction | None = None,
     dimension: int,
-) -> NDArray[np.floating]:
+) -> np.ndarray[tuple[int], np.dtype[np.floating]]:
     if cdf is None:
         return values
 
@@ -142,11 +143,11 @@ def unfold_values_with_cdf(
 
 def unfold_widths_with_cdf(
     *,
-    widths: NDArray[np.floating],
-    centers: NDArray[np.floating],
+    widths: np.ndarray[tuple[int], np.dtype[np.floating]],
+    centers: np.ndarray[tuple[int], np.dtype[np.floating]],
     cdf: FloatFunction | None = None,
     dimension: int,
-) -> NDArray[np.floating]:
+) -> np.ndarray[tuple[int], np.dtype[np.floating]]:
     if cdf is None:
         return widths
 
@@ -178,7 +179,7 @@ class DensityModel:
         default=None,
         validator=attrs.validators.optional(attrs.validators.is_callable()),
     )
-    sample_stream: SpectrumStream | ResonanceStream = attrs.field(
+    sample_stream: SpectrumStream | ResonancesStream = attrs.field(
         validator=attrs.validators.is_callable(),
         repr=False,
     )
@@ -245,36 +246,67 @@ class DensityModel:
         return True
 
     @cached_property
-    def average_coeffs(self) -> NDArray[np.floating]:
-        return self._compute_average_coeffs()
+    def average_coeffs(self) -> np.ndarray[tuple[int], np.dtype[np.floating]]:
+        average_coeffs = np.zeros(self.max_polynomial_degree + 1)
+        for sample in self.sample_stream(realizs=self.optimal_realizs):
+            average_coeffs += self.compute_variate_coeffs(sample)
+
+        average_coeffs /= self.optimal_realizs
+        return average_coeffs
 
     @cached_property
     def _average_pdf_interpolator(self) -> PchipInterpolator:
-        return self._build_average_pdf_interpolator_from_samples()
+        bins = np.linspace(*self.plot_range, self.num_bins + 1)
+        counts = np.zeros(self.num_bins, dtype=np.intp)
+
+        for sample in self.sample_stream(self.optimal_realizs):
+            counts += np.histogram(sample, bins=bins)[0]
+
+        return build_pdf_interpolator_from_histogram(
+            histogram=compute_histogram(counts, bins=bins),
+            bins=bins,
+            kernel_std_dev=self.kernel_std_dev,
+        )
 
     @cached_property
     def _average_cdf_interpolator(self) -> PchipInterpolator:
-        return self._build_average_cdf_interpolator()
+        return build_cdf_interpolator_from_pdf(
+            self.average_pdf,
+            inputs=np.linspace(*self.plot_range, self.num_pts),
+        )
 
     @cached_property
     def _weight_cdf_interpolator(self) -> PchipInterpolator:
-        return self._build_weight_cdf_interpolator()
+        return build_cdf_interpolator_from_pdf(
+            self.weight_pdf,
+            inputs=np.linspace(*self.plot_range, self.num_pts),
+        )
 
-    def average_cdf(self, inputs: NDArray[np.floating], /) -> NDArray[np.floating]:
+    def average_cdf(
+        self,
+        inputs: np.ndarray[tuple[int], np.dtype[np.floating]],
+        /,
+    ) -> np.ndarray[tuple[int], np.dtype[np.floating]]:
         if not self.has_polynomial_expansion:
             return self._average_cdf_from_samples(inputs)
 
         return self._average_cdf_from_polynomials(inputs)
 
-    def average_pdf(self, inputs: NDArray[np.floating], /) -> NDArray[np.floating]:
+    def average_pdf(
+        self,
+        inputs: np.ndarray[tuple[int], np.dtype[np.floating]],
+        /,
+    ) -> np.ndarray[tuple[int], np.dtype[np.floating]]:
         if not self.has_polynomial_expansion:
             return self._average_pdf_from_samples(inputs)
 
         return self._average_pdf_from_polynomials(inputs)
 
     def compute_polynomials(
-        self, inputs: NDArray[np.floating], /
-    ) -> NDArray[np.floating]:
+        self,
+        inputs: np.ndarray[tuple[int], np.dtype[np.floating]],
+        /,
+    ) -> np.ndarray[tuple[int, int], np.dtype[np.floating]]:
         if self.polynomials is None:
             raise NotImplementedError()
 
@@ -285,9 +317,9 @@ class DensityModel:
 
     def compute_polynomial_weight(
         self,
-        inputs: NDArray[np.floating],
+        inputs: np.ndarray[tuple[int], np.dtype[np.floating]],
         /,
-    ) -> NDArray[np.floating]:
+    ) -> np.ndarray[tuple[int], np.dtype[np.floating]]:
         if self.weight_function is None:
             raise NotImplementedError()
 
@@ -295,24 +327,29 @@ class DensityModel:
 
     def compute_variate_coeffs(
         self,
-        sample: NDArray[np.floating],
-    ) -> NDArray[np.floating]:
+        sample: np.ndarray[tuple[int], np.dtype[np.floating]],
+    ) -> np.ndarray[tuple[int], np.dtype[np.floating]]:
         polynomials = self.compute_polynomials(sample.astype(np.floating))
-        return cast(NDArray[np.floating], np.mean(polynomials, axis=1))
+        return cast(
+            np.ndarray[tuple[int], np.dtype[np.floating]],
+            np.mean(polynomials, axis=1),
+        )
 
     def build_variate_cdf_interpolator(
         self,
         *,
         interval: Support | None = None,
-        coeffs: NDArray[np.floating] | None = None,
-        sample: NDArray[np.floating] | None = None,
+        coeffs: np.ndarray[tuple[int], np.dtype[np.floating]] | None = None,
+        sample: np.ndarray[tuple[int], np.dtype[np.floating]] | None = None,
     ) -> PchipInterpolator:
         if interval is None:
             interval = self.plot_range
         else:
             validate_support(interval)
 
-        def pdf(inputs: NDArray[np.floating]) -> NDArray[np.floating]:
+        def pdf(
+            inputs: np.ndarray[tuple[int], np.dtype[np.floating]],
+        ) -> np.ndarray[tuple[int], np.dtype[np.floating]]:
             return self.variate_pdf(inputs, coeffs=coeffs, sample=sample)
 
         if interval[0] > self.plot_range[0]:
@@ -332,12 +369,12 @@ class DensityModel:
 
     def variate_pdf(
         self,
-        inputs: NDArray[np.floating],
+        inputs: np.ndarray[tuple[int], np.dtype[np.floating]],
         /,
         *,
-        coeffs: NDArray[np.floating] | None = None,
-        sample: NDArray[np.floating] | None = None,
-    ) -> NDArray[np.floating]:
+        coeffs: np.ndarray[tuple[int], np.dtype[np.floating]] | None = None,
+        sample: np.ndarray[tuple[int], np.dtype[np.floating]] | None = None,
+    ) -> np.ndarray[tuple[int], np.dtype[np.floating]]:
         if self.has_polynomial_expansion:
             return self._variate_pdf_from_polynomials(
                 inputs, coeffs=coeffs, sample=sample
@@ -347,85 +384,64 @@ class DensityModel:
 
     def variate_cdf(
         self,
-        inputs: NDArray[np.floating],
+        inputs: np.ndarray[tuple[int], np.dtype[np.floating]],
         /,
         *,
-        coeffs: NDArray[np.floating] | None = None,
-        sample: NDArray[np.floating] | None = None,
-    ) -> NDArray[np.floating]:
+        coeffs: np.ndarray[tuple[int], np.dtype[np.floating]] | None = None,
+        sample: np.ndarray[tuple[int], np.dtype[np.floating]] | None = None,
+    ) -> np.ndarray[tuple[int], np.dtype[np.floating]]:
         cdf_interpolator = self.build_variate_cdf_interpolator(
             coeffs=coeffs, sample=sample
         )
         return cdf_interpolator(inputs)
 
-    def weight_pdf(self, inputs: NDArray[np.floating], /) -> NDArray[np.floating]:
+    def weight_pdf(
+        self,
+        inputs: np.ndarray[tuple[int], np.dtype[np.floating]],
+        /,
+    ) -> np.ndarray[tuple[int], np.dtype[np.floating]]:
         if not self.has_polynomial_expansion:
             return self._average_pdf_from_samples(inputs)
 
         return self.compute_polynomial_weight(inputs)
 
-    def weight_cdf(self, inputs: NDArray[np.floating], /) -> NDArray[np.floating]:
+    def weight_cdf(
+        self,
+        inputs: np.ndarray[tuple[int], np.dtype[np.floating]],
+        /,
+    ) -> np.ndarray[tuple[int], np.dtype[np.floating]]:
         if not self.has_polynomial_expansion:
             return self._average_cdf_from_samples(inputs)
 
         return self._weight_cdf_interpolator(inputs)
 
     def _average_cdf_from_polynomials(
-        self, inputs: NDArray[np.floating]
-    ) -> NDArray[np.floating]:
+        self,
+        inputs: np.ndarray[tuple[int], np.dtype[np.floating]],
+    ) -> np.ndarray[tuple[int], np.dtype[np.floating]]:
         return self.build_variate_cdf_interpolator(coeffs=self.average_coeffs)(inputs)
 
     def _average_cdf_from_samples(
-        self, inputs: NDArray[np.floating]
-    ) -> NDArray[np.floating]:
+        self,
+        inputs: np.ndarray[tuple[int], np.dtype[np.floating]],
+    ) -> np.ndarray[tuple[int], np.dtype[np.floating]]:
         return self._average_cdf_interpolator(inputs)
 
     def _average_pdf_from_polynomials(
-        self, inputs: NDArray[np.floating]
-    ) -> NDArray[np.floating]:
+        self,
+        inputs: np.ndarray[tuple[int], np.dtype[np.floating]],
+    ) -> np.ndarray[tuple[int], np.dtype[np.floating]]:
         return self._variate_pdf_from_polynomials(inputs, coeffs=self.average_coeffs)
 
     def _average_pdf_from_samples(
-        self, inputs: NDArray[np.floating]
-    ) -> NDArray[np.floating]:
+        self,
+        inputs: np.ndarray[tuple[int], np.dtype[np.floating]],
+    ) -> np.ndarray[tuple[int], np.dtype[np.floating]]:
         return self._average_pdf_interpolator(inputs)
-
-    def _compute_average_coeffs(self) -> NDArray[np.floating]:
-        average_coeffs = np.zeros(self.max_polynomial_degree + 1)
-        for sample in self.sample_stream(realizs=self.optimal_realizs):
-            average_coeffs += self.compute_variate_coeffs(sample)
-
-        average_coeffs /= self.optimal_realizs
-        return average_coeffs
-
-    def _build_weight_cdf_interpolator(self) -> PchipInterpolator:
-        return build_cdf_interpolator_from_pdf(
-            self.weight_pdf,
-            inputs=np.linspace(*self.plot_range, self.num_pts),
-        )
-
-    def _build_average_cdf_interpolator(self) -> PchipInterpolator:
-        return build_cdf_interpolator_from_pdf(
-            self.average_pdf,
-            inputs=np.linspace(*self.plot_range, self.num_pts),
-        )
-
-    def _build_average_pdf_interpolator_from_samples(self) -> PchipInterpolator:
-        bins = np.linspace(*self.plot_range, self.num_bins + 1)
-        counts = np.zeros(self.num_bins, dtype=np.intp)
-
-        for sample in self.sample_stream(self.optimal_realizs):
-            counts += np.histogram(sample, bins=bins)[0]
-
-        return build_pdf_interpolator_from_histogram(
-            histogram=compute_histogram(counts, bins=bins),
-            bins=bins,
-            kernel_std_dev=self.kernel_std_dev,
-        )
 
     def _build_variate_pdf_interpolator_from_sample(
         self,
-        sample: NDArray[np.floating],
+        sample: np.ndarray[tuple[int], np.dtype[np.floating]],
     ) -> PchipInterpolator:
         bins = np.linspace(*self.plot_range, self.num_bins + 1)
         counts = np.histogram(sample, bins=bins)[0]
@@ -438,33 +454,34 @@ class DensityModel:
 
     def _variate_pdf_from_polynomials(
         self,
-        inputs: NDArray[np.floating],
+        inputs: np.ndarray[tuple[int], np.dtype[np.floating]],
         *,
-        coeffs: NDArray[np.floating] | None = None,
-        sample: NDArray[np.floating] | None = None,
-    ) -> NDArray[np.floating]:
+        coeffs: np.ndarray[tuple[int], np.dtype[np.floating]] | None = None,
+        sample: np.ndarray[tuple[int], np.dtype[np.floating]] | None = None,
+    ) -> np.ndarray[tuple[int], np.dtype[np.floating]]:
         if (coeffs is None) == (sample is None):
             raise ValueError("Exactly one of `coeffs` or `sample` must be provided.")
 
         if sample is not None:
             expansion_coeffs = self.compute_variate_coeffs(sample)
         else:
-            expansion_coeffs = cast(NDArray[np.floating], coeffs)
+            expansion_coeffs = cast(np.ndarray[tuple[int], np.dtype[np.floating]], coeffs)
 
         weight_function = self.compute_polynomial_weight(inputs)
         polynomials = self.compute_polynomials(inputs)
 
         expansion_factor = cast(
-            NDArray[np.floating], np.sum(expansion_coeffs[:, None] * polynomials, axis=0)
+            np.ndarray[tuple[int], np.dtype[np.floating]],
+            np.sum(expansion_coeffs[:, None] * polynomials, axis=0),
         )
         return weight_function * expansion_factor
 
     def _variate_pdf_from_sample(
         self,
-        inputs: NDArray[np.floating],
+        inputs: np.ndarray[tuple[int], np.dtype[np.floating]],
         *,
-        sample: NDArray[np.floating] | None = None,
-    ) -> NDArray[np.floating]:
+        sample: np.ndarray[tuple[int], np.dtype[np.floating]] | None = None,
+    ) -> np.ndarray[tuple[int], np.dtype[np.floating]]:
         if sample is None:
             raise ValueError("`sample` must be provided for sample-based PDFs.")
 

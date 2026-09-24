@@ -20,18 +20,18 @@ def _build_gue_matrix(
     std_dev: float,
     rng: np.random.Generator,
 ) -> None:
-    size = matrix.shape[0]  # pyright: ignore[reportAny]
-    for i in range(size):  # pyright: ignore[reportAny]
+    size = matrix.shape[0]
+    for i in range(size):
         matrix[i, i] = 2 * std_dev * rng.standard_normal(None, real_dtype)
         matrix[i + 1 :, i] = std_dev * (
-            rng.standard_normal(size - i - 1, real_dtype)  # pyright: ignore[reportAny]
-            + 1j * rng.standard_normal(size - i - 1, real_dtype)  # pyright: ignore[reportAny]
+            rng.standard_normal(size - i - 1, real_dtype)
+            + 1j * rng.standard_normal(size - i - 1, real_dtype)
         )
         matrix[i, i + 1 :] = np.conj(matrix[i + 1 :, i])
 
 
 def _compute_standard_deviation(gue: GaussianUnitaryEnsemble) -> float:
-    return cast(float, gue.spectral_radius / 2 / np.sqrt(2 * gue.dimension))
+    return gue.spectral_radius / 2 / cast(float, np.sqrt(2 * gue.dimension))
 
 
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False)

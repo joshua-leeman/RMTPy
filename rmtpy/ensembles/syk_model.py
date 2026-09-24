@@ -6,12 +6,17 @@ from typing import ClassVar, cast, override
 import attrs
 import numba
 import numpy as np
-from numpy.typing import NDArray
 
 from ..conversion import RMT_CONVERTER, SourceDict
-from ..fermions import DecomposedSparseArray, MajoranaFermionBasis
+from ..fermions import (
+    MajoranaFermionBasis,
+    QMonomialsDataComplex,
+    QMonomialsDataReal,
+    QMonomialsDecomposed,
+    QMonomialsIndices,
+)
 from ..polynomials import (
-    Float64Function,
+    FloatFunction,
     OrthogonalPolynomials,
     q_hermite_polynomial_weight,
     q_hermite_polynomials,
@@ -29,17 +34,17 @@ def _build_syk_matrix_with_imaginary_prefactor(
     matrix: HermitianMatrix,
     real_dtype: type[np.floating],
     std_dev: float,
-    monomials_idxs: NDArray[np.int32],
-    monomials_data: NDArray[np.complexfloating],
+    monomials_idxs: QMonomialsIndices,
+    monomials_data: QMonomialsDataComplex,
     rng: np.random.Generator,
 ) -> None:
-    num_monomials = monomials_data.shape[0]  # pyright: ignore[reportAny]
-    num_nonzeros = monomials_data.shape[1]  # pyright: ignore[reportAny]
-    coefficients = std_dev * rng.standard_normal(num_monomials, real_dtype)  # pyright: ignore[reportAny, reportUnknownVariableType]
+    num_monomials = monomials_data.shape[0]
+    num_nonzeros = monomials_data.shape[1]
+    coefficients = std_dev * rng.standard_normal(num_monomials, real_dtype)
 
     matrix.fill(0.0)
-    for i in range(num_monomials):  # pyright: ignore[reportAny]
-        for j in range(num_nonzeros):  # pyright: ignore[reportAny]
+    for i in range(num_monomials):
+        for j in range(num_nonzeros):
             entry_idx = (monomials_idxs[i, 0, j], monomials_idxs[i, 1, j])
             matrix[entry_idx] += 1j * coefficients[i] * monomials_data[i, j]
 
@@ -49,17 +54,17 @@ def _build_syk_matrix_without_imaginary_prefactor(
     matrix: RealSymmetricMatrix | HermitianMatrix,
     real_dtype: type[np.floating],
     std_dev: float,
-    monomials_idxs: NDArray[np.int32],
-    monomials_data: NDArray[np.int8] | NDArray[np.complexfloating],
+    monomials_idxs: QMonomialsIndices,
+    monomials_data: QMonomialsDataReal | QMonomialsDataComplex,
     rng: np.random.Generator,
 ) -> None:
-    num_monomials = monomials_data.shape[0]  # pyright: ignore[reportAny]
-    num_nonzeros = monomials_data.shape[1]  # pyright: ignore[reportAny]
-    coefficients = std_dev * rng.standard_normal(num_monomials, real_dtype)  # pyright: ignore[reportAny, reportUnknownVariableType]
+    num_monomials = monomials_data.shape[0]
+    num_nonzeros = monomials_data.shape[1]
+    coefficients = std_dev * rng.standard_normal(num_monomials, real_dtype)
 
     matrix.fill(0.0)
-    for i in range(num_monomials):  # pyright: ignore[reportAny]
-        for j in range(num_nonzeros):  # pyright: ignore[reportAny]
+    for i in range(num_monomials):
+        for j in range(num_nonzeros):
             entry_idx = (monomials_idxs[i, 0, j], monomials_idxs[i, 1, j])
             matrix[entry_idx] += coefficients[i] * monomials_data[i, j]
 
@@ -95,7 +100,7 @@ def _compute_dyson_index(syk: SachdevYeKitaevEnsemble) -> int:
 def _compute_standard_deviation(syk: SachdevYeKitaevEnsemble) -> float:
     conventional_denominator = cast(int, pow(syk.num_majoranas, (syk.q - 1)))
     variance_numerical_factor = math.factorial(syk.q - 1) / conventional_denominator
-    return cast(float, syk.interaction_strength * np.sqrt(variance_numerical_factor))
+    return syk.interaction_strength * cast(float, np.sqrt(variance_numerical_factor))
 
 
 def _compute_suppression_factor(syk: SachdevYeKitaevEnsemble) -> float:
@@ -108,7 +113,7 @@ def _compute_suppression_factor(syk: SachdevYeKitaevEnsemble) -> float:
 
 def _compute_spectral_radius(syk: SachdevYeKitaevEnsemble) -> float:
     radius_numerical_factor = math.comb(syk.num_majoranas, syk.q) / (1 - syk.suppression)
-    return cast(float, (2 * syk.std_dev) * np.sqrt(radius_numerical_factor))
+    return (2 * syk.std_dev) * cast(float, np.sqrt(radius_numerical_factor))
 
 
 def _create_majorana_fermion_basis(syk: SachdevYeKitaevEnsemble) -> MajoranaFermionBasis:
@@ -176,7 +181,7 @@ class SachdevYeKitaevEnsemble(ManyBodyEnsemble):
         return f"{super().token_name}_{self.q}_{parity}"
 
     @cached_property
-    def _decomposed_q_monomials(self) -> DecomposedSparseArray:
+    def _decomposed_q_monomials(self) -> QMonomialsDecomposed:
         return self.majorana_fermion_basis.build_decomposed_q_monomials(q=self.q)
 
     @classmethod
@@ -236,21 +241,21 @@ class SachdevYeKitaevEnsemble(ManyBodyEnsemble):
     @override
     def assign_spectral_polynomials(self) -> OrthogonalPolynomials:
         def syk_model_spectral_polynomials(
-            x: NDArray[np.float64],
+            x: np.ndarray[tuple[int], np.dtype[np.floating]],
             /,
             *,
             degree: int,
-        ) -> NDArray[np.float64]:
+        ) -> np.ndarray[tuple[int, int], np.dtype[np.floating]]:
             return q_hermite_polynomials(x, eta=self.suppression, degree=degree)
 
         return syk_model_spectral_polynomials
 
     @override
-    def assign_spectral_weight(self) -> Float64Function:
+    def assign_spectral_weight(self) -> FloatFunction:
         def syk_model_spectral_weight(
-            energies: NDArray[np.float64],
+            energies: np.ndarray[tuple[int], np.dtype[np.floating]],
             /,
-        ) -> NDArray[np.float64]:
+        ) -> np.ndarray[tuple[int], np.dtype[np.floating]]:
             return q_hermite_polynomial_weight(
                 energies,
                 support_radius=self.spectral_radius,

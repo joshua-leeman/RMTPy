@@ -3,7 +3,6 @@ from typing import cast
 
 import attrs
 import numpy as np
-from numpy.typing import NDArray
 from scipy.integrate import cumulative_trapezoid
 from scipy.interpolate import PchipInterpolator
 
@@ -23,23 +22,23 @@ def normalize_degrees(degrees: Iterable[int], /) -> tuple[int, ...]:
 
 
 def unfold_values(
-    values: NDArray[np.floating],
+    values: np.ndarray[tuple[int], np.dtype[np.floating]],
     /,
     *,
     cdf: FloatFunction,
     dimension: int,
-) -> NDArray[np.floating]:
+) -> np.ndarray[tuple[int], np.dtype[np.floating]]:
     return unfold_values_with_cdf(values, cdf=cdf, dimension=dimension)
 
 
 def unfold_widths(
-    widths: NDArray[np.floating],
+    widths: np.ndarray[tuple[int], np.dtype[np.floating]],
     /,
     *,
-    centers: NDArray[np.floating],
+    centers: np.ndarray[tuple[int], np.dtype[np.floating]],
     cdf: FloatFunction,
     dimension: int,
-) -> NDArray[np.floating]:
+) -> np.ndarray[tuple[int], np.dtype[np.floating]]:
     return unfold_widths_with_cdf(
         widths=widths,
         centers=centers,
@@ -48,7 +47,9 @@ def unfold_widths(
     )
 
 
-def _build_grid(factory: TruncatedPolynomialCdfFactory) -> NDArray[np.floating]:
+def _build_input_grid(
+    factory: TruncatedPolynomialCDFFactory,
+) -> np.ndarray[tuple[int], np.dtype[np.floating]]:
     if not factory.degrees:
         return np.empty(0, dtype=np.float64)
 
@@ -58,22 +59,26 @@ def _build_grid(factory: TruncatedPolynomialCdfFactory) -> NDArray[np.floating]:
     )
 
 
-def _compute_polynomials(factory: TruncatedPolynomialCdfFactory) -> NDArray[np.floating]:
+def _compute_polynomials(
+    factory: TruncatedPolynomialCDFFactory,
+) -> np.ndarray[tuple[int, int], np.dtype[np.floating]]:
     if not factory.degrees:
         return np.empty((0, 0), dtype=np.float64)
 
-    return factory.density.compute_polynomials(factory.grid)
+    return factory.density.compute_polynomials(factory.input_grid)
 
 
-def _compute_weight(factory: TruncatedPolynomialCdfFactory) -> NDArray[np.floating]:
+def _compute_weight(
+    factory: TruncatedPolynomialCDFFactory,
+) -> np.ndarray[tuple[int], np.dtype[np.floating]]:
     if not factory.degrees:
-        return np.empty(0, dtype=np.float64)
+        return np.empty((0,), dtype=np.float64)
 
-    return factory.density.compute_polynomial_weight(factory.grid)
+    return factory.density.compute_polynomial_weight(factory.input_grid)
 
 
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
-class TruncatedPolynomialCdfFactory:
+class TruncatedPolynomialCDFFactory:
     density: DensityModel = attrs.field(
         validator=attrs.validators.instance_of(DensityModel),
     )
@@ -93,17 +98,17 @@ class TruncatedPolynomialCdfFactory:
         repr=False,
     )
 
-    grid: NDArray[np.floating] = attrs.field(
-        default=attrs.Factory(_build_grid, takes_self=True),
+    input_grid: np.ndarray[tuple[int], np.dtype[np.floating]] = attrs.field(
+        default=attrs.Factory(_build_input_grid, takes_self=True),
         init=False,
         repr=False,
     )
-    polynomials: NDArray[np.floating] = attrs.field(
+    polynomials: np.ndarray[tuple[int, int], np.dtype[np.floating]] = attrs.field(
         default=attrs.Factory(_compute_polynomials, takes_self=True),
         init=False,
         repr=False,
     )
-    weight: NDArray[np.floating] = attrs.field(
+    weight: np.ndarray[tuple[int], np.dtype[np.floating]] = attrs.field(
         default=attrs.Factory(_compute_weight, takes_self=True),
         init=False,
         repr=False,
@@ -131,14 +136,16 @@ class TruncatedPolynomialCdfFactory:
         return self.interpolators_from_coeffs(coeffs)
 
     def build_interpolator(
-        self, *, pdf_values: NDArray[np.floating]
+        self,
+        *,
+        pdf_values: np.ndarray[tuple[int], np.dtype[np.floating]],
     ) -> PchipInterpolator:
-        cdf_values = cumulative_trapezoid(y=pdf_values, x=self.grid, initial=0)
-        return PchipInterpolator(x=self.grid, y=cdf_values, extrapolate=True)
+        cdf_values = cumulative_trapezoid(y=pdf_values, x=self.input_grid, initial=0)
+        return PchipInterpolator(x=self.input_grid, y=cdf_values, extrapolate=True)
 
     def interpolators_from_coeffs(
         self,
-        coeffs: NDArray[np.floating],
+        coeffs: np.ndarray[tuple[int], np.dtype[np.floating]],
         /,
     ) -> tuple[PchipInterpolator, ...]:
         coeffs = np.asarray(coeffs)
@@ -146,12 +153,12 @@ class TruncatedPolynomialCdfFactory:
             raise ValueError("Coefficient array is shorter than the requested degree.")
 
         interpolators: list[PchipInterpolator] = []
-        polynomial_sum = np.zeros_like(self.grid, dtype=np.float64)
+        polynomial_sum = np.zeros_like(self.input_grid, dtype=np.float64)
         next_degree = 0
 
         for degree in self.degrees:
             polynomial_sum += cast(
-                NDArray[np.floating],
+                np.ndarray[tuple[int], np.dtype[np.floating]],
                 np.sum(
                     coeffs[next_degree : degree + 1, None]
                     * self.polynomials[next_degree : degree + 1],

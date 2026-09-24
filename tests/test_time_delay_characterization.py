@@ -9,7 +9,7 @@ import numpy as np
 
 from rmtpy.compounds import CompoundEnsemble
 from rmtpy.ensembles import GOE
-from rmtpy.simulations.base_simulation import SimulationExecutionState as ExecutionState
+from rmtpy.simulations.base_simulation import ExecutionState as ExecutionState
 from rmtpy.simulations.time_delay_statistics import (
     TimeDelayStatisticsRequest,
     TimeDelayStatisticsResult,
@@ -25,7 +25,7 @@ from rmtpy.simulations.time_delay_statistics.time_delay_histograms import (
 from rmtpy.simulations.time_delay_statistics.time_delay_statistics_simulation import (
     unfold_delay_values,
 )
-from rmtpy.simulations.unfolding import TruncatedPolynomialCdfFactory
+from rmtpy.simulations.unfolding import TruncatedPolynomialCDFFactory
 
 
 def build_compound(*, max_degree: int = 0, seed: int = 123) -> CompoundEnsemble:
@@ -239,7 +239,7 @@ class TimeDelayStatisticsTests(unittest.TestCase):
         )
         control = build_compound(max_degree=2, seed=314159)
         initial_rng_state = deepcopy(simulation.compound.rng_state)
-        factory = TruncatedPolynomialCdfFactory(
+        factory = TruncatedPolynomialCDFFactory(
             density=control.ensemble.spectral_density,
             degrees=(1, 2),
             density_name="spectral",

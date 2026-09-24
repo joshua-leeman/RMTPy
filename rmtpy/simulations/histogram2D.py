@@ -3,7 +3,6 @@ from typing import ClassVar
 
 import attrs
 import numpy as np
-from numpy.typing import NDArray
 
 from ..density import Support, array_of_floats, compute_bin_centers
 from ..validators import is_valid_support, to_support_pair
@@ -12,11 +11,16 @@ from .base_data import Data
 NUM_BINS: int = 100
 
 
-def _build_empty_histogram2D(hist: Histogram2D) -> NDArray[np.floating]:
+def _build_empty_histogram2D(
+    hist: Histogram2D,
+) -> np.ndarray[tuple[int, int], np.dtype[np.floating]]:
     return np.zeros((hist.x_num_bins, hist.y_num_bins), dtype=np.float64)
 
 
-def _build_histogram2D_bins(hist: Histogram2D, axis: str) -> NDArray[np.floating]:
+def _build_histogram2D_axis_bins(
+    hist: Histogram2D,
+    axis: str,
+) -> np.ndarray[tuple[int], np.dtype[np.floating]]:
     if axis.strip().lower() == "x":
         return array_of_floats(
             support=hist.x_support,
@@ -35,11 +39,17 @@ def _build_histogram2D_bins(hist: Histogram2D, axis: str) -> NDArray[np.floating
         raise ValueError("`axis` must be either 'x' and 'y'.")
 
 
-def _build_zeroed_histogram2D_counts(hist: Histogram2D) -> NDArray[np.int64]:
+def _build_zeroed_histogram2D_counts(
+    hist: Histogram2D,
+) -> np.ndarray[tuple[int, int], np.dtype[np.int64]]:
     return np.zeros((hist.x_num_bins, hist.y_num_bins), dtype=np.int64)
 
 
-def _validate_x_bins(hist: Histogram2D, _: object, values: NDArray[np.floating]) -> None:
+def _validate_x_bins(
+    hist: Histogram2D,
+    _: object,
+    values: np.ndarray[tuple[int], np.dtype[np.floating]],
+) -> None:
     if (
         values.shape != (hist.x_num_bins + 1,)
         or not np.issubdtype(values.dtype, np.floating)
@@ -49,7 +59,11 @@ def _validate_x_bins(hist: Histogram2D, _: object, values: NDArray[np.floating])
         raise ValueError("2-D histogram x bins do not match the declared bin count.")
 
 
-def _validate_y_bins(hist: Histogram2D, _: object, values: NDArray[np.floating]) -> None:
+def _validate_y_bins(
+    hist: Histogram2D,
+    _: object,
+    values: np.ndarray[tuple[int], np.dtype[np.floating]],
+) -> None:
     if (
         values.shape != (hist.y_num_bins + 1,)
         or not np.issubdtype(values.dtype, np.floating)
@@ -59,7 +73,11 @@ def _validate_y_bins(hist: Histogram2D, _: object, values: NDArray[np.floating])
         raise ValueError("2-D histogram y bins do not match the declared bin count.")
 
 
-def _validate_counts(hist: Histogram2D, _: object, values: NDArray[np.int64]) -> None:
+def _validate_counts(
+    hist: Histogram2D,
+    _: object,
+    values: np.ndarray[tuple[int, int], np.dtype[np.int64]],
+) -> None:
     if (
         values.shape != (hist.x_num_bins, hist.y_num_bins)
         or not np.issubdtype(values.dtype, np.integer)
@@ -69,7 +87,9 @@ def _validate_counts(hist: Histogram2D, _: object, values: NDArray[np.int64]) ->
 
 
 def _validate_histogram(
-    hist: Histogram2D, _: object, values: NDArray[np.floating]
+    hist: Histogram2D,
+    _: object,
+    values: np.ndarray[tuple[int, int], np.dtype[np.floating]],
 ) -> None:
     if (
         values.shape != (hist.x_num_bins, hist.y_num_bins)
@@ -120,32 +140,32 @@ class Histogram2D(Data):
         repr=False,
     )
 
-    x_bins: NDArray[np.floating] = attrs.field(
+    x_bins: np.ndarray[tuple[int], np.dtype[np.floating]] = attrs.field(
         default=attrs.Factory(
-            partial(_build_histogram2D_bins, axis="x"),
+            partial(_build_histogram2D_axis_bins, axis="x"),
             takes_self=True,
         ),
         converter=np.asarray,
         validator=_validate_x_bins,
         repr=False,
     )
-    y_bins: NDArray[np.floating] = attrs.field(
+    y_bins: np.ndarray[tuple[int], np.dtype[np.floating]] = attrs.field(
         default=attrs.Factory(
-            partial(_build_histogram2D_bins, axis="y"),
+            partial(_build_histogram2D_axis_bins, axis="y"),
             takes_self=True,
         ),
         converter=np.asarray,
         validator=_validate_y_bins,
         repr=False,
     )
-    counts: NDArray[np.int64] = attrs.field(
+    counts: np.ndarray[tuple[int, int], np.dtype[np.int64]] = attrs.field(
         default=attrs.Factory(_build_zeroed_histogram2D_counts, takes_self=True),
         converter=np.asarray,
         validator=_validate_counts,
         repr=False,
     )
 
-    histogram: NDArray[np.floating] = attrs.field(
+    histogram: np.ndarray[tuple[int, int], np.dtype[np.floating]] = attrs.field(
         default=attrs.Factory(_build_empty_histogram2D, takes_self=True),
         converter=np.asarray,
         validator=_validate_histogram,
@@ -161,8 +181,8 @@ class Histogram2D(Data):
     def add_histogram_contribution(
         self,
         *,
-        x_data: NDArray[np.floating],
-        y_data: NDArray[np.floating],
+        x_data: np.ndarray[tuple[int], np.dtype[np.floating]],
+        y_data: np.ndarray[tuple[int], np.dtype[np.floating]],
     ) -> None:
         x_indices = np.searchsorted(self.x_bins, x_data, side="right") - 1
         y_indices = np.searchsorted(self.y_bins, y_data, side="right") - 1
@@ -197,7 +217,10 @@ class Histogram2D(Data):
 
     def compute_average_x_curve(
         self,
-    ) -> tuple[NDArray[np.floating], NDArray[np.floating]]:
+    ) -> tuple[
+        np.ndarray[tuple[int], np.dtype[np.floating]],
+        np.ndarray[tuple[int], np.dtype[np.floating]],
+    ]:
         total = np.sum(self.counts)
         if total == 0:
             prob_x_and_y = np.zeros_like(self.histogram)

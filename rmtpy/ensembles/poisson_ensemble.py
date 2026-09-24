@@ -4,11 +4,10 @@ from typing import ClassVar, cast, override
 import attrs
 import numba
 import numpy as np
-from numpy.typing import NDArray
 
 from ..conversion import RMT_CONVERTER, SourceDict
 from ..polynomials import (
-    Float64Function,
+    FloatFunction,
     OrthogonalPolynomials,
     legendre_polynomial_weight,
     legendre_polynomials,
@@ -28,9 +27,6 @@ from .wigner_dyson_ensemble import (
     WIGNER_DYSON_ENSEMBLE_NAMES_BY_INITIALISM,
     WignerDysonEnsemble,
 )
-
-type UpperComplexTriangleCloner = Callable[[NDArray[np.complexfloating]], None]
-type UpperRealTriangleCloner = Callable[[NDArray[np.floating]], None]
 
 INITIALISM: str = "Poisson"
 
@@ -52,17 +48,19 @@ def _compute_standard_deviation(poisson: PoissonEnsemble) -> float:
 
 @numba.njit(boundscheck=False, cache=True, fastmath=True)
 def _symmetrize_upper_complex_triangle_to_lower(
-    matrix: NDArray[np.complexfloating],
+    matrix: np.ndarray[tuple[int, int], np.dtype[np.complexfloating]],
 ) -> None:
-    size = matrix.shape[0]  # pyright: ignore[reportAny]
-    for i in range(size):  # pyright: ignore[reportAny]
+    size = matrix.shape[0]
+    for i in range(size):
         matrix[i + 1 :, i] = matrix[i, i + 1 :].conj()
 
 
 @numba.njit(boundscheck=False, cache=True, fastmath=True)
-def _symmetrize_upper_real_triangle_to_lower(matrix: NDArray[np.floating]) -> None:
-    size = matrix.shape[0]  # pyright: ignore[reportAny]
-    for i in range(size):  # pyright: ignore[reportAny]
+def _symmetrize_upper_real_triangle_to_lower(
+    matrix: np.ndarray[tuple[int, int], np.dtype[np.floating]],
+) -> None:
+    size = matrix.shape[0]
+    for i in range(size):
         matrix[i + 1 :, i] = matrix[i, i + 1 :]
 
 
@@ -121,15 +119,15 @@ class PoissonEnsemble(ManyBodyEnsemble):
 
         lapack_heev = self._pick_lapack_heev(use_complex_dtype=use_complex_dtype)
 
-        eigvecs = cast(
-            NDArray[np.generic],
+        eigvecs, _, _ = cast(
+            tuple[OrthogonalMatrix | UnitaryMatrix, object, object],
             lapack_heev(
                 self.eigvec_ensemble.generate_matrix(
                     use_complex_dtype=use_complex_dtype,
                 ),
                 compute_v=1,
                 overwrite_a=True,
-            )[1],
+            ),
         )
         eigvals = self.generate_eigenvalues()
 
@@ -202,11 +200,11 @@ class PoissonEnsemble(ManyBodyEnsemble):
     @override
     def porter_thomas_distribution(
         self,
-        widths: NDArray[np.float64],
+        widths: np.ndarray[tuple[int], np.dtype[np.floating]],
         /,
         *,
         num_channels: int = 1,
-    ) -> NDArray[np.float64]:
+    ) -> np.ndarray[tuple[int], np.dtype[np.floating]]:
         return porter_thomas_distribution(
             widths,
             dyson_index=self.eigvec_ensemble.dyson_index,
@@ -216,21 +214,21 @@ class PoissonEnsemble(ManyBodyEnsemble):
     @override
     def assign_spectral_polynomials(self) -> OrthogonalPolynomials:
         def poisson_spectral_polynomials(
-            x: NDArray[np.float64],
+            x: np.ndarray[tuple[int], np.dtype[np.floating]],
             /,
             *,
             degree: int,
-        ) -> NDArray[np.float64]:
+        ) -> np.ndarray[tuple[int, int], np.dtype[np.floating]]:
             return legendre_polynomials(x, degree=degree)
 
         return poisson_spectral_polynomials
 
     @override
-    def assign_spectral_weight(self) -> Float64Function:
+    def assign_spectral_weight(self) -> FloatFunction:
         def poisson_spectral_weight(
-            energies: NDArray[np.float64],
+            energies: np.ndarray[tuple[int], np.dtype[np.floating]],
             /,
-        ) -> NDArray[np.float64]:
+        ) -> np.ndarray[tuple[int], np.dtype[np.floating]]:
             return legendre_polynomial_weight(
                 energies,
                 support_radius=self.spectral_radius,

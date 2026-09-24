@@ -1,7 +1,6 @@
 from typing import cast
 
 import numpy as np
-from numpy.typing import NDArray
 from scipy.special import gamma
 
 
@@ -14,11 +13,11 @@ def universality_class(*, dyson_index: int) -> str | None:
 
 
 def wigner_surmise(
-    spacings: NDArray[np.floating],
+    spacings: np.ndarray[tuple[int], np.dtype[np.floating]],
     /,
     *,
     dyson_index: int,
-) -> NDArray[np.floating]:
+) -> np.ndarray[tuple[int], np.dtype[np.floating]]:
     if dyson_index == 0:
         return np.exp(-spacings)
 
@@ -33,24 +32,24 @@ def wigner_surmise(
 
 
 def porter_thomas_distribution(
-    widths: NDArray[np.floating],
+    widths: np.ndarray[tuple[int], np.dtype[np.floating]],
     /,
     *,
     dyson_index: int,
     num_channels: int,
-) -> NDArray[np.floating]:
+) -> np.ndarray[tuple[int], np.dtype[np.floating]]:
     real_dof = num_channels if dyson_index == 1 else 2 * num_channels
     coeff = cast(int, (real_dof / 2) ** (real_dof / 2) / gamma(real_dof / 2))
     return coeff * widths ** (real_dof / 2 - 1) * np.exp(-real_dof * widths / 2)
 
 
 def connected_sff(
-    times: NDArray[np.floating],
+    times: np.ndarray[tuple[int], np.dtype[np.floating]],
     /,
     *,
     dyson_index: int,
     dimension: int,
-) -> NDArray[np.floating]:
+) -> np.ndarray[tuple[int], np.dtype[np.floating]]:
     tau = times / (2 * np.pi)
 
     if dyson_index == 1:
@@ -71,7 +70,10 @@ def connected_sff(
         csff = np.full_like(tau, 2 / dimension)
         csff[2 * tau == 1] = np.nan
 
-        mask = cast(NDArray[np.bool_], (tau < 1) & (2 * tau != 1))
+        mask = cast(
+            np.ndarray[tuple[int], np.dtype[np.bool_]],
+            (tau < 1) & (2 * tau != 1),
+        )
         csff[mask] = tau[mask] * (2 - np.log(np.abs(2 * tau[mask] - 1))) / dimension
 
         return csff
@@ -81,12 +83,12 @@ def connected_sff(
 
 
 def time_delay_pdf(
-    times: NDArray[np.floating],
+    times: np.ndarray[tuple[int], np.dtype[np.floating]],
     /,
     *,
     num_channels: int,
     heisenberg_time: float,
-) -> NDArray[np.floating]:
+) -> np.ndarray[tuple[int], np.dtype[np.floating]]:
     taus = times / heisenberg_time
     tau_plus = cast(float, (3 + np.sqrt(8)) / num_channels)
     tau_minus = cast(float, (3 - np.sqrt(8)) / num_channels)

@@ -3,7 +3,6 @@ from typing import override
 
 import attrs
 import numpy as np
-from numpy.typing import NDArray
 from scipy.sparse import csc_array
 
 from ..ensembles.many_body_ensemble import (
@@ -12,8 +11,11 @@ from ..ensembles.many_body_ensemble import (
     UnitaryMatrix,
 )
 from ..ensembles.syk_model import SachdevYeKitaevEnsemble
-from ..fermions import DecomposedSparseArray, build_decomposed_width_matrix
-from .base_compound import CompoundEnsemble
+from ..fermions import (
+    WidthMatrixDecomposed,
+    build_decomposed_width_matrix,
+)
+from .base_compound import CompoundEnsemble, CouplingMatrix
 
 
 def _build_conjugated_coupling_matrix(compound: SYKCompoundEnsemble) -> csc_array:
@@ -42,7 +44,7 @@ class SYKCompoundEnsemble(CompoundEnsemble):
     )
 
     @cached_property
-    def decomposed_width_matrix(self) -> DecomposedSparseArray:
+    def decomposed_width_matrix(self) -> WidthMatrixDecomposed:
         return build_decomposed_width_matrix(
             coupling_matrix_conj=self.coupling_matrix_conj
         )
@@ -59,12 +61,9 @@ class SYKCompoundEnsemble(CompoundEnsemble):
     def _rotate_coupling_matrix_by_eigvecs(
         self,
         eigvecs: OrthogonalMatrix | UnitaryMatrix,
-    ) -> tuple[
-        NDArray[np.floating] | NDArray[np.complexfloating],
-        NDArray[np.floating] | NDArray[np.complexfloating],
-    ]:
+    ) -> tuple[CouplingMatrix, CouplingMatrix]:
         rotated_coupling_matrix_conj = self.coupling_matrix_conj @ eigvecs
         rotated_coupling_matrix = np.conjugate(
             rotated_coupling_matrix_conj.T, out=eigvecs[:, : self.num_channels]
         )
-        return rotated_coupling_matrix, rotated_coupling_matrix_conj.T
+        return rotated_coupling_matrix, np.transpose(rotated_coupling_matrix_conj)

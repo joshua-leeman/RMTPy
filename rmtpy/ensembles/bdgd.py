@@ -24,15 +24,15 @@ def _build_bdgd_matrix(
     std_dev: float,
     rng: np.random.Generator,
 ) -> None:
-    size = matrix.shape[0]  # pyright: ignore[reportAny]
-    for i in range(size):  # pyright: ignore[reportAny]
+    size = matrix.shape[0]
+    for i in range(size):
         matrix[i, i] = 0.0
-        matrix[i + 1 :, i] = std_dev * 1j * rng.standard_normal(size - i - 1, real_dtype)  # pyright: ignore[reportAny]
+        matrix[i + 1 :, i] = std_dev * 1j * rng.standard_normal(size - i - 1, real_dtype)
         matrix[i, i + 1 :] = np.conj(matrix[i + 1 :, i])
 
 
 def _compute_standard_deviation(bdgd: BogoliubovDeGennesDEnsemble) -> float:
-    return cast(float, bdgd.spectral_radius / 2 / np.sqrt(bdgd.dimension))
+    return bdgd.spectral_radius / 2 / cast(float, np.sqrt(bdgd.dimension))
 
 
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False)

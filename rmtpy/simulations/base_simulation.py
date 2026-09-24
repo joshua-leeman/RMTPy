@@ -17,17 +17,7 @@ class _EnsembleRngOwner(Protocol):
     ensemble: RandomMatrixEnsemble
 
 
-def _resolve_rng_ensemble(
-    rng_owner: RandomMatrixEnsemble | _EnsembleRngOwner,
-    /,
-) -> RandomMatrixEnsemble:
-    if isinstance(rng_owner, RandomMatrixEnsemble):
-        return rng_owner
-
-    return cast(_EnsembleRngOwner, rng_owner).ensemble
-
-
-class SimulationExecutionState(StringEnum):
+class ExecutionState(StringEnum):
     NEW = "new"
     RUNNING = "running"
     COMPLETE = "complete"
@@ -49,7 +39,7 @@ class RunContext:
 
     simulation_config: SourceDict = attrs.field(converter=deepcopy)
 
-    output_request: dict[str, object] = attrs.field(converter=deepcopy)
+    requested_outputs: dict[str, object] = attrs.field(converter=deepcopy)
 
     rng: dict[str, object] = attrs.field(converter=deepcopy, repr=False)
     dtype: dict[str, str] = attrs.field(converter=deepcopy)
@@ -62,10 +52,20 @@ class Result:
     context: RunContext
 
 
+def _resolve_rng_from_ensemble(
+    rng_owner: RandomMatrixEnsemble | _EnsembleRngOwner,
+    /,
+) -> RandomMatrixEnsemble:
+    if isinstance(rng_owner, RandomMatrixEnsemble):
+        return rng_owner
+
+    return cast(_EnsembleRngOwner, rng_owner).ensemble
+
+
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
 class Simulation:
-    _execution_state: SimulationExecutionState = attrs.field(
-        default=SimulationExecutionState.NEW,
+    _execution_state: ExecutionState = attrs.field(
+        default=ExecutionState.NEW,
         init=False,
         repr=False,
     )
@@ -76,35 +76,35 @@ class Simulation:
     )
 
     @property
-    def execution_state(self) -> SimulationExecutionState:
+    def execution_state(self) -> ExecutionState:
         return self._execution_state
 
     @property
     def result(self) -> Result:
-        if self._execution_state is not SimulationExecutionState.COMPLETE:
-            raise RuntimeError("The simulation has not completed successfully.")
+        if self._execution_state is not ExecutionState.COMPLETE:
+            raise RuntimeError("The simulation has not completely executed yet.")
 
         return self._result
 
     def execute(self) -> Result:
-        if self._execution_state is not SimulationExecutionState.NEW:
+        if self._execution_state is not ExecutionState.NEW:
             raise RuntimeError("A simulation instance may be executed only once.")
         else:
-            object.__setattr__(self, "_execution_state", SimulationExecutionState.RUNNING)
+            object.__setattr__(self, "_execution_state", ExecutionState.RUNNING)
 
         try:
             object.__setattr__(self, "_result", self._execute())
         except BaseException:
-            object.__setattr__(self, "_execution_state", SimulationExecutionState.FAILED)
+            object.__setattr__(self, "_execution_state", ExecutionState.FAILED)
             raise
 
-        object.__setattr__(self, "_execution_state", SimulationExecutionState.COMPLETE)
+        object.__setattr__(self, "_execution_state", ExecutionState.COMPLETE)
         return self._result
 
-    def _assemble_configuration(
+    def _serialize(
         self,
         *,
-        output_fields: tuple[str, ...] = (),
+        requested_fields_to_omit: tuple[str, ...] = (),
     ) -> SourceDict:
         fields = get_attrs_fields(type(self))
         return {
@@ -112,7 +112,7 @@ class Simulation:
             "parameters": {
                 field.name: to_json_compatible(cast(object, getattr(self, field.name)))
                 for field in fields
-                if field.init and field.name not in output_fields
+                if field.init and field.name not in requested_fields_to_omit
             },
         }
 
@@ -120,41 +120,40 @@ class Simulation:
         self,
         *,
         rng_owner: RandomMatrixEnsemble | _EnsembleRngOwner,
-        output_fields: tuple[str, ...] = (),
+        requested_outputs: tuple[str, ...] = (),
     ) -> RunActivation:
-        if self._execution_state is not SimulationExecutionState.RUNNING:
+        if self._execution_state is not ExecutionState.RUNNING:
             raise RuntimeError("The simulation must be running.")
 
-        ensemble = _resolve_rng_ensemble(rng_owner)
+        ensemble = _resolve_rng_from_ensemble(rng_owner)
         return RunActivation(
-            simulation_config=self._assemble_configuration(output_fields=output_fields),
+            simulation_config=self._serialize(requested_fields_to_omit=requested_outputs),
             rng_seed=cast(SeedLike, to_json_compatible(ensemble.seed)),
             rng_state=cast(dict[str, object], to_json_compatible(ensemble.rng_state)),
         )
 
-    def _build_run_context(
+    def _establish_run_context(
         self,
         *,
         result_type: str,
         rng_owner: RandomMatrixEnsemble | _EnsembleRngOwner,
         run_start: RunActivation,
-        output_request: dict[str, object],
+        requested_outputs: dict[str, object],
         execution: dict[str, object] | None = None,
     ) -> RunContext:
-        if self._execution_state is not SimulationExecutionState.RUNNING:
+        if self._execution_state is not ExecutionState.RUNNING:
             raise RuntimeError("The simulation must be running.")
 
-        ensemble = _resolve_rng_ensemble(rng_owner)
-        bit_generator = ensemble.rng.bit_generator
-        output_request = cast(dict[str, object], to_json_compatible(output_request))
+        ensemble = _resolve_rng_from_ensemble(rng_owner)
+
         return RunContext(
             simulation_type=insert_underscores(type(self).__name__).lower(),
             result_type=result_type,
             simulation_config=run_start.simulation_config,
-            output_request=output_request,
+            requested_outputs=requested_outputs,
             rng={
                 "policy": "numpy.random.default_rng",
-                "bit_generator": type(bit_generator).__name__,
+                "bit_generator": type(ensemble.rng.bit_generator).__name__,
                 "seed": run_start.rng_seed,
                 "state_policy": "capture_initial_and_final",
                 "initial_state": run_start.rng_state,

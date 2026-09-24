@@ -1,5 +1,4 @@
 import numpy as np
-from numpy.typing import NDArray
 
 POLYNOMIAL_DEGREE_MIN: int = 1
 POLYNOMIAL_DEGREE_STEP: int = 1
@@ -15,11 +14,11 @@ LOG_D_UNFOLDED_TIME_SUPPORT: tuple[float, float] = (-1.5, 0.5)
 
 
 def nearest_neighbor_spacings(
-    values: NDArray[np.floating],
+    values: np.ndarray[tuple[int], np.dtype[np.floating]],
     /,
     *,
     degeneracy: int = 1,
-) -> NDArray[np.floating]:
+) -> np.ndarray[tuple[int], np.dtype[np.floating]]:
     spacings = np.diff(np.sort(values))
     if degeneracy > 1:
         spacings = np.repeat(spacings[1::degeneracy], degeneracy)

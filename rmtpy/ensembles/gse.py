@@ -19,7 +19,7 @@ def _build_gse_matrix(
     std_dev: float,
     rng: np.random.Generator,
 ) -> None:
-    halfway = cast(int, matrix.shape[0] // 2)
+    halfway = matrix.shape[0] // 2
     top_left_block = matrix[:halfway, :halfway]
     top_right_block = matrix[:halfway, halfway:]
     bottom_left_block = matrix[halfway:, :halfway]
@@ -40,12 +40,12 @@ def _build_gue_matrix(
     std_dev: float,
     rng: np.random.Generator,
 ) -> None:
-    size = matrix.shape[0]  # pyright: ignore[reportAny]
-    for i in range(size):  # pyright: ignore[reportAny]
+    size = matrix.shape[0]
+    for i in range(size):
         matrix[i, i] = 2 * std_dev * rng.standard_normal(None, real_dtype)
         matrix[i + 1 :, i] = std_dev * (
-            rng.standard_normal(size - i - 1, real_dtype)  # pyright: ignore[reportAny]
-            + 1j * rng.standard_normal(size - i - 1, real_dtype)  # pyright: ignore[reportAny]
+            rng.standard_normal(size - i - 1, real_dtype)
+            + 1j * rng.standard_normal(size - i - 1, real_dtype)
         )
         matrix[i, i + 1 :] = np.conj(matrix[i + 1 :, i])
 
@@ -57,18 +57,18 @@ def _build_skew_symmetric_matrix(
     std_dev: float,
     rng: np.random.Generator,
 ) -> None:
-    size = matrix.shape[0]  # pyright: ignore[reportAny]
-    for i in range(size):  # pyright: ignore[reportAny]
+    size = matrix.shape[0]
+    for i in range(size):
         matrix[i, i] = 0.0
         matrix[i + 1 :, i] = std_dev * (
-            rng.standard_normal(size - 1 - i, real_dtype)  # pyright: ignore[reportAny]
-            + 1j * rng.standard_normal(size - 1 - i, real_dtype)  # pyright: ignore[reportAny]
+            rng.standard_normal(size - 1 - i, real_dtype)
+            + 1j * rng.standard_normal(size - 1 - i, real_dtype)
         )
         matrix[i, i + 1 :] = -matrix[i + 1 :, i]
 
 
 def _compute_standard_deviation(gse: GaussianSymplecticEnsemble) -> float:
-    return cast(float, gse.spectral_radius / 2 / np.sqrt(2 * gse.dimension))
+    return gse.spectral_radius / 2 / cast(float, np.sqrt(2 * gse.dimension))
 
 
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False)

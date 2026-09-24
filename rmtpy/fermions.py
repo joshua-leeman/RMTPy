@@ -5,7 +5,6 @@ from typing import cast
 
 import attrs
 import numpy as np
-from numpy.typing import NDArray
 from scipy import sparse
 
 from .validators import is_even_number
@@ -13,8 +12,15 @@ from .validators import is_even_number
 type ParityBlockSlice = tuple[slice, slice]
 type MajoranaFermions = tuple[sparse.csr_array, ...]
 type ComplexFermions = tuple[tuple[sparse.csr_array, ...], tuple[sparse.csr_array, ...]]
-type DecomposedSparseArray = tuple[
-    NDArray[np.int32], NDArray[np.int8] | NDArray[np.complex64]
+type QMonomialsIndices = np.ndarray[tuple[int, int, int], np.dtype[np.int32]]
+type QMonomialsDataReal = np.ndarray[tuple[int, int], np.dtype[np.int8]]
+type QMonomialsDataComplex = np.ndarray[tuple[int, int], np.dtype[np.complex64]]
+type QMonomialsDecomposed = tuple[
+    QMonomialsIndices, QMonomialsDataReal | QMonomialsDataComplex
+]
+type WidthMatrixDecomposed = tuple[
+    np.ndarray[tuple[int, int], np.dtype[np.int32]],
+    np.ndarray[tuple[int], np.dtype[np.complex64]],
 ]
 
 
@@ -162,7 +168,7 @@ def build_decomposed_q_monomials(
     majorana_fermions: MajoranaFermions,
     parity_block_slice: ParityBlockSlice,
     in_real_basis: bool,
-) -> DecomposedSparseArray:
+) -> QMonomialsDecomposed:
     num_majoranas = len(majorana_fermions)
     num_nonzeros = cast(int, pow(2, num_majoranas // 2 - 1))
     num_monomials = math.comb(num_majoranas, q)
@@ -192,7 +198,7 @@ def build_decomposed_q_monomials(
 def build_conjugated_compound_coupling_matrix(
     *,
     num_free_complex_fermions: int,
-    coupling_strengths: NDArray[np.floating],
+    coupling_strengths: np.ndarray[tuple[int], np.dtype[np.floating]],
     creation_operators: MajoranaFermions,
     vacuum_state: sparse.csr_array,
     parity_block_slice: ParityBlockSlice,
@@ -263,7 +269,7 @@ def build_conjugated_compound_coupling_matrix(
 def build_decomposed_width_matrix(
     *,
     coupling_matrix_conj: sparse.csc_array,
-) -> DecomposedSparseArray:
+) -> WidthMatrixDecomposed:
     width_matrix = coupling_matrix_conj.transpose() @ coupling_matrix_conj
     width_matrix_coo = width_matrix.tocoo()
 
@@ -339,7 +345,7 @@ class MajoranaFermionBasis:
     def vacuum_state(self) -> sparse.csr_array:
         return build_vacuum_from_complex_fermions(self.complex_fermions)
 
-    def build_decomposed_q_monomials(self, *, q: int) -> DecomposedSparseArray:
+    def build_decomposed_q_monomials(self, *, q: int) -> QMonomialsDecomposed:
         return build_decomposed_q_monomials(
             q=q,
             majorana_fermions=self.majorana_fermions,
@@ -351,7 +357,7 @@ class MajoranaFermionBasis:
         self,
         *,
         num_free_complex_fermions: int,
-        coupling_strengths: NDArray[np.floating],
+        coupling_strengths: np.ndarray[tuple[int], np.dtype[np.floating]],
         dyson_index: int = 2,
     ) -> sparse.csc_array:
         return build_conjugated_compound_coupling_matrix(

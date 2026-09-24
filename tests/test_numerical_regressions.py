@@ -4,7 +4,6 @@ import unittest
 from collections.abc import Iterator
 
 import numpy as np
-from numpy.typing import NDArray
 
 from rmtpy.compounds import CompoundEnsemble
 from rmtpy.density import DensityModel
@@ -17,7 +16,7 @@ def deterministic_sample_stream(
     realizs: int,
     *,
     use_complex_dtype: bool = False,
-) -> Iterator[NDArray[np.float64]]:
+) -> Iterator[np.ndarray[tuple[int], np.dtype[np.floating]]]:
     del use_complex_dtype
     sample = np.linspace(-0.9, 0.9, 1024)
     for _ in range(realizs):
@@ -80,8 +79,10 @@ class PoissonRegressionTests(unittest.TestCase):
     def test_rng_path_cdf_and_porter_thomas_wrapper(self) -> None:
         ensemble = Poisson(num_majoranas=4, seed=123)
 
+        test_point = np.array([ensemble.spectral_radius])
+
         self.assertIs(ensemble.rng, ensemble.eigvec_ensemble.rng)
-        self.assertEqual(ensemble.cdf(np.array([ensemble.spectral_radius]))[0], 1.0)
+        self.assertEqual(ensemble.spectral_density.average_cdf(test_point)[0], 1.0)
         self.assertNotEqual(
             Poisson(num_majoranas=4, eigvec_ensemble_flag="GOE").to_path,
             Poisson(num_majoranas=4, eigvec_ensemble_flag="GUE").to_path,

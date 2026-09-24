@@ -23,7 +23,7 @@ def _build_bdgc_matrix(
     std_dev: float,
     rng: np.random.Generator,
 ) -> None:
-    halfway_index = cast(int, matrix.shape[0] // 2)
+    halfway_index = matrix.shape[0] // 2
     top_left_block = matrix[:halfway_index, :halfway_index]
     top_right_block = matrix[:halfway_index, halfway_index:]
     bottom_left_block = matrix[halfway_index:, :halfway_index]
@@ -44,12 +44,12 @@ def _build_gue_matrix(
     std_dev: float,
     rng: np.random.Generator,
 ) -> None:
-    size = matrix.shape[0]  # pyright: ignore[reportAny]
-    for i in range(size):  # pyright: ignore[reportAny]
+    size = matrix.shape[0]
+    for i in range(size):
         matrix[i, i] = 2 * std_dev * rng.standard_normal(None, real_dtype)
         matrix[i + 1 :, i] = std_dev * (
-            rng.standard_normal(size - i - 1, real_dtype)  # pyright: ignore[reportAny]
-            + 1j * rng.standard_normal(size - i - 1, real_dtype)  # pyright: ignore[reportAny]
+            rng.standard_normal(size - i - 1, real_dtype)
+            + 1j * rng.standard_normal(size - i - 1, real_dtype)
         )
         matrix[i, i + 1 :] = np.conj(matrix[i + 1 :, i])
 
@@ -61,18 +61,18 @@ def _build_symmetric_matrix(
     std_dev: float,
     rng: np.random.Generator,
 ) -> None:
-    size = matrix.shape[0]  # pyright: ignore[reportAny]
-    for i in range(size):  # pyright: ignore[reportAny]
+    size = matrix.shape[0]
+    for i in range(size):
         matrix[i, i] = 2 * std_dev * rng.standard_normal(None, real_dtype)
         matrix[i + 1 :, i] = std_dev * (
-            rng.standard_normal(size - 1 - i, real_dtype)  # pyright: ignore[reportAny]
-            + 1j * rng.standard_normal(size - 1 - i, real_dtype)  # pyright: ignore[reportAny]
+            rng.standard_normal(size - 1 - i, real_dtype)
+            + 1j * rng.standard_normal(size - 1 - i, real_dtype)
         )
         matrix[i, i + 1 :] = matrix[i + 1 :, i]
 
 
 def _compute_standard_deviation(bdgc: BogoliubovDeGennesCEnsemble) -> float:
-    return cast(float, bdgc.spectral_radius / 2 / np.sqrt(2 * bdgc.dimension))
+    return bdgc.spectral_radius / 2 / cast(float, np.sqrt(2 * bdgc.dimension))
 
 
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False)

@@ -9,7 +9,7 @@ from typing import cast
 import attrs
 import cattrs
 import numpy as np
-from numpy.typing import DTypeLike, NDArray
+from numpy.typing import DTypeLike
 
 type SourceDict = dict[str, str | dict[str, object]]
 type AttrsField = attrs.Attribute[object]
@@ -227,7 +227,12 @@ def to_json_compatible(value: object, /) -> object:
     )
 
 
-def build_hashed_id(array: NDArray[np.generic], /, *, num_hex: int = 16) -> str:
+def build_hashed_id(
+    array: np.ndarray[tuple[int, ...], np.dtype[np.generic]],
+    /,
+    *,
+    num_hex: int = 16,
+) -> str:
     hash_object = hashlib.sha256()
     hash_object.update(str(array.dtype).encode())
     hash_object.update(str(array.shape).encode())

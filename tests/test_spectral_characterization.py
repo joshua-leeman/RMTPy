@@ -8,7 +8,7 @@ from unittest.mock import patch
 import numpy as np
 
 from rmtpy.ensembles import GOE
-from rmtpy.simulations.base_simulation import SimulationExecutionState as ExecutionState
+from rmtpy.simulations.base_simulation import ExecutionState as ExecutionState
 from rmtpy.simulations.histogram import Histogram
 from rmtpy.simulations.spectral_statistics import (
     SpectralStatisticsRequest,
@@ -24,7 +24,7 @@ from rmtpy.simulations.spectral_statistics.spectral_statistics_results import (
     SpectralStatisticsResult,
 )
 from rmtpy.simulations.statistics import nearest_neighbor_spacings
-from rmtpy.simulations.unfolding import TruncatedPolynomialCdfFactory, unfold_values
+from rmtpy.simulations.unfolding import TruncatedPolynomialCDFFactory, unfold_values
 
 
 def histogram_counts(samples: list[np.ndarray], bins: np.ndarray) -> np.ndarray:
@@ -172,7 +172,7 @@ class SpectralStatisticsTests(unittest.TestCase):
         self.assertEqual(initial_rng_state, control.rng_state)
         self.assertFalse(simulation.ensemble.spectral_density.has_average_coeffs)
 
-        control_factory = TruncatedPolynomialCdfFactory(
+        control_factory = TruncatedPolynomialCDFFactory(
             density=control.spectral_density,
             degrees=(1, 2),
             density_name="spectral",

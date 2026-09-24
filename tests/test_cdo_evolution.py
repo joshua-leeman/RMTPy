@@ -11,7 +11,7 @@ import numpy as np
 from scipy.special import xlogy
 
 from rmtpy.ensembles import GOE, GUE
-from rmtpy.simulations.base_simulation import SimulationExecutionState as ExecutionState
+from rmtpy.simulations.base_simulation import ExecutionState as ExecutionState
 from rmtpy.simulations.cdo_evolution import (
     CDOEvolutionRequest,
     CDOEvolutionResult,

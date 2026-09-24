@@ -9,7 +9,7 @@ import numpy as np
 
 from rmtpy.compounds import CompoundEnsemble
 from rmtpy.ensembles import GOE
-from rmtpy.simulations.base_simulation import SimulationExecutionState as ExecutionState
+from rmtpy.simulations.base_simulation import ExecutionState as ExecutionState
 from rmtpy.simulations.histogram2D import Histogram2D
 from rmtpy.simulations.resonance_statistics import (
     ResonanceStatisticsRequest,
@@ -23,7 +23,7 @@ from rmtpy.simulations.resonance_statistics.resonance_histogram import (
     ResonanceHistogramPlot,
 )
 from rmtpy.simulations.unfolding import (
-    TruncatedPolynomialCdfFactory,
+    TruncatedPolynomialCDFFactory,
     unfold_values,
     unfold_widths,
 )
@@ -257,7 +257,7 @@ class ResonanceStatisticsTests(unittest.TestCase):
         )
         control = build_compound(max_degree=2, seed=314159)
         initial_rng_state = deepcopy(simulation.compound.rng_state)
-        factory = TruncatedPolynomialCdfFactory(
+        factory = TruncatedPolynomialCDFFactory(
             density=control.resonance_density,
             degrees=(1, 2),
             density_name="resonance",

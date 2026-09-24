@@ -7,11 +7,10 @@ import attrs
 import numpy as np
 import scipy.linalg.blas
 import scipy.linalg.lapack
-from numpy.typing import NDArray
 
 from ..conversion import RMT_CONVERTER, SourceDict
 from ..density import MAX_POLYNOMIAL_DEGREE, DensityModel
-from ..polynomials import Float64Function, OrthogonalPolynomials
+from ..polynomials import FloatFunction, OrthogonalPolynomials
 from ..universal import (
     connected_sff,
     eigval_degeneracy,
@@ -22,11 +21,11 @@ from ..universal import (
 from ..validators import is_even_number
 from .base_ensemble import RandomMatrixEnsemble
 
-type RealSymmetricMatrix = NDArray[np.floating]
-type HermitianMatrix = NDArray[np.complexfloating]
-type RealEigenvalues = NDArray[np.floating]
-type OrthogonalMatrix = NDArray[np.floating]
-type UnitaryMatrix = NDArray[np.complexfloating]
+type RealSymmetricMatrix = np.ndarray[tuple[int, int], np.dtype[np.floating]]
+type HermitianMatrix = np.ndarray[tuple[int, int], np.dtype[np.complexfloating]]
+type RealEigenvalues = np.ndarray[tuple[int], np.dtype[np.floating]]
+type OrthogonalMatrix = np.ndarray[tuple[int, int], np.dtype[np.floating]]
+type UnitaryMatrix = np.ndarray[tuple[int, int], np.dtype[np.complexfloating]]
 
 INITIALISM: str = "MBE"
 
@@ -99,10 +98,7 @@ class ManyBodyEnsemble(RandomMatrixEnsemble, ABC):
 
     @classmethod
     @override
-    def create(
-        cls,
-        src: SourceDict | RandomMatrixEnsemble,
-    ) -> ManyBodyEnsemble:
+    def create(cls, src: SourceDict | RandomMatrixEnsemble) -> ManyBodyEnsemble:
         return RMT_CONVERTER.structure(src, cls)
 
     @property
@@ -176,25 +172,29 @@ class ManyBodyEnsemble(RandomMatrixEnsemble, ABC):
 
     def porter_thomas_distribution(
         self,
-        widths: NDArray[np.float64],
+        widths: np.ndarray[tuple[int], np.dtype[np.floating]],
         /,
         *,
         num_channels: int = 1,
-    ) -> NDArray[np.float64]:
+    ) -> np.ndarray[tuple[int], np.dtype[np.floating]]:
         return porter_thomas_distribution(
             widths,
             dyson_index=self.dyson_index,
             num_channels=num_channels,
         )
 
-    def wigner_surmise(self, spacings: NDArray[np.float64], /) -> NDArray[np.float64]:
+    def wigner_surmise(
+        self,
+        spacings: np.ndarray[tuple[int], np.dtype[np.floating]],
+        /,
+    ) -> np.ndarray[tuple[int], np.dtype[np.floating]]:
         return wigner_surmise(spacings, dyson_index=self.dyson_index)
 
     def universal_connected_sff(
         self,
         /,
-        times: NDArray[np.float64],
-    ) -> NDArray[np.float64]:
+        times: np.ndarray[tuple[int], np.dtype[np.floating]],
+    ) -> np.ndarray[tuple[int], np.dtype[np.floating]]:
         return connected_sff(
             times,
             dyson_index=self.dyson_index,
@@ -210,7 +210,7 @@ class ManyBodyEnsemble(RandomMatrixEnsemble, ABC):
     def assign_spectral_polynomials(self) -> OrthogonalPolynomials | None:
         return
 
-    def assign_spectral_weight(self) -> Float64Function | None:
+    def assign_spectral_weight(self) -> FloatFunction | None:
         return
 
     def _pick_linalg_dtype(self, use_complex_dtype: bool = False) -> np.dtype:
