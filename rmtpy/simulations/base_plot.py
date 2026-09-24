@@ -332,9 +332,7 @@ class Plot(ABC):
 
     def finish_plot(self, path: str | Path) -> None:
         if not hasattr(self, "fig") or not hasattr(self, "ax"):
-            raise AttributeError(
-                "Figure and axis not yet created. Call build_figure() first."
-            )
+            raise AttributeError("Figure and axis not yet created.")
 
         try:
             if self.xlim:
