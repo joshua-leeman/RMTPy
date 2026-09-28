@@ -93,6 +93,9 @@ def to_latex(instance: attrs.AttrsInstance, /, *, latex_name: str = "") -> str:
     for label, attr in attrs.fields_dict(type(instance)).items():
         if attr.metadata.get("latex_name") is not None:
             latex_str += rf"\ {attr.metadata['latex_name']}={getattr(instance, label)}"
+        else:
+            raise ValueError(f"'latex_name' of {label} is not of type str.")
+
     return latex_str + "$"
 
 
@@ -103,6 +106,9 @@ def to_path(instance: attrs.AttrsInstance, /, *, root: Path) -> Path:
             value = str(cast(object, getattr(instance, name)))
             value = re.sub(r"[^\w\-.]", "_", value)
             root /= f"{dir_name}_{value.replace('.', 'p')}"
+        else:
+            raise ValueError(f"'dir_name' of {name} is not of type str.")
+
     return root
 
 

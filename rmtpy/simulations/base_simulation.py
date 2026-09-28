@@ -1,4 +1,6 @@
+from collections.abc import Container
 from copy import deepcopy
+from pathlib import Path
 from typing import Protocol, cast
 
 import attrs
@@ -9,6 +11,7 @@ from ..conversion import (
     get_attrs_fields,
     insert_underscores,
     to_json_compatible,
+    to_path,
 )
 from ..ensembles.base_ensemble import RandomMatrixEnsemble, SeedLike
 
@@ -26,7 +29,7 @@ class ExecutionState(StringEnum):
 
 @attrs.frozen(kw_only=True, eq=True, weakref_slot=False)
 class RunActivation:
-    simulation_config: SourceDict = attrs.field(converter=deepcopy)
+    configuration: SourceDict = attrs.field(converter=deepcopy)
 
     rng_seed: SeedLike = attrs.field(converter=deepcopy)
     rng_state: dict[str, object] = attrs.field(converter=deepcopy, repr=False)
@@ -37,7 +40,7 @@ class RunContext:
     simulation_type: str
     result_type: str
 
-    simulation_config: SourceDict = attrs.field(converter=deepcopy)
+    configuration: SourceDict = attrs.field(converter=deepcopy)
 
     requested_outputs: dict[str, object] = attrs.field(converter=deepcopy)
 
@@ -86,6 +89,14 @@ class Simulation:
 
         return self._result
 
+    @property
+    def root_for_outputs(self) -> Path:
+        return Path(insert_underscores(type(self).__name__).lower())
+
+    @property
+    def to_path(self) -> Path:
+        return to_path(self, root=self.root_for_outputs)
+
     def execute(self) -> Result:
         if self._execution_state is not ExecutionState.NEW:
             raise RuntimeError("A simulation instance may be executed only once.")
@@ -101,18 +112,14 @@ class Simulation:
         object.__setattr__(self, "_execution_state", ExecutionState.COMPLETE)
         return self._result
 
-    def _serialize(
-        self,
-        *,
-        requested_fields_to_omit: tuple[str, ...] = (),
-    ) -> SourceDict:
+    def _record_configuration(self, *, fields_to_omit: Container[str] = ()) -> SourceDict:
         fields = get_attrs_fields(type(self))
         return {
             "type": type(self).__name__,
             "parameters": {
                 field.name: to_json_compatible(cast(object, getattr(self, field.name)))
                 for field in fields
-                if field.init and field.name not in requested_fields_to_omit
+                if field.init and field.name not in fields_to_omit
             },
         }
 
@@ -120,14 +127,14 @@ class Simulation:
         self,
         *,
         rng_owner: RandomMatrixEnsemble | _EnsembleRngOwner,
-        requested_outputs: tuple[str, ...] = (),
+        requested_outputs: Container[str] = (),
     ) -> RunActivation:
         if self._execution_state is not ExecutionState.RUNNING:
             raise RuntimeError("The simulation must be running.")
 
         ensemble = _resolve_rng_from_ensemble(rng_owner)
         return RunActivation(
-            simulation_config=self._serialize(requested_fields_to_omit=requested_outputs),
+            configuration=self._record_configuration(fields_to_omit=requested_outputs),
             rng_seed=cast(SeedLike, to_json_compatible(ensemble.seed)),
             rng_state=cast(dict[str, object], to_json_compatible(ensemble.rng_state)),
         )
@@ -137,7 +144,7 @@ class Simulation:
         *,
         result_type: str,
         rng_owner: RandomMatrixEnsemble | _EnsembleRngOwner,
-        run_start: RunActivation,
+        run_activation: RunActivation,
         requested_outputs: dict[str, object],
         execution: dict[str, object] | None = None,
     ) -> RunContext:
@@ -149,14 +156,14 @@ class Simulation:
         return RunContext(
             simulation_type=insert_underscores(type(self).__name__).lower(),
             result_type=result_type,
-            simulation_config=run_start.simulation_config,
+            configuration=run_activation.configuration,
             requested_outputs=requested_outputs,
             rng={
                 "policy": "numpy.random.default_rng",
                 "bit_generator": type(ensemble.rng.bit_generator).__name__,
-                "seed": run_start.rng_seed,
+                "seed": run_activation.rng_seed,
                 "state_policy": "capture_initial_and_final",
-                "initial_state": run_start.rng_state,
+                "initial_state": run_activation.rng_state,
                 "final_state": to_json_compatible(ensemble.rng_state),
             },
             dtype={

@@ -95,21 +95,19 @@ def _axis_limits(limits: tuple[float, ...], /) -> tuple[float, float]:
 def _plot_configuration(value: object) -> object:
     if not isinstance(value, dict):
         return value
+    else:
+        value = cast(dict[object, object], value)
 
-    mapping = cast(dict[object, object], value)
-    parameters_value = mapping.get("parameters")
-    if set(mapping) == {"type", "parameters"} and isinstance(parameters_value, dict):
-        parameters = cast(dict[object, object], parameters_value)
-        if "seed" in parameters:
-            parameters["seed"] = 0
+    mapping = {key: _plot_configuration(item) for key, item in value.items()}
+    parameters = mapping.get("parameters")
+    if (
+        set(mapping) == {"type", "parameters"}
+        and isinstance(parameters, dict)
+        and "seed" in parameters
+    ):
+        parameters["seed"] = 0
 
-        for key, item in parameters.items():
-            parameters[key] = _plot_configuration(item)
-
-        mapping["parameters"] = parameters
-        return mapping
-
-    return {key: _plot_configuration(item) for key, item in mapping.items()}
+    return mapping
 
 
 @dataclasses.dataclass(slots=True, kw_only=True, eq=False, weakref_slot=False)
@@ -380,7 +378,7 @@ class Plot(ABC):
         if cache_key in self._structured_args:
             return cast(T, self._structured_args[cache_key])
 
-        parameters = self.context.simulation_config["parameters"]
+        parameters = self.context.configuration["parameters"]
         if not isinstance(parameters, dict):
             raise ValueError("Simulation configuration parameters are malformed.")
 
