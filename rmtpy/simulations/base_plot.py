@@ -18,7 +18,7 @@ from matplotlib.legend import Legend
 from ..conversion import RMT_CONVERTER
 from .base_data import Data
 from .base_simulation import RunContext
-from .histogram import Histogram
+from .histograms import Histogram
 
 type LegendAlignment = Literal["left", "center", "right"]
 type LegendLocation = Literal[
@@ -110,7 +110,7 @@ def _plot_configuration(value: object) -> object:
     return mapping
 
 
-@dataclasses.dataclass(slots=True, kw_only=True, eq=False, weakref_slot=False)
+@dataclasses.dataclass(kw_only=True, eq=False, weakref_slot=False)
 class PlotAxes:
     axes_width: float = 1.0
 
@@ -170,7 +170,7 @@ class PlotAxes:
             _ = axes.tick_params(axis="y", labelsize=self.tick_fontsize)
 
 
-@dataclasses.dataclass(slots=True, kw_only=True, eq=False, weakref_slot=False)
+@dataclasses.dataclass(kw_only=True, eq=False, weakref_slot=False)
 class LogDimensionTimeAxes(PlotAxes):
     xticks: tuple[float, ...] = (0.0, 0.5, 1.0)  # log scale base dimension
 
@@ -183,7 +183,7 @@ class LogDimensionTimeAxes(PlotAxes):
     )
 
 
-@dataclasses.dataclass(slots=True, kw_only=True, eq=False, weakref_slot=False)
+@dataclasses.dataclass(kw_only=True, eq=False, weakref_slot=False)
 class LogDimensionUnfoldedTimeAxes(PlotAxes):
     xticks: tuple[float, ...] = (-1.0, -0.5, 0.0)  # log scale base dimension
 
@@ -196,7 +196,7 @@ class LogDimensionUnfoldedTimeAxes(PlotAxes):
     )
 
 
-@dataclasses.dataclass(slots=True, kw_only=True, eq=False, weakref_slot=False)
+@dataclasses.dataclass(kw_only=True, eq=False, weakref_slot=False)
 class PlotLegend:
     handles: tuple[Artist | tuple[Artist, ...], ...] = ()
     labels: tuple[str, ...] = ()
