@@ -32,7 +32,7 @@ class SpectralHistogram(Histogram):
         file_name_prefix: str,
         dimension: int,
         unfolding: str,
-        degree: int | None = None,
+        polynomial_degree: int | None = None,
     ) -> SpectralHistogram:
         unfolded_level_support = scale_support(
             UNFOLDED_LEVEL_SUPPORT_UNITS_DIMENSION,
@@ -45,8 +45,8 @@ class SpectralHistogram(Histogram):
         )
 
         metadata: dict[str, int | str] = {"unfolding": unfolding}
-        if degree is not None:
-            metadata["degree"] = degree
+        if polynomial_degree is not None:
+            metadata["polynomial_degree"] = polynomial_degree
         unfolded_spectral_histogram.attach_metadata(metadata)
 
         return unfolded_spectral_histogram

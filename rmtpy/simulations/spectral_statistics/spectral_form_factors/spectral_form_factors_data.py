@@ -160,7 +160,7 @@ class FormFactorsData(Data):
         file_name_prefix: str,
         dimension: int,
         unfolding: str,
-        degree: int | None = None,
+        polynomial_degree: int | None = None,
     ) -> FormFactorsData:
         unfolded_form_factors = FormFactorsData(
             file_name=f"{file_name_prefix}_data",
@@ -170,8 +170,8 @@ class FormFactorsData(Data):
         )
 
         metadata: dict[str, int | str] = {"unfolding": unfolding}
-        if degree is not None:
-            metadata["degree"] = degree
+        if polynomial_degree is not None:
+            metadata["polynomial_degree"] = polynomial_degree
         unfolded_form_factors.attach_metadata(metadata)
 
         return unfolded_form_factors

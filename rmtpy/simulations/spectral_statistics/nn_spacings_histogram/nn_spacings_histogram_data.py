@@ -35,15 +35,15 @@ class SpacingsHistogram(Histogram):
         *,
         file_name_prefix: str,
         unfolding: str,
-        degree: int | None = None,
+        polynomial_degree: int | None = None,
     ) -> SpacingsHistogram:
         unfolded_spacings_histogram = SpacingsHistogram(
             file_name=f"{file_name_prefix}_data",
             support=SPACING_SUPPORT_UNITS_MEAN,
         )
         metadata: dict[str, int | str] = {"unfolding": unfolding}
-        if degree is not None:
-            metadata["degree"] = degree
+        if polynomial_degree is not None:
+            metadata["polynomial_degree"] = polynomial_degree
         unfolded_spacings_histogram.attach_metadata(metadata)
 
         return unfolded_spacings_histogram
