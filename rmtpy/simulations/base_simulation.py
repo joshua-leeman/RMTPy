@@ -69,7 +69,7 @@ class Simulation:
                 "bit_generator": type(self._rmg.rng.bit_generator).__name__,
                 "seed": to_json_compatible(self._rmg.seed),
                 "state_policy": "capture_initial_and_final",
-                "initial_state": self._rng_initial_state,
+                "initial_state": self._rmg.rng_state,
             },
             dtype={
                 "real": self._rmg.real_dtype.name,
@@ -90,12 +90,6 @@ class Simulation:
     def _rmg(self) -> RandomMatrixEnsemble:
         raise NotImplementedError(
             f"{type(self).__name__} has not implemented property `_rmg`."
-        )
-
-    @property
-    def _rng_initial_state(self) -> dict[str, object]:
-        raise NotImplementedError(
-            f"{type(self).__name__} has not implemented property `_rng_initial_states`."
         )
 
     @property
