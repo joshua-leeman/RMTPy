@@ -57,7 +57,6 @@ class Simulation:
     )
     _execution_state: ExecutionState = attrs.field(
         default=ExecutionState.NEW,
-        init=False,
         repr=False,
     )
 
