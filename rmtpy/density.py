@@ -288,9 +288,18 @@ class DensityModel:
         /,
     ) -> np.ndarray[tuple[int], np.dtype[np.floating]]:
         if not self.has_polynomial_expansion:
-            return self._average_cdf_from_samples(inputs)
+            values = self._average_cdf_from_samples(inputs)
+        else:
+            values = self._average_cdf_from_polynomials(inputs)
 
-        return self._average_cdf_from_polynomials(inputs)
+        return cast(
+            np.ndarray[tuple[int], np.dtype[np.floating]],
+            np.where(
+                inputs <= self.support[0],
+                0.0,
+                np.where(inputs >= self.support[1], 1.0, values),
+            ),
+        )
 
     def average_pdf(
         self,
@@ -329,7 +338,7 @@ class DensityModel:
         self,
         sample: np.ndarray[tuple[int], np.dtype[np.floating]],
     ) -> np.ndarray[tuple[int], np.dtype[np.floating]]:
-        polynomials = self.compute_polynomials(sample.astype(np.floating))
+        polynomials = self.compute_polynomials(sample)
         return cast(
             np.ndarray[tuple[int], np.dtype[np.floating]],
             np.mean(polynomials, axis=1),

@@ -2,6 +2,7 @@ import hashlib
 import math
 import re
 from collections.abc import Iterable
+from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
 from typing import cast
@@ -40,35 +41,21 @@ class StringEnum(StrEnum):
         return tuple(member.value for member in cls)
 
 
-def canonicalize_string_selection(
-    str_values: str | Iterable[str],
+def completed_at_utc() -> str:
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+
+
+def build_hashed_id(
+    array: np.ndarray[tuple[int, ...], np.dtype[np.generic]],
     /,
     *,
-    allowed: type[StringEnum],
-    name: str,
-) -> tuple[str, ...]:
-    try:
-        source = (str_values,) if isinstance(str_values, str) else tuple(str_values)
-    except TypeError as exc:
-        raise TypeError(f"`{name}` must be a string or iterable of strings.") from exc
-
-    normalized: list[str] = []
-    for value in source:
-        token = value.strip().lower()
-        if not allowed.has_value(token):
-            raise ValueError(
-                f"Unknown {name} value {value!r}: Expected one of {allowed.to_tuple()}."
-            )
-        if token in normalized:
-            raise ValueError(f"`{name}` must not contain duplicate values.")
-
-        normalized.append(token)
-
-    if len(normalized) == 0:
-        raise ValueError(f"`{name}` must contain at least one value.")
-
-    normalized_set = set(normalized)
-    return tuple(value for value in allowed.to_tuple() if value in normalized_set)
+    num_hex: int = 16,
+) -> str:
+    hash_object = hashlib.sha256()
+    hash_object.update(str(array.dtype).encode())
+    hash_object.update(str(array.shape).encode())
+    hash_object.update(array.tobytes())
+    return hash_object.hexdigest()[:num_hex]
 
 
 def get_attrs_fields[T: attrs.AttrsInstance](cls: type[T], /) -> tuple[AttrsField, ...]:
@@ -91,10 +78,9 @@ def to_key_of_registry(string: str, /) -> str:
 def to_latex(instance: attrs.AttrsInstance, /, *, latex_name: str = "") -> str:
     latex_str = "$" + latex_name
     for label, attr in attrs.fields_dict(type(instance)).items():
-        if attr.metadata.get("latex_name") is not None:
-            latex_str += rf"\ {attr.metadata['latex_name']}={getattr(instance, label)}"
-        else:
-            raise ValueError(f"'latex_name' of {label} is not of type str.")
+        latex_label = attr.metadata.get("latex_name")
+        if isinstance(latex_label, str):
+            latex_str += rf"\ {latex_label}={getattr(instance, label)}"
 
     return latex_str + "$"
 
@@ -106,8 +92,6 @@ def to_path(instance: attrs.AttrsInstance, /, *, root: Path) -> Path:
             value = str(cast(object, getattr(instance, name)))
             value = re.sub(r"[^\w\-.]", "_", value)
             root /= f"{dir_name}_{value.replace('.', 'p')}"
-        else:
-            raise ValueError(f"'dir_name' of {name} is not of type str.")
 
     return root
 
@@ -150,16 +134,35 @@ def canonicalize_source_dict(
     return {"type": registered_cls.__name__, "parameters": parameters}
 
 
-def to_source_dict(instance: attrs.AttrsInstance, /) -> SourceDict:
-    fields = get_attrs_fields(type(instance))
-    return {
-        "type": type(instance).__name__,
-        "parameters": {
-            field.name: to_json_compatible(cast(object, getattr(instance, field.name)))
-            for field in fields
-            if field.init
-        },
-    }
+def canonicalize_string_selection(
+    str_values: str | Iterable[str],
+    /,
+    *,
+    allowed: type[StringEnum],
+    name: str,
+) -> tuple[str, ...]:
+    try:
+        source = (str_values,) if isinstance(str_values, str) else tuple(str_values)
+    except TypeError as exc:
+        raise TypeError(f"`{name}` must be a string or iterable of strings.") from exc
+
+    normalized: list[str] = []
+    for value in source:
+        token = value.strip().lower()
+        if not allowed.has_value(token):
+            raise ValueError(
+                f"Unknown {name} value {value!r}: Expected one of {allowed.to_tuple()}."
+            )
+        if token in normalized:
+            raise ValueError(f"`{name}` must not contain duplicate values.")
+
+        normalized.append(token)
+
+    if len(normalized) == 0:
+        raise ValueError(f"`{name}` must contain at least one value.")
+
+    normalized_set = set(normalized)
+    return tuple(value for value in allowed.to_tuple() if value in normalized_set)
 
 
 def to_json_compatible(value: object, /) -> object:
@@ -233,14 +236,13 @@ def to_json_compatible(value: object, /) -> object:
     )
 
 
-def build_hashed_id(
-    array: np.ndarray[tuple[int, ...], np.dtype[np.generic]],
-    /,
-    *,
-    num_hex: int = 16,
-) -> str:
-    hash_object = hashlib.sha256()
-    hash_object.update(str(array.dtype).encode())
-    hash_object.update(str(array.shape).encode())
-    hash_object.update(array.tobytes())
-    return hash_object.hexdigest()[:num_hex]
+def to_source_dict(instance: attrs.AttrsInstance, /) -> SourceDict:
+    fields = get_attrs_fields(type(instance))
+    return {
+        "type": type(instance).__name__,
+        "parameters": {
+            field.name: to_json_compatible(cast(object, getattr(instance, field.name)))
+            for field in fields
+            if field.init
+        },
+    }
