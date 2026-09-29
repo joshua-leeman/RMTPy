@@ -69,25 +69,29 @@ def _build_syk_matrix_without_imaginary_prefactor(
             matrix[entry_idx] += coefficients[i] * monomials_data[i, j]
 
 
+def _validate_q(num_majoranas: int, q: int) -> None:
+    if q not in NUM_MAJORANAS_LIMIT_BY_Q:
+        raise ValueError(
+            f"`q` must be one of {tuple(NUM_MAJORANAS_LIMIT_BY_Q)}, got {q}."
+        )
+    if num_majoranas > NUM_MAJORANAS_LIMIT_BY_Q[q]:
+        raise ValueError(
+            f"For the SYK q={q} model, `num_majoranas` cannot exceed "
+            + f"{NUM_MAJORANAS_LIMIT_BY_Q[q]} due to memory constraints."
+        )
+    elif q >= num_majoranas:
+        raise ValueError(
+            f"The SYK q-parameter {q} must be less than the number of majorana "
+            + f"fermions, here {num_majoranas}."
+        )
+
+
 def _are_num_majoranas_within_limit(
     syk: SachdevYeKitaevEnsemble,
     _: attrs.Attribute[int],
     q: int,
 ) -> None:
-    if q not in NUM_MAJORANAS_LIMIT_BY_Q:
-        raise ValueError(
-            f"`q` must be one of {tuple(NUM_MAJORANAS_LIMIT_BY_Q)}, got {q}."
-        )
-    if syk.num_majoranas > NUM_MAJORANAS_LIMIT_BY_Q[q]:
-        raise ValueError(
-            f"For the SYK q={q} model, `num_majoranas` cannot exceed "
-            + f"{NUM_MAJORANAS_LIMIT_BY_Q[q]} due to memory constraints."
-        )
-    elif q >= syk.num_majoranas:
-        raise ValueError(
-            f"The SYK q-parameter {q} must be less than the number of majorana "
-            + f"fermions, here {syk.num_majoranas}."
-        )
+    _validate_q(syk.num_majoranas, q)
 
 
 def _compute_dyson_index(syk: SachdevYeKitaevEnsemble) -> int:
@@ -104,6 +108,7 @@ def _compute_standard_deviation(syk: SachdevYeKitaevEnsemble) -> float:
 
 
 def _compute_suppression_factor(syk: SachdevYeKitaevEnsemble) -> float:
+    _validate_q(syk.num_majoranas, syk.q)
     return sum(
         ((-1) ** (syk.q - k) / math.comb(syk.num_majoranas, syk.q))
         * (math.comb(syk.q, k) * math.comb(syk.num_majoranas - syk.q, syk.q - k))
