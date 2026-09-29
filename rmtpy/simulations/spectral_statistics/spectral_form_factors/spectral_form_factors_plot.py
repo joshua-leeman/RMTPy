@@ -1,28 +1,29 @@
-from __future__ import annotations
-
 import dataclasses
+import math
+from collections.abc import Callable
 from pathlib import Path
+from typing import cast, override
 
 import numpy as np
 from matplotlib.lines import Line2D
 from matplotlib.ticker import LogLocator, NullLocator
 from scipy.special import jn_zeros
 
-import rmtpy.ensembles
-
-from ...plot import (
-    DIMENSION_TIME_LOG_SUPPORT,
-    UNFOLDED_DIMENSION_TIME_LOG_SUPPORT,
-    DimensionTimeAxes,
+from ....ensembles import ManyBodyEnsemble
+from ...base_data import Data
+from ...base_plot import (
+    LogDimensionTimeAxes,
+    LogDimensionUnfoldedTimeAxes,
     Plot,
+    PlotAxes,
     PlotLegend,
-    UnfoldedDimensionTimeAxes,
 )
+from ...statistics import LOG_D_TIME_SUPPORT, LOG_D_UNFOLDED_TIME_SUPPORT
 from .spectral_form_factors_data import FormFactorsData
 
 
-@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
-class FormFactorsAxes(DimensionTimeAxes):
+@dataclasses.dataclass(slots=True, kw_only=True, eq=False, weakref_slot=False)
+class FormFactorsAxes(LogDimensionTimeAxes):
     yticks: tuple[float, ...] = (-2, -1, 0)  # log scale base dimension
     ytick_labels: tuple[str, ...] = (
         r"$D^{-2}$",
@@ -31,22 +32,14 @@ class FormFactorsAxes(DimensionTimeAxes):
     )
 
 
-@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
+@dataclasses.dataclass(slots=True, kw_only=True, eq=False, weakref_slot=False)
 class FormFactorsPlot(Plot):
-    data: FormFactorsData
-    axes: FormFactorsAxes = dataclasses.field(default_factory=FormFactorsAxes)
+    data: Data
+    axes: PlotAxes = dataclasses.field(default_factory=FormFactorsAxes)
     num_points: int = 1000
 
-    xlim: tuple[float, float] = DIMENSION_TIME_LOG_SUPPORT
+    xlim: tuple[float, float] = LOG_D_TIME_SUPPORT
     ylim: tuple[float, float] = (-2.2, 0.2)
-
-    # thouless_marker: str = "*"
-    # thouless_size: int = 12
-    # thouless_color: str = "Black"
-    # thouless_alpha: float = 1.0
-    # thouless_zorder: int = 3
-    # thouless_style: str = "None"
-    # thouless_legend: str = r"$t_\text{\tiny Th}$"
 
     sff_zorder: int = 2
     sff_width: float = 0.5
@@ -60,60 +53,67 @@ class FormFactorsPlot(Plot):
     csff_color: str = "Red"
     csff_legend: str = r"$K_{\text{\tiny conn}}(u)$"
 
-    legend_labels: tuple[str, str] = (sff_legend, csff_legend)  # , thou_legend)
+    legend_labels: tuple[str, str] = (sff_legend, csff_legend)
     legend_handles: tuple[Line2D, Line2D] = (
         Line2D([0], [0], color=sff_color, alpha=sff_alpha, linewidth=sff_width),
         Line2D([0], [0], color=csff_color, alpha=csff_alpha, linewidth=csff_width),
-        # Line2D(
-        #     [0],
-        #     [0],
-        #     marker=thouless_marker,
-        #     color=thouless_color,
-        #     linestyle=thouless_style,
-        # ),
     )
 
     def set_derived_attributes(self) -> None:
-        self.ensemble: rmtpy.ensembles.ManyBodyEnsemble = self.structure_simulation_arg(
-            "ensemble", rmtpy.ensembles.ManyBodyEnsemble
+        self.ensemble: ManyBodyEnsemble = self.store_context_arg(
+            "ensemble", ManyBodyEnsemble
         )
 
-        self.legend = PlotLegend(
+        self.legend: PlotLegend = PlotLegend(
             handles=self.legend_handles,
             labels=self.legend_labels,
             loc="upper right",
             bbox=(0.925, 0.95),
         )
-
-        if self.legend.title is None:
+        if not self.legend.title:
             self.legend.title = self.ensemble.to_latex
 
-        j_1_1 = float(jn_zeros(1, 1)[0])
+        j_1_1 = cast(float, jn_zeros(1, 1)[0])
         self.scale_limits_and_ticks(
             x=lambda value: (
-                self.ensemble.dimension**value * j_1_1 / self.ensemble.spectral_radius
+                math.pow(self.ensemble.dimension, value)
+                * j_1_1
+                / self.ensemble.spectral_radius
             ),
-            y=lambda value: self.ensemble.dimension**value,
+            y=lambda value: math.pow(self.ensemble.dimension, value),
         )
 
+    @override
     def plot(self, path: str | Path) -> None:
         self.set_derived_attributes()
 
-        self.create_figure()
+        if not isinstance(self.data, FormFactorsData):
+            raise ValueError("Data must be a `FormFactorsData` instance")
 
-        self.ax.set_xscale("log", base=self.ensemble.dimension)
-        self.ax.set_yscale("log", base=self.ensemble.dimension)
+        self.build_figure()
 
-        self.ax.xaxis.set_major_locator(
+        set_xscale = cast(Callable[..., object], self.ax.set_xscale)
+        _ = set_xscale("log", base=self.ensemble.dimension)
+
+        set_yscale = cast(Callable[..., object], self.ax.set_yscale)
+        _ = set_yscale("log", base=self.ensemble.dimension)
+
+        set_x_major_locator = cast(Callable[..., object], self.ax.xaxis.set_major_locator)
+        _ = set_x_major_locator(
             LogLocator(base=self.ensemble.dimension, numticks=len(self.axes.xticks))
         )
-        self.ax.xaxis.set_minor_locator(NullLocator())
-        self.ax.yaxis.set_major_locator(
+        set_x_minor_locator = cast(Callable[..., object], self.ax.xaxis.set_minor_locator)
+        _ = set_x_minor_locator(NullLocator())
+
+        set_y_major_locator = cast(Callable[..., object], self.ax.yaxis.set_major_locator)
+        _ = set_y_major_locator(
             LogLocator(base=self.ensemble.dimension, numticks=len(self.axes.yticks))
         )
-        self.ax.yaxis.set_minor_locator(NullLocator())
+        set_y_minor_locator = cast(Callable[..., object], self.ax.yaxis.set_minor_locator)
+        _ = set_y_minor_locator(NullLocator())
 
-        self.ax.plot(
+        plot = cast(Callable[..., object], self.ax.plot)
+        _ = plot(
             self.data.times,
             self.data.form_factor,
             color=self.sff_color,
@@ -122,8 +122,7 @@ class FormFactorsPlot(Plot):
             zorder=self.sff_zorder,
             label=self.sff_legend,
         )
-
-        self.ax.plot(
+        _ = plot(
             self.data.times,
             self.data.connected_form_factor,
             color=self.csff_color,
@@ -136,8 +135,8 @@ class FormFactorsPlot(Plot):
         self.finish_plot(path=path)
 
 
-@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
-class UnfoldedFormFactorsAxes(UnfoldedDimensionTimeAxes):
+@dataclasses.dataclass(slots=True, kw_only=True, eq=False, weakref_slot=False)
+class UnfoldedFormFactorsAxes(LogDimensionUnfoldedTimeAxes):
     yticks: tuple[float, ...] = (-2, -1, 0)  # log scale base dimension
     ytick_labels: tuple[str, ...] = (
         r"$D^{-2}$",
@@ -146,24 +145,14 @@ class UnfoldedFormFactorsAxes(UnfoldedDimensionTimeAxes):
     )
 
 
-@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
+@dataclasses.dataclass(slots=True, kw_only=True, eq=False, weakref_slot=False)
 class UnfoldedFormFactorsPlot(Plot):
-    data: FormFactorsData
-    axes: UnfoldedFormFactorsAxes = dataclasses.field(
-        default_factory=UnfoldedFormFactorsAxes
-    )
+    data: Data
+    axes: PlotAxes = dataclasses.field(default_factory=UnfoldedFormFactorsAxes)
     num_points: int = 1000
 
-    xlim: tuple[float, float] = UNFOLDED_DIMENSION_TIME_LOG_SUPPORT
+    xlim: tuple[float, float] = LOG_D_UNFOLDED_TIME_SUPPORT
     ylim: tuple[float, float] = (-2.2, 0.2)
-
-    # thouless_marker: str = "*"
-    # thouless_size: int = 12
-    # thouless_color: str = "Black"
-    # thouless_alpha: float = 1.0
-    # thouless_zorder: int = 3
-    # thouless_style: str = "None"
-    # thouless_legend: str = r"$t_\text{\tiny Th}$"
 
     sff_zorder: int = 2
     sff_width: float = 0.5
@@ -201,59 +190,75 @@ class UnfoldedFormFactorsPlot(Plot):
     )
 
     def set_derived_attributes(self) -> None:
-        self.ensemble: rmtpy.ensembles.ManyBodyEnsemble = self.structure_simulation_arg(
-            "ensemble", rmtpy.ensembles.ManyBodyEnsemble
+        self.ensemble: ManyBodyEnsemble = self.store_context_arg(
+            "ensemble", ManyBodyEnsemble
         )
 
         if self.ensemble.universality_class is not None:
-            self.universal_sff_legend = rf"$K^{{\text{{\tiny {self.ensemble.universality_class}}}}}_{{\text{{\tiny conn}}}}(\upsilon)$"
+            self.universal_sff_legend = (
+                rf"$K^{{\text{{\tiny {self.ensemble.universality_class}}}}}"
+                + r"_{\text{\tiny conn}}(\upsilon)$"
+            )
             self.legend_labels = (
                 self.sff_legend,
                 self.csff_legend,
                 self.universal_sff_legend,
             )
 
-        self.legend = PlotLegend(
+        self.legend: PlotLegend = PlotLegend(
             handles=self.legend_handles,
             labels=self.legend_labels,
             loc="upper right",
             bbox=(0.925, 0.95),
         )
 
-        if self.legend.title is None:
+        if not self.legend.title:
             unfolding_type = self.data.metadata["unfolding"]
-            if unfolding_type != "wgt":
+            if unfolding_type != "weight":
                 unfolding_degree = self.data.metadata["degree"]
                 self.legend.title = (
                     self.ensemble.to_latex
-                    + f"\n{unfolding_type}.\ unfolded, degree {unfolding_degree}"
+                    + f"\n{unfolding_type} unfolded, degree {unfolding_degree}"
                 )
             else:
-                self.legend.title = self.ensemble.to_latex + "\nwgt.\ unfolded"
+                self.legend.title = self.ensemble.to_latex + "\nweight unfolded"
 
         self.scale_limits_and_ticks(
-            x=lambda value: self.ensemble.dimension**value * 2 * np.pi,
-            y=lambda value: self.ensemble.dimension**value,
+            x=lambda value: math.pow(self.ensemble.dimension, value) * 2 * np.pi,
+            y=lambda value: math.pow(self.ensemble.dimension, value),
         )
 
+    @override
     def plot(self, path: str | Path) -> None:
         self.set_derived_attributes()
 
-        self.create_figure()
+        if not isinstance(self.data, FormFactorsData):
+            raise ValueError("Data must be a `FormFactorsData` instance")
 
-        self.ax.set_xscale("log", base=self.ensemble.dimension)
-        self.ax.set_yscale("log", base=self.ensemble.dimension)
+        self.build_figure()
 
-        self.ax.xaxis.set_major_locator(
+        set_xscale = cast(Callable[..., object], self.ax.set_xscale)
+        _ = set_xscale("log", base=self.ensemble.dimension)
+
+        set_yscale = cast(Callable[..., object], self.ax.set_yscale)
+        _ = set_yscale("log", base=self.ensemble.dimension)
+
+        set_x_major_locator = cast(Callable[..., object], self.ax.xaxis.set_major_locator)
+        _ = set_x_major_locator(
             LogLocator(base=self.ensemble.dimension, numticks=len(self.axes.xticks))
         )
-        self.ax.xaxis.set_minor_locator(NullLocator())
-        self.ax.yaxis.set_major_locator(
+        set_x_minor_locator = cast(Callable[..., object], self.ax.xaxis.set_minor_locator)
+        _ = set_x_minor_locator(NullLocator())
+
+        set_y_major_locator = cast(Callable[..., object], self.ax.yaxis.set_major_locator)
+        _ = set_y_major_locator(
             LogLocator(base=self.ensemble.dimension, numticks=len(self.axes.yticks))
         )
-        self.ax.yaxis.set_minor_locator(NullLocator())
+        set_y_minor_locator = cast(Callable[..., object], self.ax.yaxis.set_minor_locator)
+        _ = set_y_minor_locator(NullLocator())
 
-        self.ax.plot(
+        plot = cast(Callable[..., object], self.ax.plot)
+        _ = plot(
             self.data.times,
             self.data.form_factor,
             color=self.sff_color,
@@ -262,8 +267,7 @@ class UnfoldedFormFactorsPlot(Plot):
             zorder=self.sff_zorder,
             label=self.sff_legend,
         )
-
-        self.ax.plot(
+        _ = plot(
             self.data.times,
             self.data.connected_form_factor,
             color=self.csff_color,
@@ -274,8 +278,7 @@ class UnfoldedFormFactorsPlot(Plot):
         )
 
         universal_sff = self.ensemble.universal_connected_sff(self.data.times)
-
-        self.ax.plot(
+        _ = plot(
             self.data.times,
             universal_sff,
             color=self.universal_sff_color,

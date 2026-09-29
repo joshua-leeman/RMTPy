@@ -1,19 +1,18 @@
-from __future__ import annotations
-
 import dataclasses
+from collections.abc import Callable
 from pathlib import Path
+from typing import cast, override
 
 import numpy as np
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 
-from rmtpy.ensembles import ManyBodyEnsemble
+from ....ensembles import ManyBodyEnsemble
+from ...base_data import Data
+from ...base_plot import Plot, PlotAxes, PlotLegend
 
-from ...histogram import Histogram
-from ...plot import Plot, PlotAxes, PlotLegend
 
-
-@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
+@dataclasses.dataclass(slots=True, kw_only=True, eq=False, weakref_slot=False)
 class SpacingsHistogramAxes(PlotAxes):
     xticks: tuple[float, ...] = (0.0, 1.0, 2.0, 3.0, 4.0)  # units of mean spacing
     xticks_minor: tuple[float, ...] = (0.5, 1.5, 2.5, 3.5)
@@ -35,10 +34,10 @@ class SpacingsHistogramAxes(PlotAxes):
     )
 
 
-@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
+@dataclasses.dataclass(slots=True, kw_only=True, eq=False, weakref_slot=False)
 class SpacingsHistogramPlot(Plot):
-    data: Histogram
-    axes: SpacingsHistogramAxes = dataclasses.field(default_factory=SpacingsHistogramAxes)
+    data: Data
+    axes: PlotAxes = dataclasses.field(default_factory=SpacingsHistogramAxes)
     num_points: int = 1000
 
     xlim: tuple[float, float] = (0.0, 4.0)  # units of mean spacing
@@ -62,7 +61,7 @@ class SpacingsHistogramPlot(Plot):
     )
 
     def set_derived_attributes(self) -> None:
-        self.ensemble: ManyBodyEnsemble = self.structure_simulation_arg(
+        self.ensemble: ManyBodyEnsemble = self.store_context_arg(
             "ensemble", ManyBodyEnsemble
         )
 
@@ -70,26 +69,27 @@ class SpacingsHistogramPlot(Plot):
             self.surmise_legend = f"{self.ensemble.universality_class} surmise"
             self.legend_labels = (self.histogram_legend, self.surmise_legend)
 
-        self.legend = PlotLegend(
+        self.legend: PlotLegend = PlotLegend(
             handles=self.legend_handles,
             labels=self.legend_labels,
             loc="upper right",
             bbox=(0.94, 0.95),
         )
-        if self.legend.title is None:
+        if not self.legend.title:
             self.legend.title = self.ensemble.to_latex
 
-        mean_spacing = self.data.metadata["global_mean_spacing"]
+        mean_spacing = cast(float, self.data.metadata["global_mean_spacing"])
 
         self.scale_limits_and_ticks(
             x=lambda value: value * mean_spacing,
             y=lambda value: value / mean_spacing,
         )
 
+    @override
     def plot(self, path: str | Path) -> None:
         self.set_derived_attributes()
 
-        self.create_figure()
+        self.build_figure()
 
         self.draw_histogram(
             color=self.histogram_color,
@@ -98,12 +98,13 @@ class SpacingsHistogramPlot(Plot):
         )
 
         spacings = np.linspace(*self.xlim, self.num_points)
-        mean_spacing = self.data.metadata["global_mean_spacing"]
+        mean_spacing = cast(float, self.data.metadata["global_mean_spacing"])
 
         surmise = self.ensemble.wigner_surmise(spacings / mean_spacing)
         surmise /= mean_spacing
 
-        self.ax.plot(
+        plot = cast(Callable[..., object], self.ax.plot)
+        _ = plot(
             spacings,
             surmise,
             color=self.surmise_color,
@@ -115,7 +116,7 @@ class SpacingsHistogramPlot(Plot):
         self.finish_plot(path=path)
 
 
-@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
+@dataclasses.dataclass(slots=True, kw_only=True, eq=False, weakref_slot=False)
 class UnfoldedSpacingsHistogramAxes(PlotAxes):
     xticks: tuple[float, ...] = (0.0, 1.0, 2.0, 3.0, 4.0)
     xticks_minor: tuple[float, ...] = (0.5, 1.5, 2.5, 3.5)
@@ -137,12 +138,10 @@ class UnfoldedSpacingsHistogramAxes(PlotAxes):
     )
 
 
-@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
+@dataclasses.dataclass(slots=True, kw_only=True, eq=False, weakref_slot=False)
 class UnfoldedSpacingsHistogramPlot(Plot):
-    data: Histogram
-    axes: UnfoldedSpacingsHistogramAxes = dataclasses.field(
-        default_factory=UnfoldedSpacingsHistogramAxes
-    )
+    data: Data
+    axes: PlotAxes = dataclasses.field(default_factory=UnfoldedSpacingsHistogramAxes)
     num_points: int = 1000
 
     xlim: tuple[float, float] = (0.0, 4.0)
@@ -166,7 +165,7 @@ class UnfoldedSpacingsHistogramPlot(Plot):
     )
 
     def set_derived_attributes(self) -> None:
-        self.ensemble: ManyBodyEnsemble = self.structure_simulation_arg(
+        self.ensemble: ManyBodyEnsemble = self.store_context_arg(
             "ensemble", ManyBodyEnsemble
         )
 
@@ -174,28 +173,29 @@ class UnfoldedSpacingsHistogramPlot(Plot):
             self.surmise_legend = f"{self.ensemble.universality_class} surmise"
             self.legend_labels = (self.histogram_legend, self.surmise_legend)
 
-        self.legend = PlotLegend(
+        self.legend: PlotLegend = PlotLegend(
             handles=self.legend_handles,
             labels=self.legend_labels,
             loc="upper right",
             bbox=(0.94, 0.95),
         )
 
-        if self.legend.title is None:
+        if not self.legend.title:
             unfolding_type = self.data.metadata["unfolding"]
-            if unfolding_type != "wgt":
+            if unfolding_type != "weight":
                 unfolding_degree = self.data.metadata["degree"]
                 self.legend.title = (
                     self.ensemble.to_latex
-                    + f"\n{unfolding_type}.\ unfolded, degree {unfolding_degree}"
+                    + f"\n{unfolding_type} unfolded, degree {unfolding_degree}"
                 )
             else:
-                self.legend.title = self.ensemble.to_latex + "\nwgt.\ unfolded"
+                self.legend.title = self.ensemble.to_latex + "\nweight unfolded"
 
+    @override
     def plot(self, path: str | Path) -> None:
         self.set_derived_attributes()
 
-        self.create_figure()
+        self.build_figure()
 
         self.draw_histogram(
             color=self.histogram_color,
@@ -206,7 +206,8 @@ class UnfoldedSpacingsHistogramPlot(Plot):
         spacings = np.linspace(0, self.xlim[1], self.num_points)
         surmise = self.ensemble.wigner_surmise(spacings)
 
-        self.ax.plot(
+        plot = cast(Callable[..., object], self.ax.plot)
+        _ = plot(
             spacings,
             surmise,
             color=self.surmise_color,

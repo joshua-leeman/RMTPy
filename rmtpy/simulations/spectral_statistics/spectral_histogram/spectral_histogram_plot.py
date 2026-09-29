@@ -1,23 +1,22 @@
-from __future__ import annotations
-
 import dataclasses
+from collections.abc import Callable
 from pathlib import Path
+from typing import cast, override
 
 import numpy as np
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 
-from rmtpy.ensembles import (
+from ....ensembles import (
     ManyBodyEnsemble,
     PoissonEnsemble,
     SachdevYeKitaevEnsemble,
 )
+from ...base_data import Data
+from ...base_plot import Plot, PlotAxes, PlotLegend
 
-from ...histogram import Histogram
-from ...plot import Plot, PlotAxes, PlotLegend
 
-
-@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
+@dataclasses.dataclass(slots=True, kw_only=True, eq=False, weakref_slot=False)
 class SpectralHistogramAxes(PlotAxes):
     xticks: tuple[float, ...] = (-1.0, 0.0, 1.0)  # units of energy_0
     xticks_minor: tuple[float, ...] = (-0.5, 0.5)
@@ -66,10 +65,10 @@ class SpectralHistogramAxes(PlotAxes):
     )
 
 
-@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
+@dataclasses.dataclass(kw_only=True, eq=False, weakref_slot=False)
 class SpectralHistogramPlot(Plot):
-    data: Histogram
-    axes: SpectralHistogramAxes = dataclasses.field(default_factory=SpectralHistogramAxes)
+    data: Data
+    axes: PlotAxes = dataclasses.field(default_factory=SpectralHistogramAxes)
 
     xlim: tuple[float, float] = (-1.2, 1.2)  # units of energy_0
     ylim: tuple[float, float] = (0.0, 2.6)  # units of 1 / (pi * energy_0)
@@ -98,20 +97,20 @@ class SpectralHistogramPlot(Plot):
     )
 
     def set_derived_attributes(self) -> None:
-        self.ensemble: ManyBodyEnsemble = self.structure_simulation_arg(
+        self.ensemble: ManyBodyEnsemble = self.store_context_arg(
             "ensemble", ManyBodyEnsemble
         )
 
-        self.legend = PlotLegend(
+        self.legend: PlotLegend = PlotLegend(
             handles=self.legend_handles,
             labels=self.legend_labels,
             loc="upper right",
             bbox=(0.99, 0.95),
         )
-        if self.legend.title is None:
+        if self.legend.title:
             self.legend.title = self.ensemble.to_latex
 
-        axes = self.axes
+        axes = cast(SpectralHistogramAxes, self.axes)
         if isinstance(self.ensemble, PoissonEnsemble):
             self.ylim = self.pois_ylim
 
@@ -139,10 +138,11 @@ class SpectralHistogramPlot(Plot):
             y=lambda value: value / np.pi / self.ensemble.spectral_radius,
         )
 
+    @override
     def plot(self, path: str | Path) -> None:
         self.set_derived_attributes()
 
-        self.create_figure()
+        self.build_figure()
 
         self.draw_histogram(
             color=self.histogram_color,
@@ -150,22 +150,31 @@ class SpectralHistogramPlot(Plot):
             zorder=self.histogram_zorder,
         )
 
-        energies = np.linspace(*self.xlim, self.num_points)
-        spectral_pdf = self.ensemble.spectral_density.average_pdf(energies)
+        coefficients = self.calibration_coefficients("spectral")
+        if coefficients is None:
+            self.legend.handles = self.legend.handles[:1]
+            self.legend.labels = self.legend.labels[:1]
+        else:
+            energies = np.linspace(*self.xlim, self.num_points)
+            spectral_pdf = self.ensemble.spectral_density.variate_pdf(
+                energies,
+                coeffs=coefficients,
+            )
 
-        self.ax.plot(
-            energies,
-            spectral_pdf,
-            color=self.pdf_color,
-            alpha=self.pdf_alpha,
-            linewidth=self.pdf_width,
-            zorder=self.pdf_zorder,
-        )
+            plot = cast(Callable[..., object], self.ax.plot)
+            _ = plot(
+                energies,
+                spectral_pdf,
+                color=self.pdf_color,
+                alpha=self.pdf_alpha,
+                linewidth=self.pdf_width,
+                zorder=self.pdf_zorder,
+            )
 
         self.finish_plot(path=path)
 
 
-@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
+@dataclasses.dataclass(slots=True, kw_only=True, eq=False, weakref_slot=False)
 class UnfoldedSpectralHistogramAxes(PlotAxes):
     xticks: tuple[float, ...] = (-0.5, 0.0, 0.5)  # units of dimension
     xticks_minor: tuple[float, ...] = (-0.25, 0.25)
@@ -187,12 +196,10 @@ class UnfoldedSpectralHistogramAxes(PlotAxes):
     )
 
 
-@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
+@dataclasses.dataclass(slots=True, kw_only=True, eq=False, weakref_slot=False)
 class UnfoldedSpectralHistogramPlot(Plot):
-    data: Histogram
-    axes: UnfoldedSpectralHistogramAxes = dataclasses.field(
-        default_factory=UnfoldedSpectralHistogramAxes
-    )
+    data: Data
+    axes: PlotAxes = dataclasses.field(default_factory=UnfoldedSpectralHistogramAxes)
     num_points: int = 1000
 
     xlim: tuple[float, float] = (-0.6, 0.6)  # units of dimension
@@ -216,38 +223,39 @@ class UnfoldedSpectralHistogramPlot(Plot):
     )
 
     def set_derived_attributes(self) -> None:
-        self.ensemble: ManyBodyEnsemble = self.structure_simulation_arg(
+        self.ensemble: ManyBodyEnsemble = self.store_context_arg(
             "ensemble", ManyBodyEnsemble
         )
         dimension = self.ensemble.dimension
 
-        self.legend = PlotLegend(
+        self.legend: PlotLegend = PlotLegend(
             handles=self.legend_handles,
             labels=self.legend_labels,
             loc="upper right",
             bbox=(0.94, 0.95),
         )
 
-        if self.legend.title is None:
+        if self.legend.title:
             unfolding_type = self.data.metadata["unfolding"]
-            if unfolding_type != "wgt":
+            if unfolding_type != "weight":
                 unfolding_degree = self.data.metadata["degree"]
                 self.legend.title = (
                     self.ensemble.to_latex
-                    + f"\n{unfolding_type}.\ unfolded, degree {unfolding_degree}"
+                    + f"\n{unfolding_type} unfolded, degree {unfolding_degree}"
                 )
             else:
-                self.legend.title = self.ensemble.to_latex + "\nwgt.\ unfolded"
+                self.legend.title = self.ensemble.to_latex + "\nweight unfolded"
 
         self.scale_limits_and_ticks(
             x=lambda value: value * dimension,
             y=lambda value: value / dimension,
         )
 
+    @override
     def plot(self, path: str | Path) -> None:
         self.set_derived_attributes()
 
-        self.create_figure()
+        self.build_figure()
 
         self.draw_histogram(
             color=self.histogram_color,
@@ -261,7 +269,8 @@ class UnfoldedSpectralHistogramPlot(Plot):
         unfolded_spectral_pdf = np.zeros(self.num_points)
         unfolded_spectral_pdf[np.abs(energies) < dimension / 2] = 1 / dimension
 
-        self.ax.plot(
+        plot = cast(Callable[..., object], self.ax.plot)
+        _ = plot(
             energies,
             unfolded_spectral_pdf,
             color=self.pdf_color,
