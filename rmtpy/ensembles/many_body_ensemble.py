@@ -112,7 +112,7 @@ class ManyBodyEnsemble(RandomMatrixEnsemble, ABC):
     @property
     @override
     def latex_name(self) -> str:
-        return rf"{{{super().latex_name}}}({{{self.num_majoranas}}})"
+        return rf"{{{super().latex_name}}}(N_\text{{m}} = {{{self.num_majoranas}}})"
 
     @cached_property
     def spectral_density(self) -> DensityModel:
