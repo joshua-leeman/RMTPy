@@ -6,7 +6,8 @@ import attrs
 from _typeshed import NoneType
 
 from ...conversion import completed_at_utc
-from ...ensembles.many_body_ensemble import ManyBodyEnsemble, RealEigenvalues
+from ...ensembles import ManyBodyEnsemble, RandomMatrixEnsemble
+from ...ensembles.many_body_ensemble import RealEigenvalues
 from ..base_data import Data
 from ..base_simulation import Simulation
 from ..histograms import Histogram
@@ -233,6 +234,16 @@ class SpectralStatisticsSimulation(Simulation):
     @override
     def _root_for_outputs(self) -> Path:
         return super()._root_for_outputs / self.ensemble.to_path
+
+    @property
+    @override
+    def _rmg(self) -> RandomMatrixEnsemble:
+        return self.ensemble
+
+    @property
+    @override
+    def _rng_initial_state(self) -> dict[str, object]:
+        return self._rmg.rng_state
 
     def _build_cdf_factory(self) -> TruncatedPolynomialCDFFactory:
         return TruncatedPolynomialCDFFactory(
