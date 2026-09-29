@@ -24,7 +24,7 @@ class ExecutionState(StringEnum):
 
 @attrs.frozen(kw_only=True, eq=True, weakref_slot=False)
 class SimulationContext:
-    simulation: str = attrs.field(
+    simulation_name: str = attrs.field(
         validator=attrs.validators.instance_of(str),
     )
     configuration: SourceDict = attrs.field(
@@ -62,7 +62,7 @@ class Simulation:
 
     def __attrs_post_init__(self) -> None:
         simulation_context = SimulationContext(
-            simulation=self._token_name,
+            simulation_name=self._token_name,
             configuration=self._build_configuration(),
             rng={
                 "policy": "numpy.random.default_rng",
