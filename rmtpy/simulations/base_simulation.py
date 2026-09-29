@@ -135,7 +135,7 @@ class Simulation:
             object.__setattr__(self, "_execution_state", ExecutionState.RUNNING)
 
         try:
-            object.__setattr__(self, "_result", self._execute())
+            self._execute()
         except BaseException:
             object.__setattr__(self, "_execution_state", ExecutionState.FAILED)
             raise

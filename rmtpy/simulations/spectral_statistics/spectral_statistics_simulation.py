@@ -3,7 +3,6 @@ from pathlib import Path
 from typing import override
 
 import attrs
-from _typeshed import NoneType
 
 from ...conversion import completed_at_utc
 from ...ensembles import ManyBodyEnsemble, RandomMatrixEnsemble
@@ -240,11 +239,6 @@ class SpectralStatisticsSimulation(Simulation):
     def _rmg(self) -> RandomMatrixEnsemble:
         return self.ensemble
 
-    @property
-    @override
-    def _rng_initial_state(self) -> dict[str, object]:
-        return self._rmg.rng_state
-
     def _build_cdf_factory(self) -> TruncatedPolynomialCDFFactory:
         return TruncatedPolynomialCDFFactory(
             density=self.ensemble.spectral_density,
@@ -294,7 +288,7 @@ class SpectralStatisticsSimulation(Simulation):
                 data.compute_form_factors()
 
     @override
-    def _execute(self) -> NoneType:
+    def _execute(self) -> None:
         spectral_density = self.ensemble.spectral_density
         has_average_coeffs = spectral_density.has_average_coeffs
 
