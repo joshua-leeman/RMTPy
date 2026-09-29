@@ -134,7 +134,7 @@ class FormFactorsData(Data):
     )
 
     @classmethod
-    def create_raw_form_factors(
+    def create_raw(
         cls,
         *,
         ensemble: ManyBodyEnsemble,
@@ -154,7 +154,7 @@ class FormFactorsData(Data):
         return raw_form_factors
 
     @classmethod
-    def create_unfolded_form_factors(
+    def create_unfolded(
         cls,
         *,
         file_name_prefix: str,

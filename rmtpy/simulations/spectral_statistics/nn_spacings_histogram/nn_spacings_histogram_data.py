@@ -10,7 +10,7 @@ SPACING_SUPPORT_UNITS_MEAN: tuple[float, float] = (0.0, 4.0)
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
 class SpacingsHistogram(Histogram):
     @classmethod
-    def create_raw_histogram(
+    def create_raw(
         cls,
         *,
         ensemble: ManyBodyEnsemble,
@@ -30,7 +30,7 @@ class SpacingsHistogram(Histogram):
         return raw_spacings_histogram
 
     @classmethod
-    def create_unfolded_histogram(
+    def create_unfolded(
         cls,
         *,
         file_name_prefix: str,

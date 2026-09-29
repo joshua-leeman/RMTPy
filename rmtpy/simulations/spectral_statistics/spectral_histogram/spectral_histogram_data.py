@@ -10,7 +10,7 @@ UNFOLDED_LEVEL_SUPPORT_UNITS_DIMENSION: tuple[float, float] = (-1.2, 1.2)
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
 class SpectralHistogram(Histogram):
     @classmethod
-    def create_raw_histogram(
+    def create_raw(
         cls,
         *,
         spectral_density: DensityModel,
@@ -26,7 +26,7 @@ class SpectralHistogram(Histogram):
         return raw_spectral_histogram
 
     @classmethod
-    def create_unfolded_histogram(
+    def create_unfolded(
         cls,
         *,
         file_name_prefix: str,
