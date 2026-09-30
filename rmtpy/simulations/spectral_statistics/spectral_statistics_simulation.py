@@ -4,7 +4,7 @@ from typing import override
 
 import attrs
 
-from ...conversion import completed_at_utc
+from ...conversion import read_utc_time
 from ...ensembles import ManyBodyEnsemble, RandomMatrixEnsemble
 from ...ensembles.many_body_ensemble import RealEigenvalues
 from ..base_data import Data
@@ -73,7 +73,7 @@ class SpectralStatisticsBuffers:
             ),
             form_factors=FormFactorsData.create_raw(
                 ensemble=simulation.ensemble,
-                file_name_prefix="spectral_form_factors",
+                file_name="spectral_form_factors",
             ),
         )
 
@@ -90,18 +90,18 @@ class SpectralStatisticsBuffers:
         return SpectralStatisticsBuffers(
             polynomial_degree=polynomial_degree,
             levels=SpectralHistogram.create_unfolded(
-                file_name_prefix=f"spectral_histogram_{unfolding}_unfolded{suffix}",
+                file_name=f"spectral_histogram_{unfolding}_unfolded{suffix}",
                 dimension=simulation.ensemble.dimension,
                 unfolding=unfolding,
                 polynomial_degree=polynomial_degree,
             ),
             nn_spacings=SpacingsHistogram.create_unfolded(
-                file_name_prefix=f"spacings_histogram_{unfolding}_unfolded{suffix}",
+                file_name=f"spacings_histogram_{unfolding}_unfolded{suffix}",
                 unfolding=unfolding,
                 polynomial_degree=polynomial_degree,
             ),
             form_factors=FormFactorsData.create_unfolded(
-                file_name_prefix=f"spectral_form_factors_{unfolding}_unfolded{suffix}",
+                file_name=f"spectral_form_factors_{unfolding}_unfolded{suffix}",
                 dimension=simulation.ensemble.dimension,
                 unfolding=unfolding,
                 polynomial_degree=polynomial_degree,
@@ -218,6 +218,7 @@ class SpectralStatisticsSimulation(Simulation):
         default=attrs.Factory(_create_variate_unfolded_buffers, takes_self=True)
     )
 
+    @override
     def __iter__(self) -> Iterator[Data]:
         yield from self.coefficient_buffers
         yield from self.raw_buffers
@@ -307,9 +308,9 @@ class SpectralStatisticsSimulation(Simulation):
                 ),
             }
 
-        self._store_run_context(
+        self._update_run_manifest(
             execution={
                 "calibration": calibration,
-                "completed_at_utc": completed_at_utc(),
+                "read_utc_time": read_utc_time(),
             },
         )

@@ -17,7 +17,7 @@ from matplotlib.legend import Legend
 
 from ..conversion import RMT_CONVERTER
 from .base_data import Data
-from .base_simulation import SimulationContext
+from .base_simulation import SimulationManifest
 from .histograms import Histogram
 
 type LegendAlignment = Literal["left", "center", "right"]
@@ -241,7 +241,7 @@ class PlotLegend:
 class Plot(ABC):
     data: Data
 
-    context: SimulationContext = dataclasses.field(repr=False)
+    context: SimulationManifest = dataclasses.field(repr=False)
 
     fig: Figure = dataclasses.field(init=False, repr=False)
     ax: Axes = dataclasses.field(init=False, repr=False)
@@ -373,7 +373,7 @@ class Plot(ABC):
             if isinstance(figure, Figure):
                 plt.close(figure)
 
-    def store_context_arg[T](self, key: str, cls: type[T]) -> T:
+    def store_manifest_arg[T](self, key: str, cls: type[T]) -> T:
         cache_key = (key, f"{cls.__module__}.{cls.__qualname__}")
         if cache_key in self._structured_args:
             return cast(T, self._structured_args[cache_key])

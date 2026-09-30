@@ -60,7 +60,7 @@ class FormFactorsPlot(Plot):
     )
 
     def set_derived_attributes(self) -> None:
-        self.ensemble: ManyBodyEnsemble = self.store_context_arg(
+        self.ensemble: ManyBodyEnsemble = self.store_manifest_arg(
             "ensemble", ManyBodyEnsemble
         )
 
@@ -190,7 +190,7 @@ class UnfoldedFormFactorsPlot(Plot):
     )
 
     def set_derived_attributes(self) -> None:
-        self.ensemble: ManyBodyEnsemble = self.store_context_arg(
+        self.ensemble: ManyBodyEnsemble = self.store_manifest_arg(
             "ensemble", ManyBodyEnsemble
         )
 

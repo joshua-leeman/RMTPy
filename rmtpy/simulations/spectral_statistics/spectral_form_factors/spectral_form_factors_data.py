@@ -1,4 +1,4 @@
-from typing import ClassVar, cast
+from typing import cast
 
 import attrs
 import numpy as np
@@ -69,8 +69,6 @@ def finalize_form_factors(form_factors: FormFactorsData) -> None:
 
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
 class FormFactorsData(Data):
-    data_type: ClassVar[str] = "form_factors"
-
     dimension: int = attrs.field(
         converter=int,
         validator=attrs.validators.gt(0),
@@ -138,12 +136,12 @@ class FormFactorsData(Data):
         cls,
         *,
         ensemble: ManyBodyEnsemble,
-        file_name_prefix: str,
+        file_name: str,
     ) -> FormFactorsData:
         j_1_1 = cast(float, jn_zeros(1, 1)[0])
 
         raw_form_factors = FormFactorsData(
-            file_name=f"{file_name_prefix}_data",
+            _file_name=f"{file_name}",
             dimension=ensemble.dimension,
             logD_time_support=LOG_D_TIME_SUPPORT,
             scale=j_1_1 / ensemble.spectral_radius,
@@ -157,13 +155,13 @@ class FormFactorsData(Data):
     def create_unfolded(
         cls,
         *,
-        file_name_prefix: str,
+        file_name: str,
         dimension: int,
         unfolding: str,
         polynomial_degree: int | None = None,
     ) -> FormFactorsData:
         unfolded_form_factors = FormFactorsData(
-            file_name=f"{file_name_prefix}_data",
+            _file_name=f"{file_name}",
             dimension=dimension,
             logD_time_support=LOG_D_UNFOLDED_TIME_SUPPORT,
             scale=2 * np.pi,

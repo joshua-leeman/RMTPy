@@ -1,8 +1,9 @@
 import base64
 import hashlib
+import json
 import math
 import re
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
@@ -42,7 +43,7 @@ class StringEnum(StrEnum):
         return tuple(member.value for member in cls)
 
 
-def completed_at_utc() -> str:
+def read_utc_time() -> str:
     return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
 
@@ -246,3 +247,47 @@ def json_value_serializer(
     value: object,
 ) -> object:
     return json_value(value)
+
+
+def numpy_savez_value(
+    value: object, /
+) -> np.ndarray[tuple[int, ...], np.dtype[np.generic]]:
+    if isinstance(value, dict):
+        value = json.dumps(
+            value,
+            allow_nan=False,
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+
+    if value is None:
+        return np.array(np.nan, dtype=np.float64)
+
+    if isinstance(value, bool | str):
+        return np.array(value)
+
+    if isinstance(value, int):
+        return np.array(value, dtype=np.int64)
+
+    if isinstance(value, float):
+        return np.array(value, dtype=np.float64)
+
+    if isinstance(value, complex):
+        return np.array(value, dtype=np.complex128)
+
+    if isinstance(value, list | tuple):
+        value = [numpy_savez_value(val) for val in cast(Sequence[object], value)]
+        return np.asarray(value)
+
+    if isinstance(value, np.ndarray):
+        return value
+
+    raise TypeError(f"Unsupported value: {type(value).__name__}.")
+
+
+def numpy_savez_serializer(
+    _instance: attrs.AttrsInstance,
+    _field: attrs.Attribute[object],
+    value: object,
+) -> np.ndarray[tuple[int, ...], np.dtype[np.generic]]:
+    return numpy_savez_value(value)

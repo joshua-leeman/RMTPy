@@ -16,7 +16,7 @@ class SpectralHistogram(Histogram):
         spectral_density: DensityModel,
     ) -> SpectralHistogram:
         raw_spectral_histogram = SpectralHistogram(
-            file_name="spectral_histogram_data",
+            _file_name="spectral_histogram",
             support=spectral_density.plot_range,
         )
 
@@ -29,7 +29,7 @@ class SpectralHistogram(Histogram):
     def create_unfolded(
         cls,
         *,
-        file_name_prefix: str,
+        file_name: str,
         dimension: int,
         unfolding: str,
         polynomial_degree: int | None = None,
@@ -40,7 +40,7 @@ class SpectralHistogram(Histogram):
         )
 
         unfolded_spectral_histogram = SpectralHistogram(
-            file_name=f"{file_name_prefix}_data",
+            _file_name=f"{file_name}",
             support=unfolded_level_support,
         )
 

@@ -56,7 +56,7 @@ class SpectralCoefficientsHistogramPlot(Plot):
         self.axes.xlabel = rf"$c_{{{coeff_degree}}}$"
         self.axes.ylabel = rf"$P(c_{{{coeff_degree}}})$"
 
-        self.ensemble: ManyBodyEnsemble = self.store_context_arg(
+        self.ensemble: ManyBodyEnsemble = self.store_manifest_arg(
             "ensemble", ManyBodyEnsemble
         )
 

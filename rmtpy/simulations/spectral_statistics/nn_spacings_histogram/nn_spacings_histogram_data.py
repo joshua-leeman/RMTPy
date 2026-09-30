@@ -18,7 +18,7 @@ class SpacingsHistogram(Histogram):
         global_mean_spacing = 2 * ensemble.spectral_radius / ensemble.dimension
 
         raw_spacings_histogram = SpacingsHistogram(
-            file_name="spacings_histogram_data",
+            _file_name="spacings_histogram",
             support=scale_support(
                 SPACING_SUPPORT_UNITS_MEAN,
                 scale=global_mean_spacing,
@@ -33,12 +33,12 @@ class SpacingsHistogram(Histogram):
     def create_unfolded(
         cls,
         *,
-        file_name_prefix: str,
+        file_name: str,
         unfolding: str,
         polynomial_degree: int | None = None,
     ) -> SpacingsHistogram:
         unfolded_spacings_histogram = SpacingsHistogram(
-            file_name=f"{file_name_prefix}_data",
+            _file_name=f"{file_name}",
             support=SPACING_SUPPORT_UNITS_MEAN,
         )
         metadata: dict[str, int | str] = {"unfolding": unfolding}

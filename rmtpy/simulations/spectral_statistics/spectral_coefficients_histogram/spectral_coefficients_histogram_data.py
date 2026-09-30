@@ -14,7 +14,7 @@ class SpectralCoefficientsHistogram(Histogram):
         degree: int,
     ) -> SpectralCoefficientsHistogram:
         coefficient_histogram = SpectralCoefficientsHistogram(
-            file_name=f"spectral_coeff_{degree}_histogram_data",
+            _file_name=f"spectral_coeff_{degree}_histogram",
             support=SPECTRAL_COEFFICIENT_SUPPORT,
         )
         metadata = {"degree": degree, "unfolding": "raw"}

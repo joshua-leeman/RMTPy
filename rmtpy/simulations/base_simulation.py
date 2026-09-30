@@ -1,3 +1,6 @@
+import json
+import os
+from collections.abc import Iterator
 from copy import deepcopy
 from pathlib import Path
 from typing import cast
@@ -11,7 +14,12 @@ from ..conversion import (
     json_value,
     to_path,
 )
-from ..ensembles.base_ensemble import RandomMatrixEnsemble
+from ..ensembles import RandomMatrixEnsemble
+from .base_data import Data
+
+DEFAULT_OUTPUT_ROOT: Path = Path("outputs")
+
+MANIFEST_FILE_NAME: str = "manifest.json"
 
 
 class ExecutionState(StringEnum):
@@ -22,10 +30,7 @@ class ExecutionState(StringEnum):
 
 
 @attrs.frozen(kw_only=True, eq=True, weakref_slot=False)
-class SimulationContext:
-    simulation_name: str = attrs.field(
-        validator=attrs.validators.instance_of(str),
-    )
+class SimulationManifest:
     configuration: SourceDict = attrs.field(
         converter=deepcopy,
         repr=False,
@@ -50,7 +55,7 @@ class SimulationContext:
 
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
 class Simulation:
-    _context: SimulationContext = attrs.field(
+    _manifest: SimulationManifest = attrs.field(
         init=False,
         repr=False,
     )
@@ -60,8 +65,7 @@ class Simulation:
     )
 
     def __attrs_post_init__(self) -> None:
-        simulation_context = SimulationContext(
-            simulation_name=self._token_name,
+        simulation_manifest = SimulationManifest(
             configuration=self._build_configuration(),
             rng={
                 "policy": "numpy.random.default_rng",
@@ -74,8 +78,14 @@ class Simulation:
                 "real": self._rmg.real_dtype.name,
                 "complex": self._rmg.complex_dtype.name,
             },
+            execution={"execution_state": self._execution_state},
         )
-        object.__setattr__(self, "_context", simulation_context)
+        object.__setattr__(self, "_manifest", simulation_manifest)
+
+    def __iter__(self) -> Iterator[Data]:
+        raise NotImplementedError(
+            f"{type(self).__name__} has not implemented iterator method."
+        )
 
     @property
     def _token_name(self) -> str:
@@ -111,12 +121,27 @@ class Simulation:
             },
         }
 
-    def _store_run_context(self, *, execution: dict[str, object]) -> None:
+    def _update_run_manifest(self, *, execution: dict[str, object]) -> None:
         if self.execution_state is not ExecutionState.RUNNING:
             raise RuntimeError("The simulation must be running.")
 
-        self._context.rng["final_state"] = json_value(self._rmg.rng_state)
-        self._context.execution.update(execution)
+        self._manifest.rng["final_state"] = json_value(self._rmg.rng_state)
+        self._manifest.execution["execution_state"] = self._execution_state
+        self._manifest.execution.update(execution)
+
+    def _write_manifest(self, *, path: Path) -> None:
+        encoded_manifest = json.dumps(
+            attrs.asdict(self._manifest),
+            allow_nan=False,
+            ensure_ascii=False,
+            indent=2,
+            sort_keys=False,
+        )
+        with path.open("x", encoding="utf-8") as file:
+            _ = file.write(encoded_manifest)
+            _ = file.write("\n")
+            file.flush()
+            os.fsync(file.fileno())
 
     def _execute(self) -> None:
         raise NotImplementedError(
@@ -136,3 +161,25 @@ class Simulation:
             raise
 
         object.__setattr__(self, "_execution_state", ExecutionState.COMPLETE)
+
+    def save_completed_simulation(
+        self,
+        *,
+        path: str | Path = DEFAULT_OUTPUT_ROOT,
+    ) -> None:
+        if self.execution_state is not ExecutionState.COMPLETE:
+            raise RuntimeError("A simulation may be saved only after execution.")
+
+        path = path / self.to_path
+
+        completion_time = self._manifest.execution.get("execution_time")
+        if not isinstance(completion_time, str):
+            raise ValueError("Execution completion time is malformed.")
+
+        destination_directory = Path(path) / Path(completion_time)
+        destination_directory.mkdir(parents=True, exist_ok=True)
+
+        self._write_manifest(path=destination_directory / Path(MANIFEST_FILE_NAME))
+
+        for finalized_data in self:
+            finalized_data.save(directory=destination_directory)
