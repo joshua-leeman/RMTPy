@@ -162,7 +162,7 @@ class Simulation:
 
         object.__setattr__(self, "_execution_state", ExecutionState.COMPLETE)
 
-    def save_completed_simulation(
+    def save_execution(
         self,
         *,
         path: str | Path = DEFAULT_OUTPUT_ROOT,
