@@ -5,7 +5,6 @@ from typing import cast
 import attrs
 
 from ..conversion import (
-    AttrsField,
     SourceDict,
     StringEnum,
     insert_underscores,
@@ -105,7 +104,9 @@ class Simulation:
             "name": type(self).__name__,
             "parameters": {
                 field.name: json_value(cast(object, getattr(self, field.name)))
-                for field in cast(tuple[AttrsField, ...], attrs.fields(type(self)))
+                for field in cast(
+                    tuple[attrs.Attribute[object], ...], attrs.fields(type(self))
+                )
                 if field.init
             },
         }

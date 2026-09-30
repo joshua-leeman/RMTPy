@@ -14,8 +14,6 @@ import numpy as np
 from numpy.typing import DTypeLike
 
 type SourceDict = dict[str, str | dict[str, object]]
-type AttrsField = attrs.Attribute[object]
-type AttrsFields = dict[str, AttrsField]
 
 TYPE_KEY: str = "__rmtpy_manifest_type__"
 
@@ -70,8 +68,8 @@ def to_key_of_registry(string: str, /) -> str:
     return re.sub(r"[_ ]", "", string).lower()
 
 
-def to_latex(instance: attrs.AttrsInstance, /, *, latex_name: str = "") -> str:
-    latex_str = "$" + latex_name
+def to_latex(instance: attrs.AttrsInstance, /, *, _latex_name: str = "") -> str:
+    latex_str = "$" + _latex_name
     for label, attr in attrs.fields_dict(type(instance)).items():
         latex_label = attr.metadata.get("latex_name")
         if isinstance(latex_label, str):
@@ -114,7 +112,7 @@ def canonicalize_source_dict(
     except KeyError as exc:
         raise ValueError(f"Unknown configuration type {type_name!r}.") from exc
 
-    fields = cast(tuple[AttrsField, ...], attrs.fields(registered_cls))
+    fields = cast(tuple[attrs.Attribute[object], ...], attrs.fields(registered_cls))
     init_field_names = {field.name for field in fields if field.init}
     parameter_names = set(parameters)
 
@@ -130,7 +128,7 @@ def canonicalize_source_dict(
 
 
 def source_dict(instance: attrs.AttrsInstance, /) -> SourceDict:
-    fields = cast(tuple[AttrsField, ...], attrs.fields(type(instance)))
+    fields = cast(tuple[attrs.Attribute[object], ...], attrs.fields(type(instance)))
     return {
         "type": type(instance).__name__,
         "parameters": {
@@ -238,3 +236,11 @@ def json_value(value: object, /) -> object:
         return source_dict(value)
 
     raise TypeError(f"Unsupported value: {type(value).__name__}.")
+
+
+def json_value_serializer(
+    _instance: attrs.AttrsInstance,
+    _field: attrs.Attribute[object],
+    value: object,
+) -> object:
+    return json_value(value)
