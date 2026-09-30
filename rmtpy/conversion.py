@@ -1,7 +1,8 @@
+import base64
 import hashlib
 import math
 import re
-from collections.abc import Iterable
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
@@ -15,6 +16,8 @@ from numpy.typing import DTypeLike
 type SourceDict = dict[str, str | dict[str, object]]
 type AttrsField = attrs.Attribute[object]
 type AttrsFields = dict[str, AttrsField]
+
+TYPE_KEY: str = "__rmtpy_manifest_type__"
 
 RMT_CONVERTER: cattrs.Converter = cattrs.Converter()
 
@@ -56,14 +59,6 @@ def build_hashed_id(
     hash_object.update(str(array.shape).encode())
     hash_object.update(array.tobytes())
     return hash_object.hexdigest()[:num_hex]
-
-
-def get_attrs_fields[T: attrs.AttrsInstance](cls: type[T], /) -> tuple[AttrsField, ...]:
-    return cast(tuple[AttrsField, ...], attrs.fields(cls))
-
-
-def get_attrs_fields_dict[T: attrs.AttrsInstance](cls: type[T], /) -> AttrsFields:
-    return cast(AttrsFields, attrs.fields_dict(cls))
 
 
 def insert_underscores(string: str, /) -> str:
@@ -119,7 +114,7 @@ def canonicalize_source_dict(
     except KeyError as exc:
         raise ValueError(f"Unknown configuration type {type_name!r}.") from exc
 
-    fields = get_attrs_fields(registered_cls)
+    fields = cast(tuple[AttrsField, ...], attrs.fields(registered_cls))
     init_field_names = {field.name for field in fields if field.init}
     parameter_names = set(parameters)
 
@@ -134,115 +129,112 @@ def canonicalize_source_dict(
     return {"type": registered_cls.__name__, "parameters": parameters}
 
 
-def canonicalize_string_selection(
-    str_values: str | Iterable[str],
-    /,
-    *,
-    allowed: type[StringEnum],
-    name: str,
-) -> tuple[str, ...]:
-    try:
-        source = (str_values,) if isinstance(str_values, str) else tuple(str_values)
-    except TypeError as exc:
-        raise TypeError(f"`{name}` must be a string or iterable of strings.") from exc
-
-    normalized: list[str] = []
-    for value in source:
-        token = value.strip().lower()
-        if not allowed.has_value(token):
-            raise ValueError(
-                f"Unknown {name} value {value!r}: Expected one of {allowed.to_tuple()}."
-            )
-        if token in normalized:
-            raise ValueError(f"`{name}` must not contain duplicate values.")
-
-        normalized.append(token)
-
-    if len(normalized) == 0:
-        raise ValueError(f"`{name}` must contain at least one value.")
-
-    normalized_set = set(normalized)
-    return tuple(value for value in allowed.to_tuple() if value in normalized_set)
+def source_dict(instance: attrs.AttrsInstance, /) -> SourceDict:
+    fields = cast(tuple[AttrsField, ...], attrs.fields(type(instance)))
+    return {
+        "type": type(instance).__name__,
+        "parameters": {
+            field.name: json_value(cast(object, getattr(instance, field.name)))
+            for field in fields
+            if field.init
+        },
+    }
 
 
-def to_json_compatible(value: object, /) -> object:
+def json_value(value: object, /) -> object:
     if value is None or isinstance(value, bool | int | str):
         return value
-
-    if isinstance(value, float):
-        if not math.isfinite(value):
-            raise ValueError(f"Non-finite float {value!r} is not JSON-compatible.")
-        return value
-
-    if isinstance(value, complex):
-        return {
-            "real": to_json_compatible(value.real),
-            "imag": to_json_compatible(value.imag),
-        }
-
-    if isinstance(value, bytes):
-        return {"hex": value.hex()}
 
     if isinstance(value, Path):
         return str(value)
 
-    if isinstance(value, list | tuple):
-        iterable = cast(list[object] | tuple[object, ...], value)
-        return [to_json_compatible(item) for item in iterable]
+    if isinstance(value, float):
+        if math.isfinite(value):
+            return value
 
-    if isinstance(value, dict):
-        mapping = cast(dict[object, object], value)
-        for key in mapping:
+        if math.isnan(value):
+            token = "nan"
+        elif value > 0:
+            token = "inf"
+        else:
+            token = "-inf"
+
+        return {TYPE_KEY: "float", "value": token}
+
+    if isinstance(value, complex):
+        return {
+            TYPE_KEY: "complex",
+            "real": json_value(value.real),
+            "imag": json_value(value.imag),
+        }
+
+    if isinstance(value, bytes):
+        return {
+            TYPE_KEY: "bytes",
+            "base64": base64.b64encode(value).decode("ascii"),
+        }
+
+    if isinstance(value, tuple):
+        tuple_items = cast(tuple[object, ...], value)
+        return {TYPE_KEY: "tuple", "items": [json_value(item) for item in tuple_items]}
+
+    if isinstance(value, list):
+        list_items = cast(list[object], value)
+        return [json_value(item) for item in list_items]
+
+    if isinstance(value, Mapping):
+        mapping = cast(Mapping[object, object], value)
+        normalized: dict[str, object] = {}
+        for key, item in mapping.items():
             if not isinstance(key, str):
-                raise TypeError(
-                    f"JSON object keys must be strings, got {type(key).__name__}."
-                )
+                raise TypeError("Mappings must use string keys.")
+            if key == TYPE_KEY:
+                raise ValueError(f"{TYPE_KEY!r} is reserved.")
 
-        return {key: to_json_compatible(item) for key, item in mapping.items()}
+            normalized[key] = json_value(item)
 
-    if isinstance(value, np.ndarray):
-        return to_json_compatible(cast(list[object], value.tolist()))
+        return normalized
 
     if isinstance(value, np.dtype):
-        return value.name
+        return {TYPE_KEY: "dtype", "value": value.str}
 
     if isinstance(value, np.generic):
-        return to_json_compatible(value.item())
+        return json_value(value.item())
+
+    if isinstance(value, np.ndarray):
+        if value.dtype.hasobject:
+            raise TypeError("Object arrays are not supported.")
+
+        return {
+            TYPE_KEY: "ndarray",
+            "dtype": value.dtype.str,
+            "shape": list(value.shape),
+            "values": json_value(cast(list[object], value.tolist())),
+        }
 
     if isinstance(value, np.random.SeedSequence):
         return {
-            "entropy": to_json_compatible(value.entropy),
+            TYPE_KEY: "random.SeedSequence",
+            "entropy": json_value(value.entropy),
             "spawn_key": list(value.spawn_key),
             "pool_size": value.pool_size,
         }
 
     if isinstance(value, np.random.Generator):
         return {
+            TYPE_KEY: "random.Generator",
             "generator": type(value.bit_generator).__name__,
-            "state": to_json_compatible(value.bit_generator.state),
+            "state": json_value(value.bit_generator.state),
         }
 
     if isinstance(value, np.random.BitGenerator):
         return {
+            TYPE_KEY: "random.BitGenerator",
             "bit_generator": type(value).__name__,
-            "state": to_json_compatible(value.state),
+            "state": json_value(value.state),
         }
 
     if attrs.has(type(value)):
-        return to_source_dict(value)
+        return source_dict(value)
 
-    raise TypeError(
-        f"{type(value).__name__} cannot be converted to a JSON-compatible value."
-    )
-
-
-def to_source_dict(instance: attrs.AttrsInstance, /) -> SourceDict:
-    fields = get_attrs_fields(type(instance))
-    return {
-        "type": type(instance).__name__,
-        "parameters": {
-            field.name: to_json_compatible(cast(object, getattr(instance, field.name)))
-            for field in fields
-            if field.init
-        },
-    }
+    raise TypeError(f"Unsupported value: {type(value).__name__}.")

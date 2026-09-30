@@ -5,11 +5,11 @@ from typing import cast
 import attrs
 
 from ..conversion import (
+    AttrsField,
     SourceDict,
     StringEnum,
-    get_attrs_fields,
     insert_underscores,
-    to_json_compatible,
+    json_value,
     to_path,
 )
 from ..ensembles.base_ensemble import RandomMatrixEnsemble
@@ -67,7 +67,7 @@ class Simulation:
             rng={
                 "policy": "numpy.random.default_rng",
                 "bit_generator": type(self._rmg.rng.bit_generator).__name__,
-                "seed": to_json_compatible(self._rmg.seed),
+                "seed": json_value(self._rmg.seed),
                 "state_policy": "capture_initial_and_final",
                 "initial_state": self._rmg.rng_state,
             },
@@ -104,8 +104,8 @@ class Simulation:
         return {
             "name": type(self).__name__,
             "parameters": {
-                field.name: to_json_compatible(cast(object, getattr(self, field.name)))
-                for field in get_attrs_fields(type(self))
+                field.name: json_value(cast(object, getattr(self, field.name)))
+                for field in cast(tuple[AttrsField, ...], attrs.fields(type(self)))
                 if field.init
             },
         }
@@ -114,7 +114,7 @@ class Simulation:
         if self.execution_state is not ExecutionState.RUNNING:
             raise RuntimeError("The simulation must be running.")
 
-        self._context.rng["final_state"] = to_json_compatible(self._rmg.rng_state)
+        self._context.rng["final_state"] = json_value(self._rmg.rng_state)
         self._context.execution.update(execution)
 
     def _execute(self) -> None:

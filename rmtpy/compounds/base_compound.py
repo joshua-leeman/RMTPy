@@ -15,7 +15,6 @@ from ..conversion import (
     SourceDict,
     build_hashed_id,
     canonicalize_source_dict,
-    get_attrs_fields_dict,
     to_key_of_registry,
     to_latex,
     to_path,
@@ -158,7 +157,7 @@ def _structure_hook_for_compound(
 
 
 def _unstructure_hook_for_compound(compound: CompoundEnsemble) -> SourceDict:
-    fields = get_attrs_fields_dict(type(compound))
+    fields = attrs.fields_dict(type(compound))
     parameters = {
         name: RMT_CONVERTER.unstructure(getattr(compound, name))
         for name, attr in fields.items()

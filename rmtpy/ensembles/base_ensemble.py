@@ -11,7 +11,6 @@ from ..conversion import (
     RMT_CONVERTER,
     SourceDict,
     canonicalize_source_dict,
-    get_attrs_fields_dict,
     to_key_of_registry,
     to_latex,
     to_path,
@@ -80,7 +79,7 @@ def _structure_hook_for_ensemble(
 
 
 def _unstructure_hook_for_ensemble(ensemble: RandomMatrixEnsemble) -> SourceDict:
-    fields = get_attrs_fields_dict(type(ensemble))
+    fields = attrs.fields_dict(type(ensemble))
     parameters = {
         name: RMT_CONVERTER.unstructure(getattr(ensemble, name))
         for name, attr in fields.items()
