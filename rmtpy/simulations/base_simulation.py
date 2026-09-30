@@ -170,13 +170,13 @@ class Simulation:
         if self.execution_state is not ExecutionState.COMPLETE:
             raise RuntimeError("A simulation may be saved only after execution.")
 
-        path = path / self.to_path
+        path = Path(path) / self.to_path
 
         completion_time = self._manifest.execution.get("execution_time")
         if not isinstance(completion_time, str):
             raise ValueError("Execution completion time is malformed.")
 
-        destination_directory = Path(path) / Path(completion_time)
+        destination_directory = path / Path(completion_time)
         destination_directory.mkdir(parents=True, exist_ok=True)
 
         self._write_manifest(path=destination_directory / Path(MANIFEST_FILE_NAME))
