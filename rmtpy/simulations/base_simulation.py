@@ -82,22 +82,22 @@ class Simulation:
         return insert_underscores(type(self).__name__).lower()
 
     @property
-    def _root_for_outputs(self) -> Path:
-        return Path(self._token_name)
-
-    @property
     def _rmg(self) -> RandomMatrixEnsemble:
         raise NotImplementedError(
             f"{type(self).__name__} has not implemented property `_rmg`."
         )
 
     @property
-    def execution_state(self) -> ExecutionState:
-        return self._execution_state
+    def _root_for_outputs(self) -> Path:
+        return Path(self._token_name)
 
     @property
     def to_path(self) -> Path:
         return to_path(self, root=self._root_for_outputs)
+
+    @property
+    def execution_state(self) -> ExecutionState:
+        return self._execution_state
 
     def _build_configuration(self) -> SourceDict:
         return {

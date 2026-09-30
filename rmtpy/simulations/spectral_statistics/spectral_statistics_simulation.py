@@ -231,13 +231,13 @@ class SpectralStatisticsSimulation(Simulation):
 
     @property
     @override
-    def _root_for_outputs(self) -> Path:
-        return super()._root_for_outputs / self.ensemble.to_path
+    def _rmg(self) -> RandomMatrixEnsemble:
+        return self.ensemble
 
     @property
     @override
-    def _rmg(self) -> RandomMatrixEnsemble:
-        return self.ensemble
+    def _root_for_outputs(self) -> Path:
+        return super()._root_for_outputs / self.ensemble.to_path
 
     def _build_cdf_factory(self) -> TruncatedPolynomialCDFFactory:
         return TruncatedPolynomialCDFFactory(

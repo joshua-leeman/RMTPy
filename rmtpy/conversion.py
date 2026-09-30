@@ -81,7 +81,9 @@ def to_latex(instance: attrs.AttrsInstance, /, *, _latex_name: str = "") -> str:
 def to_path(instance: attrs.AttrsInstance, /, *, root: Path) -> Path:
     for name, attr in attrs.fields_dict(type(instance)).items():
         dir_name = attr.metadata.get("dir_name")
-        if isinstance(dir_name, str):
+        if not isinstance(dir_name, str):
+            raise ValueError("Attribute 'dir_name' must be a string.")
+        else:
             value = str(cast(object, getattr(instance, name)))
             value = re.sub(r"[^\w\-.]", "_", value)
             root /= f"{dir_name}_{value.replace('.', 'p')}"
