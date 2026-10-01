@@ -1,31 +1,67 @@
-from __future__ import annotations
-
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from pathlib import Path
-from typing import Any
+from typing import Any, override
 
 import attrs
 import numpy as np
 
-import rmtpy.conversion
-from rmtpy.compounds import Compound
-
-from ..base import Simulation
-from ..observable import Observable
-from ..statistics import REALIZATIONS_METADATA, truncated_polynomial_degrees
-from ..unfolding import TruncatedPolynomialCdfFactory
-from .outputs import TimeDelayOutputs, create_time_delay_outputs
+from ...compounds import CompoundEnsemble
+from ...conversion import unwrap_json_value
+from ...ensembles import RandomMatrixEnsemble
+from ..base_data import Data
+from ..base_plot import Plot
+from ..base_simulation import DEFAULT_OUTPUT_ROOT, ExecutionState, Simulation
+from ..histograms import Histogram
+from ..statistics import REALIZATIONS_METADATA, truncated_polynomial_degree_range
+from ..unfolding import CDF, TruncatedPolynomialCDFFactory, unfold_widths
+from .time_delay_histogram import (
+    TimeDelayHistogram,
+    TimeDelayHistogramPlot,
+    UnfoldedTimeDelayHistogramPlot,
+)
 
 ENERGIES_METADATA: dict[str, str] = {
     "latex_name": "E",
 }
 
 
-def format_energy_path_value(energy: float) -> str:
-    return f"{energy:.5g}".replace("-", "n").replace(".", "p")
+def load_time_delay_statistics_simulation(
+    *,
+    directory: str | Path,
+) -> TimeDelayStatisticsSimulation:
+    simulation = TimeDelayStatisticsSimulation.load(directory)
+    if not isinstance(simulation, TimeDelayStatisticsSimulation):
+        raise TypeError("Saved simulation is not a TimeDelayStatisticsSimulation.")
+
+    return simulation
 
 
-def normalize_energies(energies: Any) -> np.ndarray:
+def plot_time_delay_statistics_simulation(*, directory: str | Path) -> None:
+    simulation = load_time_delay_statistics_simulation(directory=directory)
+    simulation.plot(directory)
+
+
+def run_time_delay_statistics_simulation(
+    *,
+    compound: CompoundEnsemble,
+    energies: Iterable[float],
+    realizs: int,
+    directory: str | Path = DEFAULT_OUTPUT_ROOT,
+) -> TimeDelayStatisticsSimulation:
+    simulation = TimeDelayStatisticsSimulation(
+        compound=compound,
+        energies=energies,
+        realizs=realizs,
+    )
+    simulation.execute()
+    destination_directory = simulation.save(directory)
+    plot_time_delay_statistics_simulation(directory=destination_directory)
+    return simulation
+
+
+def _normalize_energies(
+    energies: Any,
+) -> np.ndarray[tuple[int], np.dtype[np.floating]]:
     energies_array = np.array(energies, dtype=np.float64, copy=True, order="C")
     if energies_array.ndim == 0:
         energies_array = energies_array.reshape(1)
@@ -40,116 +76,371 @@ def normalize_energies(energies: Any) -> np.ndarray:
     if np.unique(energies_array).size != energies_array.size:
         raise ValueError("`energies` must contain unique values.")
 
-    path_values = tuple(format_energy_path_value(value) for value in energies_array)
-    if len(set(path_values)) != len(path_values):
-        raise ValueError(
-            "`energies` must remain unique when formatted with five significant "
-            "digits for output paths."
-        )
-
     energies_array.flags.writeable = False
     return energies_array
 
 
-def run_time_delay_statistics(
-    compound: Compound,
+def unfold_time_delays(
+    time_delays: np.ndarray[tuple[int], np.dtype[np.floating]],
     *,
-    realizs: int,
-    energies: Iterable[float] = (0.0,),
-) -> None:
-    TimeDelayStatisticsSimulation(
-        compound=compound,
-        realizs=realizs,
-        energies=energies,
-    ).run()
+    energy: float,
+    cdf: CDF,
+    dimension: int,
+) -> np.ndarray[tuple[int], np.dtype[np.floating]]:
+    valid_time_delays = time_delays[np.isfinite(time_delays) & (time_delays > 0.0)]
+    if valid_time_delays.size == 0:
+        return valid_time_delays
+
+    reciprocal_widths = np.reciprocal(valid_time_delays)
+    unfolded_widths = unfold_widths(
+        reciprocal_widths,
+        centers=np.full_like(reciprocal_widths, energy),
+        cdf=cdf,
+        dimension=dimension,
+    )
+    valid_unfolded_widths = unfolded_widths[
+        np.isfinite(unfolded_widths) & (unfolded_widths > 0.0)
+    ]
+    return np.reciprocal(valid_unfolded_widths)
+
+
+@attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
+class TimeDelayStatisticsBuffers:
+    polynomial_degree: int | None = attrs.field(
+        default=None,
+        validator=attrs.validators.optional(
+            (attrs.validators.instance_of(int), attrs.validators.gt(0)),
+        ),
+    )
+
+    time_delays: tuple[TimeDelayHistogram, ...] = attrs.field(
+        validator=attrs.validators.deep_iterable(
+            member_validator=attrs.validators.instance_of(TimeDelayHistogram),
+            iterable_validator=attrs.validators.instance_of(tuple),
+        ),
+        repr=False,
+    )
+
+    def __iter__(self) -> Iterator[Data]:
+        yield from self.time_delays
+
+    @classmethod
+    def create_raw(
+        cls,
+        *,
+        simulation: TimeDelayStatisticsSimulation,
+    ) -> TimeDelayStatisticsBuffers:
+        return TimeDelayStatisticsBuffers(
+            time_delays=tuple(
+                TimeDelayHistogram.create_raw(
+                    ensemble=simulation.compound.ensemble,
+                    energy_index=energy_index,
+                    energy=float(energy),
+                )
+                for energy_index, energy in enumerate(simulation.energies)
+            ),
+        )
+
+    @classmethod
+    def create_unfolded(
+        cls,
+        *,
+        simulation: TimeDelayStatisticsSimulation,
+        unfolding: str,
+        polynomial_degree: int | None = None,
+    ) -> TimeDelayStatisticsBuffers:
+        return TimeDelayStatisticsBuffers(
+            polynomial_degree=polynomial_degree,
+            time_delays=tuple(
+                TimeDelayHistogram.create_unfolded(
+                    ensemble=simulation.compound.ensemble,
+                    energy_index=energy_index,
+                    energy=float(energy),
+                    unfolding=unfolding,
+                    polynomial_degree=polynomial_degree,
+                )
+                for energy_index, energy in enumerate(simulation.energies)
+            ),
+        )
+
+    def accumulate_raw_time_delays(
+        self,
+        time_delays: np.ndarray[tuple[int, int], np.dtype[np.floating]],
+    ) -> None:
+        for histogram, delay_values in zip(
+            self.time_delays,
+            time_delays,
+            strict=True,
+        ):
+            histogram.add_histogram_contribution(delay_values)
+
+    def accumulate_unfolded_time_delays(
+        self,
+        time_delays: np.ndarray[tuple[int, int], np.dtype[np.floating]],
+        *,
+        energies: np.ndarray[tuple[int], np.dtype[np.floating]],
+        cdf: CDF,
+        dimension: int,
+    ) -> None:
+        for energy, histogram, delay_values in zip(
+            energies,
+            self.time_delays,
+            time_delays,
+            strict=True,
+        ):
+            histogram.add_histogram_contribution(
+                unfold_time_delays(
+                    delay_values,
+                    energy=float(energy),
+                    cdf=cdf,
+                    dimension=dimension,
+                )
+            )
+
+
+def _create_raw_buffers(
+    simulation: TimeDelayStatisticsSimulation,
+) -> TimeDelayStatisticsBuffers:
+    return TimeDelayStatisticsBuffers.create_raw(simulation=simulation)
+
+
+def _create_weight_unfolded_buffers(
+    simulation: TimeDelayStatisticsSimulation,
+) -> TimeDelayStatisticsBuffers:
+    return TimeDelayStatisticsBuffers.create_unfolded(
+        simulation=simulation,
+        unfolding="weight",
+    )
+
+
+def _create_averaged_unfolded_buffers(
+    simulation: TimeDelayStatisticsSimulation,
+) -> tuple[TimeDelayStatisticsBuffers, ...]:
+    polynomial_degrees = truncated_polynomial_degree_range(
+        max_degree=simulation.compound.ensemble.max_spectral_polynomial_degree
+    )
+
+    list_of_buffers: list[TimeDelayStatisticsBuffers] = []
+    for polynomial_degree in polynomial_degrees:
+        list_of_buffers.append(
+            TimeDelayStatisticsBuffers.create_unfolded(
+                simulation=simulation,
+                unfolding="averaged",
+                polynomial_degree=polynomial_degree,
+            )
+        )
+
+    return tuple(list_of_buffers)
+
+
+def _create_variate_unfolded_buffers(
+    simulation: TimeDelayStatisticsSimulation,
+) -> tuple[TimeDelayStatisticsBuffers, ...]:
+    polynomial_degrees = truncated_polynomial_degree_range(
+        max_degree=simulation.compound.ensemble.max_spectral_polynomial_degree
+    )
+
+    list_of_buffers: list[TimeDelayStatisticsBuffers] = []
+    for polynomial_degree in polynomial_degrees:
+        list_of_buffers.append(
+            TimeDelayStatisticsBuffers.create_unfolded(
+                simulation=simulation,
+                unfolding="variate",
+                polynomial_degree=polynomial_degree,
+            )
+        )
+
+    return tuple(list_of_buffers)
 
 
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
 class TimeDelayStatisticsSimulation(Simulation):
-    """Monte Carlo experiment for proper delay times at fixed probe energies."""
-
-    compound: Compound = attrs.field(
-        converter=Compound.create,
+    compound: CompoundEnsemble = attrs.field(
+        converter=CompoundEnsemble.create,
+    )
+    energies: np.ndarray[tuple[int], np.dtype[np.floating]] = attrs.field(
+        converter=_normalize_energies,
+        metadata=ENERGIES_METADATA,
     )
     realizs: int = attrs.field(
         converter=int,
         validator=attrs.validators.gt(0),
         metadata=REALIZATIONS_METADATA,
     )
-    energies: np.ndarray = attrs.field(
-        default=(0.0,),
-        converter=normalize_energies,
-        metadata=ENERGIES_METADATA,
+
+    raw_buffers: TimeDelayStatisticsBuffers = attrs.field(
+        default=attrs.Factory(_create_raw_buffers, takes_self=True),
+        repr=False,
+    )
+    wgt_unfolded_buffers: TimeDelayStatisticsBuffers = attrs.field(
+        default=attrs.Factory(_create_weight_unfolded_buffers, takes_self=True),
+        repr=False,
+    )
+    ave_unfolded_buffers: Iterable[TimeDelayStatisticsBuffers] = attrs.field(
+        default=attrs.Factory(_create_averaged_unfolded_buffers, takes_self=True),
+        repr=False,
+    )
+    var_unfolded_buffers: Iterable[TimeDelayStatisticsBuffers] = attrs.field(
+        default=attrs.Factory(_create_variate_unfolded_buffers, takes_self=True),
         repr=False,
     )
 
-    outputs: TimeDelayOutputs = attrs.field(
-        default=attrs.Factory(create_time_delay_outputs, takes_self=True),
-        init=False,
-        repr=False,
-    )
+    @override
+    def __iter__(self) -> Iterator[Data]:
+        yield from self.raw_buffers
+        yield from self.wgt_unfolded_buffers
+
+        for averaged_unfolded_buffers in self.ave_unfolded_buffers:
+            yield from averaged_unfolded_buffers
+
+        for variate_unfolded_buffers in self.var_unfolded_buffers:
+            yield from variate_unfolded_buffers
+
+    @override
+    def plot(self, directory: str | Path, /) -> None:
+        if self.execution_state is not ExecutionState.COMPLETE:
+            raise RuntimeError("A simulation may be plotted only after execution.")
+
+        directory = Path(directory)
+        for data in self:
+            if not (directory / data.to_path).is_file():
+                raise ValueError(f"Saved data `{data._file_name}` is missing.")
+
+        for data in self:
+            unfolded = data.metadata.get("unfolding", "raw") != "raw"
+            plot_cls: type[Plot]
+            if isinstance(data, TimeDelayHistogram):
+                plot_cls = (
+                    UnfoldedTimeDelayHistogramPlot if unfolded else TimeDelayHistogramPlot
+                )
+            else:
+                raise TypeError(f"Data `{type(data).__name__}` has no plot class.")
+
+            plot_cls(data=data, context=self.manifest).plot(
+                directory / data.to_path.parent
+            )
 
     @property
-    def to_path(self) -> Path:
-        return rmtpy.conversion.to_path(
-            self,
-            root=Path(self.path_name) / self.compound.to_path,
-        )
+    @override
+    def _rmg(self) -> RandomMatrixEnsemble:
+        return self.compound.ensemble
 
     @property
-    def truncated_degrees(self) -> tuple[int, ...]:
-        return tuple(
-            truncated_polynomial_degrees(
-                self.compound.ensemble.max_spectral_polynomial_degree
-            )
+    @override
+    def _root_for_outputs(self) -> Path:
+        return super()._root_for_outputs / self.compound.to_path
+
+    def _build_cdf_factory(self) -> TruncatedPolynomialCDFFactory:
+        return TruncatedPolynomialCDFFactory(
+            density=self.compound.ensemble.spectral_density,
+            degrees=truncated_polynomial_degree_range(
+                max_degree=self.compound.ensemble.max_spectral_polynomial_degree
+            ),
+            density_name="spectral",
         )
 
-    def energy_path(self, energy: float) -> Path:
-        return Path(f"energy_{format_energy_path_value(energy)}")
+    def _realize_time_delay_statistics(self) -> None:
+        ensemble = self.compound.ensemble
+        spectral_density = ensemble.spectral_density
 
-    def observable_output_path(self, observable: Observable) -> Path:
-        return self.energy_path(observable.metadata["energy"])
+        cdf_factory = self._build_cdf_factory()
 
-    def realize_monte_carlo_simulation(self) -> None:
-        spectral_density = self.compound.ensemble.spectral_density
-        cdf_factory = None
-        avg_cdf_interpolators = ()
-        if self.truncated_degrees:
-            cdf_factory = TruncatedPolynomialCdfFactory(
-                density=spectral_density,
-                degrees=self.truncated_degrees,
-                density_name="spectral",
-            )
-            avg_cdf_interpolators = cdf_factory.average_interpolators()
+        average_cdfs = cdf_factory.average_interpolators()
 
-        for time_delays, eigvals in self.compound.time_delays_stream(
-            energies=self.energies, realizs=self.realizs
+        for time_delays, closed_eigenvalues in self.compound.time_delays_stream(
+            energies=self.energies,
+            realizs=self.realizs,
         ):
-            self.outputs.add_raw(time_delays)
-            self.outputs.add_weight_unfolded(
+            time_delays = np.asarray(time_delays)
+            expected_shape = (len(self.energies), self.compound.num_channels)
+            if time_delays.shape != expected_shape:
+                raise ValueError(
+                    f"Time delays must have shape {expected_shape}, got "
+                    + f"{time_delays.shape}."
+                )
+
+            self.raw_buffers.accumulate_raw_time_delays(time_delays)
+
+            self.wgt_unfolded_buffers.accumulate_unfolded_time_delays(
                 time_delays,
                 energies=self.energies,
                 cdf=spectral_density.weight_cdf,
-                dimension=self.compound.ensemble.dimension,
+                dimension=ensemble.dimension,
             )
 
-            self.outputs.add_average_unfolded(
-                time_delays,
-                energies=self.energies,
-                cdfs=avg_cdf_interpolators,
-                dimension=self.compound.ensemble.dimension,
+            for cdf, buffers in zip(
+                average_cdfs,
+                self.ave_unfolded_buffers,
+                strict=True,
+            ):
+                buffers.accumulate_unfolded_time_delays(
+                    time_delays,
+                    energies=self.energies,
+                    cdf=cdf,
+                    dimension=ensemble.dimension,
+                )
+
+            variate_coefficients = spectral_density.compute_variate_coeffs(
+                closed_eigenvalues
             )
+            variate_cdfs = cdf_factory.interpolators_from_coeffs(variate_coefficients)
+            for cdf, buffers in zip(
+                variate_cdfs,
+                self.var_unfolded_buffers,
+                strict=True,
+            ):
+                buffers.accumulate_unfolded_time_delays(
+                    time_delays,
+                    energies=self.energies,
+                    cdf=cdf,
+                    dimension=ensemble.dimension,
+                )
 
-            if not self.outputs.var_unfolded_by_degree:
-                continue
+    def _finalize(self) -> None:
+        for data in self:
+            if isinstance(data, Histogram):
+                data.compute_histogram()
 
-            if cdf_factory is None:
-                raise RuntimeError("Variate unfolding requires a CDF factory.")
+    @override
+    def _restore_execution(self) -> None:
+        calibration = unwrap_json_value(self.manifest.execution.get("calibration"))
+        if not isinstance(calibration, dict):
+            raise ValueError("Saved spectral calibration is malformed.")
+        if not calibration:
+            return
 
-            coeffs = spectral_density.compute_variate_coeffs(eigvals)
-            self.outputs.add_variate_unfolded(
-                time_delays,
-                energies=self.energies,
-                cdfs=cdf_factory.interpolators_from_coeffs(coeffs),
-                dimension=self.compound.ensemble.dimension,
-            )
+        average_coefficients = np.asarray(
+            calibration["average_coefficients"],
+            dtype=self.compound.ensemble.real_dtype,
+        )
+        expected_shape = (self.compound.ensemble.max_spectral_polynomial_degree + 1,)
+        if average_coefficients.shape != expected_shape:
+            raise ValueError("Saved spectral calibration has an invalid shape.")
+
+        object.__setattr__(
+            self.compound.ensemble.spectral_density,
+            "average_coeffs",
+            average_coefficients,
+        )
+
+    @override
+    def _execute(self) -> None:
+        spectral_density = self.compound.ensemble.spectral_density
+        has_average_coefficients = spectral_density.has_average_coeffs
+
+        self._realize_time_delay_statistics()
+        self._finalize()
+
+        calibration: dict[str, object] = {}
+        if spectral_density.has_average_coeffs:
+            calibration = {
+                "density": "spectral",
+                "average_coefficients": spectral_density.average_coeffs,
+                "timing": (
+                    "previously_cached"
+                    if has_average_coefficients
+                    else "cached_during_execution"
+                ),
+            }
+
+        self.manifest.execution["calibration"] = calibration

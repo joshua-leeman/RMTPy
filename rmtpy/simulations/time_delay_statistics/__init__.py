@@ -1,11 +1,13 @@
-from __future__ import annotations
-
 from .time_delay_statistics_simulation import (
     TimeDelayStatisticsSimulation,
-    run_time_delay_statistics,
+    load_time_delay_statistics_simulation,
+    plot_time_delay_statistics_simulation,
+    run_time_delay_statistics_simulation,
 )
 
 __all__ = [
     "TimeDelayStatisticsSimulation",
-    "run_time_delay_statistics",
+    "load_time_delay_statistics_simulation",
+    "plot_time_delay_statistics_simulation",
+    "run_time_delay_statistics_simulation",
 ]
