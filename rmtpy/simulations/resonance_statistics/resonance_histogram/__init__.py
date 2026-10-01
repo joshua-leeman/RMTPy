@@ -1,8 +1,11 @@
-from __future__ import annotations
-
-from .resonance_histogram import ResonanceHistogramPlot, UnfoldedResonanceHistogramPlot
+from .resonance_histogram_data import ResonanceHistogram
+from .resonance_histogram_plot import (
+    ResonanceHistogramPlot,
+    UnfoldedResonanceHistogramPlot,
+)
 
 __all__ = [
+    "ResonanceHistogram",
     "ResonanceHistogramPlot",
     "UnfoldedResonanceHistogramPlot",
 ]

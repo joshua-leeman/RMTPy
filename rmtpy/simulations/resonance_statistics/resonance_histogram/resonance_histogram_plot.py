@@ -1,19 +1,20 @@
-from __future__ import annotations
-
 import dataclasses
+from collections.abc import Callable
 from pathlib import Path
+from typing import cast, override
 
 import numpy as np
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 
-from ....compounds import Compound
+from ....compounds import CompoundEnsemble
 from ....ensembles import PoissonEnsemble, SachdevYeKitaevEnsemble
-from ...histogram import Histogram
-from ...plot import Plot, PlotAxes, PlotLegend
+from ...base_data import Data
+from ...base_plot import Plot, PlotAxes, PlotLegend
+from .resonance_histogram_data import ResonanceHistogram
 
 
-@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
+@dataclasses.dataclass(slots=True, kw_only=True, eq=False, weakref_slot=False)
 class ResonanceHistogramAxes(PlotAxes):
     xticks: tuple[float, ...] = (-1.0, 0.0, 1.0)  # units of energy_0
     xticks_minor: tuple[float, ...] = (-0.5, 0.5)
@@ -33,7 +34,7 @@ class ResonanceHistogramAxes(PlotAxes):
         r"$2.0$",
     )
 
-    pois_yticks: tuple[float, ...] = (0.0, 1.0, 2.0, 3.0)  # units of 1 / (pi * energy_0)
+    pois_yticks: tuple[float, ...] = (0.0, 1.0, 2.0, 3.0)
     pois_yticks_minor: tuple[float, ...] = (0.5, 1.5, 2.5)
     pois_ytick_labels: tuple[str, ...] = (
         r"$0.0$",
@@ -42,8 +43,8 @@ class ResonanceHistogramAxes(PlotAxes):
         r"$3.0$",
     )
 
-    syk2_yticks: tuple[float, ...] = tuple(range(6))  # units of 1 / (pi * energy_0)
-    syk2_yticks_minor: tuple[float, ...] = tuple(x + 0.5 for x in range(6))
+    syk2_yticks: tuple[float, ...] = tuple(range(6))
+    syk2_yticks_minor: tuple[float, ...] = tuple(value + 0.5 for value in range(6))
     syk2_ytick_labels: tuple[str, ...] = (
         r"$0.0$",
         r"$1.0$",
@@ -53,8 +54,8 @@ class ResonanceHistogramAxes(PlotAxes):
         r"$5.0$",
     )
 
-    syk4_yticks: tuple[float, ...] = tuple(range(3))  # units of 1 / (pi * energy_0)
-    syk4_yticks_minor: tuple[float, ...] = tuple(x + 0.5 for x in range(3))
+    syk4_yticks: tuple[float, ...] = tuple(range(3))
+    syk4_yticks_minor: tuple[float, ...] = tuple(value + 0.5 for value in range(3))
     syk4_ytick_labels: tuple[str, ...] = (
         r"$0.0$",
         r"$1.0$",
@@ -62,18 +63,15 @@ class ResonanceHistogramAxes(PlotAxes):
     )
 
 
-@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
+@dataclasses.dataclass(slots=True, kw_only=True, eq=False, weakref_slot=False)
 class ResonanceHistogramPlot(Plot):
-    data: Histogram
-    axes: ResonanceHistogramAxes = dataclasses.field(
-        default_factory=ResonanceHistogramAxes
-    )
-    num_points: int = 1000
+    data: Data
+    axes: PlotAxes = dataclasses.field(default_factory=ResonanceHistogramAxes)
 
     xlim: tuple[float, float] = (-1.2, 1.2)  # units of energy_0
     ylim: tuple[float, float] = (0.0, 2.6)  # units of 1 / (pi * energy_0)
 
-    pois_ylim: tuple[float, float] = (0.0, 1.25)  # units of 1 / (pi * energy_0)
+    pois_ylim: tuple[float, float] = (0.0, 1.25)
     syk2_ylim: tuple[float, float] = (0.0, 4.0)
     syk4_ylim: tuple[float, float] = (0.0, 2.5)
 
@@ -88,6 +86,8 @@ class ResonanceHistogramPlot(Plot):
     pdf_color: str = "Black"
     pdf_legend: str = "theory"
 
+    num_points: int = 1000
+
     legend_labels: tuple[str, str] = (histogram_legend, pdf_legend)
     legend_handles: tuple[Patch, Line2D] = (
         Patch(color=histogram_color, alpha=histogram_alpha),
@@ -95,12 +95,13 @@ class ResonanceHistogramPlot(Plot):
     )
 
     def set_derived_attributes(self) -> None:
-        self.compound: Compound = self.structure_simulation_arg("compound", Compound)
-        mean_coupling_squared = np.mean(self.compound.coupling_strengths**2)
+        self.compound: CompoundEnsemble = self.store_manifest_arg(
+            "compound", CompoundEnsemble
+        )
+        mean_coupling_squared = float(np.mean(self.compound.couplings**2))
         ensemble = self.compound.ensemble
-        energy_0 = ensemble.spectral_radius
 
-        self.legend = PlotLegend(
+        self.legend: PlotLegend = PlotLegend(
             handles=self.legend_handles,
             labels=self.legend_labels,
             loc="upper right",
@@ -110,15 +111,15 @@ class ResonanceHistogramPlot(Plot):
         coupling_exponent = np.log10(mean_coupling_squared / ensemble.spectral_radius)
         coupling_exponent = 0.0 if abs(coupling_exponent) < 0.005 else coupling_exponent
         coupling_label = rf"$\alpha = {{{coupling_exponent:.1f}}}$"
-        if self.legend.title is None:
+        if not self.legend.title:
             self.legend.title = (
-                self.compound.ensemble.to_latex
+                ensemble.to_latex
                 + "\n"
                 + rf"$N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
                 + f", {{{coupling_label}}}"
             )
 
-        axes = self.axes
+        axes = cast(ResonanceHistogramAxes, self.axes)
         if isinstance(ensemble, PoissonEnsemble):
             self.ylim = self.pois_ylim
 
@@ -142,14 +143,18 @@ class ResonanceHistogramPlot(Plot):
                 axes.yticks_minor = axes.syk4_yticks_minor
 
         self.scale_limits_and_ticks(
-            x=lambda value: value * energy_0,
-            y=lambda value: value / np.pi / energy_0,
+            x=lambda value: value * ensemble.spectral_radius,
+            y=lambda value: value / np.pi / ensemble.spectral_radius,
         )
 
+    @override
     def plot(self, path: str | Path) -> None:
         self.set_derived_attributes()
 
-        self.create_figure()
+        if not isinstance(self.data, ResonanceHistogram):
+            raise ValueError("Data must be a `ResonanceHistogram` instance")
+
+        self.build_figure()
 
         self.draw_histogram(
             color=self.histogram_color,
@@ -157,22 +162,31 @@ class ResonanceHistogramPlot(Plot):
             zorder=self.histogram_zorder,
         )
 
-        energies = np.linspace(self.xlim[0], self.xlim[1], self.num_points)
-        resonance_pdf = self.compound.resonance_density.average_pdf(energies)
+        coefficients = self.calibration_coefficients("resonance")
+        if coefficients is None:
+            self.legend.handles = self.legend.handles[:1]
+            self.legend.labels = self.legend.labels[:1]
+        else:
+            resonance_centers = np.linspace(*self.xlim, self.num_points)
+            resonance_pdf = self.compound.resonance_density.variate_pdf(
+                resonance_centers,
+                coeffs=coefficients,
+            )
 
-        self.ax.plot(
-            energies,
-            resonance_pdf,
-            color=self.pdf_color,
-            alpha=self.pdf_alpha,
-            linewidth=self.pdf_width,
-            zorder=self.pdf_zorder,
-        )
+            plot = cast(Callable[..., object], self.ax.plot)
+            _ = plot(
+                resonance_centers,
+                resonance_pdf,
+                color=self.pdf_color,
+                alpha=self.pdf_alpha,
+                linewidth=self.pdf_width,
+                zorder=self.pdf_zorder,
+            )
 
         self.finish_plot(path=path)
 
 
-@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
+@dataclasses.dataclass(slots=True, kw_only=True, eq=False, weakref_slot=False)
 class UnfoldedResonanceHistogramAxes(PlotAxes):
     xticks: tuple[float, ...] = (-0.5, 0.0, 0.5)  # units of dimension
     xticks_minor: tuple[float, ...] = (-0.25, 0.25)
@@ -183,7 +197,7 @@ class UnfoldedResonanceHistogramAxes(PlotAxes):
         r"$+0.5$",
     )
 
-    yticks: tuple[float, ...] = (0.0, 0.5, 1.0, 1.5)  # units of dimension^{-1}
+    yticks: tuple[float, ...] = (0.0, 0.5, 1.0, 1.5)
     yticks_minor: tuple[float, ...] = (0.25, 0.75, 1.25, 1.75)
     ylabel: str = r"$\ensavg{\rho(\xi)} D$"
     ytick_labels: tuple[str, ...] = (
@@ -194,12 +208,10 @@ class UnfoldedResonanceHistogramAxes(PlotAxes):
     )
 
 
-@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
+@dataclasses.dataclass(slots=True, kw_only=True, eq=False, weakref_slot=False)
 class UnfoldedResonanceHistogramPlot(Plot):
-    data: Histogram
-    axes: UnfoldedResonanceHistogramAxes = dataclasses.field(
-        default_factory=UnfoldedResonanceHistogramAxes
-    )
+    data: Data
+    axes: PlotAxes = dataclasses.field(default_factory=UnfoldedResonanceHistogramAxes)
     num_points: int = 1000
 
     xlim: tuple[float, float] = (-0.6, 0.6)  # units of dimension
@@ -223,12 +235,13 @@ class UnfoldedResonanceHistogramPlot(Plot):
     )
 
     def set_derived_attributes(self) -> None:
-        self.compound: Compound = self.structure_simulation_arg("compound", Compound)
-        mean_coupling_squared = np.mean(self.compound.coupling_strengths**2)
+        self.compound: CompoundEnsemble = self.store_manifest_arg(
+            "compound", CompoundEnsemble
+        )
+        mean_coupling_squared = float(np.mean(self.compound.couplings**2))
         ensemble = self.compound.ensemble
-        dimension = ensemble.dimension
 
-        self.legend = PlotLegend(
+        self.legend: PlotLegend = PlotLegend(
             handles=self.legend_handles,
             labels=self.legend_labels,
             loc="upper right",
@@ -236,37 +249,41 @@ class UnfoldedResonanceHistogramPlot(Plot):
         )
 
         coupling_exponent = np.log10(mean_coupling_squared / ensemble.spectral_radius)
-        coupling_exponent = 0 if abs(coupling_exponent) < 0.005 else coupling_exponent
+        coupling_exponent = 0.0 if abs(coupling_exponent) < 0.005 else coupling_exponent
         coupling_label = rf"$\alpha = {{{coupling_exponent:.1f}}}$"
-        if self.legend.title is None:
+        if not self.legend.title:
             unfolding_type = self.data.metadata["unfolding"]
-            if unfolding_type != "wgt":
-                unfolding_degree = self.data.metadata["degree"]
+            if unfolding_type != "weight":
+                unfolding_degree = self.data.metadata["polynomial_degree"]
                 self.legend.title = (
-                    self.compound.ensemble.to_latex
-                    + f"\n{unfolding_type}.\ unfolded, degree {unfolding_degree}"
+                    ensemble.to_latex
+                    + f"\n{unfolding_type} unfolded, degree {unfolding_degree}"
                     + "\n"
                     + rf"$N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
                     + f", {{{coupling_label}}}"
                 )
             else:
                 self.legend.title = (
-                    self.compound.ensemble.to_latex
-                    + "\nwgt.\ unfolded"
+                    ensemble.to_latex
+                    + "\nweight unfolded"
                     + "\n"
                     + rf"$N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
                     + f", {{{coupling_label}}}"
                 )
 
         self.scale_limits_and_ticks(
-            x=lambda value: value * dimension,
-            y=lambda value: value / dimension,
+            x=lambda value: value * ensemble.dimension,
+            y=lambda value: value / ensemble.dimension,
         )
 
+    @override
     def plot(self, path: str | Path) -> None:
         self.set_derived_attributes()
 
-        self.create_figure()
+        if not isinstance(self.data, ResonanceHistogram):
+            raise ValueError("Data must be a `ResonanceHistogram` instance")
+
+        self.build_figure()
 
         self.draw_histogram(
             color=self.histogram_color,
@@ -274,15 +291,16 @@ class UnfoldedResonanceHistogramPlot(Plot):
             zorder=self.histogram_zorder,
         )
 
-        energies = np.linspace(self.xlim[0], self.xlim[1], self.num_points)
+        resonance_centers = np.linspace(*self.xlim, self.num_points)
 
         dimension = self.compound.ensemble.dimension
-        unfolded_spectral_pdf = np.zeros(self.num_points)
-        unfolded_spectral_pdf[np.abs(energies) < dimension / 2] = 1 / dimension
+        unfolded_resonance_pdf = np.zeros(self.num_points)
+        unfolded_resonance_pdf[np.abs(resonance_centers) < dimension / 2] = 1 / dimension
 
-        self.ax.plot(
-            energies,
-            unfolded_spectral_pdf,
+        plot = cast(Callable[..., object], self.ax.plot)
+        _ = plot(
+            resonance_centers,
+            unfolded_resonance_pdf,
             color=self.pdf_color,
             alpha=self.pdf_alpha,
             linewidth=self.pdf_width,

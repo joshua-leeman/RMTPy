@@ -1,18 +1,19 @@
-from __future__ import annotations
-
 import dataclasses
+from collections.abc import Callable
 from pathlib import Path
+from typing import cast, override
 
 import numpy as np
 from matplotlib.patches import Patch
 from matplotlib.ticker import NullFormatter
 
-from ....compounds import Compound
-from ...histogram import Histogram
-from ...plot import Plot, PlotAxes, PlotLegend
+from ....compounds import CompoundEnsemble
+from ...base_data import Data
+from ...base_plot import Plot, PlotAxes, PlotLegend
+from .width_histogram_data import WidthHistogram
 
 
-@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
+@dataclasses.dataclass(slots=True, kw_only=True, eq=False, weakref_slot=False)
 class WidthHistogramAxes(PlotAxes):
     xticks: tuple[float, ...] = tuple(range(-3, 4))  # log scale base 10
     xticks_minor: tuple[float, ...] = tuple()
@@ -41,10 +42,10 @@ class WidthHistogramAxes(PlotAxes):
     )
 
 
-@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
+@dataclasses.dataclass(slots=True, kw_only=True, eq=False, weakref_slot=False)
 class WidthHistogramPlot(Plot):
-    data: Histogram
-    axes: WidthHistogramAxes = dataclasses.field(default_factory=WidthHistogramAxes)
+    data: Data
+    axes: PlotAxes = dataclasses.field(default_factory=WidthHistogramAxes)
 
     xlim: tuple[float, float] = (-3.5, 3.5)  # log scale base 10
     ylim: tuple[float, float] = (-3.5, 3.5)  # log scale base 10
@@ -58,11 +59,13 @@ class WidthHistogramPlot(Plot):
     legend_handles: tuple[Patch] = (Patch(color=histogram_color, alpha=histogram_alpha),)
 
     def set_derived_attributes(self) -> None:
-        self.compound: Compound = self.structure_simulation_arg("compound", Compound)
-        mean_coupling_squared = np.mean(self.compound.coupling_strengths**2)
+        self.compound: CompoundEnsemble = self.store_manifest_arg(
+            "compound", CompoundEnsemble
+        )
+        mean_coupling_squared = float(np.mean(self.compound.couplings**2))
         ensemble = self.compound.ensemble
 
-        self.legend = PlotLegend(
+        self.legend: PlotLegend = PlotLegend(
             handles=self.legend_handles,
             labels=self.legend_labels,
             loc="upper right",
@@ -72,9 +75,9 @@ class WidthHistogramPlot(Plot):
         coupling_exponent = np.log10(mean_coupling_squared / ensemble.spectral_radius)
         coupling_exponent = 0.0 if abs(coupling_exponent) < 0.005 else coupling_exponent
         coupling_label = rf"$\alpha = {{{coupling_exponent:.1f}}}$"
-        if self.legend.title is None:
+        if not self.legend.title:
             self.legend.title = (
-                self.compound.ensemble.to_latex
+                ensemble.to_latex
                 + "\n"
                 + rf"$N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
                 + f", {{{coupling_label}}}"
@@ -85,16 +88,23 @@ class WidthHistogramPlot(Plot):
             y=lambda value: 10**value,
         )
 
+    @override
     def plot(self, path: str | Path) -> None:
         self.set_derived_attributes()
 
-        self.create_figure()
+        if not isinstance(self.data, WidthHistogram):
+            raise ValueError("Data must be a `WidthHistogram` instance")
 
-        self.ax.set_xscale("log", base=10)
-        self.ax.set_yscale("log", base=10)
+        self.build_figure()
 
-        self.ax.xaxis.set_minor_formatter(NullFormatter())
-        self.ax.yaxis.set_minor_formatter(NullFormatter())
+        set_xscale = cast(Callable[..., object], self.ax.set_xscale)
+        _ = set_xscale("log", base=10)
+
+        set_yscale = cast(Callable[..., object], self.ax.set_yscale)
+        _ = set_yscale("log", base=10)
+
+        _ = self.ax.xaxis.set_minor_formatter(NullFormatter())
+        _ = self.ax.yaxis.set_minor_formatter(NullFormatter())
 
         self.draw_histogram(
             color=self.histogram_color,
@@ -105,7 +115,7 @@ class WidthHistogramPlot(Plot):
         self.finish_plot(path=path)
 
 
-@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
+@dataclasses.dataclass(slots=True, kw_only=True, eq=False, weakref_slot=False)
 class UnfoldedWidthHistogramAxes(PlotAxes):
     xticks: tuple[float, ...] = tuple(range(-3, 4))  # log scale base 10
     xticks_minor: tuple[float, ...] = tuple(range(-2, 3))
@@ -134,12 +144,10 @@ class UnfoldedWidthHistogramAxes(PlotAxes):
     )
 
 
-@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
+@dataclasses.dataclass(slots=True, kw_only=True, eq=False, weakref_slot=False)
 class UnfoldedWidthHistogramPlot(Plot):
-    data: Histogram
-    axes: UnfoldedWidthHistogramAxes = dataclasses.field(
-        default_factory=UnfoldedWidthHistogramAxes
-    )
+    data: Data
+    axes: PlotAxes = dataclasses.field(default_factory=UnfoldedWidthHistogramAxes)
 
     xlim: tuple[float, float] = (-3.5, 3.5)  # log scale base 10
     ylim: tuple[float, float] = (-3.5, 3.5)  # log scale base 10
@@ -153,11 +161,13 @@ class UnfoldedWidthHistogramPlot(Plot):
     legend_handles: tuple[Patch] = (Patch(color=histogram_color, alpha=histogram_alpha),)
 
     def set_derived_attributes(self) -> None:
-        self.compound: Compound = self.structure_simulation_arg("compound", Compound)
-        mean_coupling_squared = np.mean(self.compound.coupling_strengths**2)
+        self.compound: CompoundEnsemble = self.store_manifest_arg(
+            "compound", CompoundEnsemble
+        )
+        mean_coupling_squared = float(np.mean(self.compound.couplings**2))
         ensemble = self.compound.ensemble
 
-        self.legend = PlotLegend(
+        self.legend: PlotLegend = PlotLegend(
             handles=self.legend_handles,
             labels=self.legend_labels,
             loc="upper right",
@@ -165,23 +175,23 @@ class UnfoldedWidthHistogramPlot(Plot):
         )
 
         coupling_exponent = np.log10(mean_coupling_squared / ensemble.spectral_radius)
-        coupling_exponent = 0 if abs(coupling_exponent) < 0.005 else coupling_exponent
+        coupling_exponent = 0.0 if abs(coupling_exponent) < 0.005 else coupling_exponent
         coupling_label = rf"$\alpha = {{{coupling_exponent:.1f}}}$"
-        if self.legend.title is None:
+        if not self.legend.title:
             unfolding_type = self.data.metadata["unfolding"]
-            if unfolding_type != "wgt":
-                unfolding_degree = self.data.metadata["degree"]
+            if unfolding_type != "weight":
+                unfolding_degree = self.data.metadata["polynomial_degree"]
                 self.legend.title = (
-                    self.compound.ensemble.to_latex
-                    + f"\n{unfolding_type}.\ unfolded, degree {unfolding_degree}"
+                    ensemble.to_latex
+                    + f"\n{unfolding_type} unfolded, degree {unfolding_degree}"
                     + "\n"
                     + rf"$N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
                     + f", {{{coupling_label}}}"
                 )
             else:
                 self.legend.title = (
-                    self.compound.ensemble.to_latex
-                    + "\nwgt.\ unfolded"
+                    ensemble.to_latex
+                    + "\nweight unfolded"
                     + "\n"
                     + rf"$N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
                     + f", {{{coupling_label}}}"
@@ -192,13 +202,20 @@ class UnfoldedWidthHistogramPlot(Plot):
             y=lambda value: 10**value,
         )
 
+    @override
     def plot(self, path: str | Path) -> None:
         self.set_derived_attributes()
 
-        self.create_figure()
+        if not isinstance(self.data, WidthHistogram):
+            raise ValueError("Data must be a `WidthHistogram` instance")
 
-        self.ax.set_xscale("log", base=10)
-        self.ax.set_yscale("log", base=10)
+        self.build_figure()
+
+        set_xscale = cast(Callable[..., object], self.ax.set_xscale)
+        _ = set_xscale("log", base=10)
+
+        set_yscale = cast(Callable[..., object], self.ax.set_yscale)
+        _ = set_yscale("log", base=10)
 
         self.draw_histogram(
             color=self.histogram_color,

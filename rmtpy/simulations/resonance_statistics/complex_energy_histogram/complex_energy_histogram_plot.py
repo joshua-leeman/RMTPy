@@ -1,7 +1,7 @@
-from __future__ import annotations
-
 import dataclasses
+from collections.abc import Callable
 from pathlib import Path
+from typing import cast, override
 
 import numpy as np
 from matplotlib.colors import LogNorm
@@ -9,14 +9,15 @@ from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 from matplotlib.ticker import NullFormatter
 
-from ....compounds import Compound
-from ...histogram2D import Histogram2D
-from ...plot import Plot, PlotAxes, PlotLegend
+from ....compounds import CompoundEnsemble
+from ...base_data import Data
+from ...base_plot import Plot, PlotAxes, PlotLegend
+from .complex_energy_histogram_data import ComplexEnergyHistogram
 
 
-@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
+@dataclasses.dataclass(slots=True, kw_only=True, eq=False, weakref_slot=False)
 class ComplexEnergyHistogramAxes(PlotAxes):
-    xticks: tuple[float, ...] = (-1.0, 0.0, 1.0)  # units of energy_0
+    xticks: tuple[float, ...] = (-1.0, 0.0, 1.0)
     xticks_minor: tuple[float, ...] = (-0.5, 0.5)
     xlabel: str = r"$E / E_0$"
     xtick_labels: tuple[str, ...] = (
@@ -37,15 +38,13 @@ class ComplexEnergyHistogramAxes(PlotAxes):
     )
 
 
-@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
+@dataclasses.dataclass(slots=True, kw_only=True, eq=False, weakref_slot=False)
 class ComplexEnergyHistogramPlot(Plot):
-    data: Histogram2D
-    axes: ComplexEnergyHistogramAxes = dataclasses.field(
-        default_factory=ComplexEnergyHistogramAxes
-    )
+    data: Data
+    axes: PlotAxes = dataclasses.field(default_factory=ComplexEnergyHistogramAxes)
     num_points: int = 1000
 
-    xlim: tuple[float, float] = (-1.2, 1.2)  # units of energy_0
+    xlim: tuple[float, float] = (-1.2, 1.2)
     ylim: tuple[float, float] = (-5.0, 5.0)  # log scale base 10
 
     histogram_zorder: int = 1
@@ -59,18 +58,26 @@ class ComplexEnergyHistogramPlot(Plot):
     width_curve_color: str = "Cyan"
     width_curve_legend: str = "average width"
 
-    legend_labels: tuple[str] = (histogram_legend, width_curve_legend)
-    legend_handles: tuple[Patch] = (
+    legend_labels: tuple[str, str] = (histogram_legend, width_curve_legend)
+    legend_handles: tuple[Patch, Line2D] = (
         Patch(color=histogram_color, alpha=histogram_alpha),
-        Line2D([0], [0], color=width_curve_color, linewidth=width_curve_width),
+        Line2D(
+            [0],
+            [0],
+            color=width_curve_color,
+            alpha=width_curve_alpha,
+            linewidth=width_curve_width,
+        ),
     )
 
     def set_derived_attributes(self) -> None:
-        self.compound: Compound = self.structure_simulation_arg("compound", Compound)
-        mean_coupling_squared = np.mean(self.compound.coupling_strengths**2)
+        self.compound: CompoundEnsemble = self.store_manifest_arg(
+            "compound", CompoundEnsemble
+        )
+        mean_coupling_squared = float(np.mean(self.compound.couplings**2))
         ensemble = self.compound.ensemble
 
-        self.legend = PlotLegend(
+        self.legend: PlotLegend = PlotLegend(
             handles=self.legend_handles,
             labels=self.legend_labels,
             on_black_background=True,
@@ -81,9 +88,9 @@ class ComplexEnergyHistogramPlot(Plot):
         coupling_exponent = np.log10(mean_coupling_squared / ensemble.spectral_radius)
         coupling_exponent = 0.0 if abs(coupling_exponent) < 0.005 else coupling_exponent
         coupling_label = rf"$\alpha = {{{coupling_exponent:.1f}}}$"
-        if self.legend.title is None:
+        if not self.legend.title:
             self.legend.title = (
-                self.compound.ensemble.to_latex
+                ensemble.to_latex
                 + "\n"
                 + rf"$N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
                 + f", {{{coupling_label}}}"
@@ -91,25 +98,32 @@ class ComplexEnergyHistogramPlot(Plot):
 
         self.scale_limits_and_ticks(y=lambda value: 10**value)
 
+    @override
     def plot(self, path: str | Path) -> None:
         self.set_derived_attributes()
 
-        self.create_figure()
+        if not isinstance(self.data, ComplexEnergyHistogram):
+            raise ValueError("Data must be a `ComplexEnergyHistogram` instance")
 
-        self.ax.set_xscale("linear")
-        self.ax.set_yscale("log", base=10)
+        self.build_figure()
 
-        self.ax.yaxis.set_minor_formatter(NullFormatter())
+        set_xscale = cast(Callable[..., object], self.ax.set_xscale)
+        _ = set_xscale("linear")
 
-        self.ax.set_facecolor("Black")
-        self.ax.tick_params(axis="both", which="both", color="White")
+        set_yscale = cast(Callable[..., object], self.ax.set_yscale)
+        _ = set_yscale("log", base=10)
+
+        _ = self.ax.yaxis.set_minor_formatter(NullFormatter())
+
+        _ = self.ax.set_facecolor("Black")
+        _ = self.ax.tick_params(axis="both", which="both", color="White")
 
         histogram = self.data.histogram.copy()
         positive_values = histogram[histogram > 0.0]
         if positive_values.size:
             histogram[histogram == 0.0] = np.nan
-            color_min = np.min(positive_values)
-            color_max = np.max(positive_values)
+            color_min = float(np.min(positive_values))
+            color_max = float(np.max(positive_values))
             if color_min == color_max:
                 color_max = np.nextafter(color_max, np.inf)
 
@@ -118,7 +132,8 @@ class ComplexEnergyHistogramPlot(Plot):
                 self.data.y_bins,
                 indexing="ij",
             )
-            self.ax.pcolormesh(
+            pcolormesh = cast(Callable[..., object], self.ax.pcolormesh)
+            _ = pcolormesh(
                 x_mesh,
                 y_mesh,
                 histogram,
@@ -129,10 +144,13 @@ class ComplexEnergyHistogramPlot(Plot):
                 zorder=self.histogram_zorder,
             )
 
-            x_values, average_y_given_x = self.data.compute_average_x_curve()
-            self.ax.plot(
-                x_values,
-                average_y_given_x,
+            resonance_centers, average_width_given_center = (
+                self.data.compute_average_x_curve()
+            )
+            plot = cast(Callable[..., object], self.ax.plot)
+            _ = plot(
+                resonance_centers,
+                average_width_given_center,
                 color=self.width_curve_color,
                 alpha=self.width_curve_alpha,
                 linewidth=self.width_curve_width,
@@ -142,23 +160,23 @@ class ComplexEnergyHistogramPlot(Plot):
         self.finish_plot(path=path)
 
 
-@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
+@dataclasses.dataclass(slots=True, kw_only=True, eq=False, weakref_slot=False)
 class UnfoldedComplexEnergyHistogramAxes(ComplexEnergyHistogramAxes):
     ylabel: str = r"$\log_{10}\gamma$"
 
 
-@dataclasses.dataclass(repr=False, eq=False, kw_only=True)
+@dataclasses.dataclass(slots=True, kw_only=True, eq=False, weakref_slot=False)
 class UnfoldedComplexEnergyHistogramPlot(ComplexEnergyHistogramPlot):
-    axes: UnfoldedComplexEnergyHistogramAxes = dataclasses.field(
-        default_factory=UnfoldedComplexEnergyHistogramAxes
-    )
+    axes: PlotAxes = dataclasses.field(default_factory=UnfoldedComplexEnergyHistogramAxes)
 
     def set_derived_attributes(self) -> None:
-        self.compound: Compound = self.structure_simulation_arg("compound", Compound)
-        mean_coupling_squared = np.mean(self.compound.coupling_strengths**2)
+        self.compound: CompoundEnsemble = self.store_manifest_arg(
+            "compound", CompoundEnsemble
+        )
+        mean_coupling_squared = float(np.mean(self.compound.couplings**2))
         ensemble = self.compound.ensemble
 
-        self.legend = PlotLegend(
+        self.legend: PlotLegend = PlotLegend(
             handles=self.legend_handles,
             labels=self.legend_labels,
             on_black_background=True,
@@ -167,23 +185,23 @@ class UnfoldedComplexEnergyHistogramPlot(ComplexEnergyHistogramPlot):
         )
 
         coupling_exponent = np.log10(mean_coupling_squared / ensemble.spectral_radius)
-        coupling_exponent = 0 if abs(coupling_exponent) < 0.005 else coupling_exponent
+        coupling_exponent = 0.0 if abs(coupling_exponent) < 0.005 else coupling_exponent
         coupling_label = rf"$\alpha = {{{coupling_exponent:.1f}}}$"
-        if self.legend.title is None:
+        if not self.legend.title:
             unfolding_type = self.data.metadata["unfolding"]
-            if unfolding_type != "wgt":
-                unfolding_degree = self.data.metadata["degree"]
+            if unfolding_type != "weight":
+                unfolding_degree = self.data.metadata["polynomial_degree"]
                 self.legend.title = (
-                    self.compound.ensemble.to_latex
-                    + f"\n{unfolding_type}.\ unfolded, degree {unfolding_degree}"
+                    ensemble.to_latex
+                    + f"\n{unfolding_type} unfolded, degree {unfolding_degree}"
                     + "\n"
                     + rf"$N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
                     + f", {{{coupling_label}}}"
                 )
             else:
                 self.legend.title = (
-                    self.compound.ensemble.to_latex
-                    + "\nwgt.\ unfolded"
+                    ensemble.to_latex
+                    + "\nweight unfolded"
                     + "\n"
                     + rf"$N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
                     + f", {{{coupling_label}}}"
