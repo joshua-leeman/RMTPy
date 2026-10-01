@@ -1,11 +1,4 @@
-from ._persistence import (
-    MANIFEST_FILE_NAME,
-    SCHEMA_VERSION,
-    PersistenceIntegrityError,
-    PersistenceSchemaError,
-    RunExistsError,
-)
-from .base_simulation import RunContext, Simulation
+from .base_simulation import Simulation, SimulationManifest
 from .partial_widths_statistics import (
     PartialWidthsStatisticsResult,
     PartialWidthsStatisticsSimulation,
@@ -24,13 +17,8 @@ from .resonance_statistics import (
     save_resonance_statistics_result,
 )
 from .spectral_statistics import (
-    SpectralStatisticsRequest,
-    SpectralStatisticsResult,
     SpectralStatisticsSimulation,
-    load_spectral_statistics_result,
-    plot_spectral_statistics_result,
     run_spectral_statistics,
-    save_spectral_statistics_result,
 )
 from .time_delay_statistics import (
     TimeDelayStatisticsRequest,
@@ -52,18 +40,13 @@ from .transmission_coefficients_simulation import (
 
 __all__ = [
     "Simulation",
-    "RunContext",
+    "SimulationManifest",
     "PartialWidthsStatisticsResult",
     "PartialWidthsStatisticsSimulation",
     "load_partial_widths_statistics_result",
     "plot_partial_widths_statistics_result",
     "run_partial_widths_statistics",
     "save_partial_widths_statistics_result",
-    "MANIFEST_FILE_NAME",
-    "SCHEMA_VERSION",
-    "PersistenceIntegrityError",
-    "PersistenceSchemaError",
-    "RunExistsError",
     "ResonanceStatisticsRequest",
     "ResonanceStatisticsResult",
     "ResonanceStatisticsSimulation",
@@ -71,13 +54,8 @@ __all__ = [
     "plot_resonance_statistics_result",
     "run_resonance_statistics",
     "save_resonance_statistics_result",
-    "SpectralStatisticsRequest",
-    "SpectralStatisticsResult",
     "SpectralStatisticsSimulation",
-    "load_spectral_statistics_result",
-    "plot_spectral_statistics_result",
     "run_spectral_statistics",
-    "save_spectral_statistics_result",
     "TimeDelayStatisticsRequest",
     "TimeDelayStatisticsResult",
     "TimeDelayStatisticsSimulation",
