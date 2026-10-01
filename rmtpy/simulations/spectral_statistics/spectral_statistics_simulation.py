@@ -23,7 +23,15 @@ from .spectral_form_factors import FormFactorsData
 from .spectral_histogram import SpectralHistogram
 
 
-def run_spectral_statistics(
+def load_spectral_statistics_simulation(
+    *,
+    directory: str | Path,
+) -> Simulation:
+    return SpectralStatisticsSimulation.load(directory)
+
+
+def run_spectral_statistics_simulation(
+    *,
     ensemble: ManyBodyEnsemble,
     realizs: int,
 ) -> SpectralStatisticsSimulation:

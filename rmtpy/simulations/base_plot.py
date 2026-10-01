@@ -265,7 +265,7 @@ class Plot(ABC):
 
     @property
     def file_name(self) -> str:
-        return self.data.file_name.removesuffix("_data") + "_plot"
+        return self.data._file_name.removesuffix("_data") + "_plot"
 
     @abstractmethod
     def plot(self, path: str | Path) -> None:

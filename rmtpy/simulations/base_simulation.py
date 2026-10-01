@@ -213,7 +213,7 @@ class Simulation:
         self.manifest.execution["execution_state"] = self._execution_state
         self.manifest.execution["execution_time"] = read_utc_time()
 
-    def save_execution(self, directory: str | Path = DEFAULT_OUTPUT_ROOT, /) -> Path:
+    def save(self, directory: str | Path = DEFAULT_OUTPUT_ROOT, /) -> Path:
         if self.execution_state is not ExecutionState.COMPLETE:
             raise RuntimeError("A simulation may be saved only after execution.")
 
@@ -234,7 +234,7 @@ class Simulation:
         return destination_directory
 
     @classmethod
-    def load_execution(cls, directory: str | Path, /) -> Simulation:
+    def load(cls, directory: str | Path, /) -> Simulation:
         directory = Path(directory)
         manifest_path = directory / MANIFEST_FILE_NAME
         if not directory.is_dir() or not manifest_path.is_file():
