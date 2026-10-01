@@ -4,7 +4,7 @@ import attrs
 import numpy as np
 
 from ..density import Support, array_of_floats, compute_bin_centers, compute_histogram
-from ..validators import is_valid_support, to_support_pair
+from ..validators import is_support, to_support_pair
 from .base_data import Data
 
 NUM_BINS: int = 100
@@ -77,7 +77,7 @@ def _validate_histogram(
 class Histogram(Data):
     support: Support = attrs.field(
         converter=to_support_pair,
-        validator=is_valid_support,
+        validator=is_support,
     )
     log_base: float | None = attrs.field(
         default=None,
@@ -240,7 +240,7 @@ def _validate_histogram2D(
 class Histogram2D(Data):
     x_support: Support = attrs.field(
         converter=to_support_pair,
-        validator=is_valid_support,
+        validator=is_support,
     )
     x_log_base: float | None = attrs.field(
         default=None,
@@ -258,7 +258,7 @@ class Histogram2D(Data):
 
     y_support: Support = attrs.field(
         converter=to_support_pair,
-        validator=is_valid_support,
+        validator=is_support,
     )
     y_log_base: float | None = attrs.field(
         default=None,

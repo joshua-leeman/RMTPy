@@ -9,7 +9,7 @@ from scipy.interpolate import PchipInterpolator
 from scipy.ndimage import gaussian_filter1d
 
 from .polynomials import FloatFunction, OrthogonalPolynomials
-from .validators import is_valid_support, to_support_pair, validate_support
+from .validators import is_support, to_support_pair, validate_support
 
 type Support = tuple[float, float]
 
@@ -189,7 +189,7 @@ class DensityModel:
     )
     support: Support = attrs.field(
         converter=to_support_pair,
-        validator=is_valid_support,
+        validator=is_support,
     )
 
     support_scale_factor: float = attrs.field(

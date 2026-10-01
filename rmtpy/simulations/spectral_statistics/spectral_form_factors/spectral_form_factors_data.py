@@ -6,7 +6,7 @@ from scipy.special import jn_zeros
 
 from ....density import Support, array_of_floats
 from ....ensembles import ManyBodyEnsemble
-from ....validators import is_valid_support, to_support_pair
+from ....validators import is_support, to_support_pair
 from ...base_data import Data
 from ...statistics import LOG_D_TIME_SUPPORT, LOG_D_UNFOLDED_TIME_SUPPORT
 
@@ -76,7 +76,7 @@ class FormFactorsData(Data):
     logD_time_support: Support = attrs.field(
         default=(-1.5, 0.5),
         converter=to_support_pair,
-        validator=is_valid_support,
+        validator=is_support,
     )
     scale: float = attrs.field(
         default=2 * np.pi,

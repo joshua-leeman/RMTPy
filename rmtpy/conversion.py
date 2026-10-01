@@ -1,5 +1,6 @@
 import base64
 import hashlib
+import importlib
 import json
 import math
 import re
@@ -15,6 +16,7 @@ import numpy as np
 from numpy.typing import DTypeLike
 
 type SourceDict = dict[str, str | dict[str, object]]
+type AttrsFields = tuple[attrs.Attribute[object], ...]
 
 TYPE_KEY: str = "__rmtpy_manifest_type__"
 
@@ -41,6 +43,20 @@ class StringEnum(StrEnum):
     @classmethod
     def to_tuple(cls) -> tuple[str, ...]:
         return tuple(member.value for member in cls)
+
+
+def import_rmtpy_object(qualname: str, *, module_name: str) -> object:
+    if not module_name.startswith("rmtpy."):
+        raise ValueError(f"Module `{module_name}` is outside `rmtpy`.")
+
+    imported: object = importlib.import_module(module_name)
+    for token in qualname.split("."):
+        if token == "":
+            raise ValueError(f"Qualname `{qualname}` is malformed.")
+
+        imported = cast(object, getattr(imported, token))
+
+    return imported
 
 
 def read_utc_time() -> str:
@@ -73,8 +89,12 @@ def to_latex(instance: attrs.AttrsInstance, /, *, _latex_name: str = "") -> str:
     latex_str = "$" + _latex_name
     for label, attr in attrs.fields_dict(type(instance)).items():
         latex_label = attr.metadata.get("latex_name")
-        if isinstance(latex_label, str):
+        if latex_label is None:
+            continue
+        elif isinstance(latex_label, str):
             latex_str += rf"\ {latex_label}={getattr(instance, label)}"
+        else:
+            raise ValueError("Attribute 'latex_label' must be a string.")
 
     return latex_str + "$"
 
@@ -82,30 +102,32 @@ def to_latex(instance: attrs.AttrsInstance, /, *, _latex_name: str = "") -> str:
 def to_path(instance: attrs.AttrsInstance, /, *, root: Path) -> Path:
     for name, attr in attrs.fields_dict(type(instance)).items():
         dir_name = attr.metadata.get("dir_name")
-        if not isinstance(dir_name, str):
-            raise ValueError("Attribute 'dir_name' must be a string.")
-        else:
+        if dir_name is None:
+            continue
+        elif isinstance(dir_name, str):
             value = str(cast(object, getattr(instance, name)))
             value = re.sub(r"[^\w\-.]", "_", value)
             root /= f"{dir_name}_{value.replace('.', 'p')}"
+        else:
+            raise ValueError("Attribute 'dir_name' must be a string.")
 
     return root
 
 
 def canonicalize_source_dict(
-    src: SourceDict,
+    source: SourceDict,
     /,
     *,
     registry: dict[str, type[attrs.AttrsInstance]],
-) -> dict[str, object]:
-    if set(src) != {"type", "parameters"}:
+) -> SourceDict:
+    if set(source) != {"type", "parameters"}:
         raise ValueError("Source keys must be exactly `type` and `parameters`.")
 
-    type_name = src["type"]
+    type_name = source["type"]
     if not isinstance(type_name, str):
         raise TypeError("Configuration `type` must be a string.")
 
-    parameters = src["parameters"]
+    parameters = source["parameters"]
     if not isinstance(parameters, dict):
         raise TypeError("Configuration `parameters` must be a dictionary.")
 
@@ -115,7 +137,7 @@ def canonicalize_source_dict(
     except KeyError as exc:
         raise ValueError(f"Unknown configuration type {type_name!r}.") from exc
 
-    fields = cast(tuple[attrs.Attribute[object], ...], attrs.fields(registered_cls))
+    fields = cast(AttrsFields, attrs.fields(registered_cls))
     init_field_names = {field.name for field in fields if field.init}
     parameter_names = set(parameters)
 
@@ -131,7 +153,7 @@ def canonicalize_source_dict(
 
 
 def source_dict(instance: attrs.AttrsInstance, /) -> SourceDict:
-    fields = cast(tuple[attrs.Attribute[object], ...], attrs.fields(type(instance)))
+    fields = cast(AttrsFields, attrs.fields(type(instance)))
     return {
         "type": type(instance).__name__,
         "parameters": {
@@ -247,6 +269,138 @@ def json_value_serializer(
     value: object,
 ) -> object:
     return json_value(value)
+
+
+def unwrap_json_value(value: object) -> object:
+    if isinstance(value, list):
+        items = cast(list[object], value)
+        return [unwrap_json_value(item) for item in items]
+
+    if not isinstance(value, dict):
+        return value
+
+    mapping = cast(dict[str, object], value)
+    type_tag = mapping.get(TYPE_KEY)
+
+    if not isinstance(type_tag, str):
+        return {key: unwrap_json_value(item) for key, item in mapping.items()}
+
+    if type_tag == "float":
+        float_value = mapping.get("value")
+        if isinstance(float_value, float):
+            return float_value
+        if float_value == "inf":
+            return float("inf")
+        if float_value == "-inf":
+            return float("-inf")
+
+        return float("nan")
+
+    if type_tag == "complex":
+        real_part = cast(float, unwrap_json_value(mapping.get("real")))
+        imag_part = cast(float, unwrap_json_value(mapping.get("imag")))
+        return complex(real_part, imag_part)
+
+    if type_tag == "bytes":
+        bytes_value = mapping.get("base64")
+        if not isinstance(bytes_value, str):
+            raise TypeError("Tagged bytes value is malformed.")
+
+        return base64.b64decode(bytes_value)
+
+    if type_tag == "tuple":
+        items = unwrap_json_value(mapping.get("items"))
+        if not isinstance(items, list):
+            raise TypeError("Tagged tuple is malformed.")
+
+        return tuple(cast(list[object], items))
+
+    if type_tag == "dtype":
+        dtype_value = mapping.get("value")
+        if not isinstance(dtype_value, str):
+            raise TypeError("Tagged dtype is malformed.")
+
+        return np.dtype(dtype_value)
+
+    if type_tag == "ndarray":
+        dtype_token = mapping.get("dtype")
+        if not isinstance(dtype_token, str):
+            raise TypeError("Tagged ndarray is malformed.")
+
+        shape = cast(tuple[int, ...], mapping.get("shape"))
+        array_values = unwrap_json_value(mapping.get("values"))
+
+        array = np.asarray(array_values, dtype=np.dtype(dtype_token))
+        return np.reshape(array, shape)
+
+    if type_tag == "random.SeedSequence":
+        entropy = unwrap_json_value(mapping.get("entropy"))
+        if isinstance(entropy, bool):
+            raise TypeError("Tagged SeedSequence entropy is boolean.")
+        if not isinstance(entropy, int | np.ndarray | list | tuple | None):
+            raise TypeError("Tagged SeedSequence entropy is malformed.")
+
+        return np.random.SeedSequence(
+            entropy=cast(Sequence[int] | None, entropy),
+            spawn_key=cast(Sequence[int], mapping.get("spawn_key")),
+            pool_size=cast(int, mapping.get("pool_size")),
+        )
+
+    if type_tag == "random.Generator":
+        generator_name = mapping.get("generator")
+        if not isinstance(generator_name, str):
+            raise TypeError("Tagged bit generator is malformed.")
+
+        candidate = cast(object, getattr(np.random, generator_name, None))
+        if not isinstance(candidate, type):
+            raise TypeError("Tagged bit generator is not a type.")
+        if not issubclass(candidate, np.random.BitGenerator):
+            raise TypeError("Tagged bit generator is malformed.")
+
+        bit_generator = candidate()
+        state = unwrap_json_value(mapping.get("state"))
+        if not isinstance(state, dict):
+            raise TypeError("Tagged bit generator state is malformed.")
+
+        state_mapping = cast(dict[object, object], state)
+        generator_state: dict[str, object] = {}
+        for key, item in state_mapping.items():
+            if not isinstance(key, str):
+                raise TypeError("Tagged bit generator state must use string keys.")
+
+            generator_state[key] = item
+
+        bit_generator.state = generator_state
+        return np.random.Generator(bit_generator)
+
+    if type_tag == "random.BitGenerator":
+        bit_generator_name = mapping.get("bit_generator")
+        if not isinstance(bit_generator_name, str):
+            raise TypeError("Tagged bit generator is malformed.")
+
+        candidate = cast(object, getattr(np.random, bit_generator_name, None))
+        if not isinstance(candidate, type):
+            raise TypeError("Tagged bit generator is not a type.")
+        if not issubclass(candidate, np.random.BitGenerator):
+            raise TypeError("Tagged bit generator is malformed.")
+
+        bit_generator = candidate()
+        state = unwrap_json_value(mapping.get("state"))
+        if not isinstance(state, dict):
+            raise TypeError("Tagged bit generator state is malformed.")
+
+        state_mapping = cast(dict[object, object], state)
+        bit_generator_state: dict[str, object] = {}
+        for key, item in state_mapping.items():
+            if not isinstance(key, str):
+                raise TypeError("Tagged bit generator state must use string keys.")
+
+            bit_generator_state[key] = item
+
+        bit_generator.state = bit_generator_state
+        return bit_generator
+
+    raise ValueError(f"Unknown manifest tag `{type_tag}`.")
 
 
 def numpy_savez_value(

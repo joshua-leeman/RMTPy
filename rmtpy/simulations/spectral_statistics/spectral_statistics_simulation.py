@@ -3,8 +3,9 @@ from pathlib import Path
 from typing import override
 
 import attrs
+import numpy as np
 
-from ...conversion import read_utc_time
+from ...conversion import unwrap_json_value
 from ...ensembles import ManyBodyEnsemble, RandomMatrixEnsemble
 from ...ensembles.many_body_ensemble import RealEigenvalues
 from ..base_data import Data
@@ -289,6 +290,28 @@ class SpectralStatisticsSimulation(Simulation):
                 data.compute_form_factors()
 
     @override
+    def _restore_execution(self) -> None:
+        calibration = unwrap_json_value(self.manifest.execution.get("calibration"))
+        if not isinstance(calibration, dict):
+            raise ValueError("Saved spectral calibration is malformed.")
+        if not calibration:
+            return
+
+        average_coefficients = np.asarray(
+            calibration["average_coefficients"],
+            dtype=self.ensemble.real_dtype,
+        )
+        expected_shape = (self.ensemble.max_spectral_polynomial_degree + 1,)
+        if average_coefficients.shape != expected_shape:
+            raise ValueError("Saved spectral calibration has an invalid shape.")
+
+        object.__setattr__(
+            self.ensemble.spectral_density,
+            "average_coeffs",
+            average_coefficients,
+        )
+
+    @override
     def _execute(self) -> None:
         spectral_density = self.ensemble.spectral_density
         has_average_coeffs = spectral_density.has_average_coeffs
@@ -308,9 +331,4 @@ class SpectralStatisticsSimulation(Simulation):
                 ),
             }
 
-        self._update_run_manifest(
-            execution={
-                "calibration": calibration,
-                "read_utc_time": read_utc_time(),
-            },
-        )
+        self.manifest.execution["calibration"] = calibration
