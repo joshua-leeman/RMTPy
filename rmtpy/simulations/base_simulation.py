@@ -107,12 +107,10 @@ def _structure_argument(value: object) -> object:
 class Simulation:
     manifest: SimulationManifest = attrs.field(
         init=False,
-        repr=False,
     )
 
     _execution_state: ExecutionState = attrs.field(
         default=ExecutionState.NEW,
-        repr=False,
     )
 
     def __attrs_post_init__(self) -> None:
@@ -167,7 +165,7 @@ class Simulation:
             "parameters": {
                 field.name: json_value(cast(object, getattr(self, field.name)))
                 for field in cast(AttrsFields, attrs.fields(type(self)))
-                if field.init
+                if field.init and field.repr
             },
         }
 
@@ -232,6 +230,9 @@ class Simulation:
 
         self._write_manifest(path=manifest_path)
         return destination_directory
+
+    def plot(self, _directory: str | Path, /) -> None:
+        raise NotImplementedError(f"{type(self).__name__} has not implemented plotting.")
 
     @classmethod
     def load(cls, directory: str | Path, /) -> Simulation:

@@ -9,7 +9,8 @@ from ...conversion import unwrap_json_value
 from ...ensembles import ManyBodyEnsemble, RandomMatrixEnsemble
 from ...ensembles.many_body_ensemble import RealEigenvalues
 from ..base_data import Data
-from ..base_simulation import Simulation
+from ..base_plot import Plot
+from ..base_simulation import DEFAULT_OUTPUT_ROOT, ExecutionState, Simulation
 from ..histograms import Histogram
 from ..statistics import (
     REALIZATIONS_METADATA,
@@ -17,26 +18,53 @@ from ..statistics import (
     truncated_polynomial_degree_range,
 )
 from ..unfolding import TruncatedPolynomialCDFFactory, unfold_values
-from .nn_spacings_histogram import SpacingsHistogram
-from .spectral_coefficients_histogram import SpectralCoefficientsHistogram
-from .spectral_form_factors import FormFactorsData
-from .spectral_histogram import SpectralHistogram
+from .nn_spacings_histogram import (
+    SpacingsHistogram,
+    SpacingsHistogramPlot,
+    UnfoldedSpacingsHistogramPlot,
+)
+from .spectral_coefficients_histogram import (
+    SpectralCoefficientsHistogram,
+    SpectralCoefficientsHistogramPlot,
+)
+from .spectral_form_factors import (
+    FormFactorsData,
+    FormFactorsPlot,
+    UnfoldedFormFactorsPlot,
+)
+from .spectral_histogram import (
+    SpectralHistogram,
+    SpectralHistogramPlot,
+    UnfoldedSpectralHistogramPlot,
+)
 
 
 def load_spectral_statistics_simulation(
     *,
     directory: str | Path,
-) -> Simulation:
-    return SpectralStatisticsSimulation.load(directory)
+) -> SpectralStatisticsSimulation:
+    simulation = SpectralStatisticsSimulation.load(directory)
+    if not isinstance(simulation, SpectralStatisticsSimulation):
+        raise TypeError("Saved simulation is not a SpectralStatisticsSimulation.")
+
+    return simulation
+
+
+def plot_spectral_statistics_simulation(*, directory: str | Path) -> None:
+    simulation = load_spectral_statistics_simulation(directory=directory)
+    simulation.plot(directory)
 
 
 def run_spectral_statistics_simulation(
     *,
     ensemble: ManyBodyEnsemble,
     realizs: int,
+    directory: str | Path = DEFAULT_OUTPUT_ROOT,
 ) -> SpectralStatisticsSimulation:
     simulation = SpectralStatisticsSimulation(ensemble=ensemble, realizs=realizs)
     simulation.execute()
+    destination_directory = simulation.save(directory)
+    plot_spectral_statistics_simulation(directory=destination_directory)
     return simulation
 
 
@@ -221,10 +249,12 @@ class SpectralStatisticsSimulation(Simulation):
         repr=False,
     )
     ave_unfolded_buffers: Iterable[SpectralStatisticsBuffers] = attrs.field(
-        default=attrs.Factory(_create_averaged_unfolded_buffers, takes_self=True)
+        default=attrs.Factory(_create_averaged_unfolded_buffers, takes_self=True),
+        repr=False,
     )
     var_unfolded_buffers: Iterable[SpectralStatisticsBuffers] = attrs.field(
-        default=attrs.Factory(_create_variate_unfolded_buffers, takes_self=True)
+        default=attrs.Factory(_create_variate_unfolded_buffers, takes_self=True),
+        repr=False,
     )
 
     @override
@@ -238,6 +268,38 @@ class SpectralStatisticsSimulation(Simulation):
 
         for variate_unfolded_buffers in self.var_unfolded_buffers:
             yield from variate_unfolded_buffers
+
+    @override
+    def plot(self, directory: str | Path, /) -> None:
+        if self.execution_state is not ExecutionState.COMPLETE:
+            raise RuntimeError("A simulation may be plotted only after execution.")
+
+        directory = Path(directory)
+        for data in self:
+            if not (directory / data.to_path).is_file():
+                raise ValueError(f"Saved data `{data._file_name}` is missing.")
+
+        for data in self:
+            unfolded = data.metadata.get("unfolding", "raw") != "raw"
+            plot_cls: type[Plot]
+            if isinstance(data, SpectralCoefficientsHistogram):
+                plot_cls = SpectralCoefficientsHistogramPlot
+            elif isinstance(data, SpectralHistogram):
+                plot_cls = (
+                    UnfoldedSpectralHistogramPlot if unfolded else SpectralHistogramPlot
+                )
+            elif isinstance(data, SpacingsHistogram):
+                plot_cls = (
+                    UnfoldedSpacingsHistogramPlot if unfolded else SpacingsHistogramPlot
+                )
+            elif isinstance(data, FormFactorsData):
+                plot_cls = UnfoldedFormFactorsPlot if unfolded else FormFactorsPlot
+            else:
+                raise TypeError(f"Data `{type(data).__name__}` has no plot class.")
+
+            plot_cls(data=data, context=self.manifest).plot(
+                directory / data.to_path.parent
+            )
 
     @property
     @override

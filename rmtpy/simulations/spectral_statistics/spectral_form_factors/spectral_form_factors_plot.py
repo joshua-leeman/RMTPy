@@ -215,7 +215,7 @@ class UnfoldedFormFactorsPlot(Plot):
         if not self.legend.title:
             unfolding_type = self.data.metadata["unfolding"]
             if unfolding_type != "weight":
-                unfolding_degree = self.data.metadata["degree"]
+                unfolding_degree = self.data.metadata["polynomial_degree"]
                 self.legend.title = (
                     self.ensemble.to_latex
                     + f"\n{unfolding_type} unfolded, degree {unfolding_degree}"

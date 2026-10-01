@@ -57,11 +57,14 @@ def _build_random_number_generator(
 
 
 def _structure_hook_for_ensemble(
-    src: SourceDict | RandomMatrixEnsemble,
+    source: SourceDict | RandomMatrixEnsemble,
     _: object,
 ) -> RandomMatrixEnsemble:
-    if isinstance(src, dict):
-        ensemble_dict = canonicalize_source_dict(src, registry=REGISTRY)
+    if isinstance(source, RandomMatrixEnsemble):
+        return source
+
+    if isinstance(source, dict):
+        ensemble_dict = canonicalize_source_dict(source, registry=REGISTRY)
 
         ensemble_type = ensemble_dict["type"]
         if not isinstance(ensemble_type, str):
@@ -71,11 +74,12 @@ def _structure_hook_for_ensemble(
         if not isinstance(parameters, dict):
             raise TypeError("Configuration `parameters` must be a dictionary.")
 
-        key = to_key_of_registry(ensemble_type)
-        ensemble_factory = cast(Callable[..., RandomMatrixEnsemble], REGISTRY[key])
+        ensemble_cls = REGISTRY[to_key_of_registry(ensemble_type)]
+
+        ensemble_factory = cast(Callable[..., RandomMatrixEnsemble], ensemble_cls)
         return ensemble_factory(**parameters)
 
-    return src
+    raise TypeError("`source` is not a RandomMatrixEnsemble.")
 
 
 def _unstructure_hook_for_ensemble(ensemble: RandomMatrixEnsemble) -> SourceDict:
@@ -143,8 +147,7 @@ class RandomMatrixEnsemble:
         if inspect.isabstract(cls):
             return
 
-        key = to_key_of_registry(cls.__name__)
-        REGISTRY[key] = cls
+        REGISTRY[to_key_of_registry(cls.__name__)] = cls
 
     @classmethod
     def create(

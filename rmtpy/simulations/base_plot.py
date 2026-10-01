@@ -15,7 +15,7 @@ from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from matplotlib.legend import Legend
 
-from ..conversion import RMT_CONVERTER
+from ..conversion import RMT_CONVERTER, unwrap_json_value
 from .base_data import Data
 from .base_simulation import SimulationManifest
 from .histograms import Histogram
@@ -272,7 +272,7 @@ class Plot(ABC):
         pass
 
     def calibration_coefficients(self, density: str) -> np.ndarray | None:
-        calibration = self.context.execution.get("calibration")
+        calibration = unwrap_json_value(self.context.execution.get("calibration"))
         if not calibration:
             return None
 
@@ -387,6 +387,7 @@ class Plot(ABC):
         except KeyError as exc:
             raise ValueError(f"Simulation parameter not found: {key}.") from exc
 
+        value = unwrap_json_value(value)
         if isinstance(value, cls):
             value = cast(object, RMT_CONVERTER.unstructure(value))
 
