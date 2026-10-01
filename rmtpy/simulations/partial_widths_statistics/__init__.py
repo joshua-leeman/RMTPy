@@ -1,11 +1,13 @@
-from __future__ import annotations
-
 from .partial_widths_statistics_simulation import (
     PartialWidthsStatisticsSimulation,
-    run_partial_widths_statistics,
+    load_partial_widths_statistics_simulation,
+    plot_partial_widths_statistics_simulation,
+    run_partial_widths_statistics_simulation,
 )
 
 __all__ = [
     "PartialWidthsStatisticsSimulation",
-    "run_partial_widths_statistics",
+    "load_partial_widths_statistics_simulation",
+    "plot_partial_widths_statistics_simulation",
+    "run_partial_widths_statistics_simulation",
 ]

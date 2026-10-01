@@ -1,9 +1,7 @@
-from __future__ import annotations
-
-from .partial_width_histogram import PartialWidthHistogramPlot
-from .total_width_histogram import TotalWidthHistogramPlot
+from .partial_width_histogram_data import PartialWidthHistogram
+from .partial_width_histogram_plot import PartialWidthHistogramPlot
 
 __all__ = [
+    "PartialWidthHistogram",
     "PartialWidthHistogramPlot",
-    "TotalWidthHistogramPlot",
 ]
