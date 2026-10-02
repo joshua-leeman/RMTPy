@@ -85,7 +85,9 @@ class ComplexEnergyHistogramPlot(Plot):
             bbox=(0.98, 0.95),
         )
 
-        coupling_exponent = np.log10(mean_coupling_squared / ensemble.spectral_radius)
+        coupling_exponent = cast(
+            float, np.log10(mean_coupling_squared / ensemble.spectral_radius)
+        )
         coupling_exponent = 0.0 if abs(coupling_exponent) < 0.005 else coupling_exponent
         coupling_label = rf"$\alpha = {{{coupling_exponent:.1f}}}$"
         if not self.legend.title:
@@ -116,7 +118,9 @@ class ComplexEnergyHistogramPlot(Plot):
         _ = self.ax.yaxis.set_minor_formatter(NullFormatter())
 
         _ = self.ax.set_facecolor("Black")
-        _ = self.ax.tick_params(axis="both", which="both", color="White")
+
+        tick_params = cast(Callable[..., object], self.ax.tick_params)
+        _ = tick_params(axis="both", which="both", color="White")
 
         histogram = self.data.histogram.copy()
         positive_values = histogram[histogram > 0.0]
@@ -125,7 +129,7 @@ class ComplexEnergyHistogramPlot(Plot):
             color_min = float(np.min(positive_values))
             color_max = float(np.max(positive_values))
             if color_min == color_max:
-                color_max = np.nextafter(color_max, np.inf)
+                color_max = cast(np.float64, np.nextafter(color_max, np.inf))
 
             x_mesh, y_mesh = np.meshgrid(
                 self.data.x_bins,
@@ -169,6 +173,7 @@ class UnfoldedComplexEnergyHistogramAxes(ComplexEnergyHistogramAxes):
 class UnfoldedComplexEnergyHistogramPlot(ComplexEnergyHistogramPlot):
     axes: PlotAxes = dataclasses.field(default_factory=UnfoldedComplexEnergyHistogramAxes)
 
+    @override
     def set_derived_attributes(self) -> None:
         self.compound: CompoundEnsemble = self.store_manifest_arg(
             "compound", CompoundEnsemble
@@ -184,7 +189,9 @@ class UnfoldedComplexEnergyHistogramPlot(ComplexEnergyHistogramPlot):
             bbox=(0.98, 0.95),
         )
 
-        coupling_exponent = np.log10(mean_coupling_squared / ensemble.spectral_radius)
+        coupling_exponent = cast(
+            float, np.log10(mean_coupling_squared / ensemble.spectral_radius)
+        )
         coupling_exponent = 0.0 if abs(coupling_exponent) < 0.005 else coupling_exponent
         coupling_label = rf"$\alpha = {{{coupling_exponent:.1f}}}$"
         if not self.legend.title:

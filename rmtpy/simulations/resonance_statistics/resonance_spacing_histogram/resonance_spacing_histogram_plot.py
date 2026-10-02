@@ -79,7 +79,9 @@ class ResonanceSpacingHistogramPlot(Plot):
             bbox=(0.94, 0.95),
         )
 
-        coupling_exponent = np.log10(mean_coupling_squared / ensemble.spectral_radius)
+        coupling_exponent = cast(
+            float, np.log10(mean_coupling_squared / ensemble.spectral_radius)
+        )
         coupling_exponent = 0.0 if abs(coupling_exponent) < 0.005 else coupling_exponent
         coupling_label = rf"$\alpha = {{{coupling_exponent:.1f}}}$"
         if not self.legend.title:
@@ -198,7 +200,9 @@ class UnfoldedResonanceSpacingHistogramPlot(Plot):
             bbox=(0.94, 0.95),
         )
 
-        coupling_exponent = np.log10(mean_coupling_squared / ensemble.spectral_radius)
+        coupling_exponent = cast(
+            float, np.log10(mean_coupling_squared / ensemble.spectral_radius)
+        )
         coupling_exponent = 0.0 if abs(coupling_exponent) < 0.005 else coupling_exponent
         coupling_label = rf"$\alpha = {{{coupling_exponent:.1f}}}$"
         if not self.legend.title:
