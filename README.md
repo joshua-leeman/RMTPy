@@ -26,10 +26,10 @@ physical source ──► Simulation ──► finalized Data ──► NPZ + ma
 | Part of the calculation | Implemented capabilities |
 | --- | --- |
 | Closed ensembles | GOE, GUE, GSE, Bogoliubov–de Gennes classes C and D, Poisson spectra, and the Sachdev–Ye–Kitaev model |
-| Fermionic construction | Sparse Majorana and complex-fermion operators, parity blocks, charge conjugation, few-fermion states, and decomposed $q$-body monomials |
+| Fermionic construction | Sparse Majorana and complex-fermion operators, parity blocks, charge conjugation, few-fermion states, and decomposed $`q`$-body monomials |
 | Open systems | Effective non-Hermitian Hamiltonians, resonances, partial widths, reaction and scattering matrices, Wigner–Smith matrices, and proper delay times |
 | Statistical experiments | Spectral, resonance, partial-width, time-delay, and transmission-coefficient simulations |
-| Density analysis | Semicircle, uniform, and $q$-Hermite weights; polynomial density expansions; empirical densities; and four forms of unfolding |
+| Density analysis | Semicircle, uniform, and $`q`$-Hermite weights; polynomial density expansions; empirical densities; and four forms of unfolding |
 | Analytical references | Wigner surmises, Porter–Thomas laws, connected form factors, eigenvalue degeneracies, and a proper-delay density |
 | Output | Timestamped run directories containing a manifest, compressed NumPy data, and Matplotlib PNG figures |
 
@@ -37,19 +37,19 @@ physical source ──► Simulation ──► finalized Data ──► NPZ + ma
 
 ### Closed random Hamiltonians
 
-One realization is one random draw of a Hamiltonian $H$. Diagonalizing it
+One realization is one random draw of a Hamiltonian $`H`$. Diagonalizing it
 gives an eigenspectrum,
 
-$$
+```math
 H\lvert n\rangle = E_n\lvert n\rangle.
-$$
+```
 
 Random matrix theory asks for statistical properties shared by many such
 draws. The matrix-entry distribution fixes a global energy scale. Symmetries
 fix the allowed matrix structure and the correlations among its eigenvalues.
-The latter are organized by the Dyson index $\beta$: $\beta=1$ for GOE,
-$\beta=2$ for GUE, and $\beta=4$ for GSE. Poisson spectra provide the
-uncorrelated reference case with $\beta=0$.
+The latter are organized by the Dyson index $`\beta`$: $`\beta=1`$ for GOE,
+$`\beta=2`$ for GUE, and $`\beta=4`$ for GSE. Poisson spectra provide the
+uncorrelated reference case with $`\beta=0`$.
 
 Universality means that local spectral fluctuations are governed mainly by
 the symmetry class and remain insensitive to many microscopic details. Level
@@ -58,15 +58,15 @@ locations of the others. Their short-range behavior distinguishes correlated
 Wigner–Dyson spectra from independent Poisson levels.
 
 RMTPy uses a many-body parity-sector convention for every concrete ensemble.
-With $N_m$ Majorana modes, the matrix dimension is
+With $`N_m`$ Majorana modes, the matrix dimension is
 
-$$
+```math
 D=2^{N_m/2-1}.
-$$
+```
 
 The Gaussian and Bogoliubov–de Gennes ensembles supply symmetry-controlled
 random matrices directly. The SYK ensemble constructs a Hamiltonian from
-random even-$q$ products of Majorana operators. The Poisson ensemble draws
+random even-$`q`$ products of Majorana operators. The Poisson ensemble draws
 independent levels and combines them with a random Wigner–Dyson eigenvector
 basis.
 
@@ -76,71 +76,72 @@ Different statistics probe different parts of a spectrum:
 - Nearest-neighbor spacings are adjacent differences in the sorted spectrum
   and measure short-range level repulsion. RMTPy accounts for the ensemble's
   declared eigenvalue degeneracy when forming them.
-- A spectral form factor measures correlations in the time domain. For
-  realization $r$, RMTPy accumulates
+- A spectral form factor measures correlations in the time domain.
 
-  ```math
-  Z_r(t)=\frac{1}{N}\sum_{j=1}^{N}e^{-iE_{rj}t},
-  ```
+For realization $`r`$, RMTPy accumulates
 
-  and forms
+```math
+Z_r(t)=\frac{1}{N}\sum_{j=1}^{N}e^{-iE_{rj}t},
+```
 
-  ```math
-  K(t)=\frac{1}{R}\sum_{r=1}^{R}\lvert Z_r(t)\rvert^2,
-  \qquad
-  K_{\mathrm{conn}}(t)=K(t)-
-  \left\lvert\frac{1}{R}\sum_{r=1}^{R}Z_r(t)\right\rvert^2.
-  ```
+and forms
 
-Here $R$ is the number of realizations and $N$ is the number of levels in
+```math
+K(t)=\frac{1}{R}\sum_{r=1}^{R}\lvert Z_r(t)\rvert^2,
+\qquad
+K_{\mathrm{conn}}(t)=K(t)-
+\left\lvert\frac{1}{R}\sum_{r=1}^{R}Z_r(t)\right\rvert^2.
+```
+
+Here $`R`$ is the number of realizations and $`N`$ is the number of levels in
 the current sample.
 
 ### Opening the system
 
 An open system can exchange probability with external channels. RMTPy
-represents the channel amplitudes by a coupling matrix $W$ and uses the
+represents the channel amplitudes by a coupling matrix $`W`$ and uses the
 effective Hamiltonian
 
-$$
+```math
 H_{\mathrm{eff}}=H-\frac{i}{2}WW^\dagger.
-$$
+```
 
 Its complex eigenvalues are scattering poles,
 
-$$
+```math
 \mathcal E_n=E_n-\frac{i}{2}\Gamma_n.
-$$
+```
 
-The real part $E_n$ is a resonance center. The positive quantity
-$\Gamma_n=-2\mathrm{Im}\,\mathcal E_n$ is its total decay width.
+The real part $`E_n`$ is a resonance center. The positive quantity
+$`\Gamma_n=-2\mathrm{Im}\,\mathcal E_n`$ is its total decay width.
 Resolving the coupling in the eigenbasis of the closed Hamiltonian gives the
-partial width of each state into each channel. In units with $\hbar=1$, width
+partial width of each state into each channel. In units with $`\hbar=1`$, width
 sets an inverse lifetime, so a narrow resonance is long lived.
 
-At a real probe energy $E$, the code evaluates the reaction and scattering
+At a real probe energy $`E`$, the code evaluates the reaction and scattering
 matrices with the conventions
 
-$$
+```math
 K(E)=\frac{1}{2}W^\dagger(E-H)^{-1}W,
 \qquad
 S(E)=[I+iK(E)]^{-1}[I-iK(E)].
-$$
+```
 
 The Wigner–Smith matrix
 
-$$
+```math
 Q(E)=-iS^\dagger(E)\frac{\mathrm dS(E)}{\mathrm dE}
-$$
+```
 
 describes the energy sensitivity of the scattering response. Its eigenvalues
 are the proper delay times. Channel transmission is calculated from the
 ensemble-averaged diagonal scattering amplitude,
 
-$$
+```math
 T_a(E)=1-\left\lvert\left\langle S_{aa}(E)\right\rangle\right\rvert^2.
-$$
+```
 
-$T_a=0$ describes a closed or fully reflected channel, while $T_a=1$
+$`T_a=0`$ describes a closed or fully reflected channel, while $`T_a=1`$
 describes ideal transmission.
 
 ## Representative results
@@ -150,22 +151,22 @@ code.
 
 ![GOE nearest-neighbor spacing histogram after degree-six averaged unfolding, compared with the GOE Wigner surmise](assets/readme/goe-level-spacings.png)
 
-*Nearest-neighbor spacings from 1000 GOE realizations with $N_m=14$. The
+*Nearest-neighbor spacings from 1000 GOE realizations with $`N_m=14`$. The
 degree-six averaged unfolding removes the smooth density before comparison
 with the GOE Wigner surmise.*
 
 ![Two-dimensional histogram of complex GOE scattering poles with the average resonance width](assets/readme/goe-resonance-poles.png)
 
 *The raw complex-energy histogram from 1000 GOE compound realizations with
-$N_m=14$, $N_f=2$, and equal couplings $v_a=\sqrt{14}$. This choice gives
-$\binom{7}{2}=21$ open channels. The vertical coordinate is
-$\log_{10}(\Gamma/E_0)$; the cyan curve is the energy-resolved average width.*
+$`N_m=14`$, $`N_f=2`$, and equal couplings $`v_a=\sqrt{14}`$. This choice gives
+$`\binom{7}{2}=21`$ open channels. The vertical coordinate is
+$`\log_{10}(\Gamma/E_0)`$; the cyan curve is the energy-resolved average width.*
 
 ![Energy-dependent transmission coefficient for channel zero of a GOE compound](assets/readme/goe-transmission-coefficient.png)
 
 *The channel-zero transmission coefficient from 1000 GOE compound
-realizations with $N_m=14$, $N_f=2$, and $v_a=\sqrt{14}$ for all 21
-channels. The calculation averages $S_{00}(E)$ before taking the squared
+realizations with $`N_m=14`$, $`N_f=2`$, and $`v_a=\sqrt{14}`$ for all 21
+channels. The calculation averages $`S_{00}(E)`$ before taking the squared
 modulus.*
 
 ## Installation
@@ -308,22 +309,22 @@ the completed in-memory simulation.
 The concise aliases in the first column are exported alongside the full class
 names.
 
-| Alias | Class | Matrix or spectral structure | $\beta$ | Density weight and polynomial basis |
+| Alias | Class | Matrix or spectral structure | $`\beta`$ | Density weight and polynomial basis |
 | --- | --- | --- | ---: | --- |
-| `GOE` | `GaussianOrthogonalEnsemble` | Real symmetric Gaussian matrix | 1 | Semicircle and Chebyshev-$U$ |
-| `GUE` | `GaussianUnitaryEnsemble` | Complex Hermitian Gaussian matrix | 2 | Semicircle and Chebyshev-$U$ |
-| `GSE` | `GaussianSymplecticEnsemble` | Self-dual Hermitian matrix with Kramers degeneracy | 4 | Semicircle and Chebyshev-$U$ |
-| `BdGC` | `BogoliubovDeGennesCEnsemble` | Particle-hole-symmetric block matrix | 2 | Semicircle and Chebyshev-$U$ |
-| `BdGD` | `BogoliubovDeGennesDEnsemble` | Imaginary antisymmetric Hermitian matrix | 2 | Semicircle and Chebyshev-$U$ |
+| `GOE` | `GaussianOrthogonalEnsemble` | Real symmetric Gaussian matrix | 1 | Semicircle and Chebyshev-$`U`$ |
+| `GUE` | `GaussianUnitaryEnsemble` | Complex Hermitian Gaussian matrix | 2 | Semicircle and Chebyshev-$`U`$ |
+| `GSE` | `GaussianSymplecticEnsemble` | Self-dual Hermitian matrix with Kramers degeneracy | 4 | Semicircle and Chebyshev-$`U`$ |
+| `BdGC` | `BogoliubovDeGennesCEnsemble` | Particle-hole-symmetric block matrix | 2 | Semicircle and Chebyshev-$`U`$ |
+| `BdGD` | `BogoliubovDeGennesDEnsemble` | Imaginary antisymmetric Hermitian matrix | 2 | Semicircle and Chebyshev-$`U`$ |
 | `Poisson` | `PoissonEnsemble` | Independent uniform levels with a selectable Wigner–Dyson eigenvector basis | 0 | Uniform and Legendre |
-| `SYK` | `SachdevYeKitaevEnsemble` | Random even-$q$ Majorana Hamiltonian | Derived from $q$ and $N_m$ | $q$-Hermite |
+| `SYK` | `SachdevYeKitaevEnsemble` | Random even-$`q`$ Majorana Hamiltonian | Derived from $`q`$ and $`N_m`$ | $`q`$-Hermite |
 
 All concrete constructors are keyword-only. They share these controls:
 
 - `num_majoranas` is even and lies between 4 and 32. It sets
-  $D=2^{N_m/2-1}$.
+  $`D=2^{N_m/2-1}`$.
 - `interaction_strength` is positive and defaults to 1. For the Gaussian,
-  BdG, and Poisson ensembles, the nominal spectral radius is $E_0=N_mJ$.
+  BdG, and Poisson ensembles, the nominal spectral radius is $`E_0=N_mJ`$.
 - `max_spectral_polynomial_degree` is a nonnegative integer and defaults to 6.
 - `dtype` defaults to `complex128`. The ensemble derives the corresponding
   real and complex working dtypes.
@@ -342,7 +343,7 @@ SYK accepts `q` in `{2, 4, 6, 8, 10}` with `q < num_majoranas` and an
 `is_even_parity` flag. Its supported size limits reflect storage for the
 decomposed Majorana monomials:
 
-| $q$ | Maximum $N_m$ |
+| $`q`$ | Maximum $`N_m`$ |
 | ---: | ---: |
 | 2 or 4 | 32 |
 | 6 | 26 |
@@ -356,7 +357,7 @@ GOE when `q % 4 == 0` and `num_majoranas % 8 == 0`, GSE when `q % 4 == 0` and
 The `MajoranaFermionBasis` builds its expensive sparse objects lazily. These
 include the Majorana operators, creation and annihilation operators, the
 vacuum, charge conjugation, the selected parity slice, and decomposed
-$q$-body monomials.
+$`q`$-body monomials.
 
 ## Compound ensembles and open channels
 
@@ -368,21 +369,21 @@ Three public compound classes cover the open-system constructions:
 | `PoissonCompoundEnsemble` | A Poisson spectrum with channel rotation supplied by its selected eigenvector ensemble |
 | `SYKCompoundEnsemble` | An SYK model with few-fermion channel states and a sparse width matrix |
 
-If `num_free_complex_fermions` is $N_f$, the number of open channels is
+If `num_free_complex_fermions` is $`N_f`$, the number of open channels is
 
-$$
+```math
 C=\binom{N_m/2}{N_f}.
-$$
+```
 
-The integer $N_f$ ranges from zero through $N_m/2$ and defaults to one. The
+The integer $`N_f`$ ranges from zero through $`N_m/2`$ and defaults to one. The
 channel count must fit within the Hilbert-space dimension. Use
 `PoissonCompoundEnsemble` for a `PoissonEnsemble`; `CompoundEnsemble` accepts
 the other many-body ensembles. The `couplings` argument accepts one positive
-finite scalar or a real, finite, nonnegative sequence of length $C$. RMTPy
+finite scalar or a real, finite, nonnegative sequence of length $`C`$. RMTPy
 copies a supplied sequence and marks the stored array read-only. The default
 coupling for every channel is the square root of the ensemble spectral radius.
 
-`SYKCompoundEnsemble` requires the parity of $N_f$ to match the selected SYK
+`SYKCompoundEnsemble` requires the parity of $`N_f`$ to match the selected SYK
 parity sector. A symplectic SYK compound also requires equal coupling strengths
 within each Kramers pair.
 
@@ -417,13 +418,13 @@ of duplicate values.
 
 Transmission simulations use a fixed 100-point grid spanning 1.5 times the
 ensemble density's plotting range. `channel_indices` chooses the individual
-$T_a(E)$ curves retained for output. The accompanying Weisskopf estimate
+$`T_a(E)`$ curves retained for output. The accompanying Weisskopf estimate
 
-$$
+```math
 \Gamma_{\mathrm W}(E)=\frac{d(E)}{2}\sum_{a=1}^{C}T_a(E),
 \qquad
 d(E)=\frac{1}{D\rho_{\mathrm{weight}}(E)},
-$$
+```
 
 always includes every channel in the compound. Points with zero spectral
 weight are stored as undefined values.
@@ -454,21 +455,21 @@ Every family exports the same function pattern:
 
 Raw energies contain the smooth variation of the mean density together with
 the fluctuations under study. Unfolding maps the energy coordinate through a
-cumulative distribution function $F$:
+cumulative distribution function $`F`$:
 
-$$
+```math
 \widetilde E=D[F(E)-F(0)].
-$$
+```
 
 One unit in the unfolded coordinate corresponds approximately to one local
 mean level spacing. A finite resonance width is transformed over its full
 energy interval:
 
-$$
+```math
 \widetilde\Gamma=
 D\left[F\left(E+\frac{\Gamma}{2}\right)-
 F\left(E-\frac{\Gamma}{2}\right)\right].
-$$
+```
 
 Spectral, resonance, and time-delay simulations construct four views where the
 underlying density supports them:
@@ -476,22 +477,22 @@ underlying density supports them:
 | View | CDF used by the calculation |
 | --- | --- |
 | Raw | Original energies or widths in model units |
-| Weight-unfolded | The ensemble's leading semicircle, uniform, or $q$-Hermite weight |
+| Weight-unfolded | The ensemble's leading semicircle, uniform, or $`q`$-Hermite weight |
 | Averaged-unfolded | Polynomial coefficients averaged over additional ensemble samples, with one result for every truncation degree |
 | Variate-unfolded | Coefficients fitted to each realization, with one result for every truncation degree |
 
-For a density histogram with bin count $n_i$ and bin width $\Delta_i$, the
+For a density histogram with bin count $`n_i`$ and bin width $`\Delta_i`$, the
 finalized value is
 
-$$
+```math
 h_i=\frac{n_i}{\left(\sum_j n_j\right)\Delta_i}.
-$$
+```
 
 This normalization integrates to one over the samples that fall inside the
 declared histogram support.
 
 For `max_spectral_polynomial_degree=M`, coefficient histograms and averaged and
-variate groups are created for every degree from 1 through $M$, including odd
+variate groups are created for every degree from 1 through $`M`$, including odd
 degrees. Setting `M=0` leaves the raw and weight-unfolded groups and avoids the
 polynomial groups and averaged-density calibration. For densities with a
 polynomial expansion, the degree-zero raw spectral and resonance plots still
@@ -507,8 +508,8 @@ horizontal scale.
 Spectral statistics use `ensemble.spectral_density`. Resonance statistics use
 `compound.resonance_density` and fit the resonance centers. In an unfolded
 two-dimensional complex-energy histogram, the horizontal axis remains the
-physical center $E/E_0$, while the vertical width is unfolded. Time-delay
-statistics transform $1/\tau$ as a width about the fixed probe energy and
+physical center $`E/E_0`$, while the vertical width is unfolded. Time-delay
+statistics transform $`1/\tau`$ as a width about the fixed probe energy and
 then take the reciprocal.
 
 An averaged density calibration draws
@@ -528,7 +529,7 @@ execution.
 `rmtpy.universal` contains the formulas used by the plots and direct ensemble
 methods:
 
-- symmetry labels and eigenvalue degeneracies for $\beta=0,1,2,4$;
+- symmetry labels and eigenvalue degeneracies for $`\beta=0,1,2,4`$;
 - Poisson and Wigner-surmise spacing densities;
 - single-channel and multi-channel Porter–Thomas width densities;
 - connected GOE, GUE, GSE, and Poisson spectral form factors;
@@ -538,9 +539,9 @@ The `DensityModel` in `rmtpy.density` combines a support, a sample stream, an
 optional orthogonal-polynomial family, and its weight. It supplies PDFs, CDFs,
 ensemble-average coefficients, realization-specific coefficients, and the
 interpolators used by unfolding. `rmtpy.polynomials` implements the
-Chebyshev-$U$, Legendre, and $q$-Hermite recurrences and weights.
+Chebyshev-$`U`$, Legendre, and $`q`$-Hermite recurrences and weights.
 `rmtpy.fermions` supplies the sparse Majorana and complex-fermion operators,
-parity projections, $q$-body monomials, and few-fermion channel states used by
+parity projections, $`q`$-body monomials, and few-fermion channel states used by
 the SYK constructions.
 
 ## Saved runs and plots
@@ -566,7 +567,7 @@ outputs/
                 └── spectral_form_factors_plot.png
 ```
 
-Compound paths add $N_f$ and the coupling value or a stable coupling-array
+Compound paths add $`N_f`$ and the coupling value or a stable coupling-array
 identifier. Each execution receives a UTC timestamp directory.
 
 The manifest records:
@@ -589,8 +590,8 @@ an existing plot path is preserved.
 - Matrix construction and polynomial recurrences use Numba. The first call to
   a compiled kernel includes JIT compilation time.
 - Eigensystems use SciPy BLAS/LAPACK. Dense diagonalization costs
-  $O(D^3)$, while $D=2^{N_m/2-1}$ grows exponentially.
-- SYK stores decomposed data for $\binom{N_m}{q}$ Majorana monomials. Its
+  $`O(D^3)`$, while $`D=2^{N_m/2-1}`$ grows exponentially.
+- SYK stores decomposed data for $`\binom{N_m}{q}`$ Majorana monomials. Its
   constructor limits guard broad memory bounds; a large accepted case can
   still exceed the practical resources of a particular machine.
 - Fermion operators and SYK channel matrices use SciPy sparse arrays. The
