@@ -14,7 +14,7 @@ from .transmission_coefficients_data import TransmissionCoefficientsData
 @dataclasses.dataclass(slots=True, kw_only=True, eq=False, weakref_slot=False)
 class TransmissionCoefficientsAxes(PlotAxes):
     xticks: tuple[float, ...] = (-1.0, 0.0, 1.0)  # units of energy_0
-    xticks_minor: tuple[float, ...] = (-0.5, 0.5)
+    xticks_minor: tuple[float, ...] = (-1.5, -0.5, 0.5, 1.5)
     xlabel: str = r"$E / E_0$"
     xtick_labels: tuple[str, ...] = (
         r"$-1.0$",
@@ -29,8 +29,8 @@ class TransmissionCoefficientsPlot(Plot):
     data: Data
     axes: PlotAxes = dataclasses.field(default_factory=TransmissionCoefficientsAxes)
 
-    xlim: tuple[float, float] = (-1.0, 1.0)
-    ylim: tuple[float, float] = (-0.02, 1.02)
+    xlim: tuple[float, float] = (-1.8, 1.8)
+    ylim: tuple[float, float] = (0.0, 1.2)
 
     line_zorder: int = 2
     line_width: float = 1.5

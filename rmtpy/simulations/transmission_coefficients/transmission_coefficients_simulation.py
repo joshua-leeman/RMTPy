@@ -102,8 +102,10 @@ def _validate_channel_indices(
 def _create_energy_grid(
     simulation: TransmissionCoefficientsSimulation,
 ) -> np.ndarray[tuple[int], np.dtype[np.floating]]:
+    spectral_energy_range = simulation.compound.ensemble.spectral_density.plot_range
+    expanded_energy_range = tuple(1.5 * endpoint for endpoint in spectral_energy_range)
     energies = np.linspace(
-        *simulation.compound.ensemble.spectral_density.plot_range,
+        *cast(tuple[float, float], expanded_energy_range),
         NUM_ENERGY_POINTS,
         dtype=np.float64,
     )

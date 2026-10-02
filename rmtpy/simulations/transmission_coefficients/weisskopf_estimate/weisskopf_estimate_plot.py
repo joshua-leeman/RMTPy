@@ -66,7 +66,7 @@ class WeisskopfEstimatePlot(Plot):
             handles=self.legend_handles,
             labels=self.legend_labels,
             loc="upper right",
-            bbox=(0.98, 0.95),
+            bbox=(0.74, 0.95),
         )
         if not self.legend.title:
             self.legend.title = (
