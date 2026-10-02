@@ -15,6 +15,8 @@ from ....ensembles import (
 from ...base_data import Data
 from ...base_plot import Plot, PlotAxes, PlotLegend
 
+_POLYNOMIAL_WEIGHT_LEGEND: str = "polynomial weight"
+
 
 @dataclasses.dataclass(slots=True, kw_only=True, eq=False, weakref_slot=False)
 class SpectralHistogramAxes(PlotAxes):
@@ -150,17 +152,31 @@ class SpectralHistogramPlot(Plot):
             zorder=self.histogram_zorder,
         )
 
-        coefficients = self.calibration_coefficients("spectral")
-        if coefficients is None:
-            self.legend.handles = self.legend.handles[:1]
-            self.legend.labels = self.legend.labels[:1]
-        else:
+        spectral_density = self.ensemble.spectral_density
+        if (
+            self.ensemble.max_spectral_polynomial_degree == 0
+            and spectral_density.has_polynomial_expansion
+        ):
             energies = np.linspace(*self.xlim, self.num_points)
-            spectral_pdf = self.ensemble.spectral_density.variate_pdf(
-                energies,
-                coeffs=coefficients,
+            spectral_pdf = spectral_density.weight_pdf(energies)
+            self.legend.labels = (
+                self.legend.labels[0],
+                _POLYNOMIAL_WEIGHT_LEGEND,
             )
+        else:
+            coefficients = self.calibration_coefficients("spectral")
+            if coefficients is None:
+                self.legend.handles = self.legend.handles[:1]
+                self.legend.labels = self.legend.labels[:1]
+                spectral_pdf = None
+            else:
+                energies = np.linspace(*self.xlim, self.num_points)
+                spectral_pdf = spectral_density.variate_pdf(
+                    energies,
+                    coeffs=coefficients,
+                )
 
+        if spectral_pdf is not None:
             plot = cast(Callable[..., object], self.ax.plot)
             _ = plot(
                 energies,

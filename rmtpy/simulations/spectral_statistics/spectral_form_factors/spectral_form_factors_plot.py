@@ -6,7 +6,7 @@ from typing import cast, override
 
 import numpy as np
 from matplotlib.lines import Line2D
-from matplotlib.ticker import LogLocator, NullLocator
+from matplotlib.ticker import LogLocator
 from scipy.special import jn_zeros
 
 from ....ensembles import ManyBodyEnsemble
@@ -102,15 +102,11 @@ class FormFactorsPlot(Plot):
         _ = set_x_major_locator(
             LogLocator(base=self.ensemble.dimension, numticks=len(self.axes.xticks))
         )
-        set_x_minor_locator = cast(Callable[..., object], self.ax.xaxis.set_minor_locator)
-        _ = set_x_minor_locator(NullLocator())
 
         set_y_major_locator = cast(Callable[..., object], self.ax.yaxis.set_major_locator)
         _ = set_y_major_locator(
             LogLocator(base=self.ensemble.dimension, numticks=len(self.axes.yticks))
         )
-        set_y_minor_locator = cast(Callable[..., object], self.ax.yaxis.set_minor_locator)
-        _ = set_y_minor_locator(NullLocator())
 
         plot = cast(Callable[..., object], self.ax.plot)
         _ = plot(
@@ -247,15 +243,11 @@ class UnfoldedFormFactorsPlot(Plot):
         _ = set_x_major_locator(
             LogLocator(base=self.ensemble.dimension, numticks=len(self.axes.xticks))
         )
-        set_x_minor_locator = cast(Callable[..., object], self.ax.xaxis.set_minor_locator)
-        _ = set_x_minor_locator(NullLocator())
 
         set_y_major_locator = cast(Callable[..., object], self.ax.yaxis.set_major_locator)
         _ = set_y_major_locator(
             LogLocator(base=self.ensemble.dimension, numticks=len(self.axes.yticks))
         )
-        set_y_minor_locator = cast(Callable[..., object], self.ax.yaxis.set_minor_locator)
-        _ = set_y_minor_locator(NullLocator())
 
         plot = cast(Callable[..., object], self.ax.plot)
         _ = plot(

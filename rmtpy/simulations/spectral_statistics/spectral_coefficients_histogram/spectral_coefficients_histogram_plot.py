@@ -1,36 +1,88 @@
 import dataclasses
+import math
 from pathlib import Path
 from typing import cast, override
 
+import numpy as np
 from matplotlib.patches import Patch
+from matplotlib.ticker import MaxNLocator
 
 from ....ensembles import ManyBodyEnsemble
 from ...base_data import Data
 from ...base_plot import Plot, PlotAxes, PlotLegend
+from .spectral_coefficients_histogram_data import SpectralCoefficientsHistogram
+
+_Y_AXIS_PADDING: float = 0.05
+_NUM_MAJOR_INTERVALS: int = 5
+_NUM_X_MAJOR_INTERVALS: int = 4
+_MAJOR_TICK_STEPS: tuple[float, ...] = (1.0, 2.0, 2.5, 5.0, 10.0)
+_CENTRAL_QUANTILES: tuple[float, float] = (0.01, 0.99)
+
+
+def _nice_major_ticks(
+    lower: float,
+    upper: float,
+    *,
+    num_intervals: int = _NUM_MAJOR_INTERVALS,
+    symmetric: bool = False,
+) -> tuple[float, ...]:
+    locator = MaxNLocator(
+        nbins=num_intervals,
+        steps=_MAJOR_TICK_STEPS,
+        min_n_ticks=3,
+        symmetric=symmetric,
+    )
+    return tuple(float(value) for value in locator.tick_values(lower, upper))
+
+
+def _major_tick_step(major_ticks: tuple[float, ...]) -> float:
+    return min(
+        right - left
+        for left, right in zip(major_ticks, major_ticks[1:], strict=False)
+        if right > left
+    )
+
+
+def _minor_ticks(major_ticks: tuple[float, ...]) -> tuple[float, ...]:
+    return tuple(
+        0.5 * (major_ticks[index] + major_ticks[index + 1])
+        for index in range(len(major_ticks) - 1)
+    )
+
+
+def _latex_tick_labels(
+    major_ticks: tuple[float, ...],
+    *,
+    show_positive_sign: bool,
+) -> tuple[str, ...]:
+    decimal_places = 0
+    if len(major_ticks) > 1:
+        step = _major_tick_step(major_ticks)
+        decimal_places = max(0, -math.floor(math.log10(step)))
+        scaled_step = step * 10**decimal_places
+        if not math.isclose(
+            scaled_step,
+            round(scaled_step),
+            rel_tol=1e-9,
+            abs_tol=1e-9,
+        ):
+            decimal_places += 1
+
+    step = major_ticks[1] - major_ticks[0] if len(major_ticks) > 1 else 1.0
+    zero_tolerance = abs(step) * 1e-9
+
+    labels: list[str] = []
+    for tick in major_ticks:
+        value = 0.0 if abs(tick) <= zero_tolerance else tick
+        sign = "+" if show_positive_sign and value > 0.0 else ""
+        labels.append(rf"${sign}{value:.{decimal_places}f}$")
+
+    return tuple(labels)
 
 
 @dataclasses.dataclass(slots=True, kw_only=True, eq=False, weakref_slot=False)
 class SpectralCoefficientsHistogramAxes(PlotAxes):
-    xticks: tuple[float, ...] = (-0.2, -0.1, 0.0, 0.1, 0.2)  # units of energy_0
-    xticks_minor: tuple[float, ...] = (-0.15, -0.05, 0.05, 0.15)
-    xtick_labels: tuple[str, ...] = (
-        r"$-0.2$",
-        r"$-0.1$",
-        r"$0.0$",
-        r"$+0.1$",
-        r"$+0.2$",
-    )
-
-    yticks: tuple[float, ...] = tuple(range(0, 24, 4))  # units of 1 / (pi * energy_0)
-    yticks_minor: tuple[float, ...] = tuple(range(2, 22, 4))
-    ytick_labels: tuple[str, ...] = (
-        r"$0$",
-        r"$4$",
-        r"$8$",
-        r"$12$",
-        r"$16$",
-        r"$20$",
-    )
+    pass
 
 
 @dataclasses.dataclass(slots=True, kw_only=True, eq=False, weakref_slot=False)
@@ -40,8 +92,11 @@ class SpectralCoefficientsHistogramPlot(Plot):
         default_factory=SpectralCoefficientsHistogramAxes,
     )
 
-    xlim: tuple[float, float] = (-0.25, 0.25)  # units of energy_0
-    ylim: tuple[float, float] = (0.0, 20)  # units of 1 / (pi * energy_0)
+    _derived_attributes_are_set: bool = dataclasses.field(
+        default=False,
+        init=False,
+        repr=False,
+    )
 
     histogram_zorder: int = 1
     histogram_alpha: float = 0.5
@@ -52,9 +107,59 @@ class SpectralCoefficientsHistogramPlot(Plot):
     legend_handles: tuple[Patch] = (Patch(color=histogram_color, alpha=histogram_alpha),)
 
     def set_derived_attributes(self) -> None:
+        if not isinstance(self.data, SpectralCoefficientsHistogram):
+            raise ValueError("Data must be a `SpectralCoefficientsHistogram` instance")
+
         coeff_degree = cast(int, self.data.metadata["degree"])
         self.axes.xlabel = rf"$c_{{{coeff_degree}}}$"
         self.axes.ylabel = rf"$P(c_{{{coeff_degree}}})$"
+
+        total_count = int(np.sum(self.data.counts))
+        if total_count:
+            cumulative_counts = np.cumsum(self.data.counts)
+            lower_index, upper_index = np.searchsorted(
+                cumulative_counts,
+                np.multiply(_CENTRAL_QUANTILES, total_count),
+                side="left",
+            )
+            lower = float(self.data.bins[lower_index])
+            upper = float(self.data.bins[upper_index + 1])
+        else:
+            lower = float(self.data.bins[0])
+            upper = float(self.data.bins[-1])
+
+        occupied_extent = max(abs(lower), abs(upper))
+        enclosing_ticks = _nice_major_ticks(
+            -occupied_extent,
+            occupied_extent,
+            num_intervals=_NUM_X_MAJOR_INTERVALS,
+            symmetric=True,
+        )
+        self.axes.xticks = enclosing_ticks
+        horizontal_padding = 0.5 * _major_tick_step(self.axes.xticks)
+        self.xlim = (
+            self.axes.xticks[0] - horizontal_padding,
+            self.axes.xticks[-1] + horizontal_padding,
+        )
+        self.axes.xticks_minor = _minor_ticks(self.axes.xticks)
+        self.axes.xtick_labels = _latex_tick_labels(
+            self.axes.xticks,
+            show_positive_sign=True,
+        )
+
+        histogram_peak = float(np.max(self.data.histogram, initial=0.0))
+        padded_peak = histogram_peak * (1.0 + _Y_AXIS_PADDING)
+        y_tick_target = padded_peak if padded_peak > 0.0 else 1.0
+        self.axes.yticks = _nice_major_ticks(
+            0.0,
+            y_tick_target,
+        )
+        self.ylim = (0.0, self.axes.yticks[-1])
+        self.axes.yticks_minor = _minor_ticks(self.axes.yticks)
+        self.axes.ytick_labels = _latex_tick_labels(
+            self.axes.yticks,
+            show_positive_sign=False,
+        )
 
         self.ensemble: ManyBodyEnsemble = self.store_manifest_arg(
             "ensemble", ManyBodyEnsemble
@@ -70,9 +175,12 @@ class SpectralCoefficientsHistogramPlot(Plot):
         if not self.legend.title:
             self.legend.title = self.ensemble.to_latex
 
+        self._derived_attributes_are_set = True
+
     @override
     def plot(self, path: str | Path) -> None:
-        self.set_derived_attributes()
+        if not self._derived_attributes_are_set:
+            self.set_derived_attributes()
 
         self.build_figure()
 

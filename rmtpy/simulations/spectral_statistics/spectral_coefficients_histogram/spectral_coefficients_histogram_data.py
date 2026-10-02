@@ -2,7 +2,7 @@ import attrs
 
 from ....simulations.histograms import Histogram
 
-SPECTRAL_COEFFICIENT_SUPPORT: tuple[float, float] = (-0.2, 0.2)
+_INITIAL_SPECTRAL_COEFFICIENT_SUPPORT: tuple[float, float] = (-0.2, 0.2)
 
 
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
@@ -15,7 +15,7 @@ class SpectralCoefficientsHistogram(Histogram):
     ) -> SpectralCoefficientsHistogram:
         coefficient_histogram = SpectralCoefficientsHistogram(
             _file_name=f"spectral_coeff_{degree}_histogram",
-            support=SPECTRAL_COEFFICIENT_SUPPORT,
+            support=_INITIAL_SPECTRAL_COEFFICIENT_SUPPORT,
         )
         metadata = {"degree": degree, "unfolding": "raw"}
         coefficient_histogram.attach_metadata(metadata)
