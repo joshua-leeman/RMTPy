@@ -1,5 +1,6 @@
 import dataclasses
 import logging
+import math
 import os
 import uuid
 from abc import ABC, abstractmethod
@@ -42,6 +43,10 @@ class Spine(Protocol):
 
 class ConfigurableAxes(Protocol):
     spines: Mapping[str, Spine]
+
+    def get_xscale(self) -> str: ...
+
+    def get_yscale(self) -> str: ...
 
     def set_xlabel(self, xlabel: str, *, fontsize: float = ...) -> object: ...
 
@@ -134,6 +139,8 @@ class PlotAxes:
         for spine in axes.spines.values():
             _ = spine.set_linewidth(self.axes_width)
 
+        is_log_log = axes.get_xscale() == axes.get_yscale() == "log"
+
         if self.xlabel:
             _ = axes.set_xlabel(self.xlabel, fontsize=self.xlabel_fontsize)
         if self.ylabel:
@@ -146,8 +153,32 @@ class PlotAxes:
 
         if self.xticks_minor:
             _ = axes.set_xticks(self.xticks_minor, minor=True)
+        elif is_log_log and len(self.xticks) > 1:
+            _ = axes.set_xticks(
+                tuple(
+                    math.sqrt(left_tick * right_tick)
+                    for left_tick, right_tick in zip(
+                        self.xticks,
+                        self.xticks[1:],
+                        strict=False,
+                    )
+                ),
+                minor=True,
+            )
         if self.yticks_minor:
             _ = axes.set_yticks(self.yticks_minor, minor=True)
+        elif is_log_log and len(self.yticks) > 1:
+            _ = axes.set_yticks(
+                tuple(
+                    math.sqrt(left_tick * right_tick)
+                    for left_tick, right_tick in zip(
+                        self.yticks,
+                        self.yticks[1:],
+                        strict=False,
+                    )
+                ),
+                minor=True,
+            )
 
         _ = axes.tick_params(
             direction="in",
@@ -158,6 +189,17 @@ class PlotAxes:
             which="both",
             length=self.tick_length,
         )
+
+        if is_log_log:
+            _ = axes.tick_params(
+                axis="both",
+                which="minor",
+                length=self.tick_length / 2,
+                labelbottom=False,
+                labeltop=False,
+                labelleft=False,
+                labelright=False,
+            )
 
         if self.xtick_labels:
             _ = axes.set_xticklabels(self.xtick_labels, fontsize=self.tick_fontsize)
@@ -208,19 +250,27 @@ class PlotLegend:
 
     title: str = ""
     title_fontsize: int = 10
-    title_linespacing: float = 1.5
+    title_linegap: float = 2.0  # points
 
     loc: LegendLocation = "best"
     bbox: tuple[float, ...] = ()
     frameon: bool = False
 
+    def _formatted_title(self, *, usetex: bool) -> str:
+        if not usetex or "\n" not in self.title:
+            return self.title
+
+        linebreak = rf"\\[{self.title_linegap:g}pt]"
+        return rf"\shortstack[l]{{{linebreak.join(self.title.split('\n'))}}}"
+
     def configure(self, ax: Axes) -> None:
         if self.handles and self.labels:
+            usetex = bool(matplotlib.rcParams["text.usetex"])
             configure_legend = cast(Callable[..., Legend], ax.legend)
             legend = configure_legend(
                 handles=self.handles,
                 labels=self.labels,
-                title=self.title,
+                title=self._formatted_title(usetex=usetex),
                 loc=self.loc,
                 bbox_to_anchor=self.bbox,
                 frameon=self.frameon,
@@ -229,10 +279,12 @@ class PlotLegend:
                 alignment=self.textalignment,
             )
 
-            legend.get_title().set_linespacing(self.title_linespacing)
+            title = legend.get_title()
+            if not usetex and "\n" in self.title:
+                title.set_linespacing(1.0 + self.title_linegap / self.title_fontsize)
 
             if self.on_black_background:
-                legend.get_title().set_color("white")
+                title.set_color("white")
                 for text in legend.get_texts():
                     text.set_color("white")
 
