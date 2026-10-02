@@ -4,7 +4,7 @@ import unittest
 from copy import deepcopy
 from pathlib import Path
 from typing import cast
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import attrs
 import numpy as np
@@ -228,9 +228,26 @@ class SpectralStatisticsTests(unittest.TestCase):
             expected_samples = tuple(
                 coefficients[degree : degree + 1] for coefficients in coefficient_samples
             )
+            expected_coefficients = np.concatenate(expected_samples)
+            expected_bins = np.histogram_bin_edges(
+                expected_coefficients,
+                bins="fd",
+            )
+            expected_bins[-1] = np.nextafter(expected_bins[-1], np.inf)
+
+            self.assertEqual(histogram.realizs, simulation.realizs)
+            self.assertEqual(histogram.num_bins, len(expected_bins) - 1)
+            self.assertEqual(np.sum(histogram.counts), simulation.realizs)
+            self.assertLessEqual(histogram.support[0], np.min(expected_coefficients))
+            self.assertGreater(histogram.support[1], np.max(expected_coefficients))
+            np.testing.assert_array_equal(histogram.bins, expected_bins)
             np.testing.assert_array_equal(
                 histogram.counts,
                 histogram_counts(expected_samples, bins=histogram.bins),
+            )
+            self.assertAlmostEqual(
+                np.sum(histogram.histogram * np.diff(histogram.bins)),
+                1.0,
             )
 
         np.testing.assert_array_equal(
@@ -392,8 +409,8 @@ class SpectralStatisticsTests(unittest.TestCase):
 
     def test_save_load_plot_dispatch_and_archive_validation(self) -> None:
         simulation = SpectralStatisticsSimulation(
-            ensemble=build_ensemble(max_degree=1, seed=77),
-            realizs=1,
+            ensemble=build_ensemble(max_degree=2, seed=314159),
+            realizs=2,
         )
         simulation.execute()
         completed_rng_state = deepcopy(simulation.ensemble.rng_state)
@@ -428,6 +445,33 @@ class SpectralStatisticsTests(unittest.TestCase):
                 restored_simulation.ensemble.spectral_density.average_coeffs,
                 simulation.ensemble.spectral_density.average_coeffs,
             )
+
+            native_coefficient_plots = tuple(
+                SpectralCoefficientsHistogramPlot(
+                    data=histogram,
+                    context=restored_simulation.manifest,
+                )
+                for histogram in restored_simulation.coefficient_buffers
+            )
+            for plot in native_coefficient_plots:
+                plot.set_derived_attributes()
+
+            widest_plot = max(
+                native_coefficient_plots,
+                key=lambda plot: plot.xlim[1] - plot.xlim[0],
+            )
+            horizontal_padding = 0.5 * (
+                widest_plot.axes.xticks[1] - widest_plot.axes.xticks[0]
+            )
+            self.assertAlmostEqual(
+                widest_plot.xlim[0],
+                widest_plot.axes.xticks[0] - horizontal_padding,
+            )
+            self.assertAlmostEqual(
+                widest_plot.xlim[1],
+                widest_plot.axes.xticks[-1] + horizontal_padding,
+            )
+            self.assertAlmostEqual(widest_plot.xlim[0], -widest_plot.xlim[1])
 
             with (
                 patch.object(
@@ -468,14 +512,48 @@ class SpectralStatisticsTests(unittest.TestCase):
             ):
                 plot_spectral_statistics_simulation(directory=destination_directory)
 
-            coefficient_plot.assert_called_once()
+            self.assertEqual(coefficient_plot.call_count, 2)
             raw_spectral_plot.assert_called_once()
             raw_spacings_plot.assert_called_once()
             raw_form_factors_plot.assert_called_once()
-            self.assertEqual(unfolded_spectral_plot.call_count, 3)
-            self.assertEqual(unfolded_spacings_plot.call_count, 3)
-            self.assertEqual(unfolded_form_factors_plot.call_count, 3)
+            self.assertEqual(unfolded_spectral_plot.call_count, 5)
+            self.assertEqual(unfolded_spacings_plot.call_count, 5)
+            self.assertEqual(unfolded_form_factors_plot.call_count, 5)
             self.assertIsNotNone(raw_spectral_plot.call_args.args[0].context)
+
+            shared_coefficient_plots = tuple(
+                call.args[0] for call in coefficient_plot.call_args_list
+            )
+            self.assertEqual(
+                tuple(plot.axes.xlabel for plot in shared_coefficient_plots),
+                (r"$c_{1}$", r"$c_{2}$"),
+            )
+            for native_plot, shared_plot in zip(
+                native_coefficient_plots,
+                shared_coefficient_plots,
+                strict=True,
+            ):
+                self.assertEqual(shared_plot.xlim, widest_plot.xlim)
+                self.assertEqual(shared_plot.axes.xticks, widest_plot.axes.xticks)
+                self.assertEqual(
+                    shared_plot.axes.xticks_minor,
+                    widest_plot.axes.xticks_minor,
+                )
+                self.assertEqual(
+                    shared_plot.axes.xtick_labels,
+                    widest_plot.axes.xtick_labels,
+                )
+
+                self.assertEqual(shared_plot.ylim, native_plot.ylim)
+                self.assertEqual(shared_plot.axes.yticks, native_plot.axes.yticks)
+                self.assertEqual(
+                    shared_plot.axes.yticks_minor,
+                    native_plot.axes.yticks_minor,
+                )
+                self.assertEqual(
+                    shared_plot.axes.ytick_labels,
+                    native_plot.axes.ytick_labels,
+                )
 
             manifest_path = destination_directory / "manifest.json"
             original_manifest_text = manifest_path.read_text(encoding="utf-8")
@@ -525,6 +603,75 @@ class SpectralStatisticsTests(unittest.TestCase):
 
         self.assertIsNot(plot.ensemble, simulation.ensemble)
         self.assertEqual(simulation.ensemble.rng_state, completed_rng_state)
+
+    def test_degree_zero_raw_spectral_plot_draws_polynomial_weight_pdf(
+        self,
+    ) -> None:
+        simulation = SpectralStatisticsSimulation(
+            ensemble=build_ensemble(max_degree=0, seed=271),
+            realizs=2,
+        )
+        simulation.execute()
+        self.assertEqual(simulation.manifest.execution["calibration"], {})
+
+        plot = SpectralHistogramPlot(
+            data=simulation.raw_buffers.levels,
+            context=simulation.manifest,
+        )
+        plot.ax = MagicMock()
+        with (
+            patch.object(plot, "build_figure"),
+            patch.object(plot, "draw_histogram"),
+            patch.object(plot, "finish_plot"),
+        ):
+            plot.plot(Path("unused"))
+
+        plot.ax.plot.assert_called_once()
+        energies, spectral_pdf = plot.ax.plot.call_args.args
+        np.testing.assert_array_equal(
+            energies,
+            np.linspace(*plot.xlim, plot.num_points),
+        )
+        np.testing.assert_allclose(
+            spectral_pdf,
+            plot.ensemble.spectral_density.weight_pdf(energies),
+        )
+        self.assertEqual(
+            plot.legend.labels,
+            ("simulation", "polynomial weight"),
+        )
+        self.assertEqual(len(plot.legend.handles), 2)
+
+    def test_coefficient_plot_frames_central_mass_without_discarding_outlier(
+        self,
+    ) -> None:
+        samples = np.append(np.linspace(-0.1, 0.1, 1_000), 10.0)
+        bins = np.histogram_bin_edges(samples, bins="fd")
+        bins[-1] = np.nextafter(bins[-1], np.inf)
+        counts = np.histogram(samples, bins=bins)[0]
+        histogram = SpectralCoefficientsHistogram(
+            metadata={"degree": 1, "unfolding": "raw"},
+            _file_name="spectral_coeff_1_histogram",
+            support=(float(bins[0]), float(bins[-1])),
+            num_bins=len(counts),
+            bins=bins,
+            counts=counts,
+            realizs=len(samples),
+        )
+        histogram.compute_histogram()
+
+        context = SpectralStatisticsSimulation(
+            ensemble=build_ensemble(seed=23),
+            realizs=1,
+        ).manifest
+        plot = SpectralCoefficientsHistogramPlot(data=histogram, context=context)
+        plot.set_derived_attributes()
+
+        self.assertEqual(np.sum(histogram.counts), len(samples))
+        self.assertGreater(histogram.support[1], samples[-1])
+        self.assertGreaterEqual(plot.xlim[1], np.max(samples[:-1]))
+        self.assertLess(plot.xlim[1], samples[-1])
+        self.assertEqual(plot.xlim[0], -plot.xlim[1])
 
     def test_run_helper_executes_saves_reloads_and_dispatches_plots(self) -> None:
         with (
