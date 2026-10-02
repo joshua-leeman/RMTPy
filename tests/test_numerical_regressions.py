@@ -1,5 +1,3 @@
-# pyright: reportAny=false, reportUnknownMemberType=false, reportUnknownArgumentType=false, reportUnknownVariableType=false, reportUnknownParameterType=false, reportUnknownLambdaType=false, reportUnusedCallResult=false, reportPrivateUsage=false, reportImplicitStringConcatenation=false, reportMissingParameterType=false, reportUnnecessaryIsInstance=false, reportImplicitOverride=false, reportExplicitAny=false, reportOptionalMemberAccess=false, reportOptionalSubscript=false
-
 import unittest
 from collections.abc import Iterator
 
@@ -172,12 +170,11 @@ class CompoundEnsembleRegressionTests(unittest.TestCase):
         self.assertFalse(compound.couplings.flags.writeable)
 
         for invalid_value in (np.nan, np.inf):
-            self.assertRaises(
-                ValueError,
-                CompoundEnsemble,
-                ensemble=GOE(num_majoranas=4),
-                couplings=np.array([1.0, invalid_value]),
-            )
+            with self.subTest(invalid_value=invalid_value), self.assertRaises(ValueError):
+                CompoundEnsemble(
+                    ensemble=GOE(num_majoranas=4),
+                    couplings=np.array([1.0, invalid_value]),
+                )
 
 
 class UniversalRegressionTests(unittest.TestCase):
