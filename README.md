@@ -79,18 +79,18 @@ Different statistics probe different parts of a spectrum:
 - A spectral form factor measures correlations in the time domain. For
   realization $r$, RMTPy accumulates
 
-  $$
+  ```math
   Z_r(t)=\frac{1}{N}\sum_{j=1}^{N}e^{-iE_{rj}t},
-  $$
+  ```
 
   and forms
 
-  $$
+  ```math
   K(t)=\frac{1}{R}\sum_{r=1}^{R}\lvert Z_r(t)\rvert^2,
   \qquad
   K_{\mathrm{conn}}(t)=K(t)-
   \left\lvert\frac{1}{R}\sum_{r=1}^{R}Z_r(t)\right\rvert^2.
-  $$
+  ```
 
 Here $R$ is the number of realizations and $N$ is the number of levels in
 the current sample.
@@ -112,7 +112,7 @@ $$
 $$
 
 The real part $E_n$ is a resonance center. The positive quantity
-$\Gamma_n=-2\operatorname{Im}\mathcal E_n$ is its total decay width.
+$\Gamma_n=-2\mathrm{Im}\,\mathcal E_n$ is its total decay width.
 Resolving the coupling in the eigenbasis of the closed Hamiltonian gives the
 partial width of each state into each channel. In units with $\hbar=1$, width
 sets an inverse lifetime, so a narrow resonance is long lived.
@@ -157,14 +157,14 @@ with the GOE Wigner surmise.*
 ![Two-dimensional histogram of complex GOE scattering poles with the average resonance width](assets/readme/goe-resonance-poles.png)
 
 *The raw complex-energy histogram from 1000 GOE compound realizations with
-$N_m=14$, $N_f=6$, and equal couplings $v_a=\sqrt{14}$. This choice gives
-$\binom{7}{6}=7$ open channels. The vertical coordinate is
+$N_m=14$, $N_f=2$, and equal couplings $v_a=\sqrt{14}$. This choice gives
+$\binom{7}{2}=21$ open channels. The vertical coordinate is
 $\log_{10}(\Gamma/E_0)$; the cyan curve is the energy-resolved average width.*
 
 ![Energy-dependent transmission coefficient for channel zero of a GOE compound](assets/readme/goe-transmission-coefficient.png)
 
 *The channel-zero transmission coefficient from 1000 GOE compound
-realizations with $N_m=14$, $N_f=6$, and $v_a=\sqrt{14}$ for all seven
+realizations with $N_m=14$, $N_f=2$, and $v_a=\sqrt{14}$ for all 21
 channels. The calculation averages $S_{00}(E)$ before taking the squared
 modulus.*
 
@@ -415,8 +415,8 @@ Time-delay probe energies are copied into a contiguous, read-only `float64`
 array. The input must be scalar or one-dimensional, finite, nonempty, and free
 of duplicate values.
 
-Transmission simulations use a fixed 100-point grid spanning the ensemble
-density's plotting range. `channel_indices` chooses the individual
+Transmission simulations use a fixed 100-point grid spanning 1.5 times the
+ensemble density's plotting range. `channel_indices` chooses the individual
 $T_a(E)$ curves retained for output. The accompanying Weisskopf estimate
 
 $$
@@ -493,7 +493,16 @@ declared histogram support.
 For `max_spectral_polynomial_degree=M`, coefficient histograms and averaged and
 variate groups are created for every degree from 1 through $M$, including odd
 degrees. Setting `M=0` leaves the raw and weight-unfolded groups and avoids the
-polynomial groups.
+polynomial groups and averaged-density calibration. For densities with a
+polynomial expansion, the degree-zero raw spectral and resonance plots still
+overlay the polynomial weight as a reference curve.
+
+Spectral and resonance coefficient samples must be finite. Each coefficient
+degree uses Freedman–Diaconis bin edges derived after all realizations have
+been accumulated, so the saved support retains every finite sample. The plots
+use a symmetric window around the central 1st–99th-percentile mass, and all
+coefficient plots in one spectral or resonance run share the widest such
+horizontal scale.
 
 Spectral statistics use `ensemble.spectral_density`. Resonance statistics use
 `compound.resonance_density` and fit the resonance centers. In an unfolded
@@ -588,9 +597,11 @@ an existing plot path is preserved.
   realized Hamiltonians remain dense for diagonalization.
 - Ensemble and compound streams retain one realization at a time. Histogram
   counts and form-factor moments accumulate in fixed-size buffers.
-- Histograms use fixed half-open supports. Samples outside those supports are
-  omitted from their counts. Inspect the relevant data class when tail
-  behavior matters.
+- Except for spectral and resonance coefficient histograms, histograms use
+  fixed half-open supports and omit samples outside them. Coefficient
+  histograms instead derive their support with the Freedman–Diaconis rule and
+  retain every finite sample; their central-mass plot window does not discard
+  stored tail counts.
 - Seeded runs reproduce the NumPy random trajectory within the same numerical
   software stack. BLAS/LAPACK, NumPy, SciPy, and Numba versions can affect
   bitwise results.
