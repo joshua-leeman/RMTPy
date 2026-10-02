@@ -118,14 +118,19 @@ def _create_width_histogram_buffers(
 
 
 def _compute_width(
-    partial_widths: np.ndarray[tuple[int, ...], np.dtype[np.floating]],
+    partial_widths: np.ndarray[tuple[int, int], np.dtype[np.floating]],
     *,
     width_index: tuple[int, ...],
 ) -> float:
     if len(width_index) == 2:
-        return float(partial_widths[width_index[0], width_index[1]])
+        return float(cast(np.floating, partial_widths[width_index[0], width_index[1]]))
+
     if len(width_index) == 1:
-        return float(np.sum(partial_widths[width_index[0]]))
+        row = cast(
+            np.ndarray[tuple[int, ...], np.dtype[np.floating]],
+            partial_widths[width_index[0]],
+        )
+        return float(np.sum(row))
 
     raise ValueError("Invalid width index in `width_indices`.")
 
