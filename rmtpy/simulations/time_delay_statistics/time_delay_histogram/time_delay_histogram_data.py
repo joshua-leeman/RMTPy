@@ -17,7 +17,7 @@ def _scale_logarithmic_support(
     log_base: float,
     scale: float,
 ) -> tuple[float, float]:
-    logarithmic_scale = np.log(scale) / np.log(log_base)
+    logarithmic_scale = cast(float, np.log(scale) / np.log(log_base))
     return support[0] + logarithmic_scale, support[1] + logarithmic_scale
 
 

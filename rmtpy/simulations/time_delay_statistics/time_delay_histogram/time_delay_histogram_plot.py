@@ -57,7 +57,9 @@ class TimeDelayHistogramPlot(Plot):
         self.compound: CompoundEnsemble = self.store_manifest_arg(
             "compound", CompoundEnsemble
         )
-        mean_coupling_squared = float(np.mean(self.compound.couplings**2))
+        mean_coupling_squared = cast(
+            float, cast(object, np.mean(self.compound.couplings**2))
+        )
         ensemble = self.compound.ensemble
 
         energy = cast(float, self.data.metadata["energy"])
@@ -81,7 +83,9 @@ class TimeDelayHistogramPlot(Plot):
             bbox=(0.98, 0.95),
         )
 
-        coupling_exponent = np.log10(mean_coupling_squared / ensemble.spectral_radius)
+        coupling_exponent = cast(
+            float, np.log10(mean_coupling_squared / ensemble.spectral_radius)
+        )
         coupling_exponent = 0.0 if abs(coupling_exponent) < 0.005 else coupling_exponent
         coupling_label = rf"$\alpha = {{{coupling_exponent:.1f}}}$"
         if not self.legend.title:
@@ -94,7 +98,7 @@ class TimeDelayHistogramPlot(Plot):
 
         scale = cast(float, self.data.metadata["scale"])
         self.scale_limits_and_ticks(
-            x=lambda value: ensemble.dimension**value * scale,
+            x=lambda value: cast(float, ensemble.dimension**value * scale),
         )
 
     @override
@@ -192,7 +196,9 @@ class UnfoldedTimeDelayHistogramPlot(Plot):
             bbox=(0.98, 0.95),
         )
 
-        coupling_exponent = np.log10(mean_coupling_squared / ensemble.spectral_radius)
+        coupling_exponent = cast(
+            float, np.log10(mean_coupling_squared / ensemble.spectral_radius)
+        )
         coupling_exponent = 0.0 if abs(coupling_exponent) < 0.005 else coupling_exponent
         coupling_label = rf"$\alpha = {{{coupling_exponent:.1f}}}$"
         if not self.legend.title:
@@ -217,7 +223,7 @@ class UnfoldedTimeDelayHistogramPlot(Plot):
 
         scale = cast(float, self.data.metadata["scale"])
         self.scale_limits_and_ticks(
-            x=lambda value: ensemble.dimension**value * scale,
+            x=lambda value: cast(float, ensemble.dimension**value * scale),
         )
 
     @override

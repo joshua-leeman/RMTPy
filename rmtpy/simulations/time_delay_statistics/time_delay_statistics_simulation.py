@@ -1,6 +1,6 @@
 from collections.abc import Iterable, Iterator
 from pathlib import Path
-from typing import Any, override
+from typing import override
 
 import attrs
 import numpy as np
@@ -44,7 +44,7 @@ def plot_time_delay_statistics_simulation(*, directory: str | Path) -> None:
 def run_time_delay_statistics_simulation(
     *,
     compound: CompoundEnsemble,
-    energies: Iterable[float],
+    energies: np.ndarray[tuple[int], np.dtype[np.floating]],
     realizs: int,
     directory: str | Path = DEFAULT_OUTPUT_ROOT,
 ) -> TimeDelayStatisticsSimulation:
@@ -60,7 +60,7 @@ def run_time_delay_statistics_simulation(
 
 
 def _normalize_energies(
-    energies: Any,
+    energies: np.ndarray[tuple[int], np.dtype[np.floating]],
 ) -> np.ndarray[tuple[int], np.dtype[np.floating]]:
     energies_array = np.array(energies, dtype=np.float64, copy=True, order="C")
     if energies_array.ndim == 0:
