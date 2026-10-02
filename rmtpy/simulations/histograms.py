@@ -330,6 +330,7 @@ class Histogram2D(Data):
         )
 
         np.add.at(self.counts, (x_indices[valid], y_indices[valid]), 1)
+
         object.__setattr__(self, "realizs", self.realizs + 1)
 
     def compute_histogram(self) -> None:

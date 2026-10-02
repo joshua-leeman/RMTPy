@@ -85,8 +85,8 @@ def to_key_of_registry(string: str, /) -> str:
     return re.sub(r"[_ ]", "", string).lower()
 
 
-def to_latex(instance: attrs.AttrsInstance, /, *, _latex_name: str = "") -> str:
-    latex_str = "$" + _latex_name
+def to_latex(instance: attrs.AttrsInstance, /, *, latex_name: str = "") -> str:
+    latex_str = "$" + latex_name
     for label, attr in attrs.fields_dict(type(instance)).items():
         latex_label = attr.metadata.get("latex_name")
         if latex_label is None:
