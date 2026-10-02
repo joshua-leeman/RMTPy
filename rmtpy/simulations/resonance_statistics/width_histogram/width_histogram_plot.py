@@ -120,7 +120,6 @@ class WidthHistogramPlot(Plot):
 @dataclasses.dataclass(slots=True, kw_only=True, eq=False, weakref_slot=False)
 class UnfoldedWidthHistogramAxes(PlotAxes):
     xticks: tuple[float, ...] = tuple(range(-3, 4))  # log scale base 10
-    xticks_minor: tuple[float, ...] = tuple(range(-2, 3))
     xlabel: str = r"$\zeta = \log_{10} \gamma$"
     xtick_labels: tuple[str, ...] = (
         r"$-3.0$",
@@ -133,7 +132,6 @@ class UnfoldedWidthHistogramAxes(PlotAxes):
     )
 
     yticks: tuple[float, ...] = tuple(range(-3, 4))  # log scale base 10
-    yticks_minor: tuple[float, ...] = tuple(range(-2, 3))
     ylabel: str = r"$P(\zeta)$"
     ytick_labels: tuple[str, ...] = (
         r"$-3.0$",

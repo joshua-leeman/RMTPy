@@ -357,11 +357,13 @@ class ResonanceStatisticsSimulation(Simulation):
             raise RuntimeError("A simulation may be plotted only after execution.")
 
         directory = Path(directory)
-        for data in self:
+        data_items = tuple(self)
+        for data in data_items:
             if not (directory / data.to_path).is_file():
                 raise ValueError(f"Saved data `{data._file_name}` is missing.")
 
-        for data in self:
+        plots: list[Plot] = []
+        for data in data_items:
             unfolded = data.metadata.get("unfolding", "raw") != "raw"
             plot_cls: type[Plot]
             if isinstance(data, ResonanceCoefficientsHistogram):
@@ -393,9 +395,28 @@ class ResonanceStatisticsSimulation(Simulation):
             else:
                 raise TypeError(f"Data `{type(data).__name__}` has no plot class.")
 
-            plot_cls(data=data, context=self.manifest).plot(
-                directory / data.to_path.parent
+            plots.append(plot_cls(data=data, context=self.manifest))
+
+        coefficient_plots = tuple(
+            plot for plot in plots if isinstance(plot, ResonanceCoefficientsHistogramPlot)
+        )
+        for plot in coefficient_plots:
+            plot.set_derived_attributes()
+
+        if coefficient_plots:
+            widest_plot = max(
+                coefficient_plots,
+                key=lambda plot: plot.xlim[1] - plot.xlim[0],
             )
+
+            for plot in coefficient_plots:
+                plot.xlim = widest_plot.xlim
+                plot.axes.xticks = widest_plot.axes.xticks
+                plot.axes.xticks_minor = widest_plot.axes.xticks_minor
+                plot.axes.xtick_labels = widest_plot.axes.xtick_labels
+
+        for data, plot in zip(data_items, plots, strict=True):
+            plot.plot(directory / data.to_path.parent)
 
     @property
     @override
@@ -419,12 +440,19 @@ class ResonanceStatisticsSimulation(Simulation):
     def _realize_resonance_statistics(self) -> None:
         ensemble = self.compound.ensemble
         resonance_density = self.compound.resonance_density
+        coefficient_buffers = tuple(self.coefficient_buffers)
+        coefficient_samples = np.empty(
+            (len(coefficient_buffers), self.realizs),
+            dtype=np.float64,
+        )
 
         cdf_factory = self._build_cdf_factory()
 
         average_cdfs = cdf_factory.average_interpolators()
 
-        for complex_energies in self.compound.resonances_stream(realizs=self.realizs):
+        for realization, complex_energies in enumerate(
+            self.compound.resonances_stream(realizs=self.realizs)
+        ):
             resonance_centers = complex_energies.real
             resonance_widths = -2 * complex_energies.imag
 
@@ -437,10 +465,9 @@ class ResonanceStatisticsSimulation(Simulation):
             variate_coefficients = resonance_density.compute_variate_coeffs(
                 resonance_centers
             )
-            for index, histogram in enumerate(self.coefficient_buffers, start=1):
-                histogram.add_histogram_contribution(
-                    variate_coefficients[index : index + 1]
-                )
+            coefficient_samples[:, realization] = variate_coefficients[
+                1 : len(coefficient_buffers) + 1
+            ]
 
             self.wgt_unfolded_buffers.accumulate_unfolded_resonances(
                 resonance_centers,
@@ -473,6 +500,35 @@ class ResonanceStatisticsSimulation(Simulation):
                     cdf=cdf,
                     ensemble=ensemble,
                 )
+
+        if not np.all(np.isfinite(coefficient_samples)):
+            raise ValueError("Resonance coefficients must be finite.")
+
+        for histogram, samples in zip(
+            coefficient_buffers,
+            coefficient_samples,
+            strict=True,
+        ):
+            bins = np.histogram_bin_edges(samples, bins="fd")
+            bins[-1] = np.nextafter(bins[-1], np.inf)
+            counts = np.histogram(samples, bins=bins)[0]
+            num_bins = len(counts)
+
+            object.__setattr__(histogram, "num_bins", num_bins)
+            object.__setattr__(
+                histogram,
+                "support",
+                (float(bins[0]), float(bins[-1])),
+            )
+            object.__setattr__(histogram, "bins", bins)
+            object.__setattr__(histogram, "counts", counts)
+            object.__setattr__(
+                histogram,
+                "histogram",
+                np.zeros(num_bins, dtype=np.float64),
+            )
+            object.__setattr__(histogram, "realizs", self.realizs)
+            attrs.validate(histogram)
 
     def _finalize(self) -> None:
         for data in self:

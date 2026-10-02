@@ -1,4 +1,5 @@
 import dataclasses
+import math
 from collections.abc import Callable
 from pathlib import Path
 from typing import cast, override
@@ -6,12 +7,18 @@ from typing import cast, override
 import numpy as np
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
+from matplotlib.ticker import MaxNLocator
 
 from ....compounds import CompoundEnsemble
 from ....ensembles import PoissonEnsemble, SachdevYeKitaevEnsemble
 from ...base_data import Data
 from ...base_plot import Plot, PlotAxes, PlotLegend
 from .resonance_histogram_data import ResonanceHistogram
+
+_Y_AXIS_PADDING: float = 0.05
+_NUM_Y_MAJOR_INTERVALS: int = 5
+_MAJOR_TICK_STEPS: tuple[float, ...] = (1.0, 2.0, 2.5, 5.0, 10.0)
+_POLYNOMIAL_WEIGHT_LEGEND: str = "polynomial weight"
 
 
 @dataclasses.dataclass(slots=True, kw_only=True, eq=False, weakref_slot=False)
@@ -68,6 +75,26 @@ class ResonanceHistogramPlot(Plot):
     data: Data
     axes: PlotAxes = dataclasses.field(default_factory=ResonanceHistogramAxes)
 
+    _derived_attributes_are_set: bool = dataclasses.field(
+        default=False,
+        init=False,
+        repr=False,
+    )
+    _resonance_centers: np.ndarray[tuple[int], np.dtype[np.floating]] | None = (
+        dataclasses.field(
+            default=None,
+            init=False,
+            repr=False,
+        )
+    )
+    _resonance_pdf: np.ndarray[tuple[int], np.dtype[np.floating]] | None = (
+        dataclasses.field(
+            default=None,
+            init=False,
+            repr=False,
+        )
+    )
+
     xlim: tuple[float, float] = (-1.2, 1.2)  # units of energy_0
     ylim: tuple[float, float] = (0.0, 2.6)  # units of 1 / (pi * energy_0)
 
@@ -95,6 +122,11 @@ class ResonanceHistogramPlot(Plot):
     )
 
     def set_derived_attributes(self) -> None:
+        if self._derived_attributes_are_set:
+            return
+        if not isinstance(self.data, ResonanceHistogram):
+            raise ValueError("Data must be a `ResonanceHistogram` instance")
+
         self.compound: CompoundEnsemble = self.store_manifest_arg(
             "compound", CompoundEnsemble
         )
@@ -146,15 +178,93 @@ class ResonanceHistogramPlot(Plot):
 
         self.scale_limits_and_ticks(
             x=lambda value: value * ensemble.spectral_radius,
+        )
+
+        resonance_density = self.compound.resonance_density
+        if (
+            ensemble.max_spectral_polynomial_degree == 0
+            and resonance_density.has_polynomial_expansion
+        ):
+            self._resonance_centers = np.linspace(*self.xlim, self.num_points)
+            self._resonance_pdf = resonance_density.weight_pdf(self._resonance_centers)
+            self.legend.labels = (
+                self.legend.labels[0],
+                _POLYNOMIAL_WEIGHT_LEGEND,
+            )
+        else:
+            coefficients = self.calibration_coefficients("resonance")
+            if coefficients is None:
+                self.legend.handles = self.legend.handles[:1]
+                self.legend.labels = self.legend.labels[:1]
+            else:
+                self._resonance_centers = np.linspace(*self.xlim, self.num_points)
+                self._resonance_pdf = resonance_density.variate_pdf(
+                    self._resonance_centers,
+                    coeffs=coefficients,
+                )
+
+        if self._resonance_pdf is not None and not np.all(
+            np.isfinite(self._resonance_pdf)
+        ):
+            raise ValueError("Resonance PDF values must be finite.")
+
+        histogram_peak = float(np.max(self.data.histogram, initial=0.0))
+        pdf_peak = (
+            float(np.max(self._resonance_pdf, initial=0.0))
+            if self._resonance_pdf is not None
+            else 0.0
+        )
+        density_peak = max(histogram_peak, pdf_peak)
+        if density_peak > 0.0:
+            dimensionless_peak = np.pi * ensemble.spectral_radius * density_peak
+            locator = MaxNLocator(
+                nbins=_NUM_Y_MAJOR_INTERVALS,
+                steps=_MAJOR_TICK_STEPS,
+                min_n_ticks=3,
+            )
+            axes.yticks = tuple(
+                float(value)
+                for value in locator.tick_values(
+                    0.0,
+                    dimensionless_peak * (1.0 + _Y_AXIS_PADDING),
+                )
+            )
+            self.ylim = (0.0, axes.yticks[-1])
+            axes.yticks_minor = tuple(
+                0.5 * (axes.yticks[index] + axes.yticks[index + 1])
+                for index in range(len(axes.yticks) - 1)
+            )
+
+            major_tick_step = min(
+                right - left
+                for left, right in zip(axes.yticks, axes.yticks[1:], strict=False)
+                if right > left
+            )
+            decimal_places = max(0, -math.floor(math.log10(major_tick_step)))
+            scaled_step = major_tick_step * 10**decimal_places
+            if not math.isclose(
+                scaled_step,
+                round(scaled_step),
+                rel_tol=1e-9,
+                abs_tol=1e-9,
+            ):
+                decimal_places += 1
+
+            zero_tolerance = major_tick_step * 1e-9
+            axes.ytick_labels = tuple(
+                rf"${(0.0 if abs(tick) <= zero_tolerance else tick):.{decimal_places}f}$"
+                for tick in axes.yticks
+            )
+
+        self.scale_limits_and_ticks(
             y=lambda value: value / np.pi / ensemble.spectral_radius,
         )
+        self._derived_attributes_are_set = True
 
     @override
     def plot(self, path: str | Path) -> None:
-        self.set_derived_attributes()
-
-        if not isinstance(self.data, ResonanceHistogram):
-            raise ValueError("Data must be a `ResonanceHistogram` instance")
+        if not self._derived_attributes_are_set:
+            self.set_derived_attributes()
 
         self.build_figure()
 
@@ -164,21 +274,11 @@ class ResonanceHistogramPlot(Plot):
             zorder=self.histogram_zorder,
         )
 
-        coefficients = self.calibration_coefficients("resonance")
-        if coefficients is None:
-            self.legend.handles = self.legend.handles[:1]
-            self.legend.labels = self.legend.labels[:1]
-        else:
-            resonance_centers = np.linspace(*self.xlim, self.num_points)
-            resonance_pdf = self.compound.resonance_density.variate_pdf(
-                resonance_centers,
-                coeffs=coefficients,
-            )
-
+        if self._resonance_centers is not None and self._resonance_pdf is not None:
             plot = cast(Callable[..., object], self.ax.plot)
             _ = plot(
-                resonance_centers,
-                resonance_pdf,
+                self._resonance_centers,
+                self._resonance_pdf,
                 color=self.pdf_color,
                 alpha=self.pdf_alpha,
                 linewidth=self.pdf_width,
