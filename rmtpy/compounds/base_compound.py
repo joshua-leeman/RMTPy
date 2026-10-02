@@ -224,24 +224,24 @@ class CompoundEnsemble:
         return RMT_CONVERTER.structure(src, cls)
 
     @property
-    def _latex_name(self) -> str:
-        return self.ensemble._latex_name
+    def latex_name(self) -> str:
+        return self.ensemble.latex_name
 
     @property
-    def _token_name(self) -> str:
-        return self.ensemble._token_name
+    def token_name(self) -> str:
+        return self.ensemble.token_name
 
     @property
     def to_latex(self) -> str:
         ensemble_as_latex = self.ensemble.to_latex.replace(
-            self.ensemble._latex_name, self._latex_name
+            self.ensemble.latex_name, self.latex_name
         ).strip("$")
-        return to_latex(self, _latex_name=ensemble_as_latex)
+        return to_latex(self, latex_name=ensemble_as_latex)
 
     @property
     def to_path(self) -> Path:
         ensemble_path = self.ensemble.to_path
-        root = Path(self._token_name) / Path(*ensemble_path.parts[1:])
+        root = Path(self.token_name) / Path(*ensemble_path.parts[1:])
         path = to_path(self, root=root)
 
         couplings_is_constant_array = np.all(
@@ -298,8 +298,9 @@ class CompoundEnsemble:
             yield np.real(resonances)
 
     def partial_widths_stream(
-        self, realizs: int
-    ) -> Iterator[np.ndarray[tuple[int], np.dtype[np.floating]]]:
+        self,
+        realizs: int,
+    ) -> Iterator[np.ndarray[tuple[int, int], np.dtype[np.floating]]]:
         for _, eigvecs in self.ensemble.eigsys_stream(realizs=realizs):
             rotated_coupling_matrix, rotated_coupling_matrix_conj = (
                 self._rotate_coupling_matrix_by_eigvecs(eigvecs)

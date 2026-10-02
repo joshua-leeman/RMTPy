@@ -157,20 +157,20 @@ class RandomMatrixEnsemble:
         return RMT_CONVERTER.structure(src, cls)
 
     @property
-    def _latex_name(self) -> str:
+    def latex_name(self) -> str:
         return f"\\text{{{type(self).initialism}}}"
 
     @property
-    def _token_name(self) -> str:
+    def token_name(self) -> str:
         return type(self).initialism
 
     @property
     def to_latex(self) -> str:
-        return to_latex(self, _latex_name=self._latex_name)
+        return to_latex(self, latex_name=self.latex_name)
 
     @property
     def to_path(self) -> Path:
-        return to_path(self, root=Path(self._token_name))
+        return to_path(self, root=Path(self.token_name))
 
     @property
     def rng_state(self) -> dict[str, object]:

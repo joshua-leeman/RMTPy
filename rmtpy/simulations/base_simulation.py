@@ -137,7 +137,7 @@ class Simulation:
         )
 
     @property
-    def _token_name(self) -> str:
+    def token_name(self) -> str:
         return insert_underscores(type(self).__name__).lower()
 
     @property
@@ -148,7 +148,7 @@ class Simulation:
 
     @property
     def _root_for_outputs(self) -> Path:
-        return Path(self._token_name)
+        return Path(self.token_name)
 
     @property
     def to_path(self) -> Path:

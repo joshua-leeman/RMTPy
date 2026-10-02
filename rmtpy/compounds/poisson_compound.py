@@ -6,8 +6,7 @@ import numpy as np
 import scipy.linalg.blas
 import scipy.linalg.lapack
 
-from rmtpy.ensembles.many_body_ensemble import OrthogonalMatrix, UnitaryMatrix
-
+from ..ensembles.many_body_ensemble import OrthogonalMatrix, UnitaryMatrix
 from ..ensembles.poisson_ensemble import PoissonEnsemble
 from .base_compound import ComplexHamiltonian, CompoundEnsemble
 

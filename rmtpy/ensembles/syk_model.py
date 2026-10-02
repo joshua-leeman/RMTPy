@@ -171,7 +171,7 @@ class SachdevYeKitaevEnsemble(ManyBodyEnsemble):
 
     @property
     @override
-    def _latex_name(self) -> str:
+    def latex_name(self) -> str:
         parity = "even" if self.is_even_parity else "odd"
         return (
             rf"{{\text{{{type(self).initialism}}}}}_{{q = {self.q}}}"
@@ -181,9 +181,9 @@ class SachdevYeKitaevEnsemble(ManyBodyEnsemble):
 
     @property
     @override
-    def _token_name(self) -> str:
+    def token_name(self) -> str:
         parity = "even" if self.is_even_parity else "odd"
-        return f"{super()._token_name}_{self.q}_{parity}"
+        return f"{super().token_name}_{self.q}_{parity}"
 
     @cached_property
     def _decomposed_q_monomials(self) -> QMonomialsDecomposed:

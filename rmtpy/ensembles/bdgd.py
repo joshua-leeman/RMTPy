@@ -52,12 +52,12 @@ class BogoliubovDeGennesDEnsemble(WignerDysonEnsemble):
 
     @property
     @override
-    def _latex_name(self) -> str:
+    def latex_name(self) -> str:
         return rf"{{{LATEX_NAME}}}({{{self.num_majoranas}}})"
 
     @property
     @override
-    def _token_name(self) -> str:
+    def token_name(self) -> str:
         return TOKEN_NAME
 
     @override
