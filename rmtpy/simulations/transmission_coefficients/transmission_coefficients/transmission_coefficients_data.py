@@ -137,11 +137,12 @@ class TransmissionCoefficientsData(Data):
                 + f"{self.energies.shape}, got {scattering_diagonal.shape}."
             )
 
-        np.add(
+        _ = np.add(
             self.scattering_diagonal_sum,
             scattering_diagonal,
             out=self.scattering_diagonal_sum,
         )
+
         object.__setattr__(self, "realizs", self.realizs + 1)
 
     def compute_transmission_coefficients(self) -> None:
@@ -154,7 +155,7 @@ class TransmissionCoefficientsData(Data):
         self.transmission_coefficients[:] = (
             1.0 - np.abs(self.average_scattering_diagonal) ** 2
         )
-        np.clip(
+        _ = np.clip(
             self.transmission_coefficients,
             0.0,
             1.0,

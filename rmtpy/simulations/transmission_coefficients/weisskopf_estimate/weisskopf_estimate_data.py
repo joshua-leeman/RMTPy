@@ -205,11 +205,12 @@ class WeisskopfEstimateData(Data):
                 + f"{expected_shape}, got {scattering_diagonal.shape}."
             )
 
-        np.add(
+        _ = np.add(
             self.scattering_diagonal_sum,
             scattering_diagonal,
             out=self.scattering_diagonal_sum,
         )
+
         object.__setattr__(self, "realizs", self.realizs + 1)
 
     def compute_weisskopf_estimate(self) -> None:
@@ -223,7 +224,7 @@ class WeisskopfEstimateData(Data):
             self.transmission_coefficients[:] = (
                 1.0 - np.abs(self.average_scattering_diagonal) ** 2
             )
-            np.clip(
+            _ = np.clip(
                 self.transmission_coefficients,
                 0.0,
                 1.0,
@@ -231,8 +232,13 @@ class WeisskopfEstimateData(Data):
             )
 
         self.weisskopf_estimate[:] = self.mean_level_spacings / 2.0
-        np.multiply(
-            self.weisskopf_estimate,
+
+        channel_sum = cast(
+            np.ndarray[tuple[int], np.dtype[np.floating]],
             np.sum(self.transmission_coefficients, axis=1),
+        )
+        _ = np.multiply(
+            self.weisskopf_estimate,
+            channel_sum,
             out=self.weisskopf_estimate,
         )

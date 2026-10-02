@@ -29,6 +29,8 @@ class WeisskopfEstimatePlot(Plot):
     data: Data
     axes: PlotAxes = dataclasses.field(default_factory=WeisskopfEstimateAxes)
 
+    xlim: tuple[float, float] = (-1.0, 1.0)
+
     line_zorder: int = 2
     line_width: float = 1.5
     line_alpha: float = 1.0

@@ -1,7 +1,7 @@
 from collections.abc import Iterable, Iterator
 from numbers import Integral
 from pathlib import Path
-from typing import Any, override
+from typing import cast, override
 
 import attrs
 import numpy as np
@@ -55,14 +55,14 @@ def run_transmission_coefficients_simulation(
     return simulation
 
 
-def _normalize_channel_indices(channel_indices: Any) -> tuple[int, ...]:
+def _normalize_channel_indices(channel_indices: object) -> tuple[int, ...]:
     if isinstance(channel_indices, np.ndarray) and channel_indices.ndim == 0:
         index_values = (channel_indices.item(),)
     elif np.isscalar(channel_indices):
         index_values = (channel_indices,)
     else:
         try:
-            index_values = tuple(channel_indices)
+            index_values = tuple(cast(Iterable[int], channel_indices))
         except TypeError as exc:
             raise TypeError(
                 "`channel_indices` must be an integer or one-dimensional iterable "

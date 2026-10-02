@@ -29,6 +29,7 @@ class TransmissionCoefficientsPlot(Plot):
     data: Data
     axes: PlotAxes = dataclasses.field(default_factory=TransmissionCoefficientsAxes)
 
+    xlim: tuple[float, float] = (-1.0, 1.0)
     ylim: tuple[float, float] = (-0.02, 1.02)
 
     line_zorder: int = 2
