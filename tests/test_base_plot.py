@@ -17,8 +17,9 @@ from rmtpy.ensembles import GOE, ManyBodyEnsemble
 from rmtpy.simulations.base_data import Data
 from rmtpy.simulations.base_plot import (
     CONNECTED_FORM_FACTOR_COLOR,
-    CURVE_WIDTH,
+    ENSEMBLE_AVERAGED_CURVE_WIDTH,
     FORM_FACTOR_COLOR,
+    SINGLE_REALIZATION_FORM_FACTOR_COLOR,
     LogDimensionTimeAxes,
     LogDimensionUnfoldedTimeAxes,
     Plot,
@@ -130,8 +131,11 @@ class BasePlotTests(unittest.TestCase):
         curve_fields = (
             (PartialWidthHistogramPlot, ("porter_thomas_width",)),
             (TotalWidthHistogramPlot, ("porter_thomas_width",)),
-            (ComplexEnergyHistogramPlot, ("width_curve_width",)),
-            (UnfoldedComplexEnergyHistogramPlot, ("width_curve_width",)),
+            (ComplexEnergyHistogramPlot, ("width_ENSEMBLE_AVERAGED_CURVE_WIDTH",)),
+            (
+                UnfoldedComplexEnergyHistogramPlot,
+                ("width_ENSEMBLE_AVERAGED_CURVE_WIDTH",),
+            ),
             (ResonanceHistogramPlot, ("pdf_width",)),
             (UnfoldedResonanceHistogramPlot, ("pdf_width",)),
             (ResonanceSpacingHistogramPlot, ("surmise_width",)),
@@ -140,15 +144,28 @@ class BasePlotTests(unittest.TestCase):
             (UnfoldedSpacingsHistogramPlot, ("surmise_width",)),
             (SpectralHistogramPlot, ("pdf_width",)),
             (UnfoldedSpectralHistogramPlot, ("pdf_width",)),
-            (FormFactorsPlot, ("sff_width", "csff_width")),
+            (FormFactorsPlot, ("sff_width", "csff_width", "single_sff_width")),
             (
                 UnfoldedFormFactorsPlot,
-                ("sff_width", "csff_width", "universal_sff_width"),
+                (
+                    "sff_width",
+                    "csff_width",
+                    "universal_sff_width",
+                    "single_sff_width",
+                ),
             ),
-            (ResonanceFormFactorsPlot, ("sff_width", "csff_width")),
+            (
+                ResonanceFormFactorsPlot,
+                ("sff_width", "csff_width", "single_sff_width"),
+            ),
             (
                 UnfoldedResonanceFormFactorsPlot,
-                ("sff_width", "csff_width", "universal_sff_width"),
+                (
+                    "sff_width",
+                    "csff_width",
+                    "universal_sff_width",
+                    "single_sff_width",
+                ),
             ),
             (TimeDelayHistogramPlot, ("pdf_width",)),
             (UnfoldedTimeDelayHistogramPlot, ("pdf_width",)),
@@ -160,7 +177,7 @@ class BasePlotTests(unittest.TestCase):
                 with self.subTest(plot_cls=plot_cls, field_name=field_name):
                     self.assertEqual(
                         default_dataclass_field(plot_cls, name=field_name),
-                        CURVE_WIDTH,
+                        ENSEMBLE_AVERAGED_CURVE_WIDTH,
                     )
 
             dataclass_field_names = {field.name for field in dataclasses.fields(plot_cls)}
@@ -178,7 +195,7 @@ class BasePlotTests(unittest.TestCase):
                 self.assertTrue(line_handles)
                 self.assertEqual(
                     tuple(handle.get_linewidth() for handle in line_handles),
-                    (CURVE_WIDTH,) * len(line_handles),
+                    (ENSEMBLE_AVERAGED_CURVE_WIDTH,) * len(line_handles),
                 )
 
         for plot_cls in (
@@ -195,6 +212,14 @@ class BasePlotTests(unittest.TestCase):
                 self.assertEqual(
                     default_dataclass_field(plot_cls, name="csff_color"),
                     CONNECTED_FORM_FACTOR_COLOR,
+                )
+                self.assertEqual(
+                    default_dataclass_field(plot_cls, name="single_sff_color"),
+                    SINGLE_REALIZATION_FORM_FACTOR_COLOR,
+                )
+                self.assertEqual(
+                    default_dataclass_field(plot_cls, name="single_sff_zorder"),
+                    3,
                 )
 
         for plot_cls in (

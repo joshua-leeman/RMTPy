@@ -82,13 +82,13 @@ class PartialWidthsStatisticsTests(unittest.TestCase):
 
         self.assertEqual(
             partial_plot.axes.title,
-            "Partial Widths: "
+            "Partial Width PDF: "
             + ensemble
             + r", $N_\text{f} = {2}$, $\mu = {1}$, $a = {0}$",
         )
         self.assertEqual(
             total_plot.axes.title,
-            "Total Widths: " + ensemble + r", $N_\text{f} = {2}$, $\mu = {1}$",
+            "Total Width PDF: " + ensemble + r", $N_\text{f} = {2}$, $\mu = {1}$",
         )
         self.assertNotIn("\n", partial_plot.axes.title)
         self.assertNotIn("\n", total_plot.axes.title)

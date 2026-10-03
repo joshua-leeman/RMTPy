@@ -149,8 +149,9 @@ class TransmissionCoefficientsTests(unittest.TestCase):
             channel_indices=(1, 0),
             realizs=2,
         )
+        plot_range = simulation.compound.ensemble.spectral_density.plot_range
         expected_energies = np.linspace(
-            *simulation.compound.ensemble.spectral_density.plot_range,
+            *(1.5 * endpoint for endpoint in plot_range),
             100,
             dtype=np.float64,
         )

@@ -39,7 +39,10 @@ from rmtpy.simulations.spectral_statistics.spectral_histogram import (
     SpectralHistogramPlot,
     UnfoldedSpectralHistogramPlot,
 )
-from rmtpy.simulations.statistics import nearest_neighbor_spacings
+from rmtpy.simulations.statistics import (
+    COEFFICIENT_GRID_POLICY,
+    nearest_neighbor_spacings,
+)
 from rmtpy.simulations.unfolding import TruncatedPolynomialCDFFactory, unfold_values
 
 
@@ -72,15 +75,19 @@ def form_factor_moments(
 ) -> tuple[
     np.ndarray[tuple[int], np.dtype[np.complexfloating]],
     np.ndarray[tuple[int], np.dtype[np.floating]],
+    np.ndarray[tuple[int], np.dtype[np.floating]],
 ]:
     first_moment = np.zeros(len(times), dtype=np.complex128)
     second_moment = np.zeros(len(times), dtype=np.float64)
-    for sample in samples:
+    single_realization_form_factor = np.zeros(len(times), dtype=np.float64)
+    for index, sample in enumerate(samples):
         contribution = np.sum(np.exp(-1j * np.outer(sample, times)), axis=0) / len(sample)
         first_moment += contribution
         second_moment += np.abs(contribution) ** 2
+        if index == 0:
+            single_realization_form_factor[:] = np.abs(contribution) ** 2
 
-    return first_moment, second_moment
+    return first_moment, second_moment, single_realization_form_factor
 
 
 class SpectralStatisticsTests(unittest.TestCase):
@@ -95,16 +102,16 @@ class SpectralStatisticsTests(unittest.TestCase):
                     data=simulation.raw_buffers.form_factors,
                     context=simulation.manifest,
                 ),
-                ("#0072B2", "#D55E00"),
-                ("-", "-"),
+                ("#0072B2", "#D55E00", "#009E73"),
+                ("-", "-", "-"),
             ),
             (
                 UnfoldedFormFactorsPlot(
                     data=simulation.wgt_unfolded_buffers.form_factors,
                     context=simulation.manifest,
                 ),
-                ("#0072B2", "#D55E00", "Black"),
-                ("-", "-", ":"),
+                ("#0072B2", "#D55E00", "Black", "#009E73"),
+                ("-", "-", ":", "-"),
             ),
         )
 
@@ -137,6 +144,16 @@ class SpectralStatisticsTests(unittest.TestCase):
                     self.assertEqual(
                         tuple(handle.get_linestyle() for handle in plot.legend.handles),
                         expected_styles,
+                    )
+                    self.assertEqual(plot.ax.lines[-1].get_alpha(), 1.0)
+                    self.assertEqual(plot.ax.lines[-1].get_zorder(), 3)
+                    np.testing.assert_array_equal(
+                        plot.ax.lines[-1].get_ydata(),
+                        plot.data.single_realization_form_factor,
+                    )
+                    self.assertEqual(
+                        plot.legend.labels[-1],
+                        plot.single_sff_legend,
                     )
                 finally:
                     plt.close(plot.fig)
@@ -263,7 +280,12 @@ class SpectralStatisticsTests(unittest.TestCase):
                     self.assertIsInstance(histogram, SpectralCoefficientsHistogram)
                     self.assertEqual(
                         histogram.metadata,
-                        {"degree": degree, "unfolding": "raw"},
+                        {
+                            "degree": degree,
+                            "unfolding": "raw",
+                            "grid_policy": COEFFICIENT_GRID_POLICY,
+                            "dimension": simulation.ensemble.dimension,
+                        },
                     )
 
                 self.assertIsInstance(
@@ -314,7 +336,7 @@ class SpectralStatisticsTests(unittest.TestCase):
                                 item.metadata["polynomial_degree"],
                                 buffers.polynomial_degree,
                             )
-                            self.assertEqual(item.metadata["unfolding"], "averaged")
+                            self.assertEqual(item.metadata["unfolding"], "average")
 
     def test_seeded_accumulation_unfolding_and_finalization_match_control(
         self,
@@ -358,25 +380,27 @@ class SpectralStatisticsTests(unittest.TestCase):
                 coefficients[degree : degree + 1] for coefficients in coefficient_samples
             )
             expected_coefficients = np.concatenate(expected_samples)
-            expected_bins = np.histogram_bin_edges(
-                expected_coefficients,
-                bins="fd",
-            )
-            expected_bins[-1] = np.nextafter(expected_bins[-1], np.inf)
 
             self.assertEqual(histogram.realizs, simulation.realizs)
-            self.assertEqual(histogram.num_bins, len(expected_bins) - 1)
-            self.assertEqual(np.sum(histogram.counts), simulation.realizs)
-            self.assertLessEqual(histogram.support[0], np.min(expected_coefficients))
-            self.assertGreater(histogram.support[1], np.max(expected_coefficients))
-            np.testing.assert_array_equal(histogram.bins, expected_bins)
             np.testing.assert_array_equal(
                 histogram.counts,
                 histogram_counts(expected_samples, bins=histogram.bins),
             )
+            self.assertEqual(
+                np.sum(histogram.counts) + histogram.underflow + histogram.overflow,
+                simulation.realizs,
+            )
+            self.assertEqual(
+                histogram.underflow,
+                int(np.count_nonzero(expected_coefficients < histogram.bins[0])),
+            )
+            self.assertEqual(
+                histogram.overflow,
+                int(np.count_nonzero(expected_coefficients >= histogram.bins[-1])),
+            )
             self.assertAlmostEqual(
                 np.sum(histogram.histogram * np.diff(histogram.bins)),
-                1.0,
+                1.0 if np.sum(histogram.counts) else 0.0,
             )
 
         np.testing.assert_array_equal(
@@ -412,6 +436,14 @@ class SpectralStatisticsTests(unittest.TestCase):
                 bins=simulation.wgt_unfolded_buffers.levels.bins,
             ),
         )
+        _, _, expected_single_form_factor = form_factor_moments(
+            weight_samples,
+            times=simulation.wgt_unfolded_buffers.form_factors.times,
+        )
+        np.testing.assert_allclose(
+            simulation.wgt_unfolded_buffers.form_factors.single_realization_form_factor,
+            expected_single_form_factor,
+        )
 
         for cdf, buffers in zip(
             average_cdfs,
@@ -429,6 +461,14 @@ class SpectralStatisticsTests(unittest.TestCase):
             np.testing.assert_array_equal(
                 buffers.levels.counts,
                 histogram_counts(expected_samples, bins=buffers.levels.bins),
+            )
+            _, _, expected_single_form_factor = form_factor_moments(
+                expected_samples,
+                times=buffers.form_factors.times,
+            )
+            np.testing.assert_allclose(
+                buffers.form_factors.single_realization_form_factor,
+                expected_single_form_factor,
             )
 
         variate_samples: list[list[np.ndarray[tuple[int], np.dtype[np.floating]]]] = [
@@ -459,9 +499,21 @@ class SpectralStatisticsTests(unittest.TestCase):
                 buffers.levels.counts,
                 histogram_counts(tuple(expected_samples), bins=buffers.levels.bins),
             )
+            _, _, expected_single_form_factor = form_factor_moments(
+                tuple(expected_samples),
+                times=buffers.form_factors.times,
+            )
+            np.testing.assert_allclose(
+                buffers.form_factors.single_realization_form_factor,
+                expected_single_form_factor,
+            )
 
         raw_form_factors = simulation.raw_buffers.form_factors
-        expected_first_moment, expected_second_moment = form_factor_moments(
+        (
+            expected_first_moment,
+            expected_second_moment,
+            expected_single_form_factor,
+        ) = form_factor_moments(
             eigenvalue_samples,
             times=raw_form_factors.times,
         )
@@ -474,13 +526,20 @@ class SpectralStatisticsTests(unittest.TestCase):
             expected_second_moment,
         )
         np.testing.assert_allclose(
+            raw_form_factors.single_realization_form_factor,
+            expected_single_form_factor,
+        )
+        np.testing.assert_allclose(
             raw_form_factors.form_factor,
             expected_second_moment / simulation.realizs,
         )
         np.testing.assert_allclose(
             raw_form_factors.connected_form_factor,
-            raw_form_factors.form_factor
-            - np.abs(expected_first_moment / simulation.realizs) ** 2,
+            (
+                raw_form_factors.form_factor
+                - np.abs(expected_first_moment / simulation.realizs) ** 2
+            )
+            * (simulation.realizs / (simulation.realizs - 1)),
             atol=1e-15,
         )
 
@@ -695,6 +754,31 @@ class SpectralStatisticsTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "invalid shape"):
                 load_spectral_statistics_simulation(directory=destination_directory)
             manifest_path.write_text(original_manifest_text, encoding="utf-8")
+
+            form_factors_path = (
+                destination_directory
+                / restored_simulation.raw_buffers.form_factors.to_path
+            )
+            with np.load(form_factors_path, allow_pickle=False) as archive:
+                form_factors_payload = {name: archive[name] for name in archive.files}
+            single_form_factor = form_factors_payload["single_realization_form_factor"]
+            form_factors_payload["single_realization_form_factor"] = single_form_factor[
+                :-1
+            ]
+            np.savez(form_factors_path, **form_factors_payload)
+            with self.assertRaisesRegex(ValueError, "does not match"):
+                load_spectral_statistics_simulation(directory=destination_directory)
+
+            form_factors_payload.pop("single_realization_form_factor")
+            np.savez(form_factors_path, **form_factors_payload)
+            with self.assertRaisesRegex(
+                ValueError,
+                "missing `single_realization_form_factor`",
+            ):
+                load_spectral_statistics_simulation(directory=destination_directory)
+
+            form_factors_payload["single_realization_form_factor"] = single_form_factor
+            np.savez(form_factors_path, **form_factors_payload)
 
             unexpected = SpectralHistogram(
                 _file_name="unexpected_spectral_histogram",

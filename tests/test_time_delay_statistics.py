@@ -285,7 +285,7 @@ class TimeDelayStatisticsTests(unittest.TestCase):
                                 "energy_index": energy_index,
                                 "energy": energies[energy_index],
                                 "scale": 2 * np.pi,
-                                "unfolding": "averaged",
+                                "unfolding": "average",
                                 "polynomial_degree": polynomial_degree,
                             },
                         )
@@ -844,6 +844,10 @@ class TimeDelayStatisticsTests(unittest.TestCase):
                         tuple(line.get_color() for line in plot.form_factors_ax.lines),
                         expected_sff_colors,
                     )
+                    self.assertNotIn(
+                        "#009E73",
+                        tuple(line.get_color() for line in plot.form_factors_ax.lines),
+                    )
                     self.assertEqual(
                         tuple(
                             line.get_linewidth() for line in plot.form_factors_ax.lines
@@ -857,6 +861,9 @@ class TimeDelayStatisticsTests(unittest.TestCase):
                         expected_sff_styles,
                     )
                     self.assertEqual(plot.legend.labels, expected_legend_labels)
+                    self.assertTrue(
+                        all("K^{(1)}" not in label for label in plot.legend.labels)
+                    )
                     legend_lines = tuple(
                         handle
                         for handle in plot.legend.handles
