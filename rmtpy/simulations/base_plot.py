@@ -36,9 +36,18 @@ type LegendLocation = Literal[
     "center",
 ]
 
-CURVE_WIDTH: float = 2.0
+UNFOLDING_LABELS_BY_TYPE: dict[str, str] = {
+    "average": "Ave",
+    "variate": "Var",
+    "weight": "Wgt",
+}
+
+ENSEMBLE_AVERAGED_CURVE_WIDTH: float = 1.7
+SINGLE_REALIZATION_CURVE_WIDTH = 0.7
+
 FORM_FACTOR_COLOR: str = "#0072B2"
-CONNECTED_FORM_FACTOR_COLOR: str = "#D55E00"
+CONNECTED_FORM_FACTOR_COLOR: str = "#D54300"
+SINGLE_REALIZATION_FORM_FACTOR_COLOR: str = "#009E73"
 
 
 class Spine(Protocol):
