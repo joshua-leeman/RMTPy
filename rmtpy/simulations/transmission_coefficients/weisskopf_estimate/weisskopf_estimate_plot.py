@@ -3,11 +3,13 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import cast, override
 
+import numpy as np
 from matplotlib.lines import Line2D
+from matplotlib.ticker import FormatStrFormatter
 
 from ....compounds import CompoundEnsemble
 from ...base_data import Data
-from ...base_plot import CURVE_WIDTH, Plot, PlotAxes, PlotLegend
+from ...base_plot import ENSEMBLE_AVERAGED_CURVE_WIDTH, Plot, PlotAxes, PlotLegend
 from .weisskopf_estimate_data import WeisskopfEstimateData
 
 
@@ -32,12 +34,10 @@ class WeisskopfEstimatePlot(Plot):
     xlim: tuple[float, float] = (-1.0, 1.0)
 
     line_zorder: int = 2
-    line_width: float = CURVE_WIDTH
+    line_width: float = ENSEMBLE_AVERAGED_CURVE_WIDTH
     line_alpha: float = 1.0
     line_color: str = "#28536b"
-    line_legend: str = "Weisskopf estimate"
 
-    legend_labels: tuple[str] = (line_legend,)
     legend_handles: tuple[Line2D] = (
         Line2D(
             [0],
@@ -52,6 +52,7 @@ class WeisskopfEstimatePlot(Plot):
         self.compound: CompoundEnsemble = self.store_manifest_arg(
             "compound", CompoundEnsemble
         )
+        mean_coupling_squared = float(np.mean(self.compound.couplings**2))
         ensemble = self.compound.ensemble
 
         self.xlim = ensemble.spectral_density.plot_range
@@ -62,9 +63,15 @@ class WeisskopfEstimatePlot(Plot):
             value * ensemble.spectral_radius for value in self.axes.xticks_minor
         )
 
+        coupling_exponent = cast(
+            float, np.log10(mean_coupling_squared / ensemble.spectral_radius)
+        )
+        coupling_exponent = 0.0 if abs(coupling_exponent) < 0.005 else coupling_exponent
+        coupling_label = rf"$\alpha = {{{coupling_exponent:.1f}}}$"
+
         self.legend: PlotLegend = PlotLegend(
             handles=self.legend_handles,
-            labels=self.legend_labels,
+            labels=(coupling_label,),
             loc="upper right",
             bbox=(0.74, 0.95),
         )
@@ -82,6 +89,8 @@ class WeisskopfEstimatePlot(Plot):
             raise ValueError("Data must be a `WeisskopfEstimateData` instance")
 
         self.build_figure()
+
+        self.ax.yaxis.set_major_formatter(FormatStrFormatter("%.1f"))
 
         plot = cast(Callable[..., object], self.ax.plot)
         _ = plot(

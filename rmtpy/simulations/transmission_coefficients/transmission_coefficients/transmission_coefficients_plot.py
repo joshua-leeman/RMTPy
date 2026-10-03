@@ -3,11 +3,12 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import cast, override
 
+import numpy as np
 from matplotlib.lines import Line2D
 
 from ....compounds import CompoundEnsemble
 from ...base_data import Data
-from ...base_plot import CURVE_WIDTH, Plot, PlotAxes, PlotLegend
+from ...base_plot import ENSEMBLE_AVERAGED_CURVE_WIDTH, Plot, PlotAxes, PlotLegend
 from .transmission_coefficients_data import TransmissionCoefficientsData
 
 
@@ -33,12 +34,10 @@ class TransmissionCoefficientsPlot(Plot):
     ylim: tuple[float, float] = (0.0, 1.2)
 
     line_zorder: int = 2
-    line_width: float = CURVE_WIDTH
+    line_width: float = ENSEMBLE_AVERAGED_CURVE_WIDTH
     line_alpha: float = 1.0
     line_color: str = "#7b2d26"
-    line_legend: str = "simulation"
 
-    legend_labels: tuple[str] = (line_legend,)
     legend_handles: tuple[Line2D] = (
         Line2D(
             [0],
@@ -53,6 +52,7 @@ class TransmissionCoefficientsPlot(Plot):
         self.compound: CompoundEnsemble = self.store_manifest_arg(
             "compound", CompoundEnsemble
         )
+        mean_coupling_squared = float(np.mean(self.compound.couplings**2))
         ensemble = self.compound.ensemble
         channel_index = self.data.metadata["channel_index"]
 
@@ -65,9 +65,15 @@ class TransmissionCoefficientsPlot(Plot):
         )
         self.axes.ylabel = rf"$T_{{{channel_index}}}(E)$"
 
+        coupling_exponent = cast(
+            float, np.log10(mean_coupling_squared / ensemble.spectral_radius)
+        )
+        coupling_exponent = 0.0 if abs(coupling_exponent) < 0.005 else coupling_exponent
+        coupling_label = rf"$\alpha = {{{coupling_exponent:.1f}}}$"
+
         self.legend: PlotLegend = PlotLegend(
             handles=self.legend_handles,
-            labels=self.legend_labels,
+            labels=(coupling_label,),
             loc="upper right",
             bbox=(0.98, 0.95),
         )

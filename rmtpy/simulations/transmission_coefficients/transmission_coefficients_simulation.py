@@ -18,7 +18,7 @@ from .transmission_coefficients import (
 )
 from .weisskopf_estimate import WeisskopfEstimateData, WeisskopfEstimatePlot
 
-NUM_ENERGY_POINTS: int = 100
+NUM_ENERGY_POINTS: int = 500
 
 
 def load_transmission_coefficients_simulation(
@@ -260,12 +260,6 @@ class TransmissionCoefficientsSimulation(Simulation):
                 data.add_scattering_diagonal(scattering_diagonal[:, channel_index])
 
             self.weisskopf_estimate_buffer.add_scattering_diagonal(scattering_diagonal)
-
-    def _finalize(self) -> None:
-        for data in self.transmission_coefficient_buffers:
-            data.compute_transmission_coefficients()
-
-        self.weisskopf_estimate_buffer.compute_weisskopf_estimate()
 
     @override
     def _execute(self) -> None:

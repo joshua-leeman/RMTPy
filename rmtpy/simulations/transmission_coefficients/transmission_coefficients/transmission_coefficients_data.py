@@ -101,11 +101,6 @@ class TransmissionCoefficientsData(Data):
             repr=False,
         )
     )
-    realizs: int = attrs.field(
-        default=0,
-        converter=int,
-        validator=attrs.validators.ge(0),
-    )
 
     @classmethod
     def create(
@@ -161,3 +156,21 @@ class TransmissionCoefficientsData(Data):
             1.0,
             out=self.transmission_coefficients,
         )
+
+    def add_contribution(self, contribution: Data, /) -> None:
+        self._validate_contribution(contribution)
+        if not isinstance(contribution, TransmissionCoefficientsData):
+            raise TypeError("Transmission-coefficient contribution is malformed.")
+        if contribution.channel_index != self.channel_index or not np.array_equal(
+            contribution.energies, self.energies
+        ):
+            raise ValueError(
+                f"Transmission-coefficient contribution `{self._file_name}` has "
+                + "incompatible energies or channel index."
+            )
+
+        self.scattering_diagonal_sum[:] += contribution.scattering_diagonal_sum
+        self._add_realizations(contribution)
+
+    def compute_statistics(self) -> None:
+        self.compute_transmission_coefficients()

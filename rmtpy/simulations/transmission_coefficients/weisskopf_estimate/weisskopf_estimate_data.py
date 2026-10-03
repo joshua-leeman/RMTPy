@@ -166,11 +166,6 @@ class WeisskopfEstimateData(Data):
         converter=attrs.Converter(_normalize_weisskopf_estimate, takes_self=True),
         repr=False,
     )
-    realizs: int = attrs.field(
-        default=0,
-        converter=int,
-        validator=attrs.validators.ge(0),
-    )
 
     @classmethod
     def create(
@@ -242,3 +237,27 @@ class WeisskopfEstimateData(Data):
             channel_sum,
             out=self.weisskopf_estimate,
         )
+
+    def add_contribution(self, contribution: Data, /) -> None:
+        self._validate_contribution(contribution)
+        if not isinstance(contribution, WeisskopfEstimateData):
+            raise TypeError("Weisskopf-estimate contribution is malformed.")
+        if (
+            contribution.num_channels != self.num_channels
+            or not np.array_equal(contribution.energies, self.energies)
+            or not np.array_equal(
+                contribution.mean_level_spacings,
+                self.mean_level_spacings,
+                equal_nan=True,
+            )
+        ):
+            raise ValueError(
+                f"Weisskopf-estimate contribution `{self._file_name}` has "
+                + "incompatible static data."
+            )
+
+        self.scattering_diagonal_sum[:] += contribution.scattering_diagonal_sum
+        self._add_realizations(contribution)
+
+    def compute_statistics(self) -> None:
+        self.compute_weisskopf_estimate()
