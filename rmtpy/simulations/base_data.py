@@ -133,6 +133,12 @@ class Data:
         alias="_file_name",
         converter=str,
     )
+    realizs: int = attrs.field(
+        default=0,
+        converter=int,
+        validator=attrs.validators.ge(0),
+        repr=False,
+    )
 
     @property
     def to_path(self) -> Path:
@@ -169,6 +175,8 @@ class Data:
                 if not field.init:
                     continue
                 if field.name not in archive.files:
+                    if field.metadata.get("archive_optional") is True:
+                        continue
                     raise ValueError(f"Saved data is missing `{field.name}`.")
 
                 saved_data = cast(
@@ -184,6 +192,38 @@ class Data:
 
     def attach_metadata(self, new_metadata: Mapping[str, object], /) -> None:
         self.metadata.update(new_metadata)
+
+    def _aggregation_metadata(self) -> dict[str, object]:
+        return self.metadata
+
+    def _validate_contribution(self, contribution: Data, /) -> None:
+        if type(contribution) is not type(self):
+            raise TypeError(
+                f"Cannot add `{type(contribution).__name__}` to "
+                + f"`{type(self).__name__}`."
+            )
+        if contribution._file_name != self._file_name:
+            raise ValueError(
+                f"Data contribution `{contribution._file_name}` does not match "
+                + f"`{self._file_name}`."
+            )
+        if contribution._aggregation_metadata() != self._aggregation_metadata():
+            raise ValueError(
+                f"Data contribution `{self._file_name}` has incompatible metadata."
+            )
+
+    def _add_realizations(self, contribution: Data, /) -> None:
+        object.__setattr__(self, "realizs", self.realizs + contribution.realizs)
+
+    def add_contribution(self, contribution: Data, /) -> None:
+        raise NotImplementedError(
+            f"{type(self).__name__} has not implemented contribution aggregation."
+        )
+
+    def compute_statistics(self) -> None:
+        raise NotImplementedError(
+            f"{type(self).__name__} has not implemented statistic finalization."
+        )
 
     def save(self, *, directory: str | Path | None = None) -> None:
         path = self.to_path if directory is None else Path(directory) / self.to_path
