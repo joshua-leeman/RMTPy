@@ -8,6 +8,8 @@ from unittest.mock import patch
 
 import numpy as np
 from matplotlib import pyplot as plt
+from matplotlib.colors import to_rgba
+from matplotlib.lines import Line2D
 from matplotlib.ticker import NullLocator
 from scipy.special import jn_zeros
 
@@ -93,6 +95,54 @@ def histogram_counts(
 
 
 class TimeDelayStatisticsTests(unittest.TestCase):
+    def test_all_plot_titles_move_unfolding_before_the_subject(self) -> None:
+        simulation = TimeDelayStatisticsSimulation(
+            compound=build_compound(max_degree=2),
+            energies=as_energy_argument((0.0,)),
+            realizs=1,
+        )
+        ensemble = simulation.compound.ensemble.to_latex
+        suffix = r", $N_\text{f} = {1}$, {$\alpha = {-0.6}$}"
+        cases = (
+            (
+                TimeDelayHistogramPlot,
+                simulation.raw_buffers.time_delays[0],
+                f"Time-delay Distribution: {ensemble}{suffix}",
+            ),
+            (
+                UnfoldedTimeDelayHistogramPlot,
+                simulation.wgt_unfolded_buffers.time_delays[0],
+                f"Weight-unfolded Time-delay Distribution: {ensemble}{suffix}",
+            ),
+            (
+                UnfoldedTimeDelayHistogramPlot,
+                tuple(simulation.ave_unfolded_buffers)[1].time_delays[0],
+                (
+                    r"Average-unfolded (deg = $2$) Time-delay Distribution: "
+                    + ensemble
+                    + suffix
+                ),
+            ),
+            (
+                UnfoldedTimeDelayHistogramPlot,
+                tuple(simulation.var_unfolded_buffers)[0].time_delays[0],
+                (
+                    r"Variate-unfolded (deg = $1$) Time-delay Distribution: "
+                    + ensemble
+                    + suffix
+                ),
+            ),
+        )
+        for plot_cls, data, expected_title in cases:
+            with self.subTest(title=expected_title):
+                plot = plot_cls(data=data, context=simulation.manifest)
+                plot.set_derived_attributes()
+                self.assertEqual(plot.axes.title, expected_title)
+                self.assertNotIn("\n", plot.axes.title)
+                self.assertNotIn("Averaged-unfolded", plot.axes.title)
+                self.assertNotIn("Variated-unfolded", plot.axes.title)
+                self.assertNotIn("Time-Delay", plot.axes.title)
+
     def test_required_energies_are_normalized_copied_and_validated(self) -> None:
         source = np.array([-0.25, 0.125])
         simulation = TimeDelayStatisticsSimulation(
@@ -770,7 +820,60 @@ class TimeDelayStatisticsTests(unittest.TestCase):
                         len(plot.form_factors_ax.lines),
                         expected_line_count,
                     )
+                    self.assertTrue(plot.ax.patches)
+                    for histogram_patch in plot.ax.patches:
+                        np.testing.assert_allclose(
+                            histogram_patch.get_facecolor(),
+                            to_rgba("#F0E442", alpha=0.42),
+                        )
+
+                    self.assertEqual(len(plot.ax.lines), 1)
+                    bfb_line = plot.ax.lines[0]
+                    self.assertEqual(bfb_line.get_color(), "Black")
+                    self.assertEqual(bfb_line.get_linewidth(), 2.0)
+                    self.assertEqual(bfb_line.get_linestyle(), "-")
+
+                    if isinstance(plot, UnfoldedTimeDelayHistogramPlot):
+                        expected_sff_colors = ("#0072B2", "#D55E00", "Black")
+                        expected_sff_styles = ("-", "-", ":")
+                    else:
+                        expected_sff_colors = ("#0072B2", "#D55E00")
+                        expected_sff_styles = ("-", "-")
+
+                    self.assertEqual(
+                        tuple(line.get_color() for line in plot.form_factors_ax.lines),
+                        expected_sff_colors,
+                    )
+                    self.assertEqual(
+                        tuple(
+                            line.get_linewidth() for line in plot.form_factors_ax.lines
+                        ),
+                        (2.0,) * expected_line_count,
+                    )
+                    self.assertEqual(
+                        tuple(
+                            line.get_linestyle() for line in plot.form_factors_ax.lines
+                        ),
+                        expected_sff_styles,
+                    )
                     self.assertEqual(plot.legend.labels, expected_legend_labels)
+                    legend_lines = tuple(
+                        handle
+                        for handle in plot.legend.handles
+                        if isinstance(handle, Line2D)
+                    )
+                    self.assertEqual(
+                        tuple(line.get_color() for line in legend_lines),
+                        ("Black", *expected_sff_colors),
+                    )
+                    self.assertEqual(
+                        tuple(line.get_linewidth() for line in legend_lines),
+                        (2.0,) * len(legend_lines),
+                    )
+                    self.assertEqual(
+                        tuple(line.get_linestyle() for line in legend_lines),
+                        ("-", *expected_sff_styles),
+                    )
                     self.assertEqual(
                         plot.form_factors_ax.get_ylim(),
                         plot.form_factors_plot.ylim,
@@ -785,6 +888,11 @@ class TimeDelayStatisticsTests(unittest.TestCase):
                     )
 
                     plot.axes.configure(plot.ax)
+                    plot.legend.configure(plot.ax)
+                    self.assertEqual(plot.ax.get_title(), plot.axes.title)
+                    legend = plot.ax.get_legend()
+                    self.assertIsNotNone(legend)
+                    self.assertEqual(legend.get_title().get_text(), "")
                     self.assertTrue(
                         all(
                             not tick.tick2line.get_visible()

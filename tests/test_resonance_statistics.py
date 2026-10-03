@@ -9,6 +9,7 @@ from unittest.mock import MagicMock, patch
 
 import attrs
 import numpy as np
+from matplotlib import pyplot as plt
 
 from rmtpy.compounds import CompoundEnsemble
 from rmtpy.ensembles import GOE
@@ -115,6 +116,165 @@ def histogram2d_counts(
 
 
 class ResonanceStatisticsTests(unittest.TestCase):
+    def test_form_factor_curves_and_legends_use_accessible_shared_style(self) -> None:
+        simulation = ResonanceStatisticsSimulation(
+            compound=build_compound(),
+            realizs=1,
+        )
+        plot_cases = (
+            (
+                ResonanceFormFactorsPlot(
+                    data=simulation.raw_buffers.form_factors,
+                    context=simulation.manifest,
+                ),
+                ("#0072B2", "#D55E00"),
+                ("-", "-"),
+            ),
+            (
+                UnfoldedResonanceFormFactorsPlot(
+                    data=simulation.wgt_unfolded_buffers.form_factors,
+                    context=simulation.manifest,
+                ),
+                ("#0072B2", "#D55E00", "Black"),
+                ("-", "-", ":"),
+            ),
+        )
+
+        for plot, expected_colors, expected_styles in plot_cases:
+            with self.subTest(plot=type(plot).__name__):
+                with patch.object(plot, "finish_plot"):
+                    plot.plot(Path("unused"))
+
+                try:
+                    self.assertEqual(
+                        tuple(line.get_color() for line in plot.ax.lines),
+                        expected_colors,
+                    )
+                    self.assertEqual(
+                        tuple(line.get_linewidth() for line in plot.ax.lines),
+                        (2.0,) * len(expected_colors),
+                    )
+                    self.assertEqual(
+                        tuple(line.get_linestyle() for line in plot.ax.lines),
+                        expected_styles,
+                    )
+                    self.assertEqual(
+                        tuple(handle.get_color() for handle in plot.legend.handles),
+                        expected_colors,
+                    )
+                    self.assertEqual(
+                        tuple(handle.get_linewidth() for handle in plot.legend.handles),
+                        (2.0,) * len(expected_colors),
+                    )
+                    self.assertEqual(
+                        tuple(handle.get_linestyle() for handle in plot.legend.handles),
+                        expected_styles,
+                    )
+                finally:
+                    plt.close(plot.fig)
+
+    def test_all_plot_titles_use_compact_subjects_and_ordered_metadata(self) -> None:
+        simulation = ResonanceStatisticsSimulation(
+            compound=build_compound(max_degree=2),
+            realizs=1,
+        )
+        metadata = (
+            simulation.compound.ensemble.to_latex
+            + r", $N_\text{f} = {1}$, {$\alpha = {-0.6}$}"
+        )
+        raw_cases = (
+            (
+                ResonanceHistogramPlot,
+                simulation.raw_buffers.resonance_centers,
+                "Resonance Density",
+            ),
+            (
+                WidthHistogramPlot,
+                simulation.raw_buffers.resonance_widths,
+                "Resonance Width Distribution",
+            ),
+            (
+                ResonanceSpacingHistogramPlot,
+                simulation.raw_buffers.nn_spacings,
+                "Resonance Spacing Distribution",
+            ),
+            (
+                ComplexEnergyHistogramPlot,
+                simulation.raw_buffers.complex_energies,
+                "Complex Resonances",
+            ),
+            (
+                ResonanceFormFactorsPlot,
+                simulation.raw_buffers.form_factors,
+                "Resonance Form Factors",
+            ),
+            (
+                ResonanceCoefficientsHistogramPlot,
+                tuple(simulation.coefficient_buffers)[0],
+                "Resonance Coefficients",
+            ),
+        )
+        for plot_cls, data, subject in raw_cases:
+            expected_title = f"{subject}: {metadata}"
+            with self.subTest(title=expected_title):
+                plot = plot_cls(data=data, context=simulation.manifest)
+                plot.set_derived_attributes()
+                self.assertEqual(plot.axes.title, expected_title)
+                self.assertNotIn("\n", plot.axes.title)
+
+        unfolded_cases = (
+            (
+                simulation.wgt_unfolded_buffers,
+                "Weight-unfolded",
+            ),
+            (
+                tuple(simulation.ave_unfolded_buffers)[1],
+                r"Average-unfolded (deg = $2$)",
+            ),
+            (
+                tuple(simulation.var_unfolded_buffers)[0],
+                r"Variate-unfolded (deg = $1$)",
+            ),
+        )
+        plot_cases = (
+            (
+                UnfoldedResonanceHistogramPlot,
+                "resonance_centers",
+                "Resonance Density",
+            ),
+            (
+                UnfoldedWidthHistogramPlot,
+                "resonance_widths",
+                "Resonance Width Distribution",
+            ),
+            (
+                UnfoldedResonanceSpacingHistogramPlot,
+                "nn_spacings",
+                "Resonance Spacing Distribution",
+            ),
+            (
+                UnfoldedComplexEnergyHistogramPlot,
+                "complex_energies",
+                "Complex Resonances",
+            ),
+            (
+                UnfoldedResonanceFormFactorsPlot,
+                "form_factors",
+                "Resonance Form Factors",
+            ),
+        )
+        for buffers, unfolding in unfolded_cases:
+            for plot_cls, data_name, subject in plot_cases:
+                expected_title = f"{unfolding} {subject}: {metadata}"
+                with self.subTest(title=expected_title):
+                    plot = plot_cls(
+                        data=getattr(buffers, data_name),
+                        context=simulation.manifest,
+                    )
+                    plot.set_derived_attributes()
+                    self.assertEqual(plot.axes.title, expected_title)
+                    self.assertNotIn("\n", plot.axes.title)
+
     def test_buffer_schema_filenames_metadata_and_iteration_order(self) -> None:
         expected_counts = {0: 10, 2: 32}
         for max_degree, expected_count in expected_counts.items():

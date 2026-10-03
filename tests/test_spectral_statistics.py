@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import attrs
 import numpy as np
+from matplotlib import pyplot as plt
 
 from rmtpy.conversion import unwrap_json_value
 from rmtpy.ensembles import GOE
@@ -83,6 +84,134 @@ def form_factor_moments(
 
 
 class SpectralStatisticsTests(unittest.TestCase):
+    def test_form_factor_curves_and_legends_use_accessible_shared_style(self) -> None:
+        simulation = SpectralStatisticsSimulation(
+            ensemble=build_ensemble(),
+            realizs=1,
+        )
+        plot_cases = (
+            (
+                FormFactorsPlot(
+                    data=simulation.raw_buffers.form_factors,
+                    context=simulation.manifest,
+                ),
+                ("#0072B2", "#D55E00"),
+                ("-", "-"),
+            ),
+            (
+                UnfoldedFormFactorsPlot(
+                    data=simulation.wgt_unfolded_buffers.form_factors,
+                    context=simulation.manifest,
+                ),
+                ("#0072B2", "#D55E00", "Black"),
+                ("-", "-", ":"),
+            ),
+        )
+
+        for plot, expected_colors, expected_styles in plot_cases:
+            with self.subTest(plot=type(plot).__name__):
+                with patch.object(plot, "finish_plot"):
+                    plot.plot(Path("unused"))
+
+                try:
+                    self.assertEqual(
+                        tuple(line.get_color() for line in plot.ax.lines),
+                        expected_colors,
+                    )
+                    self.assertEqual(
+                        tuple(line.get_linewidth() for line in plot.ax.lines),
+                        (2.0,) * len(expected_colors),
+                    )
+                    self.assertEqual(
+                        tuple(line.get_linestyle() for line in plot.ax.lines),
+                        expected_styles,
+                    )
+                    self.assertEqual(
+                        tuple(handle.get_color() for handle in plot.legend.handles),
+                        expected_colors,
+                    )
+                    self.assertEqual(
+                        tuple(handle.get_linewidth() for handle in plot.legend.handles),
+                        (2.0,) * len(expected_colors),
+                    )
+                    self.assertEqual(
+                        tuple(handle.get_linestyle() for handle in plot.legend.handles),
+                        expected_styles,
+                    )
+                finally:
+                    plt.close(plot.fig)
+
+    def test_all_plot_titles_use_compact_subjects_and_ordered_metadata(self) -> None:
+        simulation = SpectralStatisticsSimulation(
+            ensemble=build_ensemble(max_degree=2),
+            realizs=1,
+        )
+        ensemble = simulation.ensemble.to_latex
+
+        raw_cases = (
+            (
+                SpectralHistogramPlot,
+                simulation.raw_buffers.levels,
+                f"Spectral Density: {ensemble}",
+            ),
+            (
+                SpacingsHistogramPlot,
+                simulation.raw_buffers.nn_spacings,
+                f"NNS Distribution: {ensemble}",
+            ),
+            (
+                FormFactorsPlot,
+                simulation.raw_buffers.form_factors,
+                f"Spectral Form Factors: {ensemble}",
+            ),
+            (
+                SpectralCoefficientsHistogramPlot,
+                tuple(simulation.coefficient_buffers)[0],
+                f"Spectral Coefficients: {ensemble}",
+            ),
+        )
+        for plot_cls, data, expected_title in raw_cases:
+            with self.subTest(title=expected_title):
+                plot = plot_cls(data=data, context=simulation.manifest)
+                plot.set_derived_attributes()
+                self.assertEqual(plot.axes.title, expected_title)
+                self.assertNotIn("\n", plot.axes.title)
+
+        unfolded_cases = (
+            (
+                simulation.wgt_unfolded_buffers,
+                "Weight-unfolded",
+            ),
+            (
+                tuple(simulation.ave_unfolded_buffers)[1],
+                r"Average-unfolded (deg = $2$)",
+            ),
+            (
+                tuple(simulation.var_unfolded_buffers)[0],
+                r"Variate-unfolded (deg = $1$)",
+            ),
+        )
+        plot_cases = (
+            (UnfoldedSpectralHistogramPlot, "levels", "Spectral Density"),
+            (UnfoldedSpacingsHistogramPlot, "nn_spacings", "NNS Distribution"),
+            (
+                UnfoldedFormFactorsPlot,
+                "form_factors",
+                "Spectral Form Factors",
+            ),
+        )
+        for buffers, unfolding in unfolded_cases:
+            for plot_cls, data_name, subject in plot_cases:
+                expected_title = f"{unfolding} {subject}: {ensemble}"
+                with self.subTest(title=expected_title):
+                    plot = plot_cls(
+                        data=getattr(buffers, data_name),
+                        context=simulation.manifest,
+                    )
+                    plot.set_derived_attributes()
+                    self.assertEqual(plot.axes.title, expected_title)
+                    self.assertNotIn("\n", plot.axes.title)
+
     def test_buffer_schema_filenames_metadata_and_iteration_order(self) -> None:
         expected_counts = {0: 6, 2: 20}
         for max_degree, expected_count in expected_counts.items():

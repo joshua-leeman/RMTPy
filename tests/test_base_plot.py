@@ -1,5 +1,4 @@
 import dataclasses
-import shutil
 import tempfile
 import unittest
 from copy import deepcopy
@@ -7,7 +6,6 @@ from pathlib import Path
 from typing import cast, override
 from unittest.mock import MagicMock, patch
 
-import matplotlib
 import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.artist import Artist
@@ -18,6 +16,9 @@ from matplotlib.ticker import LogLocator
 from rmtpy.ensembles import GOE, ManyBodyEnsemble
 from rmtpy.simulations.base_data import Data
 from rmtpy.simulations.base_plot import (
+    CONNECTED_FORM_FACTOR_COLOR,
+    CURVE_WIDTH,
+    FORM_FACTOR_COLOR,
     LogDimensionTimeAxes,
     LogDimensionUnfoldedTimeAxes,
     Plot,
@@ -26,9 +27,15 @@ from rmtpy.simulations.base_plot import (
 )
 from rmtpy.simulations.partial_widths_statistics.partial_width_histogram.partial_width_histogram_plot import (
     PartialWidthHistogramAxes,
+    PartialWidthHistogramPlot,
 )
 from rmtpy.simulations.partial_widths_statistics.total_width_histogram.total_width_histogram_plot import (
     TotalWidthHistogramAxes,
+    TotalWidthHistogramPlot,
+)
+from rmtpy.simulations.resonance_statistics.complex_energy_histogram import (
+    ComplexEnergyHistogramPlot,
+    UnfoldedComplexEnergyHistogramPlot,
 )
 from rmtpy.simulations.resonance_statistics.resonance_form_factors import (
     ResonanceFormFactorsPlot,
@@ -38,11 +45,23 @@ from rmtpy.simulations.resonance_statistics.resonance_form_factors.resonance_for
     ResonanceFormFactorsAxes,
     UnfoldedResonanceFormFactorsAxes,
 )
+from rmtpy.simulations.resonance_statistics.resonance_histogram import (
+    ResonanceHistogramPlot,
+    UnfoldedResonanceHistogramPlot,
+)
+from rmtpy.simulations.resonance_statistics.resonance_spacing_histogram import (
+    ResonanceSpacingHistogramPlot,
+    UnfoldedResonanceSpacingHistogramPlot,
+)
 from rmtpy.simulations.resonance_statistics.width_histogram.width_histogram_plot import (
     UnfoldedWidthHistogramAxes,
     WidthHistogramAxes,
 )
 from rmtpy.simulations.spectral_statistics import SpectralStatisticsSimulation
+from rmtpy.simulations.spectral_statistics.nn_spacings_histogram import (
+    SpacingsHistogramPlot,
+    UnfoldedSpacingsHistogramPlot,
+)
 from rmtpy.simulations.spectral_statistics.spectral_form_factors import (
     FormFactorsPlot,
     UnfoldedFormFactorsPlot,
@@ -50,6 +69,10 @@ from rmtpy.simulations.spectral_statistics.spectral_form_factors import (
 from rmtpy.simulations.spectral_statistics.spectral_form_factors.spectral_form_factors_plot import (
     FormFactorsAxes,
     UnfoldedFormFactorsAxes,
+)
+from rmtpy.simulations.spectral_statistics.spectral_histogram import (
+    SpectralHistogramPlot,
+    UnfoldedSpectralHistogramPlot,
 )
 from rmtpy.simulations.statistics import LOG_D_TIME_SUPPORT, LOG_D_UNFOLDED_TIME_SUPPORT
 from rmtpy.simulations.time_delay_statistics.time_delay_histogram import (
@@ -59,6 +82,12 @@ from rmtpy.simulations.time_delay_statistics.time_delay_histogram import (
 from rmtpy.simulations.time_delay_statistics.time_delay_histogram.time_delay_histogram_plot import (
     TimeDelayHistogramAxes,
     UnfoldedTimeDelayHistogramAxes,
+)
+from rmtpy.simulations.transmission_coefficients.transmission_coefficients import (
+    TransmissionCoefficientsPlot,
+)
+from rmtpy.simulations.transmission_coefficients.weisskopf_estimate import (
+    WeisskopfEstimatePlot,
 )
 
 
@@ -97,6 +126,102 @@ def default_dataclass_field(plot_cls: type[Plot], *, name: str) -> object:
 
 
 class BasePlotTests(unittest.TestCase):
+    def test_all_curve_defaults_share_width_and_form_factor_palette(self) -> None:
+        curve_fields = (
+            (PartialWidthHistogramPlot, ("porter_thomas_width",)),
+            (TotalWidthHistogramPlot, ("porter_thomas_width",)),
+            (ComplexEnergyHistogramPlot, ("width_curve_width",)),
+            (UnfoldedComplexEnergyHistogramPlot, ("width_curve_width",)),
+            (ResonanceHistogramPlot, ("pdf_width",)),
+            (UnfoldedResonanceHistogramPlot, ("pdf_width",)),
+            (ResonanceSpacingHistogramPlot, ("surmise_width",)),
+            (UnfoldedResonanceSpacingHistogramPlot, ("surmise_width",)),
+            (SpacingsHistogramPlot, ("surmise_width",)),
+            (UnfoldedSpacingsHistogramPlot, ("surmise_width",)),
+            (SpectralHistogramPlot, ("pdf_width",)),
+            (UnfoldedSpectralHistogramPlot, ("pdf_width",)),
+            (FormFactorsPlot, ("sff_width", "csff_width")),
+            (
+                UnfoldedFormFactorsPlot,
+                ("sff_width", "csff_width", "universal_sff_width"),
+            ),
+            (ResonanceFormFactorsPlot, ("sff_width", "csff_width")),
+            (
+                UnfoldedResonanceFormFactorsPlot,
+                ("sff_width", "csff_width", "universal_sff_width"),
+            ),
+            (TimeDelayHistogramPlot, ("pdf_width",)),
+            (UnfoldedTimeDelayHistogramPlot, ("pdf_width",)),
+            (TransmissionCoefficientsPlot, ("line_width",)),
+            (WeisskopfEstimatePlot, ("line_width",)),
+        )
+        for plot_cls, field_names in curve_fields:
+            for field_name in field_names:
+                with self.subTest(plot_cls=plot_cls, field_name=field_name):
+                    self.assertEqual(
+                        default_dataclass_field(plot_cls, name=field_name),
+                        CURVE_WIDTH,
+                    )
+
+            dataclass_field_names = {field.name for field in dataclasses.fields(plot_cls)}
+            if "legend_handles" in dataclass_field_names:
+                legend_handles = default_dataclass_field(
+                    plot_cls,
+                    name="legend_handles",
+                )
+                self.assertIsInstance(legend_handles, tuple)
+                line_handles = tuple(
+                    handle
+                    for handle in cast(tuple[Artist, ...], legend_handles)
+                    if isinstance(handle, Line2D)
+                )
+                self.assertTrue(line_handles)
+                self.assertEqual(
+                    tuple(handle.get_linewidth() for handle in line_handles),
+                    (CURVE_WIDTH,) * len(line_handles),
+                )
+
+        for plot_cls in (
+            FormFactorsPlot,
+            UnfoldedFormFactorsPlot,
+            ResonanceFormFactorsPlot,
+            UnfoldedResonanceFormFactorsPlot,
+        ):
+            with self.subTest(plot_cls=plot_cls):
+                self.assertEqual(
+                    default_dataclass_field(plot_cls, name="sff_color"),
+                    FORM_FACTOR_COLOR,
+                )
+                self.assertEqual(
+                    default_dataclass_field(plot_cls, name="csff_color"),
+                    CONNECTED_FORM_FACTOR_COLOR,
+                )
+
+        for plot_cls in (
+            UnfoldedFormFactorsPlot,
+            UnfoldedResonanceFormFactorsPlot,
+        ):
+            with self.subTest(plot_cls=plot_cls):
+                self.assertEqual(
+                    default_dataclass_field(plot_cls, name="universal_sff_color"),
+                    "Black",
+                )
+                self.assertEqual(
+                    default_dataclass_field(plot_cls, name="universal_sff_style"),
+                    "dotted",
+                )
+
+        for plot_cls in (TimeDelayHistogramPlot, UnfoldedTimeDelayHistogramPlot):
+            with self.subTest(plot_cls=plot_cls):
+                self.assertEqual(
+                    default_dataclass_field(plot_cls, name="histogram_color"),
+                    "#F0E442",
+                )
+                self.assertEqual(
+                    default_dataclass_field(plot_cls, name="pdf_color"),
+                    "Black",
+                )
+
     def test_manifest_arguments_are_detached_cached_and_nonmutating(self) -> None:
         simulation = build_simulation(seed=902)
         configuration_before = deepcopy(simulation.manifest.configuration)
@@ -156,6 +281,7 @@ class BasePlotTests(unittest.TestCase):
         axes_mock.spines = {"left": left_spine, "right": right_spine}
         axes_configuration = PlotAxes(
             axes_width=1.5,
+            title="plot title",
             xlabel="horizontal",
             ylabel="vertical",
             xticks=(0.0, 1.0),
@@ -170,6 +296,7 @@ class BasePlotTests(unittest.TestCase):
 
         left_spine.set_linewidth.assert_called_once_with(1.5)
         right_spine.set_linewidth.assert_called_once_with(1.5)
+        axes_mock.set_title.assert_called_once_with("plot title", fontsize=12)
         axes_mock.set_xlabel.assert_called_once_with("horizontal", fontsize=12)
         axes_mock.set_ylabel.assert_called_once_with("vertical", fontsize=12)
         axes_mock.set_xticks.assert_any_call((0.0, 1.0))
@@ -194,7 +321,6 @@ class BasePlotTests(unittest.TestCase):
         legend_configuration = PlotLegend(
             handles=(handle,),
             labels=("curve",),
-            title="reference",
             on_black_background=True,
             loc="upper right",
             bbox=(1.0, 1.0),
@@ -205,131 +331,33 @@ class BasePlotTests(unittest.TestCase):
         legend_axes_mock.legend.assert_called_once_with(
             handles=(handle,),
             labels=("curve",),
-            title="reference",
             loc="upper right",
             bbox_to_anchor=(1.0, 1.0),
             frameon=False,
             fontsize=10,
-            title_fontsize=10,
             alignment="left",
         )
-        legend_mock.get_title.return_value.set_linespacing.assert_not_called()
         legend_text_mock.set_linespacing.assert_not_called()
-        legend_mock.get_title.return_value.set_color.assert_called_once_with("white")
         legend_text_mock.set_color.assert_called_once_with("white")
 
-    def test_legend_formats_only_multiline_titles_for_tex(self) -> None:
-        legend = PlotLegend(title_linegap=2.0)
-
-        for title, expected in (
-            ("single line", "single line"),
-            (
-                "first line\nsecond line",
-                r"\shortstack[l]{first line\\[2pt]second line}",
-            ),
-            (
-                "first line\nsecond line\nthird line",
-                (
-                    r"\shortstack[l]{first line\\[2pt]second line"
-                    r"\\[2pt]third line}"
-                ),
-            ),
-        ):
-            with self.subTest(title=title):
-                legend.title = title
-                self.assertEqual(legend._formatted_title(usetex=True), expected)
-
-        legend.title = "first line\nsecond line"
-        legend.title_linegap = 3.5
-        self.assertEqual(
-            legend._formatted_title(usetex=True),
-            r"\shortstack[l]{first line\\[3.5pt]second line}",
+    def test_legends_have_no_title_configuration_or_rendered_title(self) -> None:
+        legend_fields = {field.name for field in dataclasses.fields(PlotLegend)}
+        self.assertTrue(
+            {"title", "title_fontsize", "title_linegap"}.isdisjoint(legend_fields)
         )
 
-    def test_non_tex_multiline_legend_title_uses_equivalent_line_spacing(
-        self,
-    ) -> None:
-        axes_mock = MagicMock()
-        legend_mock = MagicMock()
-        axes_mock.legend.return_value = legend_mock
-        handle = cast(Artist, MagicMock())
-        legend = PlotLegend(
-            handles=(handle,),
-            labels=("curve",),
-            title="first line\nsecond line",
-            title_fontsize=10,
-            title_linegap=2.0,
-        )
-
-        with matplotlib.rc_context({"text.usetex": False}):
-            legend.configure(ax=cast(Axes, axes_mock))
-
-        axes_mock.legend.assert_called_once_with(
-            handles=(handle,),
-            labels=("curve",),
-            title="first line\nsecond line",
-            loc="best",
-            bbox_to_anchor=(),
-            frameon=False,
-            fontsize=10,
-            title_fontsize=10,
-            alignment="left",
-        )
-        legend_mock.get_title.return_value.set_linespacing.assert_called_once_with(1.2)
-
-    @unittest.skipUnless(
-        shutil.which("latex") and shutil.which("dvipng"),
-        "LaTeX rendering tools are unavailable",
-    )
-    def test_tex_linegap_increases_only_multiline_legend_title_height(self) -> None:
-        title = "GOE($N_m = 14$)\n$N_f = 2$, $a = 1$"
-        handle = Line2D([0], [0])
-
-        with matplotlib.rc_context({"text.usetex": True}):
-            control_figure, control_axes = plt.subplots()
-            spaced_figure, spaced_axes = plt.subplots()
-            try:
-                control_legend = control_axes.legend(
-                    handles=(handle,),
-                    labels=("simulation",),
-                    title=title,
-                )
-                PlotLegend(
-                    handles=(handle,),
-                    labels=("simulation",),
-                    title=title,
-                    title_linegap=2.0,
-                    bbox=(1.0, 1.0),
-                ).configure(spaced_axes)
-                spaced_legend = spaced_axes.get_legend()
-                self.assertIsNotNone(spaced_legend)
-
-                control_figure.canvas.draw()
-                spaced_figure.canvas.draw()
-                control_renderer = control_figure.canvas.get_renderer()
-                spaced_renderer = spaced_figure.canvas.get_renderer()
-                control_title_box = control_legend.get_title().get_window_extent(
-                    control_renderer
-                )
-                spaced_title_box = spaced_legend.get_title().get_window_extent(
-                    spaced_renderer
-                )
-                control_entry_box = control_legend.get_texts()[0].get_window_extent(
-                    control_renderer
-                )
-                spaced_entry_box = spaced_legend.get_texts()[0].get_window_extent(
-                    spaced_renderer
-                )
-
-                self.assertGreater(spaced_title_box.height, control_title_box.height)
-                self.assertAlmostEqual(
-                    spaced_title_box.y0 - spaced_entry_box.y1,
-                    control_title_box.y0 - control_entry_box.y1,
-                )
-                self.assertEqual(spaced_legend.get_texts()[0].get_text(), "simulation")
-            finally:
-                plt.close(control_figure)
-                plt.close(spaced_figure)
+        figure, axes = plt.subplots()
+        try:
+            PlotLegend(
+                handles=(Line2D([0], [0]),),
+                labels=("simulation",),
+                bbox=(1.0, 1.0),
+            ).configure(axes)
+            legend = axes.get_legend()
+            self.assertIsNotNone(legend)
+            self.assertEqual(legend.get_title().get_text(), "")
+        finally:
+            plt.close(figure)
 
     def test_all_log_log_axes_use_single_unlabeled_half_length_minor_ticks(
         self,

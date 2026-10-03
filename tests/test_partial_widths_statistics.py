@@ -60,6 +60,39 @@ def histogram_counts(
 
 
 class PartialWidthsStatisticsTests(unittest.TestCase):
+    def test_plot_titles_preserve_width_indices_as_ordered_metadata(self) -> None:
+        simulation = PartialWidthsStatisticsSimulation(
+            compound=build_compound(num_free_complex_fermions=2),
+            width_indices=((1, 0), (1,)),
+            realizs=1,
+        )
+        partial_width, total_width = selected_width_histograms(simulation)
+        ensemble = simulation.compound.ensemble.to_latex
+
+        partial_plot = PartialWidthHistogramPlot(
+            data=partial_width,
+            context=simulation.manifest,
+        )
+        total_plot = TotalWidthHistogramPlot(
+            data=total_width,
+            context=simulation.manifest,
+        )
+        partial_plot.set_derived_attributes()
+        total_plot.set_derived_attributes()
+
+        self.assertEqual(
+            partial_plot.axes.title,
+            "Partial Widths: "
+            + ensemble
+            + r", $N_\text{f} = {2}$, $\mu = {1}$, $a = {0}$",
+        )
+        self.assertEqual(
+            total_plot.axes.title,
+            "Total Widths: " + ensemble + r", $N_\text{f} = {2}$, $\mu = {1}$",
+        )
+        self.assertNotIn("\n", partial_plot.axes.title)
+        self.assertNotIn("\n", total_plot.axes.title)
+
     def test_required_width_indices_are_normalized_validated_and_ordered(self) -> None:
         simulation = PartialWidthsStatisticsSimulation(
             compound=build_compound(),

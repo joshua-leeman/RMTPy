@@ -54,6 +54,35 @@ def transmission_data(
 
 
 class TransmissionCoefficientsTests(unittest.TestCase):
+    def test_plot_titles_preserve_channel_and_fermion_metadata(self) -> None:
+        simulation = TransmissionCoefficientsSimulation(
+            compound=build_compound(),
+            channel_indices=(1,),
+            realizs=1,
+        )
+        ensemble = simulation.compound.ensemble.to_latex
+        transmission_plot = TransmissionCoefficientsPlot(
+            data=tuple(simulation.transmission_coefficient_buffers)[0],
+            context=simulation.manifest,
+        )
+        weisskopf_plot = WeisskopfEstimatePlot(
+            data=simulation.weisskopf_estimate_buffer,
+            context=simulation.manifest,
+        )
+        transmission_plot.set_derived_attributes()
+        weisskopf_plot.set_derived_attributes()
+
+        self.assertEqual(
+            transmission_plot.axes.title,
+            "Transmission Coefficients: " + ensemble + r", $N_\text{f} = {1}$, $a = {1}$",
+        )
+        self.assertEqual(
+            weisskopf_plot.axes.title,
+            "Weisskopf Estimate: " + ensemble + r", $N_\text{f} = {1}$",
+        )
+        self.assertNotIn("\n", transmission_plot.axes.title)
+        self.assertNotIn("\n", weisskopf_plot.axes.title)
+
     def test_required_channel_indices_are_normalized_and_validated(self) -> None:
         simulation = TransmissionCoefficientsSimulation(
             compound=build_compound(),
