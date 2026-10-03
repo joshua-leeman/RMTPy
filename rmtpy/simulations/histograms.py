@@ -1,4 +1,5 @@
 from functools import partial
+from typing import cast
 
 import attrs
 import numpy as np
@@ -111,11 +112,6 @@ class Histogram(Data):
         validator=_validate_histogram,
         repr=False,
     )
-    realizs: int = attrs.field(
-        default=0,
-        converter=int,
-        validator=attrs.validators.ge(0),
-    )
 
     def add_histogram_contribution(
         self,
@@ -131,6 +127,23 @@ class Histogram(Data):
 
         object.__setattr__(self, "realizs", self.realizs + 1)
 
+    def add_contribution(self, contribution: Data, /) -> None:
+        self._validate_contribution(contribution)
+        if not isinstance(contribution, Histogram):
+            raise TypeError("Histogram contribution is malformed.")
+        if (
+            contribution.support != self.support
+            or contribution.log_base != self.log_base
+            or contribution.num_bins != self.num_bins
+            or not np.array_equal(contribution.bins, self.bins)
+        ):
+            raise ValueError(
+                f"Histogram contribution `{self._file_name}` has an incompatible grid."
+            )
+
+        self.counts[:] += contribution.counts
+        self._add_realizations(contribution)
+
     def compute_histogram(self) -> None:
         if np.sum(self.counts) == 0:
             self.histogram.fill(0.0)
@@ -145,6 +158,111 @@ class Histogram(Data):
             return
 
         self.histogram[:] = self.counts / total
+
+    def compute_statistics(self) -> None:
+        self.compute_histogram()
+
+
+@attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
+class MeanScaledHistogram(Histogram):
+    sample_sum: float | None = attrs.field(
+        default=None,
+        converter=attrs.converters.optional(float),
+        validator=attrs.validators.optional(attrs.validators.ge(0.0)),
+        metadata={"archive_optional": True},
+        repr=False,
+    )
+
+    def __attrs_post_init__(self) -> None:
+        if self.sample_sum is not None:
+            return
+
+        average = self.metadata.get("average_width", 0.0)
+        recovered_sum = (
+            float(average) * self.realizs
+            if isinstance(average, int | float) and self.realizs > 0
+            else 0.0
+        )
+        object.__setattr__(self, "sample_sum", recovered_sum)
+
+    def _aggregation_metadata(self) -> dict[str, object]:
+        return {
+            key: value for key, value in self.metadata.items() if key != "average_width"
+        }
+
+    def _canonical_bins(self) -> np.ndarray[tuple[int], np.dtype[np.floating]]:
+        return array_of_floats(
+            support=self.support,
+            num_pts=self.num_bins + 1,
+            log_base=self.log_base,
+        )
+
+    def add_histogram_contribution(
+        self,
+        data: np.ndarray[tuple[int], np.dtype[np.floating]],
+        /,
+    ) -> None:
+        values = np.asarray(data)
+        super().add_histogram_contribution(values)
+        sample_sum = cast(float, self.sample_sum)
+        object.__setattr__(self, "sample_sum", sample_sum + float(np.sum(values)))
+
+    def add_contribution(self, contribution: Data, /) -> None:
+        self._validate_contribution(contribution)
+        if not isinstance(contribution, MeanScaledHistogram):
+            raise TypeError("Mean-scaled histogram contribution is malformed.")
+        if (
+            contribution.support != self.support
+            or contribution.log_base != self.log_base
+            or contribution.num_bins != self.num_bins
+        ):
+            raise ValueError(
+                f"Histogram contribution `{self._file_name}` has an incompatible grid."
+            )
+
+        contribution_sum = cast(float, contribution.sample_sum)
+        if contribution.realizs > 0:
+            if not np.isfinite(contribution_sum) or contribution_sum <= 0.0:
+                raise ValueError(
+                    f"Histogram contribution `{self._file_name}` has an invalid "
+                    + "sample sum."
+                )
+            average = contribution_sum / contribution.realizs
+            expected_bins = contribution._canonical_bins() / average
+        else:
+            if contribution_sum != 0.0:
+                raise ValueError(
+                    f"Histogram contribution `{self._file_name}` has an invalid "
+                    + "sample sum."
+                )
+            expected_bins = contribution._canonical_bins()
+        if not np.allclose(contribution.bins, expected_bins, rtol=1e-12, atol=0.0):
+            raise ValueError(
+                f"Histogram contribution `{self._file_name}` has malformed scaled bins."
+            )
+
+        self.counts[:] += contribution.counts
+        object.__setattr__(
+            self,
+            "sample_sum",
+            cast(float, self.sample_sum) + contribution_sum,
+        )
+        self._add_realizations(contribution)
+
+    def compute_statistics(self) -> None:
+        if self.realizs == 0:
+            raise ValueError("A mean-scaled histogram requires realizations.")
+
+        average = cast(float, self.sample_sum) / self.realizs
+        if not np.isfinite(average) or average <= 0.0:
+            index = self.metadata.get("index")
+            raise ValueError(
+                f"Average width for index {index} must be positive and finite."
+            )
+
+        self.attach_metadata({"average_width": average})
+        self.bins[:] = self._canonical_bins() / average
+        self.compute_histogram()
 
 
 def _build_empty_histogram2D(
@@ -305,12 +423,6 @@ class Histogram2D(Data):
         validator=_validate_histogram2D,
         repr=False,
     )
-    realizs: int = attrs.field(
-        default=0,
-        converter=int,
-        validator=attrs.validators.ge(0),
-        repr=False,
-    )
 
     def add_histogram_contribution(
         self,
@@ -333,6 +445,28 @@ class Histogram2D(Data):
 
         object.__setattr__(self, "realizs", self.realizs + 1)
 
+    def add_contribution(self, contribution: Data, /) -> None:
+        self._validate_contribution(contribution)
+        if not isinstance(contribution, Histogram2D):
+            raise TypeError("2-D histogram contribution is malformed.")
+        if (
+            contribution.x_support != self.x_support
+            or contribution.y_support != self.y_support
+            or contribution.x_log_base != self.x_log_base
+            or contribution.y_log_base != self.y_log_base
+            or contribution.x_num_bins != self.x_num_bins
+            or contribution.y_num_bins != self.y_num_bins
+            or not np.array_equal(contribution.x_bins, self.x_bins)
+            or not np.array_equal(contribution.y_bins, self.y_bins)
+        ):
+            raise ValueError(
+                f"2-D histogram contribution `{self._file_name}` has an "
+                + "incompatible grid."
+            )
+
+        self.counts[:] += contribution.counts
+        self._add_realizations(contribution)
+
     def compute_histogram(self) -> None:
         total = np.sum(self.counts)
         if total == 0:
@@ -349,6 +483,9 @@ class Histogram2D(Data):
             return
 
         self.histogram[:] = self.counts / total
+
+    def compute_statistics(self) -> None:
+        self.compute_histogram()
 
     def compute_average_x_curve(
         self,
