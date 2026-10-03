@@ -16,6 +16,7 @@ from ....conversion import json_value
 from ....ensembles import ManyBodyEnsemble
 from ...base_data import Data
 from ...base_plot import (
+    CURVE_WIDTH,
     ConfigurableAxes,
     LogDimensionTimeAxes,
     LogDimensionUnfoldedTimeAxes,
@@ -38,6 +39,8 @@ from .time_delay_histogram_data import TimeDelayHistogram
 
 type FormFactorsPlotType = FormFactorsPlot | UnfoldedFormFactorsPlot
 type UnfoldingKey = tuple[str, int | None]
+
+_HISTOGRAM_COLOR: str = "#F0E442"
 
 
 def format_energy_label(energy: float, energy_scale: float) -> str:
@@ -275,6 +278,7 @@ class _TimeDelayHistogramPlot(Plot):
                 color=form_factors_plot.universal_sff_color,
                 alpha=form_factors_plot.universal_sff_alpha,
                 linewidth=form_factors_plot.universal_sff_width,
+                linestyle=form_factors_plot.universal_sff_style,
                 zorder=form_factors_plot.universal_sff_zorder,
             )
 
@@ -367,10 +371,10 @@ class TimeDelayHistogramPlot(_TimeDelayHistogramPlot):
 
     histogram_zorder: int = 1
     histogram_alpha: float = 0.42
-    histogram_color: str = "#7b2d26"
+    histogram_color: str = _HISTOGRAM_COLOR
 
     pdf_zorder: int = 2
-    pdf_width: float = 1.0
+    pdf_width: float = CURVE_WIDTH
     pdf_alpha: float = 1.0
     pdf_color: str = "Black"
     pdf_legend: str = "BFB"
@@ -410,13 +414,12 @@ class TimeDelayHistogramPlot(_TimeDelayHistogramPlot):
         )
         coupling_exponent = 0.0 if abs(coupling_exponent) < 0.005 else coupling_exponent
         coupling_label = rf"$\alpha = {{{coupling_exponent:.1f}}}$"
-        if not self.legend.title:
-            self.legend.title = (
-                ensemble.to_latex
-                + "\n"
-                + rf"$N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
-                + f", {{{coupling_label}}}"
-            )
+        self.axes.title = (
+            "Time-delay Distribution: "
+            + ensemble.to_latex
+            + rf", $N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
+            + f", {{{coupling_label}}}"
+        )
 
         scale = cast(float, self.data.metadata["scale"])
         self.scale_limits_and_ticks(
@@ -491,10 +494,10 @@ class UnfoldedTimeDelayHistogramPlot(_TimeDelayHistogramPlot):
 
     histogram_zorder: int = 1
     histogram_alpha: float = 0.42
-    histogram_color: str = "#7b2d26"
+    histogram_color: str = _HISTOGRAM_COLOR
 
     pdf_zorder: int = 2
-    pdf_width: float = 2.0
+    pdf_width: float = CURVE_WIDTH
     pdf_alpha: float = 1.0
     pdf_color: str = "Black"
     pdf_legend: str = "BFB"
@@ -532,25 +535,19 @@ class UnfoldedTimeDelayHistogramPlot(_TimeDelayHistogramPlot):
         )
         coupling_exponent = 0.0 if abs(coupling_exponent) < 0.005 else coupling_exponent
         coupling_label = rf"$\alpha = {{{coupling_exponent:.1f}}}$"
-        if not self.legend.title:
-            unfolding_type = self.data.metadata["unfolding"]
-            if unfolding_type != "weight":
-                polynomial_degree = self.data.metadata["polynomial_degree"]
-                self.legend.title = (
-                    ensemble.to_latex
-                    + f"\n{unfolding_type} unfolded, degree {polynomial_degree}"
-                    + "\n"
-                    + rf"$N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
-                    + f", {{{coupling_label}}}"
-                )
-            else:
-                self.legend.title = (
-                    ensemble.to_latex
-                    + "\nweight unfolded"
-                    + "\n"
-                    + rf"$N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
-                    + f", {{{coupling_label}}}"
-                )
+        unfolding_type = cast(str, self.data.metadata["unfolding"])
+        unfolding_label = (
+            "Average" if unfolding_type == "averaged" else unfolding_type.capitalize()
+        )
+        title = f"{unfolding_label}-unfolded"
+        if unfolding_type != "weight":
+            polynomial_degree = self.data.metadata["polynomial_degree"]
+            title += f" (deg = ${polynomial_degree}$)"
+        self.axes.title = (
+            f"{title} Time-delay Distribution: {ensemble.to_latex}"
+            + rf", $N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
+            + f", {{{coupling_label}}}"
+        )
 
         scale = cast(float, self.data.metadata["scale"])
         self.scale_limits_and_ticks(
