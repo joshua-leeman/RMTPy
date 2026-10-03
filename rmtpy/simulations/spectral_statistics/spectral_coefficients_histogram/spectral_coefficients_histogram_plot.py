@@ -172,8 +172,7 @@ class SpectralCoefficientsHistogramPlot(Plot):
             bbox=(0.94, 0.95),
         )
 
-        if not self.legend.title:
-            self.legend.title = self.ensemble.to_latex
+        self.axes.title = "Spectral Coefficients: " + self.ensemble.to_latex
 
         self._derived_attributes_are_set = True
 

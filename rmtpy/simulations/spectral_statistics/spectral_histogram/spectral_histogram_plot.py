@@ -13,7 +13,7 @@ from ....ensembles import (
     SachdevYeKitaevEnsemble,
 )
 from ...base_data import Data
-from ...base_plot import Plot, PlotAxes, PlotLegend
+from ...base_plot import CURVE_WIDTH, Plot, PlotAxes, PlotLegend
 
 _POLYNOMIAL_WEIGHT_LEGEND: str = "polynomial weight"
 
@@ -85,7 +85,7 @@ class SpectralHistogramPlot(Plot):
     histogram_legend: str = "simulation"
 
     pdf_zorder: int = 2
-    pdf_width: float = 2.0
+    pdf_width: float = CURVE_WIDTH
     pdf_alpha: float = 1.0
     pdf_color: str = "Black"
     pdf_legend: str = "theory"
@@ -109,8 +109,7 @@ class SpectralHistogramPlot(Plot):
             loc="upper right",
             bbox=(0.99, 0.95),
         )
-        if not self.legend.title:
-            self.legend.title = self.ensemble.to_latex
+        self.axes.title = "Spectral Density: " + self.ensemble.to_latex
 
         axes = cast(SpectralHistogramAxes, self.axes)
         if isinstance(self.ensemble, PoissonEnsemble):
@@ -227,7 +226,7 @@ class UnfoldedSpectralHistogramPlot(Plot):
     histogram_legend: str = "simulation"
 
     pdf_zorder: int = 2
-    pdf_width: float = 2.0
+    pdf_width: float = CURVE_WIDTH
     pdf_alpha: float = 1.0
     pdf_color: str = "Black"
     pdf_legend: str = "theory"
@@ -251,16 +250,15 @@ class UnfoldedSpectralHistogramPlot(Plot):
             bbox=(0.94, 0.95),
         )
 
-        if not self.legend.title:
-            unfolding_type = self.data.metadata["unfolding"]
-            if unfolding_type != "weight":
-                unfolding_degree = self.data.metadata["polynomial_degree"]
-                self.legend.title = (
-                    self.ensemble.to_latex
-                    + f"\n{unfolding_type} unfolded, degree {unfolding_degree}"
-                )
-            else:
-                self.legend.title = self.ensemble.to_latex + "\nweight unfolded"
+        unfolding_type = cast(str, self.data.metadata["unfolding"])
+        unfolding_label = (
+            "Average" if unfolding_type == "averaged" else unfolding_type.capitalize()
+        )
+        title = f"{unfolding_label}-unfolded"
+        if unfolding_type != "weight":
+            unfolding_degree = self.data.metadata["polynomial_degree"]
+            title += f" (deg = ${unfolding_degree}$)"
+        self.axes.title = f"{title} Spectral Density: {self.ensemble.to_latex}"
 
         self.scale_limits_and_ticks(
             x=lambda value: value * dimension,
