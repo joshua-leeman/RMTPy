@@ -7,11 +7,18 @@ from typing import cast
 from unittest.mock import patch
 
 import numpy as np
+from matplotlib import pyplot as plt
+from matplotlib.ticker import NullLocator
 from scipy.special import jn_zeros
 
 from rmtpy.compounds import CompoundEnsemble
-from rmtpy.ensembles import GOE
+from rmtpy.ensembles import GOE, GUE
 from rmtpy.simulations.base_simulation import ExecutionState
+from rmtpy.simulations.spectral_statistics import SpectralStatisticsSimulation
+from rmtpy.simulations.spectral_statistics.spectral_form_factors import (
+    FormFactorsPlot,
+    UnfoldedFormFactorsPlot,
+)
 from rmtpy.simulations.time_delay_statistics import (
     TimeDelayStatisticsSimulation,
     load_time_delay_statistics_simulation,
@@ -22,6 +29,9 @@ from rmtpy.simulations.time_delay_statistics.time_delay_histogram import (
     TimeDelayHistogram,
     TimeDelayHistogramPlot,
     UnfoldedTimeDelayHistogramPlot,
+)
+from rmtpy.simulations.time_delay_statistics.time_delay_histogram.time_delay_histogram_plot import (
+    SpectralFormFactorsOverlay,
 )
 from rmtpy.simulations.time_delay_statistics.time_delay_statistics_simulation import (
     unfold_time_delays,
@@ -37,6 +47,22 @@ def build_compound(*, max_degree: int = 0, seed: int = 123) -> CompoundEnsemble:
             seed=seed,
         ),
         couplings=np.array([0.75, 1.25]),
+    )
+
+
+def build_spectral_simulation(
+    *,
+    max_degree: int = 0,
+    seed: int = 456,
+    realizs: int = 1,
+) -> SpectralStatisticsSimulation:
+    return SpectralStatisticsSimulation(
+        ensemble=GOE(
+            num_majoranas=4,
+            max_spectral_polynomial_degree=max_degree,
+            seed=seed,
+        ),
+        realizs=realizs,
     )
 
 
@@ -498,6 +524,12 @@ class TimeDelayStatisticsTests(unittest.TestCase):
             self.assertEqual(raw_plot.call_count, 2)
             self.assertEqual(unfolded_plot.call_count, 6)
             self.assertIsNotNone(raw_plot.call_args.args[0].context)
+            self.assertTrue(
+                all(
+                    call.args[0].spectral_form_factors is None
+                    for call in (*raw_plot.call_args_list, *unfolded_plot.call_args_list)
+                )
+            )
 
             manifest_path = destination_directory / "manifest.json"
             manifest_text = manifest_path.read_text(encoding="utf-8")
@@ -530,6 +562,302 @@ class TimeDelayStatisticsTests(unittest.TestCase):
                 restored_simulation.plot(destination_directory)
 
         self.assertEqual(simulation.compound.rng_state, completed_rng_state)
+
+    def test_spectral_form_factors_overlay_matches_every_unfolding_variant(
+        self,
+    ) -> None:
+        spectral_simulation = build_spectral_simulation(
+            max_degree=2,
+            seed=101,
+            realizs=2,
+        )
+        spectral_simulation.execute()
+        overlay = SpectralFormFactorsOverlay(simulation=spectral_simulation)
+        time_delay_simulation = TimeDelayStatisticsSimulation(
+            compound=build_compound(max_degree=2, seed=202),
+            energies=as_energy_argument((-0.25, 0.125)),
+            realizs=1,
+        )
+
+        expected_variants = (
+            (
+                time_delay_simulation.raw_buffers.time_delays,
+                spectral_simulation.raw_buffers.form_factors,
+                FormFactorsPlot,
+            ),
+            (
+                time_delay_simulation.wgt_unfolded_buffers.time_delays,
+                spectral_simulation.wgt_unfolded_buffers.form_factors,
+                UnfoldedFormFactorsPlot,
+            ),
+        )
+        for histograms, expected_data, expected_plot_cls in expected_variants:
+            plots = tuple(overlay.plot_for(histogram) for histogram in histograms)
+            self.assertEqual(len(plots), 2)
+            self.assertIsNot(plots[0], plots[1])
+            for plot in plots:
+                self.assertIsInstance(plot, expected_plot_cls)
+                self.assertIs(plot.data, expected_data)
+
+        for time_buffers, spectral_buffers in (
+            (
+                time_delay_simulation.ave_unfolded_buffers,
+                spectral_simulation.ave_unfolded_buffers,
+            ),
+            (
+                time_delay_simulation.var_unfolded_buffers,
+                spectral_simulation.var_unfolded_buffers,
+            ),
+        ):
+            for time_buffer, spectral_buffer in zip(
+                time_buffers,
+                spectral_buffers,
+                strict=True,
+            ):
+                for histogram in time_buffer.time_delays:
+                    plot = overlay.plot_for(histogram)
+                    self.assertIsInstance(plot, UnfoldedFormFactorsPlot)
+                    self.assertIs(plot.data, spectral_buffer.form_factors)
+
+    def test_spectral_overlay_accepts_independent_seed_and_realization_count(
+        self,
+    ) -> None:
+        spectral_simulation = build_spectral_simulation(
+            max_degree=1,
+            seed=101,
+            realizs=2,
+        )
+        spectral_simulation.execute()
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            spectral_directory = spectral_simulation.save(temporary_directory)
+            overlay = SpectralFormFactorsOverlay.from_directory(
+                directory=spectral_directory,
+                ensemble=build_compound(max_degree=1, seed=202).ensemble,
+            )
+
+        self.assertEqual(overlay.simulation.realizs, 2)
+        self.assertEqual(overlay.simulation.ensemble.seed, 101)
+
+    def test_spectral_overlay_rejects_ensemble_configuration_mismatches(
+        self,
+    ) -> None:
+        spectral_simulation = build_spectral_simulation(max_degree=1, seed=101)
+        spectral_simulation.execute()
+
+        mismatched_ensembles = (
+            GOE(num_majoranas=6, max_spectral_polynomial_degree=1, seed=202),
+            GOE(
+                num_majoranas=4,
+                interaction_strength=2.0,
+                max_spectral_polynomial_degree=1,
+                seed=202,
+            ),
+            GOE(
+                num_majoranas=4,
+                dtype=np.complex64,
+                max_spectral_polynomial_degree=1,
+                seed=202,
+            ),
+            GOE(num_majoranas=4, max_spectral_polynomial_degree=0, seed=202),
+            GUE(num_majoranas=4, max_spectral_polynomial_degree=1, seed=202),
+        )
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            spectral_directory = spectral_simulation.save(temporary_directory)
+            for ensemble in mismatched_ensembles:
+                with (
+                    self.subTest(ensemble=ensemble),
+                    self.assertRaisesRegex(ValueError, "does not match"),
+                ):
+                    SpectralFormFactorsOverlay.from_directory(
+                        directory=spectral_directory,
+                        ensemble=ensemble,
+                    )
+
+    def test_spectral_overlay_rejects_invalid_simulation_outputs(self) -> None:
+        incomplete_simulation = build_spectral_simulation()
+        with self.assertRaisesRegex(ValueError, "not complete"):
+            SpectralFormFactorsOverlay(simulation=incomplete_simulation)
+
+        malformed_simulation = build_spectral_simulation()
+        malformed_simulation.execute()
+        malformed_simulation.raw_buffers.form_factors.metadata["unfolding"] = "weight"
+        with self.assertRaisesRegex(ValueError, "does not match its simulation buffer"):
+            SpectralFormFactorsOverlay(simulation=malformed_simulation)
+
+        time_delay_simulation = TimeDelayStatisticsSimulation(
+            compound=build_compound(),
+            energies=as_energy_argument((0.0,)),
+            realizs=1,
+        )
+        time_delay_simulation.execute()
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            time_delay_directory = time_delay_simulation.save(temporary_directory)
+            with self.assertRaisesRegex(TypeError, "SpectralStatisticsSimulation"):
+                SpectralFormFactorsOverlay.from_directory(
+                    directory=time_delay_directory,
+                    ensemble=time_delay_simulation.compound.ensemble,
+                )
+
+            with self.assertRaisesRegex(ValueError, "malformed"):
+                SpectralFormFactorsOverlay.from_directory(
+                    directory=Path(temporary_directory) / "missing",
+                    ensemble=time_delay_simulation.compound.ensemble,
+                )
+
+            spectral_simulation = build_spectral_simulation()
+            spectral_simulation.execute()
+            spectral_directory = spectral_simulation.save(temporary_directory)
+            missing_form_factors = (
+                spectral_directory / spectral_simulation.raw_buffers.form_factors.to_path
+            )
+            missing_form_factors.unlink()
+            with self.assertRaisesRegex(ValueError, "Saved data .* is missing"):
+                SpectralFormFactorsOverlay.from_directory(
+                    directory=spectral_directory,
+                    ensemble=time_delay_simulation.compound.ensemble,
+                )
+
+    def test_spectral_overlay_draws_matching_curves_axis_and_combined_legend(
+        self,
+    ) -> None:
+        spectral_simulation = build_spectral_simulation(seed=101)
+        spectral_simulation.execute()
+        overlay = SpectralFormFactorsOverlay(simulation=spectral_simulation)
+        time_delay_simulation = TimeDelayStatisticsSimulation(
+            compound=build_compound(seed=202),
+            energies=as_energy_argument((0.0,)),
+            realizs=1,
+        )
+
+        plot_cases = (
+            (
+                TimeDelayHistogramPlot(
+                    data=time_delay_simulation.raw_buffers.time_delays[0],
+                    context=time_delay_simulation.manifest,
+                    spectral_form_factors=overlay,
+                ),
+                2,
+                (r"$E = 0$", "BFB", r"$K(u)$", r"$K_{\text{\tiny conn}}(u)$"),
+            ),
+            (
+                UnfoldedTimeDelayHistogramPlot(
+                    data=time_delay_simulation.wgt_unfolded_buffers.time_delays[0],
+                    context=time_delay_simulation.manifest,
+                    spectral_form_factors=overlay,
+                ),
+                3,
+                (
+                    r"$E = 0$",
+                    "BFB",
+                    r"$K(\upsilon)$",
+                    r"$K_{\text{\tiny conn}}(\upsilon)$",
+                    r"$K^{\text{\tiny GOE}}_{\text{\tiny conn}}(\upsilon)$",
+                ),
+            ),
+        )
+
+        for plot, expected_line_count, expected_legend_labels in plot_cases:
+            with self.subTest(plot=type(plot).__name__):
+                with patch.object(plot, "finish_plot"):
+                    plot.plot(Path("unused"))
+
+                try:
+                    self.assertEqual(len(plot.fig.axes), 2)
+                    self.assertEqual(plot.form_factors_ax.get_yscale(), "log")
+                    self.assertEqual(
+                        len(plot.form_factors_ax.lines),
+                        expected_line_count,
+                    )
+                    self.assertEqual(plot.legend.labels, expected_legend_labels)
+                    self.assertEqual(
+                        plot.form_factors_ax.get_ylim(),
+                        plot.form_factors_plot.ylim,
+                    )
+                    np.testing.assert_allclose(
+                        plot.form_factors_ax.get_yticks(),
+                        plot.form_factors_plot.axes.yticks,
+                    )
+                    self.assertIsInstance(
+                        plot.ax.xaxis.get_minor_locator(),
+                        NullLocator,
+                    )
+
+                    plot.axes.configure(plot.ax)
+                    self.assertTrue(
+                        all(
+                            not tick.tick2line.get_visible()
+                            for tick in plot.ax.yaxis.get_major_ticks()
+                        )
+                    )
+                    self.assertTrue(
+                        all(
+                            not tick.tick1line.get_visible()
+                            for tick in plot.form_factors_ax.yaxis.get_major_ticks()
+                        )
+                    )
+                    self.assertTrue(
+                        all(
+                            tick.tick2line.get_visible()
+                            for tick in plot.form_factors_ax.yaxis.get_major_ticks()
+                        )
+                    )
+
+                    if isinstance(plot, UnfoldedTimeDelayHistogramPlot):
+                        form_factors = (
+                            spectral_simulation.wgt_unfolded_buffers.form_factors
+                        )
+                        np.testing.assert_allclose(
+                            plot.form_factors_ax.lines[-1].get_ydata(),
+                            spectral_simulation.ensemble.universal_connected_sff(
+                                form_factors.times
+                            ),
+                        )
+                finally:
+                    plt.close(plot.fig)
+
+    def test_spectral_overlay_range_failure_creates_no_plot_output(self) -> None:
+        spectral_simulation = build_spectral_simulation(seed=101)
+        spectral_simulation.execute()
+        spectral_simulation.raw_buffers.form_factors.times[0] *= 2.0
+        overlay = SpectralFormFactorsOverlay(simulation=spectral_simulation)
+        time_delay_simulation = TimeDelayStatisticsSimulation(
+            compound=build_compound(seed=202),
+            energies=as_energy_argument((0.0,)),
+            realizs=1,
+        )
+        time_delay_simulation.execute()
+        plot = TimeDelayHistogramPlot(
+            data=time_delay_simulation.raw_buffers.time_delays[0],
+            context=time_delay_simulation.manifest,
+            spectral_form_factors=overlay,
+        )
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            plot_directory = Path(temporary_directory) / "plot"
+            with self.assertRaisesRegex(ValueError, "data ranges do not match"):
+                plot.plot(plot_directory)
+            self.assertFalse(plot_directory.exists())
+
+            spectral_directory = spectral_simulation.save(temporary_directory)
+            time_delay_directory = time_delay_simulation.save(temporary_directory)
+            with (
+                patch.object(TimeDelayHistogramPlot, "plot", autospec=True) as raw_plot,
+                patch.object(
+                    UnfoldedTimeDelayHistogramPlot,
+                    "plot",
+                    autospec=True,
+                ) as unfolded_plot,
+                self.assertRaisesRegex(ValueError, "data ranges do not match"),
+            ):
+                time_delay_simulation.plot(
+                    time_delay_directory,
+                    spectral_statistics_directory=spectral_directory,
+                )
+
+            raw_plot.assert_not_called()
+            unfolded_plot.assert_not_called()
 
     def test_plot_configuration_uses_a_detached_compound(self) -> None:
         simulation = TimeDelayStatisticsSimulation(
@@ -579,6 +907,8 @@ class TimeDelayStatisticsTests(unittest.TestCase):
             self.assertEqual(simulation.execution_state, ExecutionState.COMPLETE)
             raw_plot.assert_called_once()
             unfolded_plot.assert_called_once()
+            self.assertIsNone(raw_plot.call_args.args[0].spectral_form_factors)
+            self.assertIsNone(unfolded_plot.call_args.args[0].spectral_form_factors)
             completion_time = simulation.manifest.execution["execution_time"]
             destination_directory = (
                 Path(temporary_directory) / simulation.to_path / str(completion_time)
@@ -588,6 +918,40 @@ class TimeDelayStatisticsTests(unittest.TestCase):
                 len(tuple(destination_directory.rglob("*_data.npz"))),
                 len(tuple(simulation)),
             )
+
+    def test_run_helper_propagates_spectral_statistics_directory(self) -> None:
+        spectral_simulation = build_spectral_simulation(seed=101)
+        spectral_simulation.execute()
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            spectral_directory = spectral_simulation.save(temporary_directory)
+            with (
+                patch.object(
+                    TimeDelayHistogramPlot,
+                    "plot",
+                    autospec=True,
+                ) as raw_plot,
+                patch.object(
+                    UnfoldedTimeDelayHistogramPlot,
+                    "plot",
+                    autospec=True,
+                ) as unfolded_plot,
+            ):
+                simulation = run_time_delay_statistics_simulation(
+                    compound=build_compound(seed=202),
+                    energies=as_energy_argument((0.0,)),
+                    realizs=1,
+                    directory=temporary_directory,
+                    spectral_statistics_directory=spectral_directory,
+                )
+
+        self.assertEqual(simulation.execution_state, ExecutionState.COMPLETE)
+        raw_plot.assert_called_once()
+        unfolded_plot.assert_called_once()
+        raw_overlay = raw_plot.call_args.args[0].spectral_form_factors
+        unfolded_overlay = unfolded_plot.call_args.args[0].spectral_form_factors
+        self.assertIsNotNone(raw_overlay)
+        self.assertIs(raw_overlay, unfolded_overlay)
 
 
 if __name__ == "__main__":
