@@ -199,34 +199,6 @@ class PartialWidthsStatisticsSimulation(Simulation):
                 width = _compute_width(partial_widths, width_index=width_index)
 
                 histogram.add_histogram_contribution(np.array([width], dtype=np.float64))
-                width_sum = cast(float, histogram.metadata["average_width"])
-                histogram.attach_metadata({"average_width": width_sum + width})
-
-    def _finalize(self) -> None:
-        average_widths = tuple(
-            cast(float, histogram.metadata["average_width"]) / self.realizs
-            for histogram in self.width_histogram_buffers
-        )
-
-        for histogram, average_width in zip(
-            self.width_histogram_buffers,
-            average_widths,
-            strict=True,
-        ):
-            width_index = tuple(cast(Iterable[int], histogram.metadata["index"]))
-            if not np.isfinite(average_width) or average_width <= 0.0:
-                raise ValueError(
-                    f"Average width for index {width_index} must be positive and finite."
-                )
-
-        for histogram, average_width in zip(
-            self.width_histogram_buffers,
-            average_widths,
-            strict=True,
-        ):
-            histogram.attach_metadata({"average_width": average_width})
-            histogram.bins[:] /= average_width
-            histogram.compute_histogram()
 
     @override
     def _execute(self) -> None:

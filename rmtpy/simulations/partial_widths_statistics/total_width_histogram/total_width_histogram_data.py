@@ -1,6 +1,6 @@
 import attrs
 
-from ...histograms import Histogram
+from ...histograms import MeanScaledHistogram
 
 TOTAL_WIDTH_LOG10_SUPPORT: tuple[float, float] = (-2.0, 3.0)
 
@@ -10,7 +10,7 @@ WIDTH_LOG_BASE: float = 10.0
 
 
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
-class TotalWidthHistogram(Histogram):
+class TotalWidthHistogram(MeanScaledHistogram):
     @classmethod
     def create(
         cls,
