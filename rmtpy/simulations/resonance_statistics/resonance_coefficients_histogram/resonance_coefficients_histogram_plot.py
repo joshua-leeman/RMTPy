@@ -179,13 +179,12 @@ class ResonanceCoefficientsHistogramPlot(Plot):
         )
         coupling_exponent = 0.0 if abs(coupling_exponent) < 0.005 else coupling_exponent
         coupling_label = rf"$\alpha = {{{coupling_exponent:.1f}}}$"
-        if not self.legend.title:
-            self.legend.title = (
-                ensemble.to_latex
-                + "\n"
-                + rf"$N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
-                + f", {{{coupling_label}}}"
-            )
+        self.axes.title = (
+            "Resonance Coefficients: "
+            + ensemble.to_latex
+            + rf", $N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
+            + f", {{{coupling_label}}}"
+        )
 
         self._derived_attributes_are_set = True
 

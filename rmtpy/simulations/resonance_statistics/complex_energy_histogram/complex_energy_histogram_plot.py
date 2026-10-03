@@ -11,7 +11,7 @@ from matplotlib.ticker import NullFormatter
 
 from ....compounds import CompoundEnsemble
 from ...base_data import Data
-from ...base_plot import Plot, PlotAxes, PlotLegend
+from ...base_plot import CURVE_WIDTH, Plot, PlotAxes, PlotLegend
 from .complex_energy_histogram_data import ComplexEnergyHistogram
 
 
@@ -54,7 +54,7 @@ class ComplexEnergyHistogramPlot(Plot):
 
     width_curve_zorder: int = 2
     width_curve_alpha: float = 1.0
-    width_curve_width: float = 1.0
+    width_curve_width: float = CURVE_WIDTH
     width_curve_color: str = "Cyan"
     width_curve_legend: str = "average width"
 
@@ -90,13 +90,12 @@ class ComplexEnergyHistogramPlot(Plot):
         )
         coupling_exponent = 0.0 if abs(coupling_exponent) < 0.005 else coupling_exponent
         coupling_label = rf"$\alpha = {{{coupling_exponent:.1f}}}$"
-        if not self.legend.title:
-            self.legend.title = (
-                ensemble.to_latex
-                + "\n"
-                + rf"$N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
-                + f", {{{coupling_label}}}"
-            )
+        self.axes.title = (
+            "Complex Resonances: "
+            + ensemble.to_latex
+            + rf", $N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
+            + f", {{{coupling_label}}}"
+        )
 
         self.scale_limits_and_ticks(y=lambda value: 10**value)
 
@@ -194,24 +193,18 @@ class UnfoldedComplexEnergyHistogramPlot(ComplexEnergyHistogramPlot):
         )
         coupling_exponent = 0.0 if abs(coupling_exponent) < 0.005 else coupling_exponent
         coupling_label = rf"$\alpha = {{{coupling_exponent:.1f}}}$"
-        if not self.legend.title:
-            unfolding_type = self.data.metadata["unfolding"]
-            if unfolding_type != "weight":
-                unfolding_degree = self.data.metadata["polynomial_degree"]
-                self.legend.title = (
-                    ensemble.to_latex
-                    + f"\n{unfolding_type} unfolded, degree {unfolding_degree}"
-                    + "\n"
-                    + rf"$N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
-                    + f", {{{coupling_label}}}"
-                )
-            else:
-                self.legend.title = (
-                    ensemble.to_latex
-                    + "\nweight unfolded"
-                    + "\n"
-                    + rf"$N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
-                    + f", {{{coupling_label}}}"
-                )
+        unfolding_type = cast(str, self.data.metadata["unfolding"])
+        unfolding_label = (
+            "Average" if unfolding_type == "averaged" else unfolding_type.capitalize()
+        )
+        title = f"{unfolding_label}-unfolded"
+        if unfolding_type != "weight":
+            unfolding_degree = self.data.metadata["polynomial_degree"]
+            title += f" (deg = ${unfolding_degree}$)"
+        self.axes.title = (
+            f"{title} Complex Resonances: {ensemble.to_latex}"
+            + rf", $N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
+            + f", {{{coupling_label}}}"
+        )
 
         self.scale_limits_and_ticks(y=lambda value: 10**value)

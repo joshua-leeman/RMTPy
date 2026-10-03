@@ -77,13 +77,12 @@ class WidthHistogramPlot(Plot):
         )
         coupling_exponent = 0.0 if abs(coupling_exponent) < 0.005 else coupling_exponent
         coupling_label = rf"$\alpha = {{{coupling_exponent:.1f}}}$"
-        if not self.legend.title:
-            self.legend.title = (
-                ensemble.to_latex
-                + "\n"
-                + rf"$N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
-                + f", {{{coupling_label}}}"
-            )
+        self.axes.title = (
+            "Resonance Width Distribution: "
+            + ensemble.to_latex
+            + rf", $N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
+            + f", {{{coupling_label}}}"
+        )
 
         self.scale_limits_and_ticks(
             x=lambda value: 10**value,
@@ -179,25 +178,19 @@ class UnfoldedWidthHistogramPlot(Plot):
         )
         coupling_exponent = 0.0 if abs(coupling_exponent) < 0.005 else coupling_exponent
         coupling_label = rf"$\alpha = {{{coupling_exponent:.1f}}}$"
-        if not self.legend.title:
-            unfolding_type = self.data.metadata["unfolding"]
-            if unfolding_type != "weight":
-                unfolding_degree = self.data.metadata["polynomial_degree"]
-                self.legend.title = (
-                    ensemble.to_latex
-                    + f"\n{unfolding_type} unfolded, degree {unfolding_degree}"
-                    + "\n"
-                    + rf"$N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
-                    + f", {{{coupling_label}}}"
-                )
-            else:
-                self.legend.title = (
-                    ensemble.to_latex
-                    + "\nweight unfolded"
-                    + "\n"
-                    + rf"$N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
-                    + f", {{{coupling_label}}}"
-                )
+        unfolding_type = cast(str, self.data.metadata["unfolding"])
+        unfolding_label = (
+            "Average" if unfolding_type == "averaged" else unfolding_type.capitalize()
+        )
+        title = f"{unfolding_label}-unfolded"
+        if unfolding_type != "weight":
+            unfolding_degree = self.data.metadata["polynomial_degree"]
+            title += f" (deg = ${unfolding_degree}$)"
+        self.axes.title = (
+            f"{title} Resonance Width Distribution: {ensemble.to_latex}"
+            + rf", $N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
+            + f", {{{coupling_label}}}"
+        )
 
         self.scale_limits_and_ticks(
             x=lambda value: 10**value,

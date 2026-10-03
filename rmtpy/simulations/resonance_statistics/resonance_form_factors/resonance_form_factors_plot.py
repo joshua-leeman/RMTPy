@@ -12,6 +12,9 @@ from scipy.special import jn_zeros
 from ....compounds import CompoundEnsemble
 from ...base_data import Data
 from ...base_plot import (
+    CONNECTED_FORM_FACTOR_COLOR,
+    CURVE_WIDTH,
+    FORM_FACTOR_COLOR,
     LogDimensionTimeAxes,
     LogDimensionUnfoldedTimeAxes,
     Plot,
@@ -42,15 +45,15 @@ class ResonanceFormFactorsPlot(Plot):
     ylim: tuple[float, float] = (-2.2, 0.2)
 
     sff_zorder: int = 2
-    sff_width: float = 0.5
+    sff_width: float = CURVE_WIDTH
     sff_alpha: float = 1.0
-    sff_color: str = "Blue"
+    sff_color: str = FORM_FACTOR_COLOR
     sff_legend: str = r"$K(u)$"
 
     csff_zorder: int = 2
-    csff_width: float = 0.5
+    csff_width: float = CURVE_WIDTH
     csff_alpha: float = 1.0
-    csff_color: str = "Red"
+    csff_color: str = CONNECTED_FORM_FACTOR_COLOR
     csff_legend: str = r"$K_{\text{\tiny conn}}(u)$"
 
     legend_labels: tuple[str, str] = (sff_legend, csff_legend)
@@ -78,13 +81,12 @@ class ResonanceFormFactorsPlot(Plot):
         )
         coupling_exponent = 0.0 if abs(coupling_exponent) < 0.005 else coupling_exponent
         coupling_label = rf"$\alpha = {{{coupling_exponent:.1f}}}$"
-        if not self.legend.title:
-            self.legend.title = (
-                ensemble.to_latex
-                + "\n"
-                + rf"$N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
-                + f", {{{coupling_label}}}"
-            )
+        self.axes.title = (
+            "Resonance Form Factors: "
+            + ensemble.to_latex
+            + rf", $N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
+            + f", {{{coupling_label}}}"
+        )
 
         j_1_1 = cast(float, jn_zeros(1, 1)[0])
         self.scale_limits_and_ticks(
@@ -164,21 +166,22 @@ class UnfoldedResonanceFormFactorsPlot(Plot):
     ylim: tuple[float, float] = (-2.2, 0.2)
 
     sff_zorder: int = 2
-    sff_width: float = 0.5
+    sff_width: float = CURVE_WIDTH
     sff_alpha: float = 1.0
-    sff_color: str = "Blue"
+    sff_color: str = FORM_FACTOR_COLOR
     sff_legend: str = r"$K(\upsilon)$"
 
     csff_zorder: int = 2
-    csff_width: float = 0.5
+    csff_width: float = CURVE_WIDTH
     csff_alpha: float = 1.0
-    csff_color: str = "Red"
+    csff_color: str = CONNECTED_FORM_FACTOR_COLOR
     csff_legend: str = r"$K_{\text{\tiny conn}}(\upsilon)$"
 
     universal_sff_zorder: int = 2
-    universal_sff_width: float = 0.5
+    universal_sff_width: float = CURVE_WIDTH
     universal_sff_alpha: float = 1.0
     universal_sff_color: str = "Black"
+    universal_sff_style: str = "dotted"
     universal_sff_legend: str = "universal"
 
     legend_labels: tuple[str, str, str] = (
@@ -195,6 +198,7 @@ class UnfoldedResonanceFormFactorsPlot(Plot):
             color=universal_sff_color,
             alpha=universal_sff_alpha,
             linewidth=universal_sff_width,
+            linestyle=universal_sff_style,
         ),
     )
 
@@ -228,25 +232,19 @@ class UnfoldedResonanceFormFactorsPlot(Plot):
         )
         coupling_exponent = 0.0 if abs(coupling_exponent) < 0.005 else coupling_exponent
         coupling_label = rf"$\alpha = {{{coupling_exponent:.1f}}}$"
-        if not self.legend.title:
-            unfolding_type = self.data.metadata["unfolding"]
-            if unfolding_type != "weight":
-                unfolding_degree = self.data.metadata["polynomial_degree"]
-                self.legend.title = (
-                    ensemble.to_latex
-                    + f"\n{unfolding_type} unfolded, degree {unfolding_degree}"
-                    + "\n"
-                    + rf"$N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
-                    + f", {{{coupling_label}}}"
-                )
-            else:
-                self.legend.title = (
-                    ensemble.to_latex
-                    + "\nweight unfolded"
-                    + "\n"
-                    + rf"$N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
-                    + f", {{{coupling_label}}}"
-                )
+        unfolding_type = cast(str, self.data.metadata["unfolding"])
+        unfolding_label = (
+            "Average" if unfolding_type == "averaged" else unfolding_type.capitalize()
+        )
+        title = f"{unfolding_label}-unfolded"
+        if unfolding_type != "weight":
+            unfolding_degree = self.data.metadata["polynomial_degree"]
+            title += f" (deg = ${unfolding_degree}$)"
+        self.axes.title = (
+            f"{title} Resonance Form Factors: {ensemble.to_latex}"
+            + rf", $N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
+            + f", {{{coupling_label}}}"
+        )
 
         self.scale_limits_and_ticks(
             x=lambda value: math.pow(ensemble.dimension, value) * 2 * np.pi,
@@ -307,6 +305,7 @@ class UnfoldedResonanceFormFactorsPlot(Plot):
             color=self.universal_sff_color,
             alpha=self.universal_sff_alpha,
             linewidth=self.universal_sff_width,
+            linestyle=self.universal_sff_style,
             zorder=self.universal_sff_zorder,
             label=self.universal_sff_legend,
         )

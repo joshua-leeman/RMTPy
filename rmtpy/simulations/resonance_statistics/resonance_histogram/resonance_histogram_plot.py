@@ -12,7 +12,7 @@ from matplotlib.ticker import MaxNLocator
 from ....compounds import CompoundEnsemble
 from ....ensembles import PoissonEnsemble, SachdevYeKitaevEnsemble
 from ...base_data import Data
-from ...base_plot import Plot, PlotAxes, PlotLegend
+from ...base_plot import CURVE_WIDTH, Plot, PlotAxes, PlotLegend
 from .resonance_histogram_data import ResonanceHistogram
 
 _Y_AXIS_PADDING: float = 0.05
@@ -108,7 +108,7 @@ class ResonanceHistogramPlot(Plot):
     histogram_legend: str = "simulation"
 
     pdf_zorder: int = 2
-    pdf_width: float = 2.0
+    pdf_width: float = CURVE_WIDTH
     pdf_alpha: float = 1.0
     pdf_color: str = "Black"
     pdf_legend: str = "theory"
@@ -145,13 +145,12 @@ class ResonanceHistogramPlot(Plot):
         )
         coupling_exponent = 0.0 if abs(coupling_exponent) < 0.005 else coupling_exponent
         coupling_label = rf"$\alpha = {{{coupling_exponent:.1f}}}$"
-        if not self.legend.title:
-            self.legend.title = (
-                ensemble.to_latex
-                + "\n"
-                + rf"$N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
-                + f", {{{coupling_label}}}"
-            )
+        self.axes.title = (
+            "Resonance Density: "
+            + ensemble.to_latex
+            + rf", $N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
+            + f", {{{coupling_label}}}"
+        )
 
         axes = cast(ResonanceHistogramAxes, self.axes)
         if isinstance(ensemble, PoissonEnsemble):
@@ -325,7 +324,7 @@ class UnfoldedResonanceHistogramPlot(Plot):
     histogram_legend: str = "simulation"
 
     pdf_zorder: int = 2
-    pdf_width: float = 2.0
+    pdf_width: float = CURVE_WIDTH
     pdf_alpha: float = 1.0
     pdf_color: str = "Black"
     pdf_legend: str = "theory"
@@ -355,25 +354,19 @@ class UnfoldedResonanceHistogramPlot(Plot):
         )
         coupling_exponent = 0.0 if abs(coupling_exponent) < 0.005 else coupling_exponent
         coupling_label = rf"$\alpha = {{{coupling_exponent:.1f}}}$"
-        if not self.legend.title:
-            unfolding_type = self.data.metadata["unfolding"]
-            if unfolding_type != "weight":
-                unfolding_degree = self.data.metadata["polynomial_degree"]
-                self.legend.title = (
-                    ensemble.to_latex
-                    + f"\n{unfolding_type} unfolded, degree {unfolding_degree}"
-                    + "\n"
-                    + rf"$N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
-                    + f", {{{coupling_label}}}"
-                )
-            else:
-                self.legend.title = (
-                    ensemble.to_latex
-                    + "\nweight unfolded"
-                    + "\n"
-                    + rf"$N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
-                    + f", {{{coupling_label}}}"
-                )
+        unfolding_type = cast(str, self.data.metadata["unfolding"])
+        unfolding_label = (
+            "Average" if unfolding_type == "averaged" else unfolding_type.capitalize()
+        )
+        title = f"{unfolding_label}-unfolded"
+        if unfolding_type != "weight":
+            unfolding_degree = self.data.metadata["polynomial_degree"]
+            title += f" (deg = ${unfolding_degree}$)"
+        self.axes.title = (
+            f"{title} Resonance Density: {ensemble.to_latex}"
+            + rf", $N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
+            + f", {{{coupling_label}}}"
+        )
 
         self.scale_limits_and_ticks(
             x=lambda value: value * ensemble.dimension,
