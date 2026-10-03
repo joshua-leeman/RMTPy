@@ -36,6 +36,10 @@ type LegendLocation = Literal[
     "center",
 ]
 
+CURVE_WIDTH: float = 2.0
+FORM_FACTOR_COLOR: str = "#0072B2"
+CONNECTED_FORM_FACTOR_COLOR: str = "#D55E00"
+
 
 class Spine(Protocol):
     def set_linewidth(self, width: float) -> object: ...
@@ -47,6 +51,8 @@ class ConfigurableAxes(Protocol):
     def get_xscale(self) -> str: ...
 
     def get_yscale(self) -> str: ...
+
+    def set_title(self, title: str, *, fontsize: float = ...) -> object: ...
 
     def set_xlabel(self, xlabel: str, *, fontsize: float = ...) -> object: ...
 
@@ -119,6 +125,7 @@ def _plot_configuration(value: object) -> object:
 class PlotAxes:
     axes_width: float = 1.0
 
+    title: str = ""
     xlabel: str = ""
     ylabel: str = ""
     ylabel_fontsize: int = 12
@@ -141,6 +148,8 @@ class PlotAxes:
 
         is_log_log = axes.get_xscale() == axes.get_yscale() == "log"
 
+        if self.title:
+            _ = axes.set_title(self.title, fontsize=self.xlabel_fontsize)
         if self.xlabel:
             _ = axes.set_xlabel(self.xlabel, fontsize=self.xlabel_fontsize)
         if self.ylabel:
@@ -248,43 +257,24 @@ class PlotLegend:
 
     on_black_background: bool = False
 
-    title: str = ""
-    title_fontsize: int = 10
-    title_linegap: float = 2.0  # points
-
     loc: LegendLocation = "best"
     bbox: tuple[float, ...] = ()
     frameon: bool = False
 
-    def _formatted_title(self, *, usetex: bool) -> str:
-        if not usetex or "\n" not in self.title:
-            return self.title
-
-        linebreak = rf"\\[{self.title_linegap:g}pt]"
-        return rf"\shortstack[l]{{{linebreak.join(self.title.split('\n'))}}}"
-
     def configure(self, ax: Axes) -> None:
         if self.handles and self.labels:
-            usetex = bool(matplotlib.rcParams["text.usetex"])
             configure_legend = cast(Callable[..., Legend], ax.legend)
             legend = configure_legend(
                 handles=self.handles,
                 labels=self.labels,
-                title=self._formatted_title(usetex=usetex),
                 loc=self.loc,
                 bbox_to_anchor=self.bbox,
                 frameon=self.frameon,
                 fontsize=self.fontsize,
-                title_fontsize=self.title_fontsize,
                 alignment=self.textalignment,
             )
 
-            title = legend.get_title()
-            if not usetex and "\n" in self.title:
-                title.set_linespacing(1.0 + self.title_linegap / self.title_fontsize)
-
             if self.on_black_background:
-                title.set_color("white")
                 for text in legend.get_texts():
                     text.set_color("white")
 
