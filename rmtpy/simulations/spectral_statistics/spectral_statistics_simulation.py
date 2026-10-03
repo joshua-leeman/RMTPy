@@ -11,7 +11,6 @@ from ...ensembles.many_body_ensemble import RealEigenvalues
 from ..base_data import Data
 from ..base_plot import Plot
 from ..base_simulation import DEFAULT_OUTPUT_ROOT, ExecutionState, Simulation
-from ..histograms import Histogram
 from ..statistics import (
     REALIZATIONS_METADATA,
     nearest_neighbor_spacings,
@@ -164,7 +163,10 @@ def _create_coefficient_buffers(
 ) -> Iterable[SpectralCoefficientsHistogram]:
     spectral_coeff_histogram_list: list[SpectralCoefficientsHistogram] = []
     for degree in range(1, simulation.ensemble.max_spectral_polynomial_degree + 1):
-        spectral_coeff_histogram = SpectralCoefficientsHistogram.create(degree=degree)
+        spectral_coeff_histogram = SpectralCoefficientsHistogram.create(
+            degree=degree,
+            dimension=simulation.ensemble.dimension,
+        )
         spectral_coeff_histogram_list.append(spectral_coeff_histogram)
 
     return tuple(spectral_coeff_histogram_list)
@@ -197,7 +199,7 @@ def _create_averaged_unfolded_buffers(
         list_of_buffers.append(
             SpectralStatisticsBuffers.create_unfolded(
                 simulation=simulation,
-                unfolding="averaged",
+                unfolding="average",
                 polynomial_degree=polynomial_degree,
             )
         )
@@ -346,24 +348,22 @@ class SpectralStatisticsSimulation(Simulation):
         dimension = self.ensemble.dimension
         density = self.ensemble.spectral_density
         coefficient_buffers = tuple(self.coefficient_buffers)
-        coefficient_samples = np.empty(
-            (len(coefficient_buffers), self.realizs),
-            dtype=np.float64,
-        )
-
         cdf_factory = self._build_cdf_factory()
 
         average_cdfs = cdf_factory.average_interpolators()
 
-        for realization, eigvals in enumerate(
-            self.ensemble.eigvals_stream(realizs=self.realizs)
-        ):
+        for eigvals in self.ensemble.eigvals_stream(realizs=self.realizs):
             self.raw_buffers.accumulate_eigenvalues(eigvals, degeneracy=degeneracy)
 
             variate_coeffs = density.compute_variate_coeffs(eigvals)
-            coefficient_samples[:, realization] = variate_coeffs[
-                1 : len(coefficient_buffers) + 1
-            ]
+            for histogram, coefficient in zip(
+                coefficient_buffers,
+                variate_coeffs[1 : len(coefficient_buffers) + 1],
+                strict=True,
+            ):
+                histogram.add_histogram_contribution(
+                    np.array([coefficient], dtype=np.float64)
+                )
 
             wgt_unf_eigvals = unfold_values(
                 eigvals, cdf=density.weight_cdf, dimension=dimension
@@ -380,42 +380,6 @@ class SpectralStatisticsSimulation(Simulation):
             for cdf, buffers in zip(variate_cdfs, self.var_unfolded_buffers, strict=True):
                 variate_levels = unfold_values(eigvals, cdf=cdf, dimension=dimension)
                 buffers.accumulate_eigenvalues(variate_levels, degeneracy=degeneracy)
-
-        if not np.all(np.isfinite(coefficient_samples)):
-            raise ValueError("Spectral coefficients must be finite.")
-
-        for histogram, samples in zip(
-            coefficient_buffers,
-            coefficient_samples,
-            strict=True,
-        ):
-            bins = np.histogram_bin_edges(samples, bins="fd")
-            bins[-1] = np.nextafter(bins[-1], np.inf)
-            counts = np.histogram(samples, bins=bins)[0]
-            num_bins = len(counts)
-
-            object.__setattr__(histogram, "num_bins", num_bins)
-            object.__setattr__(
-                histogram,
-                "support",
-                (float(bins[0]), float(bins[-1])),
-            )
-            object.__setattr__(histogram, "bins", bins)
-            object.__setattr__(histogram, "counts", counts)
-            object.__setattr__(
-                histogram,
-                "histogram",
-                np.zeros(num_bins, dtype=np.float64),
-            )
-            object.__setattr__(histogram, "realizs", self.realizs)
-            attrs.validate(histogram)
-
-    def _finalize(self) -> None:
-        for data in self:
-            if isinstance(data, Histogram):
-                data.compute_histogram()
-            elif isinstance(data, FormFactorsData):
-                data.compute_form_factors()
 
     @override
     def _restore_execution(self) -> None:

@@ -9,7 +9,13 @@ from matplotlib.patches import Patch
 
 from ....ensembles import ManyBodyEnsemble
 from ...base_data import Data
-from ...base_plot import CURVE_WIDTH, Plot, PlotAxes, PlotLegend
+from ...base_plot import (
+    ENSEMBLE_AVERAGED_CURVE_WIDTH,
+    UNFOLDING_LABELS_BY_TYPE,
+    Plot,
+    PlotAxes,
+    PlotLegend,
+)
 
 
 @dataclasses.dataclass(slots=True, kw_only=True, eq=False, weakref_slot=False)
@@ -49,7 +55,7 @@ class SpacingsHistogramPlot(Plot):
     histogram_legend: str = "simulation"
 
     surmise_zorder: int = 2
-    surmise_width: float = CURVE_WIDTH
+    surmise_width: float = ENSEMBLE_AVERAGED_CURVE_WIDTH
     surmise_alpha: float = 1.0
     surmise_color: str = "Black"
     surmise_legend: str = "surmise"
@@ -75,7 +81,7 @@ class SpacingsHistogramPlot(Plot):
             loc="upper right",
             bbox=(0.94, 0.95),
         )
-        self.axes.title = "NNS Distribution: " + self.ensemble.to_latex
+        self.axes.title = "NNS PDF: " + self.ensemble.to_latex
 
         mean_spacing = cast(float, self.data.metadata["global_mean_spacing"])
 
@@ -152,7 +158,7 @@ class UnfoldedSpacingsHistogramPlot(Plot):
     histogram_legend: str = "simulation"
 
     surmise_zorder: int = 2
-    surmise_width: float = CURVE_WIDTH
+    surmise_width: float = ENSEMBLE_AVERAGED_CURVE_WIDTH
     surmise_alpha: float = 1.0
     surmise_color: str = "Black"
     surmise_legend: str = "surmise"
@@ -180,14 +186,13 @@ class UnfoldedSpacingsHistogramPlot(Plot):
         )
 
         unfolding_type = cast(str, self.data.metadata["unfolding"])
-        unfolding_label = (
-            "Average" if unfolding_type == "averaged" else unfolding_type.capitalize()
-        )
-        title = f"{unfolding_label}-unfolded"
+        unfolding_label = UNFOLDING_LABELS_BY_TYPE[unfolding_type]
         if unfolding_type != "weight":
             unfolding_degree = self.data.metadata["polynomial_degree"]
-            title += f" (deg = ${unfolding_degree}$)"
-        self.axes.title = f"{title} NNS Distribution: {self.ensemble.to_latex}"
+            title = f"{unfolding_label}({unfolding_degree})-unfolded"
+        else:
+            title = f"{unfolding_label}-unfolded"
+        self.axes.title = f"{title} NNS PDF: {self.ensemble.to_latex}"
 
     @override
     def plot(self, path: str | Path) -> None:

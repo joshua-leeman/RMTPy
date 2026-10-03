@@ -13,7 +13,13 @@ from ....ensembles import (
     SachdevYeKitaevEnsemble,
 )
 from ...base_data import Data
-from ...base_plot import CURVE_WIDTH, Plot, PlotAxes, PlotLegend
+from ...base_plot import (
+    ENSEMBLE_AVERAGED_CURVE_WIDTH,
+    UNFOLDING_LABELS_BY_TYPE,
+    Plot,
+    PlotAxes,
+    PlotLegend,
+)
 
 _POLYNOMIAL_WEIGHT_LEGEND: str = "polynomial weight"
 
@@ -85,7 +91,7 @@ class SpectralHistogramPlot(Plot):
     histogram_legend: str = "simulation"
 
     pdf_zorder: int = 2
-    pdf_width: float = CURVE_WIDTH
+    pdf_width: float = ENSEMBLE_AVERAGED_CURVE_WIDTH
     pdf_alpha: float = 1.0
     pdf_color: str = "Black"
     pdf_legend: str = "theory"
@@ -109,7 +115,7 @@ class SpectralHistogramPlot(Plot):
             loc="upper right",
             bbox=(0.99, 0.95),
         )
-        self.axes.title = "Spectral Density: " + self.ensemble.to_latex
+        self.axes.title = "Spectral PDF: " + self.ensemble.to_latex
 
         axes = cast(SpectralHistogramAxes, self.axes)
         if isinstance(self.ensemble, PoissonEnsemble):
@@ -202,7 +208,7 @@ class UnfoldedSpectralHistogramAxes(PlotAxes):
 
     yticks: tuple[float, ...] = (0.0, 0.5, 1.0, 1.5)  # units of dimension^{-1}
     yticks_minor: tuple[float, ...] = (0.25, 0.75, 1.25, 1.75)
-    ylabel: str = r"$\ensavg{\rho(\xi)} D$"
+    ylabel: str = r"$D \ensavg{\rho(\xi)}$"
     ytick_labels: tuple[str, ...] = (
         r"$0.0$",
         r"$0.5$",
@@ -226,7 +232,7 @@ class UnfoldedSpectralHistogramPlot(Plot):
     histogram_legend: str = "simulation"
 
     pdf_zorder: int = 2
-    pdf_width: float = CURVE_WIDTH
+    pdf_width: float = ENSEMBLE_AVERAGED_CURVE_WIDTH
     pdf_alpha: float = 1.0
     pdf_color: str = "Black"
     pdf_legend: str = "theory"
@@ -251,14 +257,13 @@ class UnfoldedSpectralHistogramPlot(Plot):
         )
 
         unfolding_type = cast(str, self.data.metadata["unfolding"])
-        unfolding_label = (
-            "Average" if unfolding_type == "averaged" else unfolding_type.capitalize()
-        )
-        title = f"{unfolding_label}-unfolded"
+        unfolding_label = UNFOLDING_LABELS_BY_TYPE[unfolding_type]
         if unfolding_type != "weight":
             unfolding_degree = self.data.metadata["polynomial_degree"]
-            title += f" (deg = ${unfolding_degree}$)"
-        self.axes.title = f"{title} Spectral Density: {self.ensemble.to_latex}"
+            title = f"{unfolding_label}({unfolding_degree})-unfolded"
+        else:
+            title = f"{unfolding_label}-unfolded"
+        self.axes.title = f"{title} Spectral PDF: {self.ensemble.to_latex}"
 
         self.scale_limits_and_ticks(
             x=lambda value: value * dimension,

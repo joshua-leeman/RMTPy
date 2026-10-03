@@ -10,7 +10,7 @@ from ....validators import is_support, to_support_pair
 from ...base_data import Data
 from ...statistics import LOG_D_TIME_SUPPORT, LOG_D_UNFOLDED_TIME_SUPPORT
 
-NUM_TIMES: int = 6000
+NUM_TIMES: int = 6144
 
 TIME_CHUNK_SIZE: int = 1024
 
@@ -64,7 +64,7 @@ def _validate_complex_series(
 
 
 def finalize_form_factors(form_factors: FormFactorsData) -> None:
-    form_factors.compute_form_factors()
+    form_factors.compute_statistics()
 
 
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
@@ -112,6 +112,14 @@ class FormFactorsData(Data):
         validator=_validate_real_series,
         repr=False,
     )
+    single_realization_form_factor: np.ndarray[tuple[int], np.dtype[np.floating]] = (
+        attrs.field(
+            default=attrs.Factory(_build_float_zeros, takes_self=True),
+            converter=np.asarray,
+            validator=_validate_real_series,
+            repr=False,
+        )
+    )
     form_factor: np.ndarray[tuple[int], np.dtype[np.floating]] = attrs.field(
         default=attrs.Factory(_build_float_zeros, takes_self=True),
         converter=np.asarray,
@@ -122,12 +130,6 @@ class FormFactorsData(Data):
         default=attrs.Factory(_build_float_zeros, takes_self=True),
         converter=np.asarray,
         validator=_validate_real_series,
-        repr=False,
-    )
-    realizs: int = attrs.field(
-        default=0,
-        converter=int,
-        validator=attrs.validators.ge(0),
         repr=False,
     )
 
@@ -189,9 +191,12 @@ class FormFactorsData(Data):
                 )
                 / len(levels),
             )
+            form_factor_contribution = np.abs(first_moment_contribution) ** 2
 
             self.first_moment[start:stop] += first_moment_contribution
-            self.second_moment[start:stop] += np.abs(first_moment_contribution) ** 2
+            self.second_moment[start:stop] += form_factor_contribution
+            if self.realizs == 0:
+                self.single_realization_form_factor[start:stop] = form_factor_contribution
 
         object.__setattr__(self, "realizs", self.realizs + 1)
 
@@ -202,6 +207,38 @@ class FormFactorsData(Data):
             return
 
         self.form_factor[:] = self.second_moment / self.realizs
+        if self.realizs == 1:
+            self.connected_form_factor.fill(0.0)
+            return
+
         self.connected_form_factor[:] = (
             self.form_factor - np.abs(self.first_moment / self.realizs) ** 2
-        )
+        ) * (self.realizs / (self.realizs - 1))
+
+    def add_contribution(self, contribution: Data, /) -> None:
+        self._validate_contribution(contribution)
+        if not isinstance(contribution, FormFactorsData):
+            raise TypeError("Form-factor contribution is malformed.")
+        if (
+            contribution.dimension != self.dimension
+            or contribution.logD_time_support != self.logD_time_support
+            or contribution.scale != self.scale
+            or contribution.num_times != self.num_times
+            or not np.array_equal(contribution.times, self.times)
+        ):
+            raise ValueError(
+                f"Form-factor contribution `{self._file_name}` has an "
+                + "incompatible time grid."
+            )
+
+        if self.realizs == 0 and contribution.realizs > 0:
+            self.single_realization_form_factor[:] = (
+                contribution.single_realization_form_factor
+            )
+
+        self.first_moment[:] += contribution.first_moment
+        self.second_moment[:] += contribution.second_moment
+        self._add_realizations(contribution)
+
+    def compute_statistics(self) -> None:
+        self.compute_form_factors()

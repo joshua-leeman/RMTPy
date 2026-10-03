@@ -54,6 +54,7 @@ def _latex_tick_labels(
     major_ticks: tuple[float, ...],
     *,
     show_positive_sign: bool,
+    min_decimal_places: int = 0,
 ) -> tuple[str, ...]:
     decimal_places = 0
     if len(major_ticks) > 1:
@@ -67,6 +68,7 @@ def _latex_tick_labels(
             abs_tol=1e-9,
         ):
             decimal_places += 1
+    decimal_places = max(decimal_places, min_decimal_places)
 
     step = major_ticks[1] - major_ticks[0] if len(major_ticks) > 1 else 1.0
     zero_tolerance = abs(step) * 1e-9
@@ -159,6 +161,7 @@ class SpectralCoefficientsHistogramPlot(Plot):
         self.axes.ytick_labels = _latex_tick_labels(
             self.axes.yticks,
             show_positive_sign=False,
+            min_decimal_places=1,
         )
 
         self.ensemble: ManyBodyEnsemble = self.store_manifest_arg(
