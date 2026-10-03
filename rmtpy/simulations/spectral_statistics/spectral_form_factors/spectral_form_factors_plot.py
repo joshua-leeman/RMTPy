@@ -151,19 +151,19 @@ class UnfoldedFormFactorsPlot(Plot):
     ylim: tuple[float, float] = (-2.2, 0.2)
 
     sff_zorder: int = 2
-    sff_width: float = 0.5
+    sff_width: float = 1.0
     sff_alpha: float = 1.0
     sff_color: str = "Blue"
     sff_legend: str = r"$K(\upsilon)$"
 
     csff_zorder: int = 2
-    csff_width: float = 0.5
+    csff_width: float = 1.0
     csff_alpha: float = 1.0
     csff_color: str = "Red"
     csff_legend: str = r"$K_{\text{\tiny conn}}(\upsilon)$"
 
     universal_sff_zorder: int = 2
-    universal_sff_width: float = 0.5
+    universal_sff_width: float = 1.0
     universal_sff_alpha: float = 1.0
     universal_sff_color: str = "Black"
     universal_sff_legend: str = "universal"
