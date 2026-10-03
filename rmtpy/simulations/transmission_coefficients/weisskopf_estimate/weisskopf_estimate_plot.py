@@ -7,7 +7,7 @@ from matplotlib.lines import Line2D
 
 from ....compounds import CompoundEnsemble
 from ...base_data import Data
-from ...base_plot import Plot, PlotAxes, PlotLegend
+from ...base_plot import CURVE_WIDTH, Plot, PlotAxes, PlotLegend
 from .weisskopf_estimate_data import WeisskopfEstimateData
 
 
@@ -32,7 +32,7 @@ class WeisskopfEstimatePlot(Plot):
     xlim: tuple[float, float] = (-1.0, 1.0)
 
     line_zorder: int = 2
-    line_width: float = 1.5
+    line_width: float = CURVE_WIDTH
     line_alpha: float = 1.0
     line_color: str = "#28536b"
     line_legend: str = "Weisskopf estimate"
@@ -68,12 +68,11 @@ class WeisskopfEstimatePlot(Plot):
             loc="upper right",
             bbox=(0.74, 0.95),
         )
-        if not self.legend.title:
-            self.legend.title = (
-                ensemble.to_latex
-                + "\n"
-                + rf"$N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
-            )
+        self.axes.title = (
+            "Weisskopf Estimate: "
+            + ensemble.to_latex
+            + rf", $N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
+        )
 
     @override
     def plot(self, path: str | Path) -> None:

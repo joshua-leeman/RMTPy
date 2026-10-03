@@ -7,7 +7,7 @@ from matplotlib.lines import Line2D
 
 from ....compounds import CompoundEnsemble
 from ...base_data import Data
-from ...base_plot import Plot, PlotAxes, PlotLegend
+from ...base_plot import CURVE_WIDTH, Plot, PlotAxes, PlotLegend
 from .transmission_coefficients_data import TransmissionCoefficientsData
 
 
@@ -33,7 +33,7 @@ class TransmissionCoefficientsPlot(Plot):
     ylim: tuple[float, float] = (0.0, 1.2)
 
     line_zorder: int = 2
-    line_width: float = 1.5
+    line_width: float = CURVE_WIDTH
     line_alpha: float = 1.0
     line_color: str = "#7b2d26"
     line_legend: str = "simulation"
@@ -71,13 +71,12 @@ class TransmissionCoefficientsPlot(Plot):
             loc="upper right",
             bbox=(0.98, 0.95),
         )
-        if not self.legend.title:
-            self.legend.title = (
-                ensemble.to_latex
-                + "\n"
-                + rf"$N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
-                + rf", $a = {{{channel_index}}}$"
-            )
+        self.axes.title = (
+            "Transmission Coefficients: "
+            + ensemble.to_latex
+            + rf", $N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
+            + rf", $a = {{{channel_index}}}$"
+        )
 
     @override
     def plot(self, path: str | Path) -> None:
