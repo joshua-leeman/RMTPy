@@ -10,7 +10,7 @@ from matplotlib.ticker import NullFormatter
 from ....compounds import CompoundEnsemble
 from ....density import compute_bin_centers
 from ...base_data import Data
-from ...base_plot import Plot, PlotAxes, PlotLegend
+from ...base_plot import CURVE_WIDTH, Plot, PlotAxes, PlotLegend
 from .partial_width_histogram_data import PartialWidthHistogram
 
 
@@ -50,7 +50,7 @@ class PartialWidthHistogramPlot(Plot):
     histogram_legend: str = "simulation"
 
     porter_thomas_zorder: int = 2
-    porter_thomas_width: float = 2.0
+    porter_thomas_width: float = CURVE_WIDTH
     porter_thomas_alpha: float = 1.0
     porter_thomas_color: str = "Black"
     porter_thomas_legend: str = "Porter-Thomas"
@@ -85,13 +85,12 @@ class PartialWidthHistogramPlot(Plot):
             bbox=(0.97, 0.95),
         )
 
-        if not self.legend.title:
-            self.legend.title = (
-                self.compound.ensemble.to_latex
-                + "\n"
-                + rf"$N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
-                + rf", $\mu = {{{state_index}}}$, $a = {{{channel_index}}}$"
-            )
+        self.axes.title = (
+            "Partial Widths: "
+            + self.compound.ensemble.to_latex
+            + rf", $N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
+            + rf", $\mu = {{{state_index}}}$, $a = {{{channel_index}}}$"
+        )
 
         self.scale_limits_and_ticks(
             x=lambda value: 10**value,
