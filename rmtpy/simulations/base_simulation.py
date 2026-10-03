@@ -1,11 +1,13 @@
 import json
 import os
+import re
 from collections.abc import Callable, Iterator
 from copy import deepcopy
 from pathlib import Path
 from typing import cast
 
 import attrs
+import numpy as np
 
 from ..conversion import (
     AttrsFields,
@@ -27,6 +29,8 @@ from .base_data import Data, graft_loaded_data, load_saved_data
 DEFAULT_OUTPUT_ROOT: Path = Path("outputs")
 
 MANIFEST_FILE_NAME: str = "manifest.json"
+
+JOB_OUTPUT_DIRECTORY_PATTERN: re.Pattern[str] = re.compile(r"job_(?P<index>\d+)_outputs")
 
 
 class ExecutionState(StringEnum):
@@ -101,6 +105,78 @@ def _structure_argument(value: object) -> object:
         return RandomMatrixEnsemble.create(source)
 
     return cast(dict[str, object], unwrapped_value)
+
+
+def _simulation_class_from_manifest(
+    manifest: SimulationManifest,
+) -> type[Simulation]:
+    module_name = cast(str, manifest.configuration["module"])
+    class_name = cast(str, manifest.configuration["type"])
+    simulation_cls = import_rmtpy_object(class_name, module_name=module_name)
+    if not isinstance(simulation_cls, type):
+        raise ValueError("Imported object is not a type.")
+    if not issubclass(simulation_cls, Simulation):
+        raise ValueError("Imported class is not a Simulation.")
+
+    return simulation_cls
+
+
+def _replace_nested_seeds(value: object, replacement: object) -> object:
+    if isinstance(value, dict):
+        return {
+            key: (
+                deepcopy(replacement)
+                if key == "seed"
+                else _replace_nested_seeds(item, replacement)
+            )
+            for key, item in cast(dict[str, object], value).items()
+        }
+    if isinstance(value, list):
+        return [_replace_nested_seeds(item, replacement) for item in value]
+
+    return deepcopy(value)
+
+
+def _aggregation_configuration(manifest: SimulationManifest) -> SourceDict:
+    configuration = deepcopy(manifest.configuration)
+    parameters = cast(dict[str, object], configuration["parameters"])
+    normalized_parameters = cast(
+        dict[str, object],
+        _replace_nested_seeds(parameters, None),
+    )
+    normalized_parameters.pop("realizs", None)
+    normalized_parameters.pop("_execution_state", None)
+    return {
+        "module": cast(str, configuration["module"]),
+        "type": cast(str, configuration["type"]),
+        "parameters": normalized_parameters,
+    }
+
+
+def _create_simulation_from_manifest(
+    manifest: SimulationManifest,
+    *,
+    realizs: int | None = None,
+    reset_seed: bool = False,
+) -> Simulation:
+    simulation_cls = _simulation_class_from_manifest(manifest)
+    parameters = deepcopy(cast(dict[str, object], manifest.configuration["parameters"]))
+    if realizs is not None:
+        parameters["realizs"] = realizs
+    if reset_seed:
+        parameters = cast(dict[str, object], _replace_nested_seeds(parameters, None))
+
+    arguments: dict[str, object] = {}
+    for field in cast(AttrsFields, attrs.fields(simulation_cls)):
+        if not field.init or field.default is not attrs.NOTHING:
+            continue
+        if field.name not in parameters:
+            raise ValueError(f"Manifest parameters are missing `{field.name}`.")
+
+        arguments[field.name] = _structure_argument(parameters[field.name])
+
+    simulation_factory = cast(Callable[..., Simulation], simulation_cls)
+    return simulation_factory(**arguments)
 
 
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
@@ -188,6 +264,10 @@ class Simulation:
             f"{type(self).__name__} has not implemented the execution program."
         )
 
+    def _finalize(self) -> None:
+        for data in self:
+            data.compute_statistics()
+
     def _restore_execution(self) -> None:
         pass
 
@@ -235,6 +315,219 @@ class Simulation:
         raise NotImplementedError(f"{type(self).__name__} has not implemented plotting.")
 
     @classmethod
+    def aggregate(cls, superfolder: str | Path, /) -> Simulation:
+        superfolder = Path(superfolder)
+        if not superfolder.is_dir():
+            raise ValueError(f"Aggregation superfolder `{superfolder}` is malformed.")
+
+        indexed_job_directories: list[tuple[int, Path]] = []
+        for child in superfolder.iterdir():
+            match = JOB_OUTPUT_DIRECTORY_PATTERN.fullmatch(child.name)
+            if child.is_dir() and match is not None:
+                indexed_job_directories.append((int(match.group("index")), child))
+
+        if not indexed_job_directories:
+            raise ValueError(
+                f"Aggregation superfolder `{superfolder}` has no job output directories."
+            )
+
+        indexed_job_directories.sort(key=lambda item: (item[0], item[1].name))
+        job_indices = [index for index, _ in indexed_job_directories]
+        if len(job_indices) != len(set(job_indices)):
+            raise ValueError("Job output directory indices must be unique.")
+
+        source_records: list[tuple[int, Path, SimulationManifest, type[Simulation]]] = []
+        for job_index, job_directory in indexed_job_directories:
+            candidates: list[tuple[Path, SimulationManifest, type[Simulation]]] = []
+            for manifest_path in sorted(job_directory.rglob(MANIFEST_FILE_NAME)):
+                manifest = SimulationManifest.create_manifest_from_path(manifest_path)
+                simulation_cls = _simulation_class_from_manifest(manifest)
+                if cls is Simulation or issubclass(simulation_cls, cls):
+                    candidates.append((manifest_path.parent, manifest, simulation_cls))
+
+            if len(candidates) != 1:
+                requested_name = (
+                    "an unambiguous simulation"
+                    if cls is Simulation
+                    else f"one {cls.__name__}"
+                )
+                raise ValueError(
+                    f"Job directory `{job_directory}` must contain exactly "
+                    + f"{requested_name}; found {len(candidates)}."
+                )
+
+            source_directory, manifest, simulation_cls = candidates[0]
+            source_records.append((job_index, source_directory, manifest, simulation_cls))
+
+        first_manifest = source_records[0][2]
+        first_simulation_cls = source_records[0][3]
+        normalized_configuration = _aggregation_configuration(first_manifest)
+        expected_dtype = first_manifest.dtype
+        source_realizs: list[int] = []
+        for _, source_directory, manifest, simulation_cls in source_records:
+            execution_state = manifest.execution.get("execution_state")
+            if execution_state != ExecutionState.COMPLETE:
+                raise ValueError(
+                    f"Simulation `{source_directory}` is not complete and cannot "
+                    + "be aggregated."
+                )
+            if simulation_cls is not first_simulation_cls:
+                raise ValueError("Job outputs contain different simulation classes.")
+            if _aggregation_configuration(manifest) != normalized_configuration:
+                raise ValueError(
+                    f"Simulation `{source_directory}` has an incompatible "
+                    + "scientific configuration."
+                )
+            if manifest.dtype != expected_dtype:
+                raise ValueError(
+                    f"Simulation `{source_directory}` has incompatible dtypes."
+                )
+
+            completion_time = manifest.execution.get("execution_time")
+            if not isinstance(completion_time, str) or completion_time == "":
+                raise ValueError(
+                    f"Simulation `{source_directory}` has a malformed completion time."
+                )
+
+            parameters = cast(dict[str, object], manifest.configuration["parameters"])
+            realizs = parameters.get("realizs")
+            if not isinstance(realizs, int) or isinstance(realizs, bool) or realizs < 1:
+                raise ValueError(
+                    f"Simulation `{source_directory}` has an invalid realization count."
+                )
+            source_realizs.append(realizs)
+
+        total_realizs = sum(source_realizs)
+        aggregate = _create_simulation_from_manifest(
+            first_manifest,
+            realizs=total_realizs,
+            reset_seed=True,
+        )
+
+        aggregate_data = {data._file_name: data for data in aggregate}
+        if len(aggregate_data) != len(tuple(aggregate)):
+            raise ValueError("Aggregate simulation contains duplicate data names.")
+
+        source_simulations: list[Simulation] = []
+        for (_, source_directory, _, _), expected_realizs in zip(
+            source_records,
+            source_realizs,
+            strict=True,
+        ):
+            source = Simulation.load(source_directory)
+            source_simulations.append(source)
+            source_data = {data._file_name: data for data in source}
+            if len(source_data) != len(tuple(source)):
+                raise ValueError(
+                    f"Simulation `{source_directory}` contains duplicate data names."
+                )
+            if set(source_data) != set(aggregate_data):
+                raise ValueError(
+                    f"Simulation `{source_directory}` has an incompatible data layout."
+                )
+            for data in source_data.values():
+                if data.realizs != expected_realizs:
+                    raise ValueError(
+                        f"Saved data `{data._file_name}` has {data.realizs} "
+                        + f"realizations; expected {expected_realizs}."
+                    )
+
+        for source in source_simulations:
+            source_data = {data._file_name: data for data in source}
+            for file_name, data in aggregate_data.items():
+                data.add_contribution(source_data[file_name])
+
+        for data in aggregate_data.values():
+            if data.realizs != total_realizs:
+                raise ValueError(
+                    f"Aggregated data `{data._file_name}` has {data.realizs} "
+                    + f"realizations; expected {total_realizs}."
+                )
+
+        aggregate._finalize()
+
+        calibrations: list[dict[str, object]] = []
+        for _, _, manifest, _ in source_records:
+            calibration = unwrap_json_value(manifest.execution.get("calibration", {}))
+            if not isinstance(calibration, dict):
+                raise ValueError("Saved simulation calibration is malformed.")
+            calibrations.append(cast(dict[str, object], calibration))
+
+        nonempty_calibrations = [
+            calibration for calibration in calibrations if calibration
+        ]
+        aggregate_calibration: dict[str, object] = {}
+        if nonempty_calibrations:
+            if len(nonempty_calibrations) != len(calibrations):
+                raise ValueError("Saved simulations have inconsistent calibrations.")
+
+            densities = {calibration.get("density") for calibration in calibrations}
+            if len(densities) != 1 or not all(
+                isinstance(density, str) for density in densities
+            ):
+                raise ValueError("Saved simulations have incompatible calibrations.")
+
+            coefficient_arrays = [
+                np.asarray(calibration.get("average_coefficients"), dtype=np.float64)
+                for calibration in calibrations
+            ]
+            first_shape = coefficient_arrays[0].shape
+            if not first_shape or any(
+                coefficients.shape != first_shape or not np.all(np.isfinite(coefficients))
+                for coefficients in coefficient_arrays
+            ):
+                raise ValueError("Saved simulations have malformed calibrations.")
+
+            pooled_coefficients = np.average(
+                np.stack(coefficient_arrays),
+                axis=0,
+                weights=np.asarray(source_realizs, dtype=np.float64),
+            )
+            aggregate_calibration = {
+                "density": densities.pop(),
+                "average_coefficients": pooled_coefficients,
+                "timing": "aggregated",
+            }
+
+        completion_time = read_utc_time()
+        source_seeds = [
+            deepcopy(manifest.rng.get("seed")) for _, _, manifest, _ in source_records
+        ]
+        aggregate.manifest.rng.update(
+            {
+                "policy": "aggregate",
+                "seed": {
+                    "type": "aggregate",
+                    "source_seeds": source_seeds,
+                },
+                "final_state": json_value(aggregate._rmg.rng_state),
+            }
+        )
+        aggregate.manifest.execution.clear()
+        aggregate.manifest.execution.update(
+            {
+                "execution_state": ExecutionState.COMPLETE,
+                "execution_time": completion_time,
+                "calibration": json_value(aggregate_calibration),
+                "aggregation": {
+                    "source_directories": [
+                        str(source_directory.relative_to(superfolder))
+                        for _, source_directory, _, _ in source_records
+                    ],
+                    "job_indices": [job_index for job_index, _, _, _ in source_records],
+                    "source_realizs": source_realizs,
+                    "source_completion_times": [
+                        manifest.execution.get("execution_time")
+                        for _, _, manifest, _ in source_records
+                    ],
+                },
+            }
+        )
+        object.__setattr__(aggregate, "_execution_state", ExecutionState.COMPLETE)
+        aggregate._restore_execution()
+        return aggregate
+
+    @classmethod
     def load(cls, directory: str | Path, /) -> Simulation:
         directory = Path(directory)
         manifest_path = directory / MANIFEST_FILE_NAME
@@ -243,26 +536,7 @@ class Simulation:
 
         manifest = SimulationManifest.create_manifest_from_path(manifest_path)
 
-        module_name = cast(str, manifest.configuration["module"])
-        class_name = cast(str, manifest.configuration["type"])
-        simulation_cls = import_rmtpy_object(class_name, module_name=module_name)
-        if not isinstance(simulation_cls, type):
-            raise ValueError("Imported object is not a type.")
-        if not issubclass(simulation_cls, Simulation):
-            raise ValueError("Imported class is not a Simulation.")
-
-        parameters = cast(dict[str, object], manifest.configuration["parameters"])
-        arguments: dict[str, object] = {}
-        for field in cast(AttrsFields, attrs.fields(simulation_cls)):
-            if not field.init or field.default is not attrs.NOTHING:
-                continue
-            if field.name not in parameters:
-                raise ValueError(f"Manifest parameters are missing `{field.name}`.")
-
-            arguments[field.name] = _structure_argument(parameters[field.name])
-
-        simulation_factory = cast(Callable[..., Simulation], simulation_cls)
-        simulation = simulation_factory(**arguments)
+        simulation = _create_simulation_from_manifest(manifest)
 
         loaded_data = load_saved_data(directory)
         _ = graft_loaded_data(simulation, loaded_data)
