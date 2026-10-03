@@ -1,5 +1,4 @@
 import dataclasses
-import math
 from collections.abc import Callable
 from pathlib import Path
 from typing import cast, override
@@ -8,7 +7,7 @@ import numpy as np
 from matplotlib.axes import Axes
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
-from matplotlib.ticker import LogLocator, NullLocator
+from matplotlib.ticker import FormatStrFormatter, LogLocator, NullLocator
 
 from .... import universal
 from ....compounds import CompoundEnsemble
@@ -16,7 +15,8 @@ from ....conversion import json_value
 from ....ensembles import ManyBodyEnsemble
 from ...base_data import Data
 from ...base_plot import (
-    CURVE_WIDTH,
+    ENSEMBLE_AVERAGED_CURVE_WIDTH,
+    UNFOLDING_LABELS_BY_TYPE,
     ConfigurableAxes,
     LogDimensionTimeAxes,
     LogDimensionUnfoldedTimeAxes,
@@ -40,7 +40,7 @@ from .time_delay_histogram_data import TimeDelayHistogram
 type FormFactorsPlotType = FormFactorsPlot | UnfoldedFormFactorsPlot
 type UnfoldingKey = tuple[str, int | None]
 
-_HISTOGRAM_COLOR: str = "#F0E442"
+TIME_DELAY_HISTOGRAM_COLOR: str = "#E8B03F"
 
 
 def format_energy_label(energy: float, energy_scale: float) -> str:
@@ -79,7 +79,7 @@ class SpectralFormFactorsOverlay:
         )
 
         for unfolding, buffers_collection in (
-            ("averaged", self.simulation.ave_unfolded_buffers),
+            ("average", self.simulation.ave_unfolded_buffers),
             ("variate", self.simulation.var_unfolded_buffers),
         ):
             for buffers in buffers_collection:
@@ -133,11 +133,11 @@ class SpectralFormFactorsOverlay:
     @staticmethod
     def _unfolding_key(data: Data) -> UnfoldingKey:
         unfolding = data.metadata.get("unfolding")
-        if unfolding not in {"raw", "weight", "averaged", "variate"}:
+        if unfolding not in {"raw", "weight", "average", "variate"}:
             raise ValueError("Plot-data unfolding metadata is malformed.")
 
         polynomial_degree = data.metadata.get("polynomial_degree")
-        if unfolding in {"averaged", "variate"}:
+        if unfolding in {"average", "variate"}:
             if (
                 isinstance(polynomial_degree, bool)
                 or not isinstance(polynomial_degree, int)
@@ -210,6 +210,7 @@ class _TimeDelayHistogramPlot(Plot):
     def set_form_factors_derived_attributes(self) -> None:
         if self.spectral_form_factors is None:
             return
+
         if not isinstance(self.data, TimeDelayHistogram):
             raise ValueError("Data must be a `TimeDelayHistogram` instance")
 
@@ -221,8 +222,8 @@ class _TimeDelayHistogramPlot(Plot):
             )
 
         self.form_factors_plot = form_factors_plot
-        self.legend.handles += form_factors_plot.legend.handles
-        self.legend.labels += form_factors_plot.legend.labels
+        self.legend.handles += form_factors_plot.legend.handles[:-1]
+        self.legend.labels += form_factors_plot.legend.labels[:-1]
         axes = cast(TimeDelayHistogramAxes | UnfoldedTimeDelayHistogramAxes, self.axes)
         axes.right_ticks = False
 
@@ -292,35 +293,21 @@ class _TimeDelayHistogramPlot(Plot):
         for spine in self.form_factors_ax.spines.values():
             _ = spine.set_linewidth(axes.axes_width)
 
-        if axes.ylabel:
-            _ = self.form_factors_ax.set_ylabel(
-                axes.ylabel,
-                fontsize=axes.ylabel_fontsize,
-            )
+        _ = self.form_factors_ax.set_ylabel(
+            "SFFs",
+            fontsize=axes.ylabel_fontsize,
+            rotation=270,
+            labelpad=15,
+        )
         if axes.yticks:
             _ = self.form_factors_ax.set_yticks(axes.yticks)
-
-        if axes.yticks_minor:
-            _ = self.form_factors_ax.set_yticks(axes.yticks_minor, minor=True)
-        elif len(axes.yticks) > 1:
-            _ = self.form_factors_ax.set_yticks(
-                tuple(
-                    math.sqrt(lower_tick * upper_tick)
-                    for lower_tick, upper_tick in zip(
-                        axes.yticks,
-                        axes.yticks[1:],
-                        strict=False,
-                    )
-                ),
-                minor=True,
-            )
 
         _ = self.form_factors_ax.tick_params(
             axis="y",
             direction="in",
             left=False,
             right=True,
-            which="both",
+            which="major",
             length=axes.tick_length,
             labelleft=False,
             labelright=True,
@@ -328,7 +315,8 @@ class _TimeDelayHistogramPlot(Plot):
         _ = self.form_factors_ax.tick_params(
             axis="y",
             which="minor",
-            length=axes.tick_length / 2,
+            left=False,
+            right=False,
             labelleft=False,
             labelright=False,
         )
@@ -371,10 +359,10 @@ class TimeDelayHistogramPlot(_TimeDelayHistogramPlot):
 
     histogram_zorder: int = 1
     histogram_alpha: float = 0.42
-    histogram_color: str = _HISTOGRAM_COLOR
+    histogram_color: str = TIME_DELAY_HISTOGRAM_COLOR
 
     pdf_zorder: int = 2
-    pdf_width: float = CURVE_WIDTH
+    pdf_width: float = ENSEMBLE_AVERAGED_CURVE_WIDTH
     pdf_alpha: float = 1.0
     pdf_color: str = "Black"
     pdf_legend: str = "BFB"
@@ -382,9 +370,6 @@ class TimeDelayHistogramPlot(_TimeDelayHistogramPlot):
     def set_derived_attributes(self) -> None:
         self.compound: CompoundEnsemble = self.store_manifest_arg(
             "compound", CompoundEnsemble
-        )
-        mean_coupling_squared = cast(
-            float, cast(object, np.mean(self.compound.couplings**2))
         )
         ensemble = self.compound.ensemble
 
@@ -406,19 +391,18 @@ class TimeDelayHistogramPlot(_TimeDelayHistogramPlot):
             handles=self.legend_handles,
             labels=self.legend_labels,
             loc="upper right",
-            bbox=(0.98, 0.95),
+            bbox=(0.98, 0.99),
         )
 
-        coupling_exponent = cast(
-            float, np.log10(mean_coupling_squared / ensemble.spectral_radius)
-        )
-        coupling_exponent = 0.0 if abs(coupling_exponent) < 0.005 else coupling_exponent
-        coupling_label = rf"$\alpha = {{{coupling_exponent:.1f}}}$"
+        if self.spectral_form_factors is None:
+            descriptive_title = "Time-delay PDF"
+        else:
+            descriptive_title = "Time-delay PDF vs SFFs"
+
         self.axes.title = (
-            "Time-delay Distribution: "
+            f"{descriptive_title}: "
             + ensemble.to_latex
             + rf", $N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
-            + f", {{{coupling_label}}}"
         )
 
         scale = cast(float, self.data.metadata["scale"])
@@ -435,6 +419,8 @@ class TimeDelayHistogramPlot(_TimeDelayHistogramPlot):
         self.set_form_factors_derived_attributes()
 
         self.build_figure()
+
+        self.ax.yaxis.set_major_formatter(FormatStrFormatter("%.1f"))
 
         set_xscale = cast(Callable[..., object], self.ax.set_xscale)
         _ = set_xscale("log", base=self.compound.ensemble.dimension)
@@ -494,10 +480,10 @@ class UnfoldedTimeDelayHistogramPlot(_TimeDelayHistogramPlot):
 
     histogram_zorder: int = 1
     histogram_alpha: float = 0.42
-    histogram_color: str = _HISTOGRAM_COLOR
+    histogram_color: str = TIME_DELAY_HISTOGRAM_COLOR
 
     pdf_zorder: int = 2
-    pdf_width: float = CURVE_WIDTH
+    pdf_width: float = ENSEMBLE_AVERAGED_CURVE_WIDTH
     pdf_alpha: float = 1.0
     pdf_color: str = "Black"
     pdf_legend: str = "BFB"
@@ -506,7 +492,6 @@ class UnfoldedTimeDelayHistogramPlot(_TimeDelayHistogramPlot):
         self.compound: CompoundEnsemble = self.store_manifest_arg(
             "compound", CompoundEnsemble
         )
-        mean_coupling_squared = float(np.mean(self.compound.couplings**2))
         ensemble = self.compound.ensemble
 
         energy = cast(float, self.data.metadata["energy"])
@@ -527,26 +512,24 @@ class UnfoldedTimeDelayHistogramPlot(_TimeDelayHistogramPlot):
             handles=self.legend_handles,
             labels=self.legend_labels,
             loc="upper right",
-            bbox=(0.98, 0.95),
+            bbox=(0.98, 0.99),
         )
 
-        coupling_exponent = cast(
-            float, np.log10(mean_coupling_squared / ensemble.spectral_radius)
-        )
-        coupling_exponent = 0.0 if abs(coupling_exponent) < 0.005 else coupling_exponent
-        coupling_label = rf"$\alpha = {{{coupling_exponent:.1f}}}$"
+        if self.spectral_form_factors is None:
+            descriptive_title = "Time-delay PDF"
+        else:
+            descriptive_title = "Time-delay PDF vs SFFs"
+
         unfolding_type = cast(str, self.data.metadata["unfolding"])
-        unfolding_label = (
-            "Average" if unfolding_type == "averaged" else unfolding_type.capitalize()
-        )
-        title = f"{unfolding_label}-unfolded"
+        unfolding_label = UNFOLDING_LABELS_BY_TYPE[unfolding_type]
         if unfolding_type != "weight":
-            polynomial_degree = self.data.metadata["polynomial_degree"]
-            title += f" (deg = ${polynomial_degree}$)"
+            unfolding_degree = self.data.metadata["polynomial_degree"]
+            title = f"{unfolding_label}({unfolding_degree})-unfolded"
+        else:
+            title = f"{unfolding_label}-unfolded"
         self.axes.title = (
-            f"{title} Time-delay Distribution: {ensemble.to_latex}"
+            f"{title} {descriptive_title}: {ensemble.to_latex}"
             + rf", $N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
-            + f", {{{coupling_label}}}"
         )
 
         scale = cast(float, self.data.metadata["scale"])
@@ -563,6 +546,8 @@ class UnfoldedTimeDelayHistogramPlot(_TimeDelayHistogramPlot):
         self.set_form_factors_derived_attributes()
 
         self.build_figure()
+
+        self.ax.yaxis.set_major_formatter(FormatStrFormatter("%.1f"))
 
         set_xscale = cast(Callable[..., object], self.ax.set_xscale)
         _ = set_xscale("log", base=self.compound.ensemble.dimension)

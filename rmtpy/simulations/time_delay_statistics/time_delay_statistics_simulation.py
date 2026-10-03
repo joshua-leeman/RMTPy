@@ -10,7 +10,6 @@ from ...conversion import unwrap_json_value
 from ...ensembles import RandomMatrixEnsemble
 from ..base_data import Data
 from ..base_simulation import DEFAULT_OUTPUT_ROOT, ExecutionState, Simulation
-from ..histograms import Histogram
 from ..statistics import REALIZATIONS_METADATA, truncated_polynomial_degree_range
 from ..unfolding import CDF, TruncatedPolynomialCDFFactory, unfold_widths
 from .time_delay_histogram import (
@@ -236,7 +235,7 @@ def _create_averaged_unfolded_buffers(
         list_of_buffers.append(
             TimeDelayStatisticsBuffers.create_unfolded(
                 simulation=simulation,
-                unfolding="averaged",
+                unfolding="average",
                 polynomial_degree=polynomial_degree,
             )
         )
@@ -430,11 +429,6 @@ class TimeDelayStatisticsSimulation(Simulation):
                     cdf=cdf,
                     dimension=ensemble.dimension,
                 )
-
-    def _finalize(self) -> None:
-        for data in self:
-            if isinstance(data, Histogram):
-                data.compute_histogram()
 
     @override
     def _restore_execution(self) -> None:
