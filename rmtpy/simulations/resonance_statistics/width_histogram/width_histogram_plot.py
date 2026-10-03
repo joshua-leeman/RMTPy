@@ -9,7 +9,7 @@ from matplotlib.ticker import NullFormatter
 
 from ....compounds import CompoundEnsemble
 from ...base_data import Data
-from ...base_plot import Plot, PlotAxes, PlotLegend
+from ...base_plot import UNFOLDING_LABELS_BY_TYPE, Plot, PlotAxes, PlotLegend
 from .width_histogram_data import WidthHistogram
 
 
@@ -77,8 +77,9 @@ class WidthHistogramPlot(Plot):
         )
         coupling_exponent = 0.0 if abs(coupling_exponent) < 0.005 else coupling_exponent
         coupling_label = rf"$\alpha = {{{coupling_exponent:.1f}}}$"
+
         self.axes.title = (
-            "Resonance Width Distribution: "
+            "Pole-width PDF: "
             + ensemble.to_latex
             + rf", $N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
             + f", {{{coupling_label}}}"
@@ -178,16 +179,16 @@ class UnfoldedWidthHistogramPlot(Plot):
         )
         coupling_exponent = 0.0 if abs(coupling_exponent) < 0.005 else coupling_exponent
         coupling_label = rf"$\alpha = {{{coupling_exponent:.1f}}}$"
+
         unfolding_type = cast(str, self.data.metadata["unfolding"])
-        unfolding_label = (
-            "Average" if unfolding_type == "averaged" else unfolding_type.capitalize()
-        )
-        title = f"{unfolding_label}-unfolded"
+        unfolding_label = UNFOLDING_LABELS_BY_TYPE[unfolding_type]
         if unfolding_type != "weight":
             unfolding_degree = self.data.metadata["polynomial_degree"]
-            title += f" (deg = ${unfolding_degree}$)"
+            title = f"{unfolding_label}({unfolding_degree})-unfolded"
+        else:
+            title = f"{unfolding_label}-unfolded"
         self.axes.title = (
-            f"{title} Resonance Width Distribution: {ensemble.to_latex}"
+            f"{title} Pole-width PDF: {ensemble.to_latex}"
             + rf", $N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
             + f", {{{coupling_label}}}"
         )

@@ -11,7 +11,14 @@ from matplotlib.ticker import NullFormatter
 
 from ....compounds import CompoundEnsemble
 from ...base_data import Data
-from ...base_plot import CURVE_WIDTH, Plot, PlotAxes, PlotLegend
+from ...base_plot import (
+    ENSEMBLE_AVERAGED_CURVE_WIDTH,
+    UNFOLDING_LABELS_BY_TYPE,
+    ConfigurableAxes,
+    Plot,
+    PlotAxes,
+    PlotLegend,
+)
 from .complex_energy_histogram_data import ComplexEnergyHistogram
 
 
@@ -37,6 +44,15 @@ class ComplexEnergyHistogramAxes(PlotAxes):
         r"$+4.0$",
     )
 
+    @override
+    def configure(self, axes: ConfigurableAxes) -> None:
+        super().configure(axes)
+        _ = axes.tick_params(
+            axis="x",
+            which="minor",
+            length=self.tick_length / 2,
+        )
+
 
 @dataclasses.dataclass(slots=True, kw_only=True, eq=False, weakref_slot=False)
 class ComplexEnergyHistogramPlot(Plot):
@@ -54,9 +70,9 @@ class ComplexEnergyHistogramPlot(Plot):
 
     width_curve_zorder: int = 2
     width_curve_alpha: float = 1.0
-    width_curve_width: float = CURVE_WIDTH
+    width_ENSEMBLE_AVERAGED_CURVE_WIDTH: float = ENSEMBLE_AVERAGED_CURVE_WIDTH
     width_curve_color: str = "Cyan"
-    width_curve_legend: str = "average width"
+    width_curve_legend: str = r"$\ensavg{\Gamma(E)}$"
 
     legend_labels: tuple[str, str] = (histogram_legend, width_curve_legend)
     legend_handles: tuple[Patch, Line2D] = (
@@ -66,7 +82,7 @@ class ComplexEnergyHistogramPlot(Plot):
             [0],
             color=width_curve_color,
             alpha=width_curve_alpha,
-            linewidth=width_curve_width,
+            linewidth=width_ENSEMBLE_AVERAGED_CURVE_WIDTH,
         ),
     )
 
@@ -90,8 +106,9 @@ class ComplexEnergyHistogramPlot(Plot):
         )
         coupling_exponent = 0.0 if abs(coupling_exponent) < 0.005 else coupling_exponent
         coupling_label = rf"$\alpha = {{{coupling_exponent:.1f}}}$"
+
         self.axes.title = (
-            "Complex Resonances: "
+            "Pole Distribution: "
             + ensemble.to_latex
             + rf", $N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
             + f", {{{coupling_label}}}"
@@ -156,7 +173,7 @@ class ComplexEnergyHistogramPlot(Plot):
                 average_width_given_center,
                 color=self.width_curve_color,
                 alpha=self.width_curve_alpha,
-                linewidth=self.width_curve_width,
+                linewidth=self.width_ENSEMBLE_AVERAGED_CURVE_WIDTH,
                 zorder=self.width_curve_zorder,
             )
 
@@ -193,16 +210,16 @@ class UnfoldedComplexEnergyHistogramPlot(ComplexEnergyHistogramPlot):
         )
         coupling_exponent = 0.0 if abs(coupling_exponent) < 0.005 else coupling_exponent
         coupling_label = rf"$\alpha = {{{coupling_exponent:.1f}}}$"
+
         unfolding_type = cast(str, self.data.metadata["unfolding"])
-        unfolding_label = (
-            "Average" if unfolding_type == "averaged" else unfolding_type.capitalize()
-        )
-        title = f"{unfolding_label}-unfolded"
+        unfolding_label = UNFOLDING_LABELS_BY_TYPE[unfolding_type]
         if unfolding_type != "weight":
             unfolding_degree = self.data.metadata["polynomial_degree"]
-            title += f" (deg = ${unfolding_degree}$)"
+            title = f"{unfolding_label}({unfolding_degree})-unfolded"
+        else:
+            title = f"{unfolding_label}-unfolded"
         self.axes.title = (
-            f"{title} Complex Resonances: {ensemble.to_latex}"
+            f"{title} Pole Distribution: {ensemble.to_latex}"
             + rf", $N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
             + f", {{{coupling_label}}}"
         )

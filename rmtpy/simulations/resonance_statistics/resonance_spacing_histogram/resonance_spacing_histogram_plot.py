@@ -9,7 +9,13 @@ from matplotlib.patches import Patch
 
 from ....compounds import CompoundEnsemble
 from ...base_data import Data
-from ...base_plot import CURVE_WIDTH, Plot, PlotAxes, PlotLegend
+from ...base_plot import (
+    ENSEMBLE_AVERAGED_CURVE_WIDTH,
+    UNFOLDING_LABELS_BY_TYPE,
+    Plot,
+    PlotAxes,
+    PlotLegend,
+)
 from .resonance_spacing_histogram_data import ResonanceSpacingHistogram
 
 
@@ -50,7 +56,7 @@ class ResonanceSpacingHistogramPlot(Plot):
     histogram_legend: str = "simulation"
 
     surmise_zorder: int = 2
-    surmise_width: float = CURVE_WIDTH
+    surmise_width: float = ENSEMBLE_AVERAGED_CURVE_WIDTH
     surmise_alpha: float = 1.0
     surmise_color: str = "Black"
     surmise_legend: str = "surmise"
@@ -84,8 +90,9 @@ class ResonanceSpacingHistogramPlot(Plot):
         )
         coupling_exponent = 0.0 if abs(coupling_exponent) < 0.005 else coupling_exponent
         coupling_label = rf"$\alpha = {{{coupling_exponent:.1f}}}$"
+
         self.axes.title = (
-            "Resonance Spacing Distribution: "
+            "Resonance NNS PDF: "
             + ensemble.to_latex
             + rf", $N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
             + f", {{{coupling_label}}}"
@@ -170,7 +177,7 @@ class UnfoldedResonanceSpacingHistogramPlot(Plot):
     histogram_legend: str = "simulation"
 
     surmise_zorder: int = 2
-    surmise_width: float = CURVE_WIDTH
+    surmise_width: float = ENSEMBLE_AVERAGED_CURVE_WIDTH
     surmise_alpha: float = 1.0
     surmise_color: str = "Black"
     surmise_legend: str = "surmise"
@@ -204,16 +211,16 @@ class UnfoldedResonanceSpacingHistogramPlot(Plot):
         )
         coupling_exponent = 0.0 if abs(coupling_exponent) < 0.005 else coupling_exponent
         coupling_label = rf"$\alpha = {{{coupling_exponent:.1f}}}$"
+
         unfolding_type = cast(str, self.data.metadata["unfolding"])
-        unfolding_label = (
-            "Average" if unfolding_type == "averaged" else unfolding_type.capitalize()
-        )
-        title = f"{unfolding_label}-unfolded"
+        unfolding_label = UNFOLDING_LABELS_BY_TYPE[unfolding_type]
         if unfolding_type != "weight":
             unfolding_degree = self.data.metadata["polynomial_degree"]
-            title += f" (deg = ${unfolding_degree}$)"
+            title = f"{unfolding_label}({unfolding_degree})-unfolded"
+        else:
+            title = f"{unfolding_label}-unfolded"
         self.axes.title = (
-            f"{title} Resonance Spacing Distribution: {ensemble.to_latex}"
+            f"{title} Resonance NNS PDF: {ensemble.to_latex}"
             + rf", $N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
             + f", {{{coupling_label}}}"
         )

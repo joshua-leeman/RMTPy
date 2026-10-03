@@ -12,7 +12,13 @@ from matplotlib.ticker import MaxNLocator
 from ....compounds import CompoundEnsemble
 from ....ensembles import PoissonEnsemble, SachdevYeKitaevEnsemble
 from ...base_data import Data
-from ...base_plot import CURVE_WIDTH, Plot, PlotAxes, PlotLegend
+from ...base_plot import (
+    ENSEMBLE_AVERAGED_CURVE_WIDTH,
+    UNFOLDING_LABELS_BY_TYPE,
+    Plot,
+    PlotAxes,
+    PlotLegend,
+)
 from .resonance_histogram_data import ResonanceHistogram
 
 _Y_AXIS_PADDING: float = 0.05
@@ -108,7 +114,7 @@ class ResonanceHistogramPlot(Plot):
     histogram_legend: str = "simulation"
 
     pdf_zorder: int = 2
-    pdf_width: float = CURVE_WIDTH
+    pdf_width: float = ENSEMBLE_AVERAGED_CURVE_WIDTH
     pdf_alpha: float = 1.0
     pdf_color: str = "Black"
     pdf_legend: str = "theory"
@@ -145,8 +151,9 @@ class ResonanceHistogramPlot(Plot):
         )
         coupling_exponent = 0.0 if abs(coupling_exponent) < 0.005 else coupling_exponent
         coupling_label = rf"$\alpha = {{{coupling_exponent:.1f}}}$"
+
         self.axes.title = (
-            "Resonance Density: "
+            "Resonance PDF: "
             + ensemble.to_latex
             + rf", $N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
             + f", {{{coupling_label}}}"
@@ -300,7 +307,7 @@ class UnfoldedResonanceHistogramAxes(PlotAxes):
 
     yticks: tuple[float, ...] = (0.0, 0.5, 1.0, 1.5)
     yticks_minor: tuple[float, ...] = (0.25, 0.75, 1.25, 1.75)
-    ylabel: str = r"$\ensavg{\rho(\xi)} D$"
+    ylabel: str = r"$D \ensavg{\rho(\xi)}$"
     ytick_labels: tuple[str, ...] = (
         r"$0.0$",
         r"$0.5$",
@@ -324,7 +331,7 @@ class UnfoldedResonanceHistogramPlot(Plot):
     histogram_legend: str = "simulation"
 
     pdf_zorder: int = 2
-    pdf_width: float = CURVE_WIDTH
+    pdf_width: float = ENSEMBLE_AVERAGED_CURVE_WIDTH
     pdf_alpha: float = 1.0
     pdf_color: str = "Black"
     pdf_legend: str = "theory"
@@ -354,16 +361,16 @@ class UnfoldedResonanceHistogramPlot(Plot):
         )
         coupling_exponent = 0.0 if abs(coupling_exponent) < 0.005 else coupling_exponent
         coupling_label = rf"$\alpha = {{{coupling_exponent:.1f}}}$"
+
         unfolding_type = cast(str, self.data.metadata["unfolding"])
-        unfolding_label = (
-            "Average" if unfolding_type == "averaged" else unfolding_type.capitalize()
-        )
-        title = f"{unfolding_label}-unfolded"
+        unfolding_label = UNFOLDING_LABELS_BY_TYPE[unfolding_type]
         if unfolding_type != "weight":
             unfolding_degree = self.data.metadata["polynomial_degree"]
-            title += f" (deg = ${unfolding_degree}$)"
+            title = f"{unfolding_label}({unfolding_degree})-unfolded"
+        else:
+            title = f"{unfolding_label}-unfolded"
         self.axes.title = (
-            f"{title} Resonance Density: {ensemble.to_latex}"
+            f"{title} Resonance PDF: {ensemble.to_latex}"
             + rf", $N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
             + f", {{{coupling_label}}}"
         )

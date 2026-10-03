@@ -13,8 +13,12 @@ from ....compounds import CompoundEnsemble
 from ...base_data import Data
 from ...base_plot import (
     CONNECTED_FORM_FACTOR_COLOR,
-    CURVE_WIDTH,
+    ENSEMBLE_AVERAGED_CURVE_WIDTH,
     FORM_FACTOR_COLOR,
+    SINGLE_REALIZATION_CURVE_WIDTH,
+    SINGLE_REALIZATION_FORM_FACTOR_COLOR,
+    UNFOLDING_LABELS_BY_TYPE,
+    ConfigurableAxes,
     LogDimensionTimeAxes,
     LogDimensionUnfoldedTimeAxes,
     Plot,
@@ -34,6 +38,18 @@ class ResonanceFormFactorsAxes(LogDimensionTimeAxes):
         r"$1$",
     )
 
+    @override
+    def configure(self, axes: ConfigurableAxes) -> None:
+        super().configure(axes)
+        _ = axes.tick_params(
+            axis="both",
+            which="minor",
+            bottom=False,
+            top=False,
+            left=False,
+            right=False,
+        )
+
 
 @dataclasses.dataclass(slots=True, kw_only=True, eq=False, weakref_slot=False)
 class ResonanceFormFactorsPlot(Plot):
@@ -45,21 +61,38 @@ class ResonanceFormFactorsPlot(Plot):
     ylim: tuple[float, float] = (-2.2, 0.2)
 
     sff_zorder: int = 2
-    sff_width: float = CURVE_WIDTH
+    sff_width: float = ENSEMBLE_AVERAGED_CURVE_WIDTH
     sff_alpha: float = 1.0
     sff_color: str = FORM_FACTOR_COLOR
     sff_legend: str = r"$K(u)$"
 
     csff_zorder: int = 2
-    csff_width: float = CURVE_WIDTH
+    csff_width: float = ENSEMBLE_AVERAGED_CURVE_WIDTH
     csff_alpha: float = 1.0
     csff_color: str = CONNECTED_FORM_FACTOR_COLOR
     csff_legend: str = r"$K_{\text{\tiny conn}}(u)$"
 
-    legend_labels: tuple[str, str] = (sff_legend, csff_legend)
-    legend_handles: tuple[Line2D, Line2D] = (
+    single_sff_zorder: int = 1
+    single_sff_width: float = SINGLE_REALIZATION_CURVE_WIDTH
+    single_sff_alpha: float = 1.0
+    single_sff_color: str = SINGLE_REALIZATION_FORM_FACTOR_COLOR
+    single_sff_legend: str = r"$K^{(1)}(u)$"
+
+    legend_labels: tuple[str, str, str] = (
+        sff_legend,
+        csff_legend,
+        single_sff_legend,
+    )
+    legend_handles: tuple[Line2D, Line2D, Line2D] = (
         Line2D([0], [0], color=sff_color, alpha=sff_alpha, linewidth=sff_width),
         Line2D([0], [0], color=csff_color, alpha=csff_alpha, linewidth=csff_width),
+        Line2D(
+            [0],
+            [0],
+            color=single_sff_color,
+            alpha=single_sff_alpha,
+            linewidth=single_sff_width,
+        ),
     )
 
     def set_derived_attributes(self) -> None:
@@ -73,7 +106,7 @@ class ResonanceFormFactorsPlot(Plot):
             handles=self.legend_handles,
             labels=self.legend_labels,
             loc="upper right",
-            bbox=(0.925, 0.95),
+            bbox=(0.925, 0.99),
         )
 
         coupling_exponent = cast(
@@ -81,8 +114,9 @@ class ResonanceFormFactorsPlot(Plot):
         )
         coupling_exponent = 0.0 if abs(coupling_exponent) < 0.005 else coupling_exponent
         coupling_label = rf"$\alpha = {{{coupling_exponent:.1f}}}$"
+
         self.axes.title = (
-            "Resonance Form Factors: "
+            "RFFs: "
             + ensemble.to_latex
             + rf", $N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
             + f", {{{coupling_label}}}"
@@ -142,6 +176,15 @@ class ResonanceFormFactorsPlot(Plot):
             zorder=self.csff_zorder,
             label=self.csff_legend,
         )
+        _ = plot(
+            self.data.times,
+            self.data.single_realization_form_factor,
+            color=self.single_sff_color,
+            alpha=self.single_sff_alpha,
+            linewidth=self.single_sff_width,
+            zorder=self.single_sff_zorder,
+            label=self.single_sff_legend,
+        )
 
         self.finish_plot(path=path)
 
@@ -155,6 +198,18 @@ class UnfoldedResonanceFormFactorsAxes(LogDimensionUnfoldedTimeAxes):
         r"$1$",
     )
 
+    @override
+    def configure(self, axes: ConfigurableAxes) -> None:
+        super().configure(axes)
+        _ = axes.tick_params(
+            axis="both",
+            which="minor",
+            bottom=False,
+            top=False,
+            left=False,
+            right=False,
+        )
+
 
 @dataclasses.dataclass(slots=True, kw_only=True, eq=False, weakref_slot=False)
 class UnfoldedResonanceFormFactorsPlot(Plot):
@@ -166,30 +221,37 @@ class UnfoldedResonanceFormFactorsPlot(Plot):
     ylim: tuple[float, float] = (-2.2, 0.2)
 
     sff_zorder: int = 2
-    sff_width: float = CURVE_WIDTH
+    sff_width: float = ENSEMBLE_AVERAGED_CURVE_WIDTH
     sff_alpha: float = 1.0
     sff_color: str = FORM_FACTOR_COLOR
     sff_legend: str = r"$K(\upsilon)$"
 
     csff_zorder: int = 2
-    csff_width: float = CURVE_WIDTH
+    csff_width: float = ENSEMBLE_AVERAGED_CURVE_WIDTH
     csff_alpha: float = 1.0
     csff_color: str = CONNECTED_FORM_FACTOR_COLOR
     csff_legend: str = r"$K_{\text{\tiny conn}}(\upsilon)$"
 
     universal_sff_zorder: int = 2
-    universal_sff_width: float = CURVE_WIDTH
+    universal_sff_width: float = ENSEMBLE_AVERAGED_CURVE_WIDTH
     universal_sff_alpha: float = 1.0
     universal_sff_color: str = "Black"
     universal_sff_style: str = "dotted"
     universal_sff_legend: str = "universal"
 
-    legend_labels: tuple[str, str, str] = (
+    single_sff_zorder: int = 1
+    single_sff_width: float = SINGLE_REALIZATION_CURVE_WIDTH
+    single_sff_alpha: float = 1.0
+    single_sff_color: str = SINGLE_REALIZATION_FORM_FACTOR_COLOR
+    single_sff_legend: str = r"$K^{(1)}(\upsilon)$"
+
+    legend_labels: tuple[str, str, str, str] = (
         sff_legend,
         csff_legend,
         universal_sff_legend,
+        single_sff_legend,
     )
-    legend_handles: tuple[Line2D, Line2D, Line2D] = (
+    legend_handles: tuple[Line2D, Line2D, Line2D, Line2D] = (
         Line2D([0], [0], color=sff_color, alpha=sff_alpha, linewidth=sff_width),
         Line2D([0], [0], color=csff_color, alpha=csff_alpha, linewidth=csff_width),
         Line2D(
@@ -199,6 +261,13 @@ class UnfoldedResonanceFormFactorsPlot(Plot):
             alpha=universal_sff_alpha,
             linewidth=universal_sff_width,
             linestyle=universal_sff_style,
+        ),
+        Line2D(
+            [0],
+            [0],
+            color=single_sff_color,
+            alpha=single_sff_alpha,
+            linewidth=single_sff_width,
         ),
     )
 
@@ -218,13 +287,14 @@ class UnfoldedResonanceFormFactorsPlot(Plot):
                 self.sff_legend,
                 self.csff_legend,
                 self.universal_sff_legend,
+                self.single_sff_legend,
             )
 
         self.legend: PlotLegend = PlotLegend(
             handles=self.legend_handles,
             labels=self.legend_labels,
             loc="upper right",
-            bbox=(0.925, 0.95),
+            bbox=(0.925, 0.99),
         )
 
         coupling_exponent = cast(
@@ -232,16 +302,16 @@ class UnfoldedResonanceFormFactorsPlot(Plot):
         )
         coupling_exponent = 0.0 if abs(coupling_exponent) < 0.005 else coupling_exponent
         coupling_label = rf"$\alpha = {{{coupling_exponent:.1f}}}$"
+
         unfolding_type = cast(str, self.data.metadata["unfolding"])
-        unfolding_label = (
-            "Average" if unfolding_type == "averaged" else unfolding_type.capitalize()
-        )
-        title = f"{unfolding_label}-unfolded"
+        unfolding_label = UNFOLDING_LABELS_BY_TYPE[unfolding_type]
         if unfolding_type != "weight":
             unfolding_degree = self.data.metadata["polynomial_degree"]
-            title += f" (deg = ${unfolding_degree}$)"
+            title = f"{unfolding_label}({unfolding_degree})-unfolded"
+        else:
+            title = f"{unfolding_label}-unfolded"
         self.axes.title = (
-            f"{title} Resonance Form Factors: {ensemble.to_latex}"
+            f"{title} RFFs: {ensemble.to_latex}"
             + rf", $N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
             + f", {{{coupling_label}}}"
         )
@@ -308,6 +378,15 @@ class UnfoldedResonanceFormFactorsPlot(Plot):
             linestyle=self.universal_sff_style,
             zorder=self.universal_sff_zorder,
             label=self.universal_sff_legend,
+        )
+        _ = plot(
+            self.data.times,
+            self.data.single_realization_form_factor,
+            color=self.single_sff_color,
+            alpha=self.single_sff_alpha,
+            linewidth=self.single_sff_width,
+            zorder=self.single_sff_zorder,
+            label=self.single_sff_legend,
         )
 
         self.finish_plot(path=path)

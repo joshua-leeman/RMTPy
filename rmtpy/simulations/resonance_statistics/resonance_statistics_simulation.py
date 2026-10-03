@@ -11,7 +11,6 @@ from ...ensembles import ManyBodyEnsemble, RandomMatrixEnsemble
 from ..base_data import Data
 from ..base_plot import Plot
 from ..base_simulation import DEFAULT_OUTPUT_ROOT, ExecutionState, Simulation
-from ..histograms import Histogram, Histogram2D
 from ..statistics import (
     REALIZATIONS_METADATA,
     nearest_neighbor_spacings,
@@ -246,7 +245,10 @@ def _create_coefficient_buffers(
     for degree in range(
         1, simulation.compound.ensemble.max_spectral_polynomial_degree + 1
     ):
-        coefficient_histogram = ResonanceCoefficientsHistogram.create(degree=degree)
+        coefficient_histogram = ResonanceCoefficientsHistogram.create(
+            degree=degree,
+            dimension=simulation.compound.ensemble.dimension,
+        )
         coefficient_histogram_list.append(coefficient_histogram)
 
     return tuple(coefficient_histogram_list)
@@ -279,7 +281,7 @@ def _create_averaged_unfolded_buffers(
         list_of_buffers.append(
             ResonanceStatisticsBuffers.create_unfolded(
                 simulation=simulation,
-                unfolding="averaged",
+                unfolding="average",
                 polynomial_degree=polynomial_degree,
             )
         )
@@ -441,18 +443,11 @@ class ResonanceStatisticsSimulation(Simulation):
         ensemble = self.compound.ensemble
         resonance_density = self.compound.resonance_density
         coefficient_buffers = tuple(self.coefficient_buffers)
-        coefficient_samples = np.empty(
-            (len(coefficient_buffers), self.realizs),
-            dtype=np.float64,
-        )
-
         cdf_factory = self._build_cdf_factory()
 
         average_cdfs = cdf_factory.average_interpolators()
 
-        for realization, complex_energies in enumerate(
-            self.compound.resonances_stream(realizs=self.realizs)
-        ):
+        for complex_energies in self.compound.resonances_stream(realizs=self.realizs):
             resonance_centers = complex_energies.real
             resonance_widths = -2 * complex_energies.imag
 
@@ -465,9 +460,14 @@ class ResonanceStatisticsSimulation(Simulation):
             variate_coefficients = resonance_density.compute_variate_coeffs(
                 resonance_centers
             )
-            coefficient_samples[:, realization] = variate_coefficients[
-                1 : len(coefficient_buffers) + 1
-            ]
+            for histogram, coefficient in zip(
+                coefficient_buffers,
+                variate_coefficients[1 : len(coefficient_buffers) + 1],
+                strict=True,
+            ):
+                histogram.add_histogram_contribution(
+                    np.array([coefficient], dtype=np.float64)
+                )
 
             self.wgt_unfolded_buffers.accumulate_unfolded_resonances(
                 resonance_centers,
@@ -500,44 +500,6 @@ class ResonanceStatisticsSimulation(Simulation):
                     cdf=cdf,
                     ensemble=ensemble,
                 )
-
-        if not np.all(np.isfinite(coefficient_samples)):
-            raise ValueError("Resonance coefficients must be finite.")
-
-        for histogram, samples in zip(
-            coefficient_buffers,
-            coefficient_samples,
-            strict=True,
-        ):
-            bins = np.histogram_bin_edges(samples, bins="fd")
-            bins[-1] = np.nextafter(bins[-1], np.inf)
-            counts = np.histogram(samples, bins=bins)[0]
-            num_bins = len(counts)
-
-            object.__setattr__(histogram, "num_bins", num_bins)
-            object.__setattr__(
-                histogram,
-                "support",
-                (float(bins[0]), float(bins[-1])),
-            )
-            object.__setattr__(histogram, "bins", bins)
-            object.__setattr__(histogram, "counts", counts)
-            object.__setattr__(
-                histogram,
-                "histogram",
-                np.zeros(num_bins, dtype=np.float64),
-            )
-            object.__setattr__(histogram, "realizs", self.realizs)
-            attrs.validate(histogram)
-
-    def _finalize(self) -> None:
-        for data in self:
-            if isinstance(data, Histogram):
-                data.compute_histogram()
-            elif isinstance(data, Histogram2D):
-                data.compute_histogram_probabilities()
-            elif isinstance(data, FormFactorsData):
-                data.compute_form_factors()
 
     @override
     def _restore_execution(self) -> None:

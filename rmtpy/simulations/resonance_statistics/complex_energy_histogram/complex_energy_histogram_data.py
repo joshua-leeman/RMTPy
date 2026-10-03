@@ -13,6 +13,9 @@ COMPLEX_ENERGY_WIDTH_LOG_BASE: float = 10.0
 
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
 class ComplexEnergyHistogram(Histogram2D):
+    def compute_statistics(self) -> None:
+        self.compute_histogram_probabilities()
+
     @classmethod
     def create_raw(cls) -> ComplexEnergyHistogram:
         raw_complex_energy_histogram = ComplexEnergyHistogram(
