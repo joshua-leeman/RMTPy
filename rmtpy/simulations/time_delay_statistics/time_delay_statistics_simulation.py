@@ -9,7 +9,6 @@ from ...compounds import CompoundEnsemble
 from ...conversion import unwrap_json_value
 from ...ensembles import RandomMatrixEnsemble
 from ..base_data import Data
-from ..base_plot import Plot
 from ..base_simulation import DEFAULT_OUTPUT_ROOT, ExecutionState, Simulation
 from ..histograms import Histogram
 from ..statistics import REALIZATIONS_METADATA, truncated_polynomial_degree_range
@@ -19,6 +18,7 @@ from .time_delay_histogram import (
     TimeDelayHistogramPlot,
     UnfoldedTimeDelayHistogramPlot,
 )
+from .time_delay_histogram.time_delay_histogram_plot import SpectralFormFactorsOverlay
 
 ENERGIES_METADATA: dict[str, str] = {
     "latex_name": "E",
@@ -36,9 +36,16 @@ def load_time_delay_statistics_simulation(
     return simulation
 
 
-def plot_time_delay_statistics_simulation(*, directory: str | Path) -> None:
+def plot_time_delay_statistics_simulation(
+    *,
+    directory: str | Path,
+    spectral_statistics_directory: str | Path | None = None,
+) -> None:
     simulation = load_time_delay_statistics_simulation(directory=directory)
-    simulation.plot(directory)
+    simulation.plot(
+        directory,
+        spectral_statistics_directory=spectral_statistics_directory,
+    )
 
 
 def run_time_delay_statistics_simulation(
@@ -47,6 +54,7 @@ def run_time_delay_statistics_simulation(
     energies: np.ndarray[tuple[int], np.dtype[np.floating]],
     realizs: int,
     directory: str | Path = DEFAULT_OUTPUT_ROOT,
+    spectral_statistics_directory: str | Path | None = None,
 ) -> TimeDelayStatisticsSimulation:
     simulation = TimeDelayStatisticsSimulation(
         compound=compound,
@@ -55,7 +63,10 @@ def run_time_delay_statistics_simulation(
     )
     simulation.execute()
     destination_directory = simulation.save(directory)
-    plot_time_delay_statistics_simulation(directory=destination_directory)
+    plot_time_delay_statistics_simulation(
+        directory=destination_directory,
+        spectral_statistics_directory=spectral_statistics_directory,
+    )
     return simulation
 
 
@@ -297,7 +308,13 @@ class TimeDelayStatisticsSimulation(Simulation):
             yield from variate_unfolded_buffers
 
     @override
-    def plot(self, directory: str | Path, /) -> None:
+    def plot(
+        self,
+        directory: str | Path,
+        /,
+        *,
+        spectral_statistics_directory: str | Path | None = None,
+    ) -> None:
         if self.execution_state is not ExecutionState.COMPLETE:
             raise RuntimeError("A simulation may be plotted only after execution.")
 
@@ -306,19 +323,37 @@ class TimeDelayStatisticsSimulation(Simulation):
             if not (directory / data.to_path).is_file():
                 raise ValueError(f"Saved data `{data._file_name}` is missing.")
 
+        spectral_form_factors = None
+        if spectral_statistics_directory is not None:
+            spectral_form_factors = SpectralFormFactorsOverlay.from_directory(
+                directory=spectral_statistics_directory,
+                ensemble=self.compound.ensemble,
+            )
+            for data in self:
+                if not isinstance(data, TimeDelayHistogram):
+                    raise TypeError(f"Data `{type(data).__name__}` has no plot class.")
+                _ = spectral_form_factors.validate(data)
+
         for data in self:
             unfolded = data.metadata.get("unfolding", "raw") != "raw"
-            plot_cls: type[Plot]
             if isinstance(data, TimeDelayHistogram):
-                plot_cls = (
-                    UnfoldedTimeDelayHistogramPlot if unfolded else TimeDelayHistogramPlot
+                plot = (
+                    UnfoldedTimeDelayHistogramPlot(
+                        data=data,
+                        context=self.manifest,
+                        spectral_form_factors=spectral_form_factors,
+                    )
+                    if unfolded
+                    else TimeDelayHistogramPlot(
+                        data=data,
+                        context=self.manifest,
+                        spectral_form_factors=spectral_form_factors,
+                    )
                 )
             else:
                 raise TypeError(f"Data `{type(data).__name__}` has no plot class.")
 
-            plot_cls(data=data, context=self.manifest).plot(
-                directory / data.to_path.parent
-            )
+            plot.plot(directory / data.to_path.parent)
 
     @property
     @override
