@@ -252,9 +252,14 @@ class CompoundEnsemble:
         )
         if not couplings_is_constant_array:
             coupling_strengths_id = build_hashed_id(self.couplings)
-            return path / f"v_{coupling_strengths_id}"
+            return path / f"couplingsID_{coupling_strengths_id}"
 
-        return path / f"v_{self.couplings[0]:.5g}".replace(".", "p")
+        mean_coupling_squared = float(np.mean(self.couplings**2))
+        coupling_exponent = cast(
+            float, np.log10(mean_coupling_squared / self.ensemble.spectral_radius)
+        )
+
+        return path / f"alpha_{coupling_exponent:.5g}".replace(".", "p")
 
     @property
     def rng_state(self) -> dict[str, object]:
