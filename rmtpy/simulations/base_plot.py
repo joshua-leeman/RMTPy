@@ -15,8 +15,13 @@ from matplotlib.artist import Artist
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from matplotlib.legend import Legend
+from matplotlib.lines import Line2D
+from matplotlib.patches import Patch
+from matplotlib.ticker import LogLocator, MaxNLocator
 
+from ..compounds import CompoundEnsemble
 from ..conversion import RMT_CONVERTER, unwrap_json_value
+from ..universal import wigner_surmise
 from .base_data import Data
 from .base_simulation import SimulationManifest
 from .histograms import Histogram
@@ -35,6 +40,12 @@ type LegendLocation = Literal[
     "upper center",
     "center",
 ]
+type SpacingReference = tuple[
+    str,
+    int,
+    str,
+    Literal["solid", "dashed", "dashdot", "dotted"],
+]
 
 UNFOLDING_LABELS_BY_TYPE: dict[str, str] = {
     "average": "Ave",
@@ -42,12 +53,25 @@ UNFOLDING_LABELS_BY_TYPE: dict[str, str] = {
     "weight": "Wgt",
 }
 
-ENSEMBLE_AVERAGED_CURVE_WIDTH: float = 1.7
-SINGLE_REALIZATION_CURVE_WIDTH = 0.7
+ENSEMBLE_AVERAGED_CURVE_WIDTH: float = 1.4
+SINGLE_REALIZATION_CURVE_WIDTH: float = 0.5
+CURVE_WIDTH: float = ENSEMBLE_AVERAGED_CURVE_WIDTH
 
 FORM_FACTOR_COLOR: str = "#0072B2"
 CONNECTED_FORM_FACTOR_COLOR: str = "#D54300"
 SINGLE_REALIZATION_FORM_FACTOR_COLOR: str = "#009E73"
+
+SPACING_REFERENCES: tuple[SpacingReference, ...] = (
+    ("GOE", 1, "#0072B2", "solid"),
+    ("GUE", 2, "#009E73", "dashed"),
+    ("GSE", 4, "#CC79A7", "dashdot"),
+    ("Poisson", 0, "#000000", "dotted"),
+)
+SPACING_REFERENCE_LABELS: tuple[str, ...] = tuple(
+    label for label, _, _, _ in SPACING_REFERENCES
+)
+
+_MAJOR_TICK_STEPS: tuple[float, ...] = (1.0, 2.0, 2.5, 5.0, 10.0)
 
 
 class Spine(Protocol):
@@ -55,7 +79,8 @@ class Spine(Protocol):
 
 
 class ConfigurableAxes(Protocol):
-    spines: Mapping[str, Spine]
+    @property
+    def spines(self) -> Mapping[str, Spine]: ...
 
     def get_xscale(self) -> str: ...
 
@@ -65,7 +90,14 @@ class ConfigurableAxes(Protocol):
 
     def set_xlabel(self, xlabel: str, *, fontsize: float = ...) -> object: ...
 
-    def set_ylabel(self, ylabel: str, *, fontsize: float = ...) -> object: ...
+    def set_ylabel(
+        self,
+        ylabel: str,
+        *,
+        fontsize: float = ...,
+        rotation: float = ...,
+        labelpad: float = ...,
+    ) -> object: ...
 
     def set_xticks(self, ticks: Sequence[float], *, minor: bool = False) -> object: ...
 
@@ -79,7 +111,235 @@ class ConfigurableAxes(Protocol):
         self, labels: Sequence[str], *, fontsize: float = ...
     ) -> object: ...
 
-    def tick_params(self, *args: object, **kwargs: object) -> object: ...
+    def tick_params(
+        self,
+        axis: Literal["x", "y", "both"] = "both",
+        *,
+        which: Literal["major", "minor", "both"] = "major",
+        direction: Literal["in", "out", "inout"] = "in",
+        top: bool = True,
+        bottom: bool = True,
+        left: bool = True,
+        right: bool = True,
+        labelbottom: bool = True,
+        labeltop: bool = True,
+        labelleft: bool = True,
+        labelright: bool = True,
+        length: float = ...,
+        labelsize: float = ...,
+    ) -> object: ...
+
+
+def nice_major_ticks(
+    lower: float,
+    upper: float,
+    *,
+    num_intervals: int = 5,
+    symmetric: bool = False,
+) -> tuple[float, ...]:
+    locator = MaxNLocator(
+        nbins=num_intervals,
+        steps=_MAJOR_TICK_STEPS,
+        min_n_ticks=3,
+        symmetric=symmetric,
+    )
+    return tuple(float(value) for value in locator.tick_values(lower, upper))
+
+
+def major_tick_step(major_ticks: tuple[float, ...]) -> float:
+    return min(
+        right - left
+        for left, right in zip(major_ticks, major_ticks[1:], strict=False)
+        if right > left
+    )
+
+
+def minor_ticks(major_ticks: tuple[float, ...]) -> tuple[float, ...]:
+    return tuple(
+        0.5 * (major_ticks[index] + major_ticks[index + 1])
+        for index in range(len(major_ticks) - 1)
+    )
+
+
+def latex_tick_labels(
+    major_ticks: tuple[float, ...],
+    *,
+    show_positive_sign: bool,
+    min_decimal_places: int = 0,
+) -> tuple[str, ...]:
+    decimal_places = 0
+    if len(major_ticks) > 1:
+        step = major_tick_step(major_ticks)
+        decimal_places = max(0, -math.floor(math.log10(step)))
+        scaled_step = step * math.pow(10.0, decimal_places)
+        if not math.isclose(
+            scaled_step,
+            round(scaled_step),
+            rel_tol=1e-9,
+            abs_tol=1e-9,
+        ):
+            decimal_places += 1
+    decimal_places = max(decimal_places, min_decimal_places)
+
+    step = major_ticks[1] - major_ticks[0] if len(major_ticks) > 1 else 1.0
+    zero_tolerance = abs(step) * 1e-9
+
+    labels: list[str] = []
+    for tick in major_ticks:
+        value = 0.0 if abs(tick) <= zero_tolerance else tick
+        sign = "+" if show_positive_sign and value > 0.0 else ""
+        labels.append(rf"${sign}{value:.{decimal_places}f}$")
+
+    return tuple(labels)
+
+
+def configure_coefficient_histogram_axes(
+    data: Histogram,
+    axes: PlotAxes,
+    /,
+) -> tuple[tuple[float, float], tuple[float, float]]:
+    total_count = int(np.sum(data.counts))
+    if total_count:
+        cumulative_counts = np.cumsum(data.counts)
+        quantile_indices = np.searchsorted(
+            cumulative_counts,
+            np.multiply((0.01, 0.99), total_count),
+            side="left",
+        )
+        lower_index, upper_index = cast(list[int], quantile_indices.tolist())
+        lower = float(cast(np.floating, data.bins[lower_index]))
+        upper = float(cast(np.floating, data.bins[upper_index + 1]))
+    else:
+        lower = float(cast(np.floating, data.bins[0]))
+        upper = float(cast(np.floating, data.bins[-1]))
+
+    occupied_extent = max(abs(lower), abs(upper))
+    enclosing_ticks = nice_major_ticks(
+        -occupied_extent,
+        occupied_extent,
+        num_intervals=4,
+        symmetric=True,
+    )
+    axes.xticks = enclosing_ticks
+    horizontal_padding = 0.5 * major_tick_step(axes.xticks)
+    xlim = (
+        axes.xticks[0] - horizontal_padding,
+        axes.xticks[-1] + horizontal_padding,
+    )
+    axes.xticks_minor = minor_ticks(axes.xticks)
+    axes.xtick_labels = latex_tick_labels(
+        axes.xticks,
+        show_positive_sign=True,
+    )
+
+    histogram_peak = float(np.max(data.histogram, initial=0.0))
+    padded_peak = histogram_peak * (1.0 + 0.05)
+    y_tick_target = padded_peak if padded_peak > 0.0 else 1.0
+    axes.yticks = nice_major_ticks(
+        0.0,
+        y_tick_target,
+    )
+    ylim = (0.0, axes.yticks[-1])
+    axes.yticks_minor = minor_ticks(axes.yticks)
+    axes.ytick_labels = latex_tick_labels(
+        axes.yticks,
+        show_positive_sign=False,
+        min_decimal_places=1,
+    )
+
+    return xlim, ylim
+
+
+def format_coupling_label(compound: CompoundEnsemble, /) -> str:
+    mean_coupling_squared = float(np.mean(compound.couplings**2))
+    coupling_exponent = math.log10(
+        mean_coupling_squared / compound.ensemble.spectral_radius
+    )
+    if abs(coupling_exponent) < 0.005:
+        coupling_exponent = 0.0
+
+    return rf"$\alpha = {{{coupling_exponent:.1f}}}$"
+
+
+def configure_form_factor_axes(
+    axes: Axes,
+    /,
+    *,
+    dimension: int,
+    x_tick_count: int,
+    y_tick_count: int,
+) -> None:
+    set_xscale = cast(Callable[..., object], axes.set_xscale)
+    set_yscale = cast(Callable[..., object], axes.set_yscale)
+    _ = set_xscale("log", base=dimension)
+    _ = set_yscale("log", base=dimension)
+
+    set_x_locator = cast(Callable[..., object], axes.xaxis.set_major_locator)
+    set_y_locator = cast(Callable[..., object], axes.yaxis.set_major_locator)
+    _ = set_x_locator(LogLocator(base=dimension, numticks=x_tick_count))
+    _ = set_y_locator(LogLocator(base=dimension, numticks=y_tick_count))
+
+
+def configure_form_factor_minor_ticks(axes: ConfigurableAxes, /) -> None:
+    _ = axes.tick_params(
+        axis="both",
+        which="minor",
+        bottom=False,
+        top=False,
+        left=False,
+        right=False,
+    )
+
+
+def spacing_legend_handles(
+    *,
+    histogram_color: str,
+    histogram_alpha: float,
+    width: float,
+    alpha: float,
+) -> tuple[Patch | Line2D, ...]:
+    return (
+        Patch(color=histogram_color, alpha=histogram_alpha),
+        *(
+            Line2D(
+                [0],
+                [0],
+                color=color,
+                linestyle=style,
+                linewidth=width,
+                alpha=alpha,
+                label=label,
+            )
+            for label, _, color, style in SPACING_REFERENCES
+        ),
+    )
+
+
+def draw_spacing_references(
+    plot: Plot,
+    spacings: np.ndarray[tuple[int], np.dtype[np.floating]],
+    /,
+    *,
+    width: float,
+    alpha: float,
+    zorder: int,
+    mean_spacing: float = 1.0,
+) -> None:
+    for label, dyson_index, color, style in SPACING_REFERENCES:
+        values = (
+            wigner_surmise(spacings / mean_spacing, dyson_index=dyson_index)
+            / mean_spacing
+        )
+        plot.draw_curve(
+            spacings,
+            values,
+            color=color,
+            style=style,
+            width=width,
+            alpha=alpha,
+            zorder=zorder,
+            label=label,
+        )
 
 
 def _configure_matplotlib() -> None:
@@ -305,6 +565,12 @@ class Plot(ABC):
 
     dpi: int = 300
 
+    _derived_attributes_are_set: bool = dataclasses.field(
+        default=False,
+        init=False,
+        repr=False,
+    )
+
     _structured_args: dict[tuple[str, str], object] = dataclasses.field(
         default_factory=dict,
         init=False,
@@ -359,6 +625,31 @@ class Plot(ABC):
             color=color,
             alpha=alpha,
             zorder=zorder,
+        )
+
+    def draw_curve(
+        self,
+        coordinates: np.ndarray[tuple[int], np.dtype[np.floating]],
+        values: np.ndarray[tuple[int], np.dtype[np.floating]],
+        /,
+        *,
+        color: str,
+        alpha: float,
+        width: float,
+        zorder: int,
+        label: str,
+        style: str = "solid",
+    ) -> None:
+        plot = cast(Callable[..., object], self.ax.plot)
+        _ = plot(
+            coordinates,
+            values,
+            color=color,
+            alpha=alpha,
+            linewidth=width,
+            zorder=zorder,
+            label=label,
+            linestyle=style,
         )
 
     def scale_limits_and_ticks(

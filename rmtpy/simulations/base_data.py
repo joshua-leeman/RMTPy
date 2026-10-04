@@ -18,10 +18,10 @@ def load_saved_data(directory: str | Path) -> dict[str, Data]:
     loaded_data: dict[str, Data] = {}
     for data_path in sorted(Path(directory).rglob("*_data.npz")):
         data = Data.load(data_path)
-        if data._file_name in loaded_data:
+        if data.aggregation_key in loaded_data:
             raise ValueError(f"Saved data `{data._file_name}` is duplicated.")
 
-        loaded_data[data._file_name] = data
+        loaded_data[data.aggregation_key] = data
 
     return loaded_data
 
@@ -29,7 +29,7 @@ def load_saved_data(directory: str | Path) -> dict[str, Data]:
 def graft_loaded_data(value: object, loaded_data: dict[str, Data]) -> object:
     if isinstance(value, Data):
         try:
-            replacement = loaded_data.pop(value._file_name)
+            replacement = loaded_data.pop(value.aggregation_key)
         except KeyError as exc:
             raise ValueError(f"Saved data `{value._file_name}` is missing.") from exc
         if type(replacement) is not type(value):
@@ -137,15 +137,27 @@ class Data:
         default=0,
         converter=int,
         validator=attrs.validators.ge(0),
+        metadata={"archive_optional": True},
         repr=False,
     )
+
+    @property
+    def aggregation_key(self) -> str:
+        if self.metadata.get("unfolding") in {"average", "averaged"}:
+            return self._file_name.replace("_averaged_unfolded", "_average_unfolded")
+
+        return self._file_name
 
     @property
     def to_path(self) -> Path:
         return Path(self._file_name) / Path(f"{self._file_name}_data.npz")
 
     @classmethod
-    def load(cls, path: str | Path, /) -> Data:
+    def load[DataType: Data](
+        cls: type[DataType],
+        path: str | Path,
+        /,
+    ) -> DataType:
         path = Path(path)
 
         if path.is_dir():
@@ -168,6 +180,8 @@ class Data:
                 raise TypeError(f"Saved data `{qualname}` is malformed.")
             if cls is not Data and not issubclass(loaded, cls):
                 raise TypeError(f"`{cls.__name__}` cannot load `{loaded.__name__}`.")
+            if cls is Data and loaded is not Data:
+                return cast(DataType, loaded.load(path))
 
             annotations = get_type_hints(loaded)
             arguments: dict[str, object] = {}
@@ -188,7 +202,11 @@ class Data:
                 arguments[alias] = _decode_saved_value(saved_data, annotation)
 
             data_factory = cast(Callable[..., Data], loaded)
-            return data_factory(**arguments)
+            data = data_factory(**arguments)
+            if data.metadata.get("unfolding") == "averaged":
+                data.metadata["unfolding"] = "average"
+
+            return cast(DataType, data)
 
     def attach_metadata(self, new_metadata: Mapping[str, object], /) -> None:
         self.metadata.update(new_metadata)
@@ -202,7 +220,7 @@ class Data:
                 f"Cannot add `{type(contribution).__name__}` to "
                 + f"`{type(self).__name__}`."
             )
-        if contribution._file_name != self._file_name:
+        if contribution.aggregation_key != self.aggregation_key:
             raise ValueError(
                 f"Data contribution `{contribution._file_name}` does not match "
                 + f"`{self._file_name}`."
@@ -215,7 +233,7 @@ class Data:
     def _add_realizations(self, contribution: Data, /) -> None:
         object.__setattr__(self, "realizs", self.realizs + contribution.realizs)
 
-    def add_contribution(self, contribution: Data, /) -> None:
+    def add_contribution(self, _contribution: Data, /) -> None:
         raise NotImplementedError(
             f"{type(self).__name__} has not implemented contribution aggregation."
         )

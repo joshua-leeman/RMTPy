@@ -1,5 +1,6 @@
+import math
 from functools import partial
-from typing import cast
+from typing import ClassVar, cast, override
 
 import attrs
 import numpy as np
@@ -9,6 +10,8 @@ from ..validators import is_support, to_support_pair
 from .base_data import Data
 
 NUM_BINS: int = 100
+
+COEFFICIENT_GRID_POLICY: str = "configuration_v1"
 
 
 def _build_empty_histogram(
@@ -127,6 +130,7 @@ class Histogram(Data):
 
         object.__setattr__(self, "realizs", self.realizs + 1)
 
+    @override
     def add_contribution(self, contribution: Data, /) -> None:
         self._validate_contribution(contribution)
         if not isinstance(contribution, Histogram):
@@ -159,8 +163,98 @@ class Histogram(Data):
 
         self.histogram[:] = self.counts / total
 
+    @override
     def compute_statistics(self) -> None:
         self.compute_histogram()
+
+
+@attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
+class CoefficientsHistogram(Histogram):
+    coefficient_name: ClassVar[str]
+
+    underflow: int = attrs.field(
+        default=0,
+        converter=int,
+        validator=attrs.validators.ge(0),
+        metadata={"archive_optional": True},
+        repr=False,
+    )
+    overflow: int = attrs.field(
+        default=0,
+        converter=int,
+        validator=attrs.validators.ge(0),
+        metadata={"archive_optional": True},
+        repr=False,
+    )
+
+    @classmethod
+    def create[HistogramType: CoefficientsHistogram](
+        cls: type[HistogramType],
+        *,
+        degree: int,
+        dimension: int,
+    ) -> HistogramType:
+        degree = int(degree)
+        dimension = int(dimension)
+        if degree < 1:
+            raise ValueError("Coefficient polynomial degree must be positive.")
+        if dimension < 1:
+            raise ValueError("Coefficient histogram dimension must be positive.")
+
+        half_width = (degree + 1) / math.sqrt(dimension)
+        num_bins = max(NUM_BINS, math.ceil(math.sqrt(dimension)))
+        histogram = cls(
+            _file_name=f"{cls.coefficient_name}_coeff_{degree}_histogram",
+            support=(-half_width, half_width),
+            num_bins=num_bins,
+        )
+        histogram.attach_metadata(
+            {
+                "degree": degree,
+                "unfolding": "raw",
+                "grid_policy": COEFFICIENT_GRID_POLICY,
+                "dimension": dimension,
+            }
+        )
+        return histogram
+
+    @override
+    def add_histogram_contribution(
+        self,
+        data: np.ndarray[tuple[int], np.dtype[np.floating]],
+        /,
+    ) -> None:
+        values = np.asarray(data)
+        if not np.all(np.isfinite(values)):
+            raise ValueError("Coefficient samples must be finite.")
+
+        object.__setattr__(
+            self,
+            "underflow",
+            self.underflow
+            + int(np.count_nonzero(values < cast(np.floating, self.bins[0]))),
+        )
+        object.__setattr__(
+            self,
+            "overflow",
+            self.overflow
+            + int(np.count_nonzero(values >= cast(np.floating, self.bins[-1]))),
+        )
+        super().add_histogram_contribution(values)
+
+    @override
+    def add_contribution(self, contribution: Data, /) -> None:
+        if not isinstance(contribution, CoefficientsHistogram):
+            raise TypeError("Coefficient histogram contribution is malformed.")
+        if contribution.metadata.get("grid_policy") != COEFFICIENT_GRID_POLICY:
+            raise ValueError(
+                f"Coefficient histogram `{contribution._file_name}` predates the "
+                + "deterministic aggregation grid and cannot be aggregated exactly."
+            )
+
+        super().add_contribution(contribution)
+        object.__setattr__(self, "underflow", self.underflow + contribution.underflow)
+        object.__setattr__(self, "overflow", self.overflow + contribution.overflow)
 
 
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
@@ -185,6 +279,7 @@ class MeanScaledHistogram(Histogram):
         )
         object.__setattr__(self, "sample_sum", recovered_sum)
 
+    @override
     def _aggregation_metadata(self) -> dict[str, object]:
         return {
             key: value for key, value in self.metadata.items() if key != "average_width"
@@ -197,6 +292,7 @@ class MeanScaledHistogram(Histogram):
             log_base=self.log_base,
         )
 
+    @override
     def add_histogram_contribution(
         self,
         data: np.ndarray[tuple[int], np.dtype[np.floating]],
@@ -207,6 +303,7 @@ class MeanScaledHistogram(Histogram):
         sample_sum = cast(float, self.sample_sum)
         object.__setattr__(self, "sample_sum", sample_sum + float(np.sum(values)))
 
+    @override
     def add_contribution(self, contribution: Data, /) -> None:
         self._validate_contribution(contribution)
         if not isinstance(contribution, MeanScaledHistogram):
@@ -249,6 +346,7 @@ class MeanScaledHistogram(Histogram):
         )
         self._add_realizations(contribution)
 
+    @override
     def compute_statistics(self) -> None:
         if self.realizs == 0:
             raise ValueError("A mean-scaled histogram requires realizations.")
@@ -445,6 +543,7 @@ class Histogram2D(Data):
 
         object.__setattr__(self, "realizs", self.realizs + 1)
 
+    @override
     def add_contribution(self, contribution: Data, /) -> None:
         self._validate_contribution(contribution)
         if not isinstance(contribution, Histogram2D):
@@ -484,6 +583,7 @@ class Histogram2D(Data):
 
         self.histogram[:] = self.counts / total
 
+    @override
     def compute_statistics(self) -> None:
         self.compute_histogram()
 

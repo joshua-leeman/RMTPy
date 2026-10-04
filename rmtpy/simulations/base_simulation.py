@@ -132,7 +132,9 @@ def _replace_nested_seeds(value: object, replacement: object) -> object:
             for key, item in cast(dict[str, object], value).items()
         }
     if isinstance(value, list):
-        return [_replace_nested_seeds(item, replacement) for item in value]
+        return [
+            _replace_nested_seeds(item, replacement) for item in cast(list[object], value)
+        ]
 
     return deepcopy(value)
 
@@ -144,8 +146,8 @@ def _aggregation_configuration(manifest: SimulationManifest) -> SourceDict:
         dict[str, object],
         _replace_nested_seeds(parameters, None),
     )
-    normalized_parameters.pop("realizs", None)
-    normalized_parameters.pop("_execution_state", None)
+    _ = normalized_parameters.pop("realizs", None)
+    _ = normalized_parameters.pop("_execution_state", None)
     return {
         "module": cast(str, configuration["module"]),
         "type": cast(str, configuration["type"]),
@@ -315,7 +317,11 @@ class Simulation:
         raise NotImplementedError(f"{type(self).__name__} has not implemented plotting.")
 
     @classmethod
-    def aggregate(cls, superfolder: str | Path, /) -> Simulation:
+    def aggregate[SimulationType: Simulation](
+        cls: type[SimulationType],
+        superfolder: str | Path,
+        /,
+    ) -> SimulationType:
         superfolder = Path(superfolder)
         if not superfolder.is_dir():
             raise ValueError(f"Aggregation superfolder `{superfolder}` is malformed.")
@@ -342,7 +348,7 @@ class Simulation:
             for manifest_path in sorted(job_directory.rglob(MANIFEST_FILE_NAME)):
                 manifest = SimulationManifest.create_manifest_from_path(manifest_path)
                 simulation_cls = _simulation_class_from_manifest(manifest)
-                if cls is Simulation or issubclass(simulation_cls, cls):
+                if cls is Simulation or cls in simulation_cls.__mro__:
                     candidates.append((manifest_path.parent, manifest, simulation_cls))
 
             if len(candidates) != 1:
@@ -404,7 +410,7 @@ class Simulation:
             reset_seed=True,
         )
 
-        aggregate_data = {data._file_name: data for data in aggregate}
+        aggregate_data = {data.aggregation_key: data for data in aggregate}
         if len(aggregate_data) != len(tuple(aggregate)):
             raise ValueError("Aggregate simulation contains duplicate data names.")
 
@@ -416,7 +422,7 @@ class Simulation:
         ):
             source = Simulation.load(source_directory)
             source_simulations.append(source)
-            source_data = {data._file_name: data for data in source}
+            source_data = {data.aggregation_key: data for data in source}
             if len(source_data) != len(tuple(source)):
                 raise ValueError(
                     f"Simulation `{source_directory}` contains duplicate data names."
@@ -433,7 +439,7 @@ class Simulation:
                     )
 
         for source in source_simulations:
-            source_data = {data._file_name: data for data in source}
+            source_data = {data.aggregation_key: data for data in source}
             for file_name, data in aggregate_data.items():
                 data.add_contribution(source_data[file_name])
 
@@ -516,6 +522,8 @@ class Simulation:
                     ],
                     "job_indices": [job_index for job_index, _, _, _ in source_records],
                     "source_realizs": source_realizs,
+                    "source_calibrations": json_value(calibrations),
+                    "unfolding_policy": "pooled_source_calibrations",
                     "source_completion_times": [
                         manifest.execution.get("execution_time")
                         for _, _, manifest, _ in source_records
@@ -525,10 +533,14 @@ class Simulation:
         )
         object.__setattr__(aggregate, "_execution_state", ExecutionState.COMPLETE)
         aggregate._restore_execution()
-        return aggregate
+        return cast(SimulationType, aggregate)
 
     @classmethod
-    def load(cls, directory: str | Path, /) -> Simulation:
+    def load[SimulationType: Simulation](
+        cls: type[SimulationType],
+        directory: str | Path,
+        /,
+    ) -> SimulationType:
         directory = Path(directory)
         manifest_path = directory / MANIFEST_FILE_NAME
         if not directory.is_dir() or not manifest_path.is_file():
@@ -537,6 +549,8 @@ class Simulation:
         manifest = SimulationManifest.create_manifest_from_path(manifest_path)
 
         simulation = _create_simulation_from_manifest(manifest)
+        if cls is not Simulation and not isinstance(simulation, cls):
+            raise TypeError(f"Saved simulation is not a {cls.__name__}.")
 
         loaded_data = load_saved_data(directory)
         _ = graft_loaded_data(simulation, loaded_data)
@@ -565,4 +579,4 @@ class Simulation:
         simulation._rmg.rng.bit_generator.state = rng_final_state
         simulation._restore_execution()
 
-        return simulation
+        return cast(SimulationType, simulation)
