@@ -8,10 +8,15 @@ import scipy.linalg.lapack
 
 from ..ensembles.many_body_ensemble import OrthogonalMatrix, UnitaryMatrix
 from ..ensembles.poisson_ensemble import PoissonEnsemble
-from .base_compound import ComplexHamiltonian, CompoundEnsemble
+from .base_compound import ComplexHamiltonian, CompoundEnsemble, order_compound_fields
 
 
-@attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
+@attrs.frozen(
+    kw_only=True,
+    eq=False,
+    weakref_slot=False,
+    field_transformer=order_compound_fields,
+)
 class PoissonCompoundEnsemble(CompoundEnsemble):
     ensemble: PoissonEnsemble = attrs.field(
         converter=PoissonEnsemble.create,
@@ -21,8 +26,8 @@ class PoissonCompoundEnsemble(CompoundEnsemble):
     @override
     def generate_effective_hamiltonian(self) -> ComplexHamiltonian:
         lapack_heev = self._pick_lapack_heev(use_complex_dtype=True)
-        eigvecs, _ = cast(
-            tuple[OrthogonalMatrix | UnitaryMatrix, object],
+        _, eigvecs, _ = cast(
+            tuple[object, OrthogonalMatrix | UnitaryMatrix, int],
             lapack_heev(
                 self.ensemble.eigvec_ensemble.generate_matrix(use_complex_dtype=True),
                 compute_v=1,

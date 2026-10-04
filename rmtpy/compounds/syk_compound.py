@@ -15,7 +15,7 @@ from ..fermions import (
     WidthMatrixDecomposed,
     build_decomposed_width_matrix,
 )
-from .base_compound import CompoundEnsemble, CouplingMatrix
+from .base_compound import CompoundEnsemble, CouplingMatrix, order_compound_fields
 
 
 def _build_conjugated_coupling_matrix(compound: SYKCompoundEnsemble) -> csc_array:
@@ -30,7 +30,12 @@ def _build_conjugated_coupling_matrix(compound: SYKCompoundEnsemble) -> csc_arra
     )
 
 
-@attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
+@attrs.frozen(
+    kw_only=True,
+    eq=False,
+    weakref_slot=False,
+    field_transformer=order_compound_fields,
+)
 class SYKCompoundEnsemble(CompoundEnsemble):
     ensemble: SachdevYeKitaevEnsemble = attrs.field(
         converter=SachdevYeKitaevEnsemble.create,

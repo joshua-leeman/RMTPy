@@ -32,8 +32,12 @@ from ..universal import time_delay_pdf
 
 type ComplexEigenvalues = np.ndarray[tuple[int], np.dtype[np.complexfloating]]
 type ComplexHamiltonian = np.ndarray[tuple[int, int], np.dtype[np.complexfloating]]
-type CouplingMatrix = np.ndarray[tuple[int], np.dtype[np.floating | np.complexfloating]]
+type CouplingMatrix = np.ndarray[
+    tuple[int, int], np.dtype[np.floating | np.complexfloating]
+]
+type TimeDelays = np.ndarray[tuple[int, int], np.dtype[np.floating]]
 type MatrixFloatFunction = np.ndarray[tuple[int, int, int], np.dtype[np.complexfloating]]
+type CompoundFields = list[attrs.Attribute[object]]
 
 MAX_SPECTRAL_POLYNOMIAL_DEGREE_METADATA: dict[str, str] = {
     "dir_name": "max_polydeg",
@@ -46,6 +50,13 @@ NUM_FREE_COMPLEX_FERMIONS_METADATA: dict[str, str] = {
 }
 
 REGISTRY: dict[str, type[attrs.AttrsInstance]] = {}
+
+
+def order_compound_fields(
+    _: type[attrs.AttrsInstance],
+    fields: CompoundFields,
+) -> CompoundFields:
+    return sorted(fields, key=lambda field: field.name != "ensemble")
 
 
 def _compute_default_couplings(
@@ -488,7 +499,7 @@ class CompoundEnsemble:
         realizs: int,
         *,
         energies: np.ndarray[tuple[int], np.dtype[np.floating]],
-    ) -> Iterator[tuple[RealEigenvalues, RealEigenvalues]]:
+    ) -> Iterator[tuple[TimeDelays, RealEigenvalues]]:
         for delay_matrix, eigvals in self.wigner_smith_matrix_stream(
             realizs, energies=energies
         ):
