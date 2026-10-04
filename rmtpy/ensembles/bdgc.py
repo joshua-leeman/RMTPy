@@ -5,6 +5,7 @@ import attrs
 import numba
 import numpy as np
 
+from .gue import build_gue_matrix
 from .many_body_ensemble import HermitianMatrix
 from .wigner_dyson_ensemble import WignerDysonEnsemble
 
@@ -17,7 +18,7 @@ TOKEN_NAME: str = "BdG_C"
 DYSON_INDEX: int = 2
 
 
-def _build_bdgc_matrix(
+def build_bdgc_matrix(
     matrix: HermitianMatrix,
     real_dtype: type[np.floating],
     std_dev: float,
@@ -29,33 +30,16 @@ def _build_bdgc_matrix(
     bottom_left_block = matrix[halfway_index:, :halfway_index]
     bottom_right_block = matrix[halfway_index:, halfway_index:]
 
-    _build_gue_matrix(top_left_block, real_dtype, std_dev, rng)
+    build_gue_matrix(top_left_block, real_dtype, std_dev, rng)
     _ = np.negative(top_left_block, out=bottom_right_block)
     _ = np.conjugate(bottom_right_block, out=bottom_right_block)
 
-    _build_symmetric_matrix(top_right_block, real_dtype, std_dev, rng)
+    build_symmetric_matrix(top_right_block, real_dtype, std_dev, rng)
     _ = np.conjugate(top_right_block, out=bottom_left_block)
 
 
 @numba.njit(boundscheck=False, cache=True, fastmath=True)
-def _build_gue_matrix(
-    matrix: HermitianMatrix,
-    real_dtype: type[np.floating],
-    std_dev: float,
-    rng: np.random.Generator,
-) -> None:
-    size = matrix.shape[0]
-    for i in range(size):
-        matrix[i, i] = 2 * std_dev * rng.standard_normal(None, real_dtype)
-        matrix[i + 1 :, i] = std_dev * (
-            rng.standard_normal(size - i - 1, real_dtype)
-            + 1j * rng.standard_normal(size - i - 1, real_dtype)
-        )
-        matrix[i, i + 1 :] = np.conj(matrix[i + 1 :, i])
-
-
-@numba.njit(boundscheck=False, cache=True, fastmath=True)
-def _build_symmetric_matrix(
+def build_symmetric_matrix(
     matrix: HermitianMatrix,
     real_dtype: type[np.floating],
     std_dev: float,
@@ -107,7 +91,7 @@ class BogoliubovDeGennesCEnsemble(WignerDysonEnsemble):
         use_complex_dtype: bool = False,
     ) -> HermitianMatrix:
         matrix = self._allocate_complex_hermitian_matrix_memory()
-        _build_bdgc_matrix(matrix, self.real_dtype.type, self.std_dev, self.rng)
+        build_bdgc_matrix(matrix, self.real_dtype.type, self.std_dev, self.rng)
         return matrix
 
     @override
@@ -119,5 +103,5 @@ class BogoliubovDeGennesCEnsemble(WignerDysonEnsemble):
     ) -> Iterator[HermitianMatrix]:
         matrix = self._allocate_complex_hermitian_matrix_memory()
         for _ in range(realizs):
-            _build_bdgc_matrix(matrix, self.real_dtype.type, self.std_dev, self.rng)
+            build_bdgc_matrix(matrix, self.real_dtype.type, self.std_dev, self.rng)
             yield matrix

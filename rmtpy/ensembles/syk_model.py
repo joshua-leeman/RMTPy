@@ -30,7 +30,7 @@ NUM_MAJORANAS_LIMIT_BY_Q: dict[int, int] = {2: 32, 4: 32, 6: 26, 8: 24, 10: 22}
 
 
 @numba.njit(boundscheck=False, cache=True, fastmath=True)
-def _build_syk_matrix_with_imaginary_prefactor(
+def build_syk_matrix_with_imaginary_prefactor(
     matrix: HermitianMatrix,
     real_dtype: type[np.floating],
     std_dev: float,
@@ -50,7 +50,7 @@ def _build_syk_matrix_with_imaginary_prefactor(
 
 
 @numba.njit(boundscheck=False, cache=True, fastmath=True)
-def _build_syk_matrix_without_imaginary_prefactor(
+def build_syk_matrix_without_imaginary_prefactor(
     matrix: RealSymmetricMatrix | HermitianMatrix,
     real_dtype: type[np.floating],
     std_dev: float,
@@ -271,6 +271,6 @@ class SachdevYeKitaevEnsemble(ManyBodyEnsemble):
 
     def _pick_syk_matrix_builder(self) -> Callable[..., None]:
         if self.q % 4 == 2:
-            return _build_syk_matrix_with_imaginary_prefactor
+            return build_syk_matrix_with_imaginary_prefactor
         else:
-            return _build_syk_matrix_without_imaginary_prefactor
+            return build_syk_matrix_without_imaginary_prefactor

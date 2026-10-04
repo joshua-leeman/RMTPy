@@ -14,7 +14,7 @@ DYSON_INDEX: int = 1
 
 
 @numba.njit(boundscheck=False, cache=True, fastmath=True)
-def _build_goe_matrix(
+def build_goe_matrix(
     matrix: RealSymmetricMatrix | HermitianMatrix,
     real_dtype: type[np.floating],
     std_dev: float,
@@ -57,7 +57,7 @@ class GaussianOrthogonalEnsemble(WignerDysonEnsemble):
         else:
             matrix = self._allocate_empty_real_symmetric_matrix_memory()
 
-        _build_goe_matrix(matrix, self.real_dtype.type, self.std_dev, self.rng)
+        build_goe_matrix(matrix, self.real_dtype.type, self.std_dev, self.rng)
         return matrix
 
     @override
@@ -73,5 +73,5 @@ class GaussianOrthogonalEnsemble(WignerDysonEnsemble):
             matrix = self._allocate_empty_real_symmetric_matrix_memory()
 
         for _ in range(realizs):
-            _build_goe_matrix(matrix, self.real_dtype.type, self.std_dev, self.rng)
+            build_goe_matrix(matrix, self.real_dtype.type, self.std_dev, self.rng)
             yield matrix

@@ -14,7 +14,7 @@ DYSON_INDEX: int = 2
 
 
 @numba.njit(boundscheck=False, cache=True, fastmath=True)
-def _build_gue_matrix(
+def build_gue_matrix(
     matrix: HermitianMatrix,
     real_dtype: type[np.floating],
     std_dev: float,
@@ -56,7 +56,7 @@ class GaussianUnitaryEnsemble(WignerDysonEnsemble):
         use_complex_dtype: bool = False,
     ) -> HermitianMatrix:
         matrix = self._allocate_complex_hermitian_matrix_memory()
-        _build_gue_matrix(matrix, self.real_dtype.type, self.std_dev, self.rng)
+        build_gue_matrix(matrix, self.real_dtype.type, self.std_dev, self.rng)
         return matrix
 
     @override
@@ -68,5 +68,5 @@ class GaussianUnitaryEnsemble(WignerDysonEnsemble):
     ) -> Iterator[HermitianMatrix]:
         matrix = self._allocate_complex_hermitian_matrix_memory()
         for _ in range(realizs):
-            _build_gue_matrix(matrix, self.real_dtype.type, self.std_dev, self.rng)
+            build_gue_matrix(matrix, self.real_dtype.type, self.std_dev, self.rng)
             yield matrix

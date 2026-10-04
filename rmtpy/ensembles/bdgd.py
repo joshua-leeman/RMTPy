@@ -18,7 +18,7 @@ DYSON_INDEX: int = 2
 
 
 @numba.njit(boundscheck=False, cache=True, fastmath=True)
-def _build_bdgd_matrix(
+def build_bdgd_matrix(
     matrix: HermitianMatrix,
     real_dtype: type[np.floating],
     std_dev: float,
@@ -67,7 +67,7 @@ class BogoliubovDeGennesDEnsemble(WignerDysonEnsemble):
         use_complex_dtype: bool = False,
     ) -> HermitianMatrix:
         matrix = self._allocate_complex_hermitian_matrix_memory()
-        _build_bdgd_matrix(matrix, self.real_dtype.type, self.std_dev, self.rng)
+        build_bdgd_matrix(matrix, self.real_dtype.type, self.std_dev, self.rng)
         return matrix
 
     @override
@@ -79,5 +79,5 @@ class BogoliubovDeGennesDEnsemble(WignerDysonEnsemble):
     ) -> Iterator[HermitianMatrix]:
         matrix = self._allocate_complex_hermitian_matrix_memory()
         for _ in range(realizs):
-            _build_bdgd_matrix(matrix, self.real_dtype.type, self.std_dev, self.rng)
+            build_bdgd_matrix(matrix, self.real_dtype.type, self.std_dev, self.rng)
             yield matrix

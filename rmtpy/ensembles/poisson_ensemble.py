@@ -38,16 +38,8 @@ EIGVEC_ENSEMBLE_FLAG_METADATA: dict[str, str] = {
 }
 
 
-def _cast_eigvec_ensemble_fag(flag: str) -> str:
-    return WIGNER_DYSON_ENSEMBLE_INITIALISMS_BY_NAME.get(flag, flag)
-
-
-def _compute_standard_deviation(poisson: PoissonEnsemble) -> float:
-    return 2 * poisson.spectral_radius
-
-
 @numba.njit(boundscheck=False, cache=True, fastmath=True)
-def _symmetrize_upper_complex_triangle_to_lower(
+def symmetrize_upper_complex_triangle_to_lower(
     matrix: np.ndarray[tuple[int, int], np.dtype[np.complexfloating]],
 ) -> None:
     size = matrix.shape[0]
@@ -56,12 +48,20 @@ def _symmetrize_upper_complex_triangle_to_lower(
 
 
 @numba.njit(boundscheck=False, cache=True, fastmath=True)
-def _symmetrize_upper_real_triangle_to_lower(
+def symmetrize_upper_real_triangle_to_lower(
     matrix: np.ndarray[tuple[int, int], np.dtype[np.floating]],
 ) -> None:
     size = matrix.shape[0]
     for i in range(size):
         matrix[i + 1 :, i] = matrix[i, i + 1 :]
+
+
+def _cast_eigvec_ensemble_fag(flag: str) -> str:
+    return WIGNER_DYSON_ENSEMBLE_INITIALISMS_BY_NAME.get(flag, flag)
+
+
+def _compute_standard_deviation(poisson: PoissonEnsemble) -> float:
+    return 2 * poisson.spectral_radius
 
 
 def _instantiate_eigvec_ensemble(poisson: PoissonEnsemble) -> WignerDysonEnsemble:
@@ -264,6 +264,6 @@ class PoissonEnsemble(ManyBodyEnsemble):
         use_complex_dtype: bool = False,
     ) -> Callable[..., None]:
         if use_complex_dtype or self.eigvec_ensemble.dyson_index != 1:
-            return _symmetrize_upper_complex_triangle_to_lower
+            return symmetrize_upper_complex_triangle_to_lower
         else:
-            return _symmetrize_upper_real_triangle_to_lower
+            return symmetrize_upper_real_triangle_to_lower
