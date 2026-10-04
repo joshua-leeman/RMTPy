@@ -29,8 +29,6 @@ def load_time_delay_statistics_simulation(
     directory: str | Path,
 ) -> TimeDelayStatisticsSimulation:
     simulation = TimeDelayStatisticsSimulation.load(directory)
-    if not isinstance(simulation, TimeDelayStatisticsSimulation):
-        raise TypeError("Saved simulation is not a TimeDelayStatisticsSimulation.")
 
     return simulation
 

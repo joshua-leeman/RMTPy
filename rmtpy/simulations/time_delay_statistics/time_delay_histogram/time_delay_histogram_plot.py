@@ -1,4 +1,5 @@
 import dataclasses
+from abc import ABC
 from collections.abc import Callable
 from pathlib import Path
 from typing import cast, override
@@ -51,6 +52,62 @@ def format_energy_label(energy: float, energy_scale: float) -> str:
     return rf"$E = {scaled_energy:.2f}E_0$"
 
 
+def _configuration_without_seed(
+    ensemble: ManyBodyEnsemble,
+) -> dict[str, object]:
+    configuration = json_value(ensemble)
+    if not isinstance(configuration, dict):
+        raise TypeError("Ensemble configuration is malformed.")
+
+    configuration = cast(dict[str, object], configuration)
+    parameters = configuration.get("parameters")
+    if not isinstance(parameters, dict):
+        raise TypeError("Ensemble configuration parameters are malformed.")
+    if "seed" not in parameters:
+        raise ValueError("Ensemble configuration is missing `seed`.")
+
+    comparable_parameters = dict(cast(dict[str, object], parameters))
+    del comparable_parameters["seed"]
+    return {**configuration, "parameters": comparable_parameters}
+
+
+def _unfolding_key(data: Data) -> UnfoldingKey:
+    unfolding = data.metadata.get("unfolding")
+    if unfolding not in {"raw", "weight", "average", "variate"}:
+        raise ValueError("Plot-data unfolding metadata is malformed.")
+
+    polynomial_degree = data.metadata.get("polynomial_degree")
+    if unfolding in {"average", "variate"}:
+        if (
+            isinstance(polynomial_degree, bool)
+            or not isinstance(polynomial_degree, int)
+            or polynomial_degree <= 0
+        ):
+            raise ValueError("Plot-data polynomial degree is malformed.")
+    elif polynomial_degree is not None:
+        raise ValueError(
+            "Raw and weight-unfolded plot data cannot have a polynomial degree."
+        )
+
+    return cast(str, unfolding), polynomial_degree
+
+
+def _store_form_factors(
+    form_factors: dict[UnfoldingKey, FormFactorsData],
+    *,
+    key: UnfoldingKey,
+    data: FormFactorsData,
+) -> None:
+    if _unfolding_key(data) != key:
+        raise ValueError(
+            "Spectral form-factor metadata does not match its simulation buffer."
+        )
+    if key in form_factors:
+        raise ValueError(f"Spectral form-factor variant {key!r} is duplicated.")
+
+    form_factors[key] = data
+
+
 @dataclasses.dataclass(slots=True, kw_only=True, eq=False, weakref_slot=False)
 class SpectralFormFactorsOverlay:
     simulation: SpectralStatisticsSimulation = dataclasses.field(
@@ -67,12 +124,12 @@ class SpectralFormFactorsOverlay:
             raise ValueError("Spectral-statistics simulation output is not complete.")
 
         form_factors: dict[UnfoldingKey, FormFactorsData] = {}
-        self._store_form_factors(
+        _store_form_factors(
             form_factors,
             key=("raw", None),
             data=self.simulation.raw_buffers.form_factors,
         )
-        self._store_form_factors(
+        _store_form_factors(
             form_factors,
             key=("weight", None),
             data=self.simulation.wgt_unfolded_buffers.form_factors,
@@ -86,7 +143,7 @@ class SpectralFormFactorsOverlay:
                 polynomial_degree = buffers.polynomial_degree
                 if polynomial_degree is None:
                     raise ValueError("Spectral form-factor unfolding degree is missing.")
-                self._store_form_factors(
+                _store_form_factors(
                     form_factors,
                     key=(unfolding, polynomial_degree),
                     data=buffers.form_factors,
@@ -102,8 +159,8 @@ class SpectralFormFactorsOverlay:
         ensemble: ManyBodyEnsemble,
     ) -> SpectralFormFactorsOverlay:
         simulation = load_spectral_statistics_simulation(directory=directory)
-        expected_configuration = cls._configuration_without_seed(ensemble)
-        saved_configuration = cls._configuration_without_seed(simulation.ensemble)
+        expected_configuration = _configuration_without_seed(ensemble)
+        saved_configuration = _configuration_without_seed(simulation.ensemble)
         if saved_configuration != expected_configuration:
             raise ValueError(
                 "Spectral-statistics ensemble configuration does not match the "
@@ -112,70 +169,14 @@ class SpectralFormFactorsOverlay:
 
         return cls(simulation=simulation)
 
-    @staticmethod
-    def _configuration_without_seed(
-        ensemble: ManyBodyEnsemble,
-    ) -> dict[str, object]:
-        configuration = json_value(ensemble)
-        if not isinstance(configuration, dict):
-            raise TypeError("Ensemble configuration is malformed.")
-
-        parameters = configuration.get("parameters")
-        if not isinstance(parameters, dict):
-            raise TypeError("Ensemble configuration parameters are malformed.")
-        if "seed" not in parameters:
-            raise ValueError("Ensemble configuration is missing `seed`.")
-
-        comparable_parameters = dict(parameters)
-        del comparable_parameters["seed"]
-        return {**configuration, "parameters": comparable_parameters}
-
-    @staticmethod
-    def _unfolding_key(data: Data) -> UnfoldingKey:
-        unfolding = data.metadata.get("unfolding")
-        if unfolding not in {"raw", "weight", "average", "variate"}:
-            raise ValueError("Plot-data unfolding metadata is malformed.")
-
-        polynomial_degree = data.metadata.get("polynomial_degree")
-        if unfolding in {"average", "variate"}:
-            if (
-                isinstance(polynomial_degree, bool)
-                or not isinstance(polynomial_degree, int)
-                or polynomial_degree <= 0
-            ):
-                raise ValueError("Plot-data polynomial degree is malformed.")
-        elif polynomial_degree is not None:
-            raise ValueError(
-                "Raw and weight-unfolded plot data cannot have a polynomial degree."
-            )
-
-        return cast(str, unfolding), cast(int | None, polynomial_degree)
-
-    @classmethod
-    def _store_form_factors(
-        cls,
-        form_factors: dict[UnfoldingKey, FormFactorsData],
-        *,
-        key: UnfoldingKey,
-        data: FormFactorsData,
-    ) -> None:
-        if cls._unfolding_key(data) != key:
-            raise ValueError(
-                "Spectral form-factor metadata does not match its simulation buffer."
-            )
-        if key in form_factors:
-            raise ValueError(f"Spectral form-factor variant {key!r} is duplicated.")
-
-        form_factors[key] = data
-
     def plot_for(self, data: TimeDelayHistogram) -> FormFactorsPlotType:
         form_factors = self.validate(data)
-        key = self._unfolding_key(data)
+        key = _unfolding_key(data)
         plot_cls = FormFactorsPlot if key == ("raw", None) else UnfoldedFormFactorsPlot
         return plot_cls(data=form_factors, context=self.simulation.manifest)
 
     def validate(self, data: TimeDelayHistogram) -> FormFactorsData:
-        key = self._unfolding_key(data)
+        key = _unfolding_key(data)
         try:
             form_factors = self.form_factors[key]
         except KeyError as exc:
@@ -193,7 +194,7 @@ class SpectralFormFactorsOverlay:
 
 
 @dataclasses.dataclass(kw_only=True, eq=False, weakref_slot=False)
-class _TimeDelayHistogramPlot(Plot):
+class _TimeDelayHistogramPlot(Plot, ABC):
     spectral_form_factors: SpectralFormFactorsOverlay | None = dataclasses.field(
         default=None,
         repr=False,
@@ -235,7 +236,7 @@ class _TimeDelayHistogramPlot(Plot):
         form_factors = cast(FormFactorsData, form_factors_plot.data)
         dimension = form_factors_plot.ensemble.dimension
 
-        self.form_factors_ax = self.ax.twinx()
+        self.form_factors_ax = cast(Callable[[], Axes], self.ax.twinx)()
 
         set_yscale = cast(Callable[..., object], self.form_factors_ax.set_yscale)
         _ = set_yscale("log", base=dimension)
@@ -290,19 +291,20 @@ class _TimeDelayHistogramPlot(Plot):
 
     def configure_form_factors_axes(self) -> None:
         axes = self.form_factors_plot.axes
-        for spine in self.form_factors_ax.spines.values():
+        form_factors_axes = cast(ConfigurableAxes, cast(object, self.form_factors_ax))
+        for spine in form_factors_axes.spines.values():
             _ = spine.set_linewidth(axes.axes_width)
 
-        _ = self.form_factors_ax.set_ylabel(
+        _ = form_factors_axes.set_ylabel(
             "SFFs",
             fontsize=axes.ylabel_fontsize,
             rotation=270,
             labelpad=15,
         )
         if axes.yticks:
-            _ = self.form_factors_ax.set_yticks(axes.yticks)
+            _ = form_factors_axes.set_yticks(axes.yticks)
 
-        _ = self.form_factors_ax.tick_params(
+        _ = form_factors_axes.tick_params(
             axis="y",
             direction="in",
             left=False,
@@ -312,7 +314,7 @@ class _TimeDelayHistogramPlot(Plot):
             labelleft=False,
             labelright=True,
         )
-        _ = self.form_factors_ax.tick_params(
+        _ = form_factors_axes.tick_params(
             axis="y",
             which="minor",
             left=False,
@@ -322,12 +324,12 @@ class _TimeDelayHistogramPlot(Plot):
         )
 
         if axes.ytick_labels:
-            _ = self.form_factors_ax.set_yticklabels(
+            _ = form_factors_axes.set_yticklabels(
                 axes.ytick_labels,
                 fontsize=axes.tick_fontsize,
             )
         else:
-            _ = self.form_factors_ax.tick_params(
+            _ = form_factors_axes.tick_params(
                 axis="y",
                 labelsize=axes.tick_fontsize,
             )
@@ -368,6 +370,9 @@ class TimeDelayHistogramPlot(_TimeDelayHistogramPlot):
     pdf_legend: str = "BFB"
 
     def set_derived_attributes(self) -> None:
+        if self._derived_attributes_are_set:
+            return
+
         self.compound: CompoundEnsemble = self.store_manifest_arg(
             "compound", CompoundEnsemble
         )
@@ -409,6 +414,8 @@ class TimeDelayHistogramPlot(_TimeDelayHistogramPlot):
         self.scale_limits_and_ticks(
             x=lambda value: cast(float, ensemble.dimension**value * scale),
         )
+
+        self._derived_attributes_are_set: bool = True
 
     @override
     def plot(self, path: str | Path) -> None:
@@ -489,6 +496,9 @@ class UnfoldedTimeDelayHistogramPlot(_TimeDelayHistogramPlot):
     pdf_legend: str = "BFB"
 
     def set_derived_attributes(self) -> None:
+        if self._derived_attributes_are_set:
+            return
+
         self.compound: CompoundEnsemble = self.store_manifest_arg(
             "compound", CompoundEnsemble
         )
@@ -536,6 +546,8 @@ class UnfoldedTimeDelayHistogramPlot(_TimeDelayHistogramPlot):
         self.scale_limits_and_ticks(
             x=lambda value: cast(float, ensemble.dimension**value * scale),
         )
+
+        self._derived_attributes_are_set: bool = True
 
     @override
     def plot(self, path: str | Path) -> None:
