@@ -25,3 +25,8 @@ ignore = [
 [tool.ruff.lint.isort]
 known-first-party = ["rmtpy"]
 
+[tool.basedpyright]
+include = ["rmtpy", "tests", "slurm"]
+extraPaths = ["."]
+pythonVersion = "3.14"
+typeCheckingMode = "recommended"
