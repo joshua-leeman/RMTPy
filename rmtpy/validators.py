@@ -2,6 +2,26 @@ import math
 from collections.abc import Iterable, Sequence
 from typing import cast
 
+import numpy as np
+
+
+def to_increasing_energy_grid(
+    energies: np.ndarray[tuple[int], np.dtype[np.floating]],
+    /,
+) -> np.ndarray[tuple[int], np.dtype[np.floating]]:
+    energies_array = np.array(energies, dtype=np.float64, copy=True, order="C")
+    if energies_array.ndim != 1 or energies_array.size < 2:
+        raise ValueError(
+            "`energies` must be a one-dimensional array with at least two entries."
+        )
+    if not np.all(np.isfinite(energies_array)):
+        raise ValueError("`energies` must contain finite values.")
+    if np.any(np.diff(energies_array) <= 0.0):
+        raise ValueError("`energies` must be strictly increasing.")
+
+    energies_array.flags.writeable = False
+    return energies_array
+
 
 def to_support_pair(support: Iterable[float], /) -> tuple[float, float]:
     values = tuple(support)
