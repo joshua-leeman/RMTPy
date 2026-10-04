@@ -9,6 +9,8 @@ scratch/
 archive/
 notebooks/
 reports/
+.rmtpy-slurm.toml
+*.slurm
 
 # DotEnv configuration
 .env

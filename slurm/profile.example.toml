@@ -1,0 +1,32 @@
+# Copy this file outside the repository or to the ignored
+# `.rmtpy-slurm.toml` path, then adapt every value to your cluster.
+schema_version = 1
+name = "example-cluster"
+
+[defaults]
+nodes = 1
+tasks_per_node = 4
+cpus_per_task = 2
+time = "01:00:00"
+partition = "compute"
+distribution = "cyclic"
+mail_type = "BEGIN,END,FAIL"
+log_directory = "logs"
+modules = ["python"]
+module_purge = true
+cpu_bind = "cores"
+numactl = false
+
+[partitions.compute]
+cores_per_node = 64
+max_nodes = 8
+max_time = "24:00:00"
+requires_memory = false
+numactl = false
+
+[partitions.compute-shared]
+cores_per_node = 64
+max_nodes = 2
+max_time = "08:00:00"
+requires_memory = true
+numactl = false
