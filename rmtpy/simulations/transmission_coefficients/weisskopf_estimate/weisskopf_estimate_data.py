@@ -1,38 +1,17 @@
-from typing import Protocol, cast
+from typing import cast, override
 
 import attrs
 import numpy as np
 
+from ....validators import to_increasing_energy_grid
 from ...base_data import Data
-
-
-class _WeisskopfEstimateDataLike(Protocol):
-    energies: np.ndarray[tuple[int], np.dtype[np.floating]]
-    num_channels: int
-
-
-def _normalize_energies(
-    energies: np.ndarray[tuple[int], np.dtype[np.floating]],
-) -> np.ndarray[tuple[int], np.dtype[np.floating]]:
-    energies_array = np.array(energies, dtype=np.float64, copy=True, order="C")
-    if energies_array.ndim != 1 or energies_array.size < 2:
-        raise ValueError(
-            "`energies` must be a one-dimensional array with at least two entries."
-        )
-    if not np.all(np.isfinite(energies_array)):
-        raise ValueError("`energies` must contain finite values.")
-    if np.any(np.diff(energies_array) <= 0.0):
-        raise ValueError("`energies` must be strictly increasing.")
-
-    energies_array.flags.writeable = False
-    return energies_array
 
 
 def _normalize_mean_level_spacings(
     mean_level_spacings: np.ndarray[tuple[int], np.dtype[np.floating]],
     data: attrs.AttrsInstance,
 ) -> np.ndarray[tuple[int], np.dtype[np.floating]]:
-    data = cast(_WeisskopfEstimateDataLike, data)
+    data = cast(WeisskopfEstimateData, data)
     spacings = np.array(
         mean_level_spacings,
         dtype=np.float64,
@@ -82,7 +61,7 @@ def _normalize_complex_channel_matrix(
     values: np.ndarray[tuple[int, int], np.dtype[np.complexfloating]],
     data: attrs.AttrsInstance,
 ) -> np.ndarray[tuple[int, int], np.dtype[np.complexfloating]]:
-    data = cast(_WeisskopfEstimateDataLike, data)
+    data = cast(WeisskopfEstimateData, data)
     array = np.array(values, dtype=np.complex128, copy=True, order="C")
     expected_shape = (len(data.energies), data.num_channels)
     if array.shape != expected_shape or not np.all(np.isfinite(array)):
@@ -98,7 +77,7 @@ def _normalize_float_channel_matrix(
     values: np.ndarray[tuple[int, int], np.dtype[np.floating]],
     data: attrs.AttrsInstance,
 ) -> np.ndarray[tuple[int, int], np.dtype[np.floating]]:
-    data = cast(_WeisskopfEstimateDataLike, data)
+    data = cast(WeisskopfEstimateData, data)
     array = np.array(values, dtype=np.float64, copy=True, order="C")
     expected_shape = (len(data.energies), data.num_channels)
     if array.shape != expected_shape or not np.all(np.isfinite(array)):
@@ -114,7 +93,7 @@ def _normalize_weisskopf_estimate(
     values: np.ndarray[tuple[int], np.dtype[np.floating]],
     data: attrs.AttrsInstance,
 ) -> np.ndarray[tuple[int], np.dtype[np.floating]]:
-    data = cast(_WeisskopfEstimateDataLike, data)
+    data = cast(WeisskopfEstimateData, data)
     array = np.array(values, dtype=np.float64, copy=True, order="C")
     if array.shape != data.energies.shape or np.any(np.isinf(array)):
         raise ValueError(
@@ -128,7 +107,7 @@ def _normalize_weisskopf_estimate(
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
 class WeisskopfEstimateData(Data):
     energies: np.ndarray[tuple[int], np.dtype[np.floating]] = attrs.field(
-        converter=_normalize_energies,
+        converter=to_increasing_energy_grid,
         repr=False,
     )
     mean_level_spacings: np.ndarray[tuple[int], np.dtype[np.floating]] = attrs.field(
@@ -238,6 +217,7 @@ class WeisskopfEstimateData(Data):
             out=self.weisskopf_estimate,
         )
 
+    @override
     def add_contribution(self, contribution: Data, /) -> None:
         self._validate_contribution(contribution)
         if not isinstance(contribution, WeisskopfEstimateData):
@@ -259,5 +239,6 @@ class WeisskopfEstimateData(Data):
         self.scattering_diagonal_sum[:] += contribution.scattering_diagonal_sum
         self._add_realizations(contribution)
 
+    @override
     def compute_statistics(self) -> None:
         self.compute_weisskopf_estimate()

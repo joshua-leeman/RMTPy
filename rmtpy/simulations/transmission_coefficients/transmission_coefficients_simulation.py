@@ -26,8 +26,6 @@ def load_transmission_coefficients_simulation(
     directory: str | Path,
 ) -> TransmissionCoefficientsSimulation:
     simulation = TransmissionCoefficientsSimulation.load(directory)
-    if not isinstance(simulation, TransmissionCoefficientsSimulation):
-        raise TypeError("Saved simulation is not a TransmissionCoefficientsSimulation.")
 
     return simulation
 
@@ -260,6 +258,17 @@ class TransmissionCoefficientsSimulation(Simulation):
                 data.add_scattering_diagonal(scattering_diagonal[:, channel_index])
 
             self.weisskopf_estimate_buffer.add_scattering_diagonal(scattering_diagonal)
+
+    @override
+    def _restore_execution(self) -> None:
+        energies = self.weisskopf_estimate_buffer.energies
+        if any(
+            not np.array_equal(data.energies, energies)
+            for data in self.transmission_coefficient_buffers
+        ):
+            raise ValueError("Saved transmission energy grids do not match.")
+
+        object.__setattr__(self, "energies", energies)
 
     @override
     def _execute(self) -> None:

@@ -3,12 +3,17 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import cast, override
 
-import numpy as np
 from matplotlib.lines import Line2D
 
 from ....compounds import CompoundEnsemble
 from ...base_data import Data
-from ...base_plot import ENSEMBLE_AVERAGED_CURVE_WIDTH, Plot, PlotAxes, PlotLegend
+from ...base_plot import (
+    ENSEMBLE_AVERAGED_CURVE_WIDTH,
+    Plot,
+    PlotAxes,
+    PlotLegend,
+    format_coupling_label,
+)
 from .transmission_coefficients_data import TransmissionCoefficientsData
 
 
@@ -49,10 +54,12 @@ class TransmissionCoefficientsPlot(Plot):
     )
 
     def set_derived_attributes(self) -> None:
+        if self._derived_attributes_are_set:
+            return
+
         self.compound: CompoundEnsemble = self.store_manifest_arg(
             "compound", CompoundEnsemble
         )
-        mean_coupling_squared = float(np.mean(self.compound.couplings**2))
         ensemble = self.compound.ensemble
         channel_index = self.data.metadata["channel_index"]
 
@@ -65,11 +72,7 @@ class TransmissionCoefficientsPlot(Plot):
         )
         self.axes.ylabel = rf"$T_{{{channel_index}}}(E)$"
 
-        coupling_exponent = cast(
-            float, np.log10(mean_coupling_squared / ensemble.spectral_radius)
-        )
-        coupling_exponent = 0.0 if abs(coupling_exponent) < 0.005 else coupling_exponent
-        coupling_label = rf"$\alpha = {{{coupling_exponent:.1f}}}$"
+        coupling_label = format_coupling_label(self.compound)
 
         self.legend: PlotLegend = PlotLegend(
             handles=self.legend_handles,
@@ -83,6 +86,8 @@ class TransmissionCoefficientsPlot(Plot):
             + rf", $N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
             + rf", $a = {{{channel_index}}}$"
         )
+
+        self._derived_attributes_are_set: bool = True
 
     @override
     def plot(self, path: str | Path) -> None:

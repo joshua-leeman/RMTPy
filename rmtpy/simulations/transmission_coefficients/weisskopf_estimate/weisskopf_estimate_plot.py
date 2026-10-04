@@ -3,13 +3,18 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import cast, override
 
-import numpy as np
 from matplotlib.lines import Line2D
 from matplotlib.ticker import FormatStrFormatter
 
 from ....compounds import CompoundEnsemble
 from ...base_data import Data
-from ...base_plot import ENSEMBLE_AVERAGED_CURVE_WIDTH, Plot, PlotAxes, PlotLegend
+from ...base_plot import (
+    ENSEMBLE_AVERAGED_CURVE_WIDTH,
+    Plot,
+    PlotAxes,
+    PlotLegend,
+    format_coupling_label,
+)
 from .weisskopf_estimate_data import WeisskopfEstimateData
 
 
@@ -49,10 +54,12 @@ class WeisskopfEstimatePlot(Plot):
     )
 
     def set_derived_attributes(self) -> None:
+        if self._derived_attributes_are_set:
+            return
+
         self.compound: CompoundEnsemble = self.store_manifest_arg(
             "compound", CompoundEnsemble
         )
-        mean_coupling_squared = float(np.mean(self.compound.couplings**2))
         ensemble = self.compound.ensemble
 
         self.xlim = ensemble.spectral_density.plot_range
@@ -63,11 +70,7 @@ class WeisskopfEstimatePlot(Plot):
             value * ensemble.spectral_radius for value in self.axes.xticks_minor
         )
 
-        coupling_exponent = cast(
-            float, np.log10(mean_coupling_squared / ensemble.spectral_radius)
-        )
-        coupling_exponent = 0.0 if abs(coupling_exponent) < 0.005 else coupling_exponent
-        coupling_label = rf"$\alpha = {{{coupling_exponent:.1f}}}$"
+        coupling_label = format_coupling_label(self.compound)
 
         self.legend: PlotLegend = PlotLegend(
             handles=self.legend_handles,
@@ -80,6 +83,8 @@ class WeisskopfEstimatePlot(Plot):
             + ensemble.to_latex
             + rf", $N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
         )
+
+        self._derived_attributes_are_set: bool = True
 
     @override
     def plot(self, path: str | Path) -> None:
