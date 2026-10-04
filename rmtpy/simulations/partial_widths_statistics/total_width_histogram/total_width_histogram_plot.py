@@ -69,6 +69,9 @@ class TotalWidthHistogramPlot(Plot):
     )
 
     def set_derived_attributes(self) -> None:
+        if self._derived_attributes_are_set:
+            return
+
         width_index = cast(list[int], self.data.metadata["index"])
         state_index = width_index[0]
 
@@ -97,6 +100,8 @@ class TotalWidthHistogramPlot(Plot):
             x=lambda value: 10**value,
             y=lambda value: 10**value,
         )
+
+        self._derived_attributes_are_set: bool = True
 
     @override
     def plot(self, path: str | Path) -> None:

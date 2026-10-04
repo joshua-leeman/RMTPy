@@ -22,8 +22,6 @@ def load_partial_widths_statistics_simulation(
     directory: str | Path,
 ) -> PartialWidthsStatisticsSimulation:
     simulation = PartialWidthsStatisticsSimulation.load(directory)
-    if not isinstance(simulation, PartialWidthsStatisticsSimulation):
-        raise TypeError("Saved simulation is not a PartialWidthsStatisticsSimulation.")
 
     return simulation
 
