@@ -1,4 +1,5 @@
 import json
+import math
 import tempfile
 import unittest
 from contextlib import ExitStack
@@ -10,9 +11,16 @@ from unittest.mock import MagicMock, patch
 import attrs
 import numpy as np
 from matplotlib import pyplot as plt
+from matplotlib.lines import Line2D
 
 from rmtpy.compounds import CompoundEnsemble
+from rmtpy.conversion import AttrsFields
 from rmtpy.ensembles import GOE
+from rmtpy.simulations.base_data import Data
+from rmtpy.simulations.base_plot import (
+    ENSEMBLE_AVERAGED_CURVE_WIDTH,
+    SINGLE_REALIZATION_CURVE_WIDTH,
+)
 from rmtpy.simulations.base_simulation import ExecutionState
 from rmtpy.simulations.resonance_statistics import (
     ResonanceStatisticsSimulation,
@@ -53,6 +61,16 @@ from rmtpy.simulations.unfolding import (
     TruncatedPolynomialCDFFactory,
     unfold_values,
     unfold_widths,
+)
+from tests.support import (
+    ArchiveArray,
+    ComplexArray,
+    FloatArray,
+    FloatVector,
+    attribute_value,
+    json_mapping,
+    manifest_section,
+    mock_argument,
 )
 
 RESONANCE_PLOT_CLASSES = (
@@ -127,7 +145,7 @@ class ResonanceStatisticsTests(unittest.TestCase):
                     data=simulation.raw_buffers.form_factors,
                     context=simulation.manifest,
                 ),
-                ("#0072B2", "#D55E00", "#009E73"),
+                ("#0072B2", "#D54300", "#009E73"),
                 ("-", "-", "-"),
             ),
             (
@@ -135,7 +153,7 @@ class ResonanceStatisticsTests(unittest.TestCase):
                     data=simulation.wgt_unfolded_buffers.form_factors,
                     context=simulation.manifest,
                 ),
-                ("#0072B2", "#D55E00", "Black", "#009E73"),
+                ("#0072B2", "#D54300", "Black", "#009E73"),
                 ("-", "-", ":", "-"),
             ),
         )
@@ -152,29 +170,40 @@ class ResonanceStatisticsTests(unittest.TestCase):
                     )
                     self.assertEqual(
                         tuple(line.get_linewidth() for line in plot.ax.lines),
-                        (2.0,) * len(expected_colors),
+                        (ENSEMBLE_AVERAGED_CURVE_WIDTH,) * (len(expected_colors) - 1)
+                        + (SINGLE_REALIZATION_CURVE_WIDTH,),
                     )
                     self.assertEqual(
                         tuple(line.get_linestyle() for line in plot.ax.lines),
                         expected_styles,
                     )
                     self.assertEqual(
-                        tuple(handle.get_color() for handle in plot.legend.handles),
+                        tuple(
+                            handle.get_color()
+                            for handle in cast(tuple[Line2D, ...], plot.legend.handles)
+                        ),
                         expected_colors,
                     )
                     self.assertEqual(
-                        tuple(handle.get_linewidth() for handle in plot.legend.handles),
-                        (2.0,) * len(expected_colors),
+                        tuple(
+                            handle.get_linewidth()
+                            for handle in cast(tuple[Line2D, ...], plot.legend.handles)
+                        ),
+                        (ENSEMBLE_AVERAGED_CURVE_WIDTH,) * (len(expected_colors) - 1)
+                        + (SINGLE_REALIZATION_CURVE_WIDTH,),
                     )
                     self.assertEqual(
-                        tuple(handle.get_linestyle() for handle in plot.legend.handles),
+                        tuple(
+                            handle.get_linestyle()
+                            for handle in cast(tuple[Line2D, ...], plot.legend.handles)
+                        ),
                         expected_styles,
                     )
                     self.assertEqual(plot.ax.lines[-1].get_alpha(), 1.0)
-                    self.assertEqual(plot.ax.lines[-1].get_zorder(), 3)
+                    self.assertEqual(plot.ax.lines[-1].get_zorder(), 1)
                     np.testing.assert_array_equal(
                         plot.ax.lines[-1].get_ydata(),
-                        plot.data.single_realization_form_factor,
+                        cast(FormFactorsData, plot.data).single_realization_form_factor,
                     )
                     self.assertEqual(
                         plot.legend.labels[-1],
@@ -196,27 +225,27 @@ class ResonanceStatisticsTests(unittest.TestCase):
             (
                 ResonanceHistogramPlot,
                 simulation.raw_buffers.resonance_centers,
-                "Resonance Density",
+                "Resonance PDF",
             ),
             (
                 WidthHistogramPlot,
                 simulation.raw_buffers.resonance_widths,
-                "Resonance Width Distribution",
+                "Pole-width PDF",
             ),
             (
                 ResonanceSpacingHistogramPlot,
                 simulation.raw_buffers.nn_spacings,
-                "Resonance Spacing Distribution",
+                "Resonance NNS PDF",
             ),
             (
                 ComplexEnergyHistogramPlot,
                 simulation.raw_buffers.complex_energies,
-                "Complex Resonances",
+                "Pole Distribution",
             ),
             (
                 ResonanceFormFactorsPlot,
                 simulation.raw_buffers.form_factors,
-                "Resonance Form Factors",
+                "RFFs",
             ),
             (
                 ResonanceCoefficientsHistogramPlot,
@@ -235,42 +264,42 @@ class ResonanceStatisticsTests(unittest.TestCase):
         unfolded_cases = (
             (
                 simulation.wgt_unfolded_buffers,
-                "Weight-unfolded",
+                "Wgt-unfolded",
             ),
             (
                 tuple(simulation.ave_unfolded_buffers)[1],
-                r"Average-unfolded (deg = $2$)",
+                r"Ave(2)-unfolded",
             ),
             (
                 tuple(simulation.var_unfolded_buffers)[0],
-                r"Variate-unfolded (deg = $1$)",
+                r"Var(1)-unfolded",
             ),
         )
         plot_cases = (
             (
                 UnfoldedResonanceHistogramPlot,
                 "resonance_centers",
-                "Resonance Density",
+                "Resonance PDF",
             ),
             (
                 UnfoldedWidthHistogramPlot,
                 "resonance_widths",
-                "Resonance Width Distribution",
+                "Pole-width PDF",
             ),
             (
                 UnfoldedResonanceSpacingHistogramPlot,
                 "nn_spacings",
-                "Resonance Spacing Distribution",
+                "Resonance NNS PDF",
             ),
             (
                 UnfoldedComplexEnergyHistogramPlot,
                 "complex_energies",
-                "Complex Resonances",
+                "Pole Distribution",
             ),
             (
                 UnfoldedResonanceFormFactorsPlot,
                 "form_factors",
-                "Resonance Form Factors",
+                "RFFs",
             ),
         )
         for buffers, unfolding in unfolded_cases:
@@ -278,7 +307,7 @@ class ResonanceStatisticsTests(unittest.TestCase):
                 expected_title = f"{unfolding} {subject}: {metadata}"
                 with self.subTest(title=expected_title):
                     plot = plot_cls(
-                        data=getattr(buffers, data_name),
+                        data=cast(Data, getattr(buffers, data_name)),
                         context=simulation.manifest,
                     )
                     plot.set_derived_attributes()
@@ -322,12 +351,6 @@ class ResonanceStatisticsTests(unittest.TestCase):
                 self.assertEqual(
                     tuple(buffer.metadata["degree"] for buffer in coefficient_buffers),
                     tuple(range(1, max_degree + 1)),
-                )
-                self.assertTrue(
-                    all(
-                        isinstance(buffer, ResonanceCoefficientsHistogram)
-                        for buffer in coefficient_buffers
-                    )
                 )
                 self.assertEqual(
                     tuple(buffer.polynomial_degree for buffer in averaged_buffers),
@@ -376,11 +399,11 @@ class ResonanceStatisticsTests(unittest.TestCase):
                     self.assertEqual(
                         tuple(data._file_name for data in averaged_buffers[0]),
                         (
-                            "resonance_histogram_averaged_unfolded_degree_1",
-                            "width_histogram_averaged_unfolded_degree_1",
-                            "resonance_spacing_histogram_averaged_unfolded_degree_1",
-                            "complex_energy_histogram_averaged_unfolded_degree_1",
-                            "resonance_form_factors_averaged_unfolded_degree_1",
+                            "resonance_histogram_average_unfolded_degree_1",
+                            "width_histogram_average_unfolded_degree_1",
+                            "resonance_spacing_histogram_average_unfolded_degree_1",
+                            "complex_energy_histogram_average_unfolded_degree_1",
+                            "resonance_form_factors_average_unfolded_degree_1",
                         ),
                     )
 
@@ -435,9 +458,12 @@ class ResonanceStatisticsTests(unittest.TestCase):
         )
         self.assertAlmostEqual(float(np.sum(raw.complex_energies.histogram)), 1.0)
 
-        raw_moment = np.mean(
-            np.exp(-1j * np.outer(resonance_centers, raw.form_factors.times)),
-            axis=0,
+        raw_moment = cast(
+            ComplexArray,
+            np.mean(
+                np.exp(-1j * np.outer(resonance_centers, raw.form_factors.times)),
+                axis=0,
+            ),
         )
         np.testing.assert_allclose(raw.form_factors.first_moment, raw_moment)
         np.testing.assert_allclose(
@@ -527,15 +553,18 @@ class ResonanceStatisticsTests(unittest.TestCase):
         )
 
         raw_form_factors = simulation.raw_buffers.form_factors
-        first_raw_moment = np.mean(
-            np.exp(
-                -1j
-                * np.outer(
-                    resonance_center_samples[0],
-                    raw_form_factors.times,
-                )
+        first_raw_moment = cast(
+            ComplexArray,
+            np.mean(
+                np.exp(
+                    -1j
+                    * np.outer(
+                        resonance_center_samples[0],
+                        raw_form_factors.times,
+                    )
+                ),
+                axis=0,
             ),
-            axis=0,
         )
         np.testing.assert_allclose(
             raw_form_factors.single_realization_form_factor,
@@ -548,9 +577,12 @@ class ResonanceStatisticsTests(unittest.TestCase):
             cdf=control.resonance_density.weight_cdf,
             dimension=control.ensemble.dimension,
         )
-        first_weight_moment = np.mean(
-            np.exp(-1j * np.outer(first_weight_centers, weight_form_factors.times)),
-            axis=0,
+        first_weight_moment = cast(
+            ComplexArray,
+            np.mean(
+                np.exp(-1j * np.outer(first_weight_centers, weight_form_factors.times)),
+                axis=0,
+            ),
         )
         np.testing.assert_allclose(
             weight_form_factors.single_realization_form_factor,
@@ -567,15 +599,18 @@ class ResonanceStatisticsTests(unittest.TestCase):
                 cdf=cdf,
                 dimension=control.ensemble.dimension,
             )
-            first_average_moment = np.mean(
-                np.exp(
-                    -1j
-                    * np.outer(
-                        first_average_centers,
-                        buffers.form_factors.times,
-                    )
+            first_average_moment = cast(
+                ComplexArray,
+                np.mean(
+                    np.exp(
+                        -1j
+                        * np.outer(
+                            first_average_centers,
+                            buffers.form_factors.times,
+                        )
+                    ),
+                    axis=0,
                 ),
-                axis=0,
             )
             np.testing.assert_allclose(
                 buffers.form_factors.single_realization_form_factor,
@@ -595,15 +630,18 @@ class ResonanceStatisticsTests(unittest.TestCase):
                 cdf=cdf,
                 dimension=control.ensemble.dimension,
             )
-            first_variate_moment = np.mean(
-                np.exp(
-                    -1j
-                    * np.outer(
-                        first_variate_centers,
-                        buffers.form_factors.times,
-                    )
+            first_variate_moment = cast(
+                ComplexArray,
+                np.mean(
+                    np.exp(
+                        -1j
+                        * np.outer(
+                            first_variate_centers,
+                            buffers.form_factors.times,
+                        )
+                    ),
+                    axis=0,
                 ),
-                axis=0,
             )
             np.testing.assert_allclose(
                 buffers.form_factors.single_realization_form_factor,
@@ -627,11 +665,19 @@ class ResonanceStatisticsTests(unittest.TestCase):
             )
             self.assertEqual(
                 histogram.underflow,
-                int(np.count_nonzero(expected_coefficients < histogram.bins[0])),
+                int(
+                    np.count_nonzero(
+                        expected_coefficients < cast(np.floating, histogram.bins[0])
+                    )
+                ),
             )
             self.assertEqual(
                 histogram.overflow,
-                int(np.count_nonzero(expected_coefficients >= histogram.bins[-1])),
+                int(
+                    np.count_nonzero(
+                        expected_coefficients >= cast(np.floating, histogram.bins[-1])
+                    )
+                ),
             )
             self.assertAlmostEqual(
                 np.sum(histogram.histogram * np.diff(histogram.bins)),
@@ -723,7 +769,7 @@ class ResonanceStatisticsTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "only once"):
             simulation.execute()
         with self.assertRaisesRegex(RuntimeError, "only after execution"):
-            simulation.save()
+            _ = simulation.save()
         with self.assertRaisesRegex(RuntimeError, "only after execution"):
             simulation.plot(Path("unused"))
 
@@ -755,11 +801,14 @@ class ResonanceStatisticsTests(unittest.TestCase):
                 strict=True,
             ):
                 self.assertEqual(restored_data.metadata, original_data.metadata)
-                for field in attrs.fields(type(original_data)):
-                    restored_value = getattr(restored_data, field.name)
-                    original_value = getattr(original_data, field.name)
+                for field in cast(AttrsFields, attrs.fields(type(original_data))):
+                    restored_value = cast(object, getattr(restored_data, field.name))
+                    original_value = cast(object, getattr(original_data, field.name))
                     if isinstance(original_value, np.ndarray):
-                        np.testing.assert_array_equal(restored_value, original_value)
+                        np.testing.assert_array_equal(
+                            cast(ArchiveArray, restored_value),
+                            cast(ArchiveArray, original_value),
+                        )
 
             np.testing.assert_array_equal(
                 restored_simulation.compound.resonance_density.average_coeffs,
@@ -771,10 +820,22 @@ class ResonanceStatisticsTests(unittest.TestCase):
                 context=restored_simulation.manifest,
             )
             raw_resonance_plot.set_derived_attributes()
-            self.assertIsNotNone(raw_resonance_plot._resonance_pdf)
-            raw_pdf_peak = float(np.max(raw_resonance_plot._resonance_pdf, initial=0.0))
+            self.assertIsNotNone(
+                cast(FloatArray, attribute_value(raw_resonance_plot, "_resonance_pdf"))
+            )
+            raw_pdf_peak = float(
+                np.max(
+                    cast(
+                        FloatArray, attribute_value(raw_resonance_plot, "_resonance_pdf")
+                    ),
+                    initial=0.0,
+                )
+            )
             raw_histogram_peak = float(
-                np.max(raw_resonance_plot.data.histogram, initial=0.0)
+                np.max(
+                    cast(ResonanceHistogram, raw_resonance_plot.data).histogram,
+                    initial=0.0,
+                )
             )
             self.assertGreater(
                 raw_resonance_plot.ylim[1],
@@ -812,7 +873,9 @@ class ResonanceStatisticsTests(unittest.TestCase):
                 patch.object(plot_cls, "plot", autospec=True)
                 for plot_cls in RESONANCE_PLOT_CLASSES
             ]
-            plot_mocks = [plot_patcher.start() for plot_patcher in plot_patchers]
+            plot_mocks = [
+                cast(MagicMock, plot_patcher.start()) for plot_patcher in plot_patchers
+            ]
             try:
                 plot_resonance_statistics_simulation(directory=destination_directory)
             finally:
@@ -826,10 +889,13 @@ class ResonanceStatisticsTests(unittest.TestCase):
                 strict=True,
             ):
                 self.assertEqual(plot_mock.call_count, expected_call_count)
-            self.assertIsNotNone(plot_mocks[1].call_args.args[0].context)
+            self.assertIsNotNone(
+                mock_argument(plot_mocks[1], 0, ResonanceHistogramPlot).context
+            )
 
             shared_coefficient_plots = tuple(
-                call.args[0] for call in plot_mocks[0].call_args_list
+                cast(ResonanceCoefficientsHistogramPlot, call.args[0])
+                for call in plot_mocks[0].call_args_list
             )
             self.assertEqual(
                 tuple(plot.axes.xlabel for plot in shared_coefficient_plots),
@@ -864,15 +930,17 @@ class ResonanceStatisticsTests(unittest.TestCase):
 
             manifest_path = destination_directory / "manifest.json"
             original_manifest_text = manifest_path.read_text(encoding="utf-8")
-            manifest = json.loads(original_manifest_text)
-            manifest["execution"]["calibration"]["average_coefficients"] = []
-            manifest_path.write_text(
+            manifest = json_mapping(original_manifest_text)
+            manifest_section(manifest, "execution", "calibration")[
+                "average_coefficients"
+            ] = []
+            _ = manifest_path.write_text(
                 json.dumps(manifest, indent=2) + "\n",
                 encoding="utf-8",
             )
             with self.assertRaisesRegex(ValueError, "invalid shape"):
-                load_resonance_statistics_simulation(directory=destination_directory)
-            manifest_path.write_text(original_manifest_text, encoding="utf-8")
+                _ = load_resonance_statistics_simulation(directory=destination_directory)
+            _ = manifest_path.write_text(original_manifest_text, encoding="utf-8")
 
             unexpected = ResonanceHistogram(
                 _file_name="unexpected_resonance_histogram",
@@ -880,7 +948,7 @@ class ResonanceStatisticsTests(unittest.TestCase):
             )
             unexpected.save(directory=destination_directory)
             with self.assertRaisesRegex(ValueError, "not part of the simulation"):
-                load_resonance_statistics_simulation(directory=destination_directory)
+                _ = load_resonance_statistics_simulation(directory=destination_directory)
             (destination_directory / unexpected.to_path).unlink()
 
             missing_data_path = (
@@ -888,7 +956,7 @@ class ResonanceStatisticsTests(unittest.TestCase):
             )
             missing_data_path.unlink()
             with self.assertRaisesRegex(ValueError, "Saved data .* is missing"):
-                load_resonance_statistics_simulation(directory=destination_directory)
+                _ = load_resonance_statistics_simulation(directory=destination_directory)
             with self.assertRaisesRegex(ValueError, "Saved data .* is missing"):
                 restored_simulation.plot(destination_directory)
 
@@ -927,10 +995,10 @@ class ResonanceStatisticsTests(unittest.TestCase):
         )
         plot.set_derived_attributes()
 
-        self.assertIsNotNone(plot._resonance_centers)
-        self.assertIsNotNone(plot._resonance_pdf)
-        resonance_centers = cast(np.ndarray, plot._resonance_centers)
-        resonance_pdf = cast(np.ndarray, plot._resonance_pdf)
+        self.assertIsNotNone(attribute_value(plot, "_resonance_centers"))
+        self.assertIsNotNone(attribute_value(plot, "_resonance_pdf"))
+        resonance_centers = cast(FloatVector, attribute_value(plot, "_resonance_centers"))
+        resonance_pdf = cast(FloatArray, attribute_value(plot, "_resonance_pdf"))
         np.testing.assert_array_equal(
             resonance_centers,
             np.linspace(*plot.xlim, plot.num_points),
@@ -953,8 +1021,9 @@ class ResonanceStatisticsTests(unittest.TestCase):
             patch.object(plot, "finish_plot"),
         ):
             plot.plot(Path("unused"))
-        plot.ax.plot.assert_called_once()
-        plotted_centers, plotted_pdf = plot.ax.plot.call_args.args
+        cast(MagicMock, plot.ax.plot).assert_called_once()
+        plotted_centers = mock_argument(cast(MagicMock, plot.ax.plot), 0, np.ndarray)
+        plotted_pdf = mock_argument(cast(MagicMock, plot.ax.plot), 1, np.ndarray)
         np.testing.assert_array_equal(plotted_centers, resonance_centers)
         np.testing.assert_array_equal(plotted_pdf, resonance_pdf)
 
@@ -966,11 +1035,11 @@ class ResonanceStatisticsTests(unittest.TestCase):
             max_spectral_polynomial_degree=2,
             seed=211,
         )
-        coupling = float(np.sqrt(ensemble.spectral_radius * 100.0))
+        coupling = math.sqrt(ensemble.spectral_radius * 100.0)
         simulation = ResonanceStatisticsSimulation(
             compound=CompoundEnsemble(
                 ensemble=ensemble,
-                couplings=coupling,
+                couplings=np.full(ensemble.num_majoranas // 2, coupling),
             ),
             realizs=2,
         )
@@ -983,10 +1052,10 @@ class ResonanceStatisticsTests(unittest.TestCase):
         plot = ResonanceHistogramPlot(data=histogram, context=simulation.manifest)
         plot.set_derived_attributes()
 
-        self.assertIsNotNone(plot._resonance_centers)
-        self.assertIsNotNone(plot._resonance_pdf)
-        resonance_centers = cast(np.ndarray, plot._resonance_centers)
-        resonance_pdf = cast(np.ndarray, plot._resonance_pdf)
+        self.assertIsNotNone(attribute_value(plot, "_resonance_centers"))
+        self.assertIsNotNone(attribute_value(plot, "_resonance_pdf"))
+        resonance_centers = cast(FloatVector, attribute_value(plot, "_resonance_centers"))
+        resonance_pdf = cast(FloatArray, attribute_value(plot, "_resonance_pdf"))
         np.testing.assert_array_equal(
             resonance_centers,
             np.linspace(*plot.xlim, plot.num_points),
@@ -1065,7 +1134,7 @@ class ResonanceStatisticsTests(unittest.TestCase):
             patch.object(plot, "finish_plot"),
         ):
             plot.plot(Path("unused"))
-        plot.ax.plot.assert_called_once()
+        cast(MagicMock, plot.ax.plot).assert_called_once()
         np.testing.assert_array_equal(histogram.bins, original_bins)
         np.testing.assert_array_equal(histogram.counts, original_counts)
         np.testing.assert_array_equal(histogram.histogram, original_density)
@@ -1078,10 +1147,14 @@ class ResonanceStatisticsTests(unittest.TestCase):
             context=simulation.manifest,
         )
         pdf_dominant_plot.set_derived_attributes()
-        self.assertIsNotNone(pdf_dominant_plot._resonance_pdf)
+        self.assertIsNotNone(
+            cast(FloatArray, attribute_value(pdf_dominant_plot, "_resonance_pdf"))
+        )
         self.assertGreater(
             pdf_dominant_plot.ylim[1],
-            np.max(pdf_dominant_plot._resonance_pdf),
+            np.max(
+                cast(FloatArray, attribute_value(pdf_dominant_plot, "_resonance_pdf"))
+            ),
         )
 
         unfolded_plot = UnfoldedResonanceHistogramPlot(
@@ -1111,7 +1184,7 @@ class ResonanceStatisticsTests(unittest.TestCase):
             context=simulation.manifest,
         )
         histogram_plot.set_derived_attributes()
-        self.assertIsNone(histogram_plot._resonance_pdf)
+        self.assertIsNone(attribute_value(histogram_plot, "_resonance_pdf"))
         self.assertGreaterEqual(histogram_plot.ylim[1], 1.05)
         self.assertEqual(len(histogram_plot.legend.handles), 1)
         self.assertEqual(len(histogram_plot.legend.labels), 1)
@@ -1136,12 +1209,15 @@ class ResonanceStatisticsTests(unittest.TestCase):
     ) -> None:
         samples = np.append(np.linspace(-0.1, 0.1, 1_000), 10.0)
         bins = np.histogram_bin_edges(samples, bins="fd")
-        bins[-1] = np.nextafter(bins[-1], np.inf)
+        bins[-1] = np.nextafter(cast(np.floating, bins[-1]), np.inf)
         counts = np.histogram(samples, bins=bins)[0]
         histogram = ResonanceCoefficientsHistogram(
             metadata={"degree": 1, "unfolding": "raw"},
             _file_name="resonance_coeff_1_histogram",
-            support=(float(bins[0]), float(bins[-1])),
+            support=(
+                float(cast(np.floating, bins[0])),
+                float(cast(np.floating, bins[-1])),
+            ),
             num_bins=len(counts),
             bins=bins,
             counts=counts,
@@ -1160,9 +1236,11 @@ class ResonanceStatisticsTests(unittest.TestCase):
         plot.set_derived_attributes()
 
         self.assertEqual(np.sum(histogram.counts), len(samples))
-        self.assertGreater(histogram.support[1], samples[-1])
-        self.assertGreaterEqual(plot.xlim[1], np.max(samples[:-1]))
-        self.assertLess(plot.xlim[1], samples[-1])
+        self.assertGreater(histogram.support[1], float(cast(np.floating, samples[-1])))
+        self.assertGreaterEqual(
+            plot.xlim[1], float(np.max(cast(FloatVector, samples[:-1])))
+        )
+        self.assertLess(plot.xlim[1], float(cast(np.floating, samples[-1])))
         self.assertEqual(plot.xlim[0], -plot.xlim[1])
         np.testing.assert_array_equal(histogram.bins, original_bins)
         np.testing.assert_array_equal(histogram.counts, original_counts)
@@ -1259,4 +1337,4 @@ class ResonanceStatisticsTests(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    _ = unittest.main()

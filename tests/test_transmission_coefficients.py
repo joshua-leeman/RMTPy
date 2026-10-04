@@ -3,12 +3,13 @@ import unittest
 from copy import deepcopy
 from pathlib import Path
 from typing import cast
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import attrs
 import numpy as np
 
 from rmtpy.compounds import CompoundEnsemble
+from rmtpy.conversion import AttrsFields
 from rmtpy.ensembles import GOE
 from rmtpy.simulations.base_simulation import ExecutionState
 from rmtpy.simulations.transmission_coefficients import (
@@ -25,6 +26,7 @@ from rmtpy.simulations.transmission_coefficients.weisskopf_estimate import (
     WeisskopfEstimateData,
     WeisskopfEstimatePlot,
 )
+from tests.support import mock_argument
 
 
 def build_compound(*, seed: int = 123) -> CompoundEnsemble:
@@ -112,7 +114,7 @@ class TransmissionCoefficientsTests(unittest.TestCase):
                 self.subTest(channel_indices=channel_indices),
                 self.assertRaises(TypeError),
             ):
-                TransmissionCoefficientsSimulation(
+                _ = TransmissionCoefficientsSimulation(
                     compound=build_compound(),
                     channel_indices=channel_indices,
                     realizs=1,
@@ -124,19 +126,19 @@ class TransmissionCoefficientsTests(unittest.TestCase):
                 self.subTest(channel_indices=channel_indices),
                 self.assertRaises(ValueError),
             ):
-                TransmissionCoefficientsSimulation(
+                _ = TransmissionCoefficientsSimulation(
                     compound=build_compound(),
                     channel_indices=channel_indices,
                     realizs=1,
                 )
 
         with self.assertRaises(TypeError):
-            TransmissionCoefficientsSimulation(  # pyright: ignore[reportCallIssue]
+            _ = TransmissionCoefficientsSimulation(  # pyright: ignore[reportCallIssue]
                 compound=build_compound(),
                 realizs=1,
             )
         with self.assertRaises(TypeError):
-            TransmissionCoefficientsSimulation(
+            _ = TransmissionCoefficientsSimulation(
                 compound=build_compound(),
                 channel_indices=(0,),
                 realizs=1,
@@ -150,9 +152,11 @@ class TransmissionCoefficientsTests(unittest.TestCase):
             realizs=2,
         )
         plot_range = simulation.compound.ensemble.spectral_density.plot_range
+        lower_energy, upper_energy = plot_range
         expected_energies = np.linspace(
-            *(1.5 * endpoint for endpoint in plot_range),
-            100,
+            1.5 * lower_energy,
+            1.5 * upper_energy,
+            500,
             dtype=np.float64,
         )
 
@@ -190,9 +194,17 @@ class TransmissionCoefficientsTests(unittest.TestCase):
             simulation.weisskopf_estimate_buffer.mean_level_spacings.flags.writeable
         )
         self.assertTrue(
-            all(field.init for field in attrs.fields(TransmissionCoefficientsData))
+            all(
+                field.init
+                for field in cast(AttrsFields, attrs.fields(TransmissionCoefficientsData))
+            )
         )
-        self.assertTrue(all(field.init for field in attrs.fields(WeisskopfEstimateData)))
+        self.assertTrue(
+            all(
+                field.init
+                for field in cast(AttrsFields, attrs.fields(WeisskopfEstimateData))
+            )
+        )
         self.assertFalse(hasattr(simulation, "result"))
         self.assertFalse(hasattr(simulation, "num_energy_points"))
 
@@ -235,7 +247,7 @@ class TransmissionCoefficientsTests(unittest.TestCase):
         self,
     ) -> None:
         compound = build_compound()
-        density = np.ones(100, dtype=np.float64)
+        density = np.ones(500, dtype=np.float64)
         density[:3] = (0.0, -1.0, np.nan)
         with patch.object(
             type(compound.ensemble.spectral_density),
@@ -313,7 +325,7 @@ class TransmissionCoefficientsTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "only once"):
             simulation.execute()
         with self.assertRaisesRegex(RuntimeError, "only after execution"):
-            simulation.save()
+            _ = simulation.save()
         with self.assertRaisesRegex(RuntimeError, "only after execution"):
             simulation.plot(Path("unused"))
 
@@ -338,7 +350,7 @@ class TransmissionCoefficientsTests(unittest.TestCase):
         simulation.execute()
         expected_average = diagonal_sum / simulation.realizs
         expected_transmission = 1.0 - np.abs(expected_average) ** 2
-        np.clip(expected_transmission, 0.0, 1.0, out=expected_transmission)
+        _ = np.clip(expected_transmission, 0.0, 1.0, out=expected_transmission)
 
         self.assertEqual(simulation.compound.rng_state, control.rng_state)
         self.assertEqual(simulation.manifest.rng["initial_state"], initial_rng_state)
@@ -433,12 +445,16 @@ class TransmissionCoefficientsTests(unittest.TestCase):
             weisskopf_plot.assert_called_once()
             for call in transmission_plot.call_args_list:
                 self.assertIsInstance(
-                    call.args[0].data,
+                    cast(TransmissionCoefficientsPlot, call.args[0]).data,
                     TransmissionCoefficientsData,
                 )
-                self.assertIsNotNone(call.args[0].context)
+                self.assertIsNotNone(
+                    cast(TransmissionCoefficientsPlot, call.args[0]).context
+                )
             self.assertIsInstance(
-                weisskopf_plot.call_args.args[0].data,
+                mock_argument(
+                    cast(MagicMock, weisskopf_plot), 0, WeisskopfEstimatePlot
+                ).data,
                 WeisskopfEstimateData,
             )
 
@@ -448,7 +464,9 @@ class TransmissionCoefficientsTests(unittest.TestCase):
             )
             unexpected.save(directory=destination_directory)
             with self.assertRaisesRegex(ValueError, "not part of the simulation"):
-                load_transmission_coefficients_simulation(directory=destination_directory)
+                _ = load_transmission_coefficients_simulation(
+                    directory=destination_directory
+                )
             (destination_directory / unexpected.to_path).unlink()
 
             missing_data_path = (
@@ -456,7 +474,9 @@ class TransmissionCoefficientsTests(unittest.TestCase):
             )
             missing_data_path.unlink()
             with self.assertRaisesRegex(ValueError, "Saved data .* is missing"):
-                load_transmission_coefficients_simulation(directory=destination_directory)
+                _ = load_transmission_coefficients_simulation(
+                    directory=destination_directory
+                )
             with (
                 patch.object(
                     TransmissionCoefficientsPlot,
@@ -538,4 +558,4 @@ class TransmissionCoefficientsTests(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    _ = unittest.main()

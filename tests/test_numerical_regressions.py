@@ -1,13 +1,16 @@
 import unittest
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
+from typing import cast
 
 import numpy as np
 
 from rmtpy.compounds import CompoundEnsemble
+from rmtpy.compounds.base_compound import CouplingMatrix
 from rmtpy.density import DensityModel
 from rmtpy.ensembles import GOE, GUE, SYK, Poisson
 from rmtpy.universal import porter_thomas_distribution, time_delay_pdf
 from rmtpy.validators import validate_support
+from tests.support import attribute_value
 
 
 def deterministic_sample_stream(
@@ -100,7 +103,7 @@ class PoissonRegressionTests(unittest.TestCase):
 class SYKRegressionTests(unittest.TestCase):
     def test_q_is_validated_before_dependent_factories(self) -> None:
         with self.assertRaises(ValueError):
-            SYK(num_majoranas=4, q=4)
+            _ = SYK(num_majoranas=4, q=4)
 
     def test_parity_reaches_basis_and_density_uses_q_hermite(self) -> None:
         even = SYK(
@@ -138,7 +141,11 @@ class CompoundEnsembleRegressionTests(unittest.TestCase):
             ]
         )
         original = eigvecs.copy()
-        rotated, rotated_conj = compound._rotate_coupling_matrix_by_eigvecs(eigvecs)
+        rotate = cast(
+            Callable[[np.ndarray], tuple[CouplingMatrix, CouplingMatrix]],
+            attribute_value(compound, "_rotate_coupling_matrix_by_eigvecs"),
+        )
+        rotated, rotated_conj = rotate(eigvecs)
 
         np.testing.assert_array_equal(eigvecs, original)
         np.testing.assert_allclose(rotated_conj, rotated.conj())
@@ -171,7 +178,7 @@ class CompoundEnsembleRegressionTests(unittest.TestCase):
 
         for invalid_value in (np.nan, np.inf):
             with self.subTest(invalid_value=invalid_value), self.assertRaises(ValueError):
-                CompoundEnsemble(
+                _ = CompoundEnsemble(
                     ensemble=GOE(num_majoranas=4),
                     couplings=np.array([1.0, invalid_value]),
                 )
@@ -194,4 +201,4 @@ class UniversalRegressionTests(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    _ = unittest.main()

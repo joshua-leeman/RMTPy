@@ -97,7 +97,7 @@ class SimulationsPublicAPITests(unittest.TestCase):
     def test_concrete_packages_export_only_the_canonical_simulation_api(self) -> None:
         for module, expected_api in SIMULATION_APIS:
             with self.subTest(module=module.__name__):
-                self.assertEqual(set(module.__all__), expected_api)
+                self.assertEqual(set(cast(list[str], module.__all__)), expected_api)
                 self.assertTrue(all(hasattr(module, name) for name in expected_api))
                 self.assertTrue(
                     all(not hasattr(module, name) for name in OBSOLETE_PUBLIC_NAMES)
@@ -141,4 +141,4 @@ class SimulationsPublicAPITests(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    _ = unittest.main()

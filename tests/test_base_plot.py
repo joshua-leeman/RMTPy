@@ -1,6 +1,8 @@
 import dataclasses
+import math
 import tempfile
 import unittest
+from collections.abc import Callable
 from copy import deepcopy
 from pathlib import Path
 from typing import cast, override
@@ -19,7 +21,9 @@ from rmtpy.simulations.base_plot import (
     CONNECTED_FORM_FACTOR_COLOR,
     ENSEMBLE_AVERAGED_CURVE_WIDTH,
     FORM_FACTOR_COLOR,
+    SINGLE_REALIZATION_CURVE_WIDTH,
     SINGLE_REALIZATION_FORM_FACTOR_COLOR,
+    ConfigurableAxes,
     LogDimensionTimeAxes,
     LogDimensionUnfoldedTimeAxes,
     Plot,
@@ -94,12 +98,12 @@ from rmtpy.simulations.transmission_coefficients.weisskopf_estimate import (
 
 class _CompleteFigure:
     def savefig(self, path: str | Path, **_arguments: object) -> None:
-        Path(path).write_bytes(b"complete png")
+        _ = Path(path).write_bytes(b"complete png")
 
 
 class _FailingFigure:
     def savefig(self, path: str | Path, **_arguments: object) -> None:
-        Path(path).write_bytes(b"partial png")
+        _ = Path(path).write_bytes(b"partial png")
         raise OSError("expected plot failure")
 
 
@@ -177,7 +181,9 @@ class BasePlotTests(unittest.TestCase):
                 with self.subTest(plot_cls=plot_cls, field_name=field_name):
                     self.assertEqual(
                         default_dataclass_field(plot_cls, name=field_name),
-                        ENSEMBLE_AVERAGED_CURVE_WIDTH,
+                        SINGLE_REALIZATION_CURVE_WIDTH
+                        if field_name == "single_sff_width"
+                        else ENSEMBLE_AVERAGED_CURVE_WIDTH,
                     )
 
             dataclass_field_names = {field.name for field in dataclasses.fields(plot_cls)}
@@ -195,7 +201,10 @@ class BasePlotTests(unittest.TestCase):
                 self.assertTrue(line_handles)
                 self.assertEqual(
                     tuple(handle.get_linewidth() for handle in line_handles),
-                    (ENSEMBLE_AVERAGED_CURVE_WIDTH,) * len(line_handles),
+                    (ENSEMBLE_AVERAGED_CURVE_WIDTH,) * (len(line_handles) - 1)
+                    + (SINGLE_REALIZATION_CURVE_WIDTH,)
+                    if "single_sff_width" in field_names
+                    else (ENSEMBLE_AVERAGED_CURVE_WIDTH,) * len(line_handles),
                 )
 
         for plot_cls in (
@@ -212,6 +221,7 @@ class BasePlotTests(unittest.TestCase):
                 self.assertEqual(
                     default_dataclass_field(plot_cls, name="csff_color"),
                     CONNECTED_FORM_FACTOR_COLOR,
+                    ConfigurableAxes,
                 )
                 self.assertEqual(
                     default_dataclass_field(plot_cls, name="single_sff_color"),
@@ -219,7 +229,7 @@ class BasePlotTests(unittest.TestCase):
                 )
                 self.assertEqual(
                     default_dataclass_field(plot_cls, name="single_sff_zorder"),
-                    3,
+                    1,
                 )
 
         for plot_cls in (
@@ -240,7 +250,7 @@ class BasePlotTests(unittest.TestCase):
             with self.subTest(plot_cls=plot_cls):
                 self.assertEqual(
                     default_dataclass_field(plot_cls, name="histogram_color"),
-                    "#F0E442",
+                    "#E8B03F",
                 )
                 self.assertEqual(
                     default_dataclass_field(plot_cls, name="pdf_color"),
@@ -265,7 +275,7 @@ class BasePlotTests(unittest.TestCase):
         self.assertEqual(simulation.ensemble.rng_state, rng_state_before)
 
         with self.assertRaisesRegex(ValueError, "parameter not found"):
-            plot.store_manifest_arg("compound", ManyBodyEnsemble)
+            _ = plot.store_manifest_arg("compound", ManyBodyEnsemble)
 
     def test_calibration_coefficients_are_selected_and_validated(self) -> None:
         simulation = build_simulation()
@@ -289,18 +299,18 @@ class BasePlotTests(unittest.TestCase):
             "average_coefficients": [[1.0]],
         }
         with self.assertRaisesRegex(ValueError, "malformed"):
-            plot.calibration_coefficients("spectral")
+            _ = plot.calibration_coefficients("spectral")
 
         simulation.manifest.execution["calibration"] = {
             "density": "spectral",
         }
         with self.assertRaisesRegex(ValueError, "missing"):
-            plot.calibration_coefficients("spectral")
+            _ = plot.calibration_coefficients("spectral")
 
     def test_axes_and_legend_configuration_apply_complete_style(self) -> None:
         axes_mock = MagicMock()
-        axes_mock.get_xscale.return_value = "linear"
-        axes_mock.get_yscale.return_value = "linear"
+        cast(MagicMock, axes_mock.get_xscale).return_value = "linear"
+        cast(MagicMock, axes_mock.get_yscale).return_value = "linear"
         left_spine = MagicMock()
         right_spine = MagicMock()
         axes_mock.spines = {"left": left_spine, "right": right_spine}
@@ -319,20 +329,26 @@ class BasePlotTests(unittest.TestCase):
 
         axes_configuration.configure(axes=axes_mock)
 
-        left_spine.set_linewidth.assert_called_once_with(1.5)
-        right_spine.set_linewidth.assert_called_once_with(1.5)
-        axes_mock.set_title.assert_called_once_with("plot title", fontsize=12)
-        axes_mock.set_xlabel.assert_called_once_with("horizontal", fontsize=12)
-        axes_mock.set_ylabel.assert_called_once_with("vertical", fontsize=12)
-        axes_mock.set_xticks.assert_any_call((0.0, 1.0))
-        axes_mock.set_xticks.assert_any_call((0.5,), minor=True)
-        axes_mock.set_yticks.assert_any_call((2.0, 3.0))
-        axes_mock.set_yticks.assert_any_call((2.5,), minor=True)
-        axes_mock.set_xticklabels.assert_called_once_with(
+        cast(MagicMock, left_spine.set_linewidth).assert_called_once_with(1.5)
+        cast(MagicMock, right_spine.set_linewidth).assert_called_once_with(1.5)
+        cast(MagicMock, axes_mock.set_title).assert_called_once_with(
+            "plot title", fontsize=12
+        )
+        cast(MagicMock, axes_mock.set_xlabel).assert_called_once_with(
+            "horizontal", fontsize=12
+        )
+        cast(MagicMock, axes_mock.set_ylabel).assert_called_once_with(
+            "vertical", fontsize=12
+        )
+        cast(MagicMock, axes_mock.set_xticks).assert_any_call((0.0, 1.0))
+        cast(MagicMock, axes_mock.set_xticks).assert_any_call((0.5,), minor=True)
+        cast(MagicMock, axes_mock.set_yticks).assert_any_call((2.0, 3.0))
+        cast(MagicMock, axes_mock.set_yticks).assert_any_call((2.5,), minor=True)
+        cast(MagicMock, axes_mock.set_xticklabels).assert_called_once_with(
             ("zero", "one"),
             fontsize=10,
         )
-        axes_mock.set_yticklabels.assert_called_once_with(
+        cast(MagicMock, axes_mock.set_yticklabels).assert_called_once_with(
             ("two", "three"),
             fontsize=10,
         )
@@ -340,8 +356,8 @@ class BasePlotTests(unittest.TestCase):
         legend_axes_mock = MagicMock()
         legend_mock = MagicMock()
         legend_text_mock = MagicMock()
-        legend_mock.get_texts.return_value = (legend_text_mock,)
-        legend_axes_mock.legend.return_value = legend_mock
+        cast(MagicMock, legend_mock.get_texts).return_value = (legend_text_mock,)
+        cast(MagicMock, legend_axes_mock.legend).return_value = legend_mock
         handle = cast(Artist, MagicMock())
         legend_configuration = PlotLegend(
             handles=(handle,),
@@ -353,7 +369,7 @@ class BasePlotTests(unittest.TestCase):
 
         legend_configuration.configure(ax=cast(Axes, legend_axes_mock))
 
-        legend_axes_mock.legend.assert_called_once_with(
+        cast(MagicMock, legend_axes_mock.legend).assert_called_once_with(
             handles=(handle,),
             labels=("curve",),
             loc="upper right",
@@ -362,8 +378,8 @@ class BasePlotTests(unittest.TestCase):
             fontsize=10,
             alignment="left",
         )
-        legend_text_mock.set_linespacing.assert_not_called()
-        legend_text_mock.set_color.assert_called_once_with("white")
+        cast(MagicMock, legend_text_mock.set_linespacing).assert_not_called()
+        cast(MagicMock, legend_text_mock.set_color).assert_called_once_with("white")
 
     def test_legends_have_no_title_configuration_or_rendered_title(self) -> None:
         legend_fields = {field.name for field in dataclasses.fields(PlotLegend)}
@@ -379,7 +395,7 @@ class BasePlotTests(unittest.TestCase):
                 bbox=(1.0, 1.0),
             ).configure(axes)
             legend = axes.get_legend()
-            self.assertIsNotNone(legend)
+            assert legend is not None
             self.assertEqual(legend.get_title().get_text(), "")
         finally:
             plt.close(figure)
@@ -402,20 +418,22 @@ class BasePlotTests(unittest.TestCase):
             with self.subTest(axes_cls=axes_cls):
                 axes_configuration = axes_cls()
                 axes_configuration.xticks = tuple(
-                    base**value for value in axes_configuration.xticks
+                    math.pow(base, value) for value in axes_configuration.xticks
                 )
                 axes_configuration.yticks = tuple(
-                    base**value for value in axes_configuration.yticks
+                    math.pow(base, value) for value in axes_configuration.yticks
                 )
 
                 figure, axes = plt.subplots()
                 try:
-                    axes.set_xscale("log", base=base)
-                    axes.set_yscale("log", base=base)
-                    axes_configuration.configure(axes)
+                    _ = cast(Callable[..., object], axes.set_xscale)("log", base=base)
+                    _ = cast(Callable[..., object], axes.set_yscale)("log", base=base)
+                    axes_configuration.configure(
+                        cast(ConfigurableAxes, cast(object, axes))
+                    )
 
                     expected_x_minor_ticks = tuple(
-                        np.sqrt(left_tick * right_tick)
+                        math.sqrt(left_tick * right_tick)
                         for left_tick, right_tick in zip(
                             axes_configuration.xticks,
                             axes_configuration.xticks[1:],
@@ -423,7 +441,7 @@ class BasePlotTests(unittest.TestCase):
                         )
                     )
                     expected_y_minor_ticks = tuple(
-                        np.sqrt(left_tick * right_tick)
+                        math.sqrt(left_tick * right_tick)
                         for left_tick, right_tick in zip(
                             axes_configuration.yticks,
                             axes_configuration.yticks[1:],
@@ -476,10 +494,10 @@ class BasePlotTests(unittest.TestCase):
         )
         figure, axes = plt.subplots()
         try:
-            axes.set_xscale("log", base=10)
-            axes.set_yscale("linear")
-            axes.set_xlim(1.0, 100.0)
-            axes_configuration.configure(axes)
+            _ = cast(Callable[..., object], axes.set_xscale)("log", base=10)
+            _ = cast(Callable[..., object], axes.set_yscale)("linear")
+            _ = axes.set_xlim(1.0, 100.0)
+            axes_configuration.configure(cast(ConfigurableAxes, cast(object, axes)))
 
             self.assertIsInstance(axes.xaxis.get_minor_locator(), LogLocator)
             self.assertTrue(
@@ -499,7 +517,7 @@ class BasePlotTests(unittest.TestCase):
             context=simulation.manifest,
         )
         object.__setattr__(plot, "fig", cast(object, _CompleteFigure()))
-        object.__setattr__(plot, "ax", cast(object, object()))
+        object.__setattr__(plot, "ax", object())
 
         with (
             tempfile.TemporaryDirectory() as temporary_directory,
@@ -527,7 +545,7 @@ class BasePlotTests(unittest.TestCase):
             context=simulation.manifest,
         )
         object.__setattr__(plot, "fig", cast(object, _FailingFigure()))
-        object.__setattr__(plot, "ax", cast(object, object()))
+        object.__setattr__(plot, "ax", object())
 
         with tempfile.TemporaryDirectory() as temporary_directory:
             with (
@@ -592,4 +610,4 @@ class BasePlotTests(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    _ = unittest.main()

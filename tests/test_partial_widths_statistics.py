@@ -3,7 +3,7 @@ import unittest
 from copy import deepcopy
 from pathlib import Path
 from typing import cast
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -25,6 +25,7 @@ from rmtpy.simulations.partial_widths_statistics.total_width_histogram import (
     TotalWidthHistogram,
     TotalWidthHistogramPlot,
 )
+from tests.support import FloatVector, mock_argument
 
 
 def build_compound(
@@ -134,14 +135,14 @@ class PartialWidthsStatisticsTests(unittest.TestCase):
         )
         for width_indices in invalid_cases:
             with self.subTest(width_indices=width_indices), self.assertRaises(ValueError):
-                PartialWidthsStatisticsSimulation(
+                _ = PartialWidthsStatisticsSimulation(
                     compound=compound,
                     width_indices=width_indices,
                     realizs=1,
                 )
 
         with self.assertRaises(TypeError):
-            PartialWidthsStatisticsSimulation(  # pyright: ignore[reportCallIssue]
+            _ = PartialWidthsStatisticsSimulation(  # pyright: ignore[reportCallIssue]
                 compound=build_compound(),
                 realizs=1,
             )
@@ -232,7 +233,7 @@ class PartialWidthsStatisticsTests(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, "only once"):
                     simulation.execute()
                 with self.assertRaisesRegex(RuntimeError, "only after execution"):
-                    simulation.save()
+                    _ = simulation.save()
                 with self.assertRaisesRegex(RuntimeError, "only after execution"):
                     simulation.plot(Path("unused"))
 
@@ -256,8 +257,8 @@ class PartialWidthsStatisticsTests(unittest.TestCase):
         self.assertEqual(simulation.manifest.rng["final_state"], control.rng_state)
 
         expected_values = (
-            tuple(float(sample[0, 0]) for sample in samples),
-            tuple(float(np.sum(sample[1])) for sample in samples),
+            tuple(float(cast(np.floating, sample[0, 0])) for sample in samples),
+            tuple(float(np.sum(cast(FloatVector, sample[1]))) for sample in samples),
         )
         for histogram, bins, values in zip(
             selected_width_histograms(simulation),
@@ -336,10 +337,22 @@ class PartialWidthsStatisticsTests(unittest.TestCase):
             partial_plot.assert_called_once()
             total_plot.assert_called_once()
             self.assertIsInstance(
-                partial_plot.call_args.args[0].data, PartialWidthHistogram
+                mock_argument(
+                    cast(MagicMock, partial_plot), 0, PartialWidthHistogramPlot
+                ).data,
+                PartialWidthHistogram,
             )
-            self.assertIsInstance(total_plot.call_args.args[0].data, TotalWidthHistogram)
-            self.assertIsNotNone(partial_plot.call_args.args[0].context)
+            self.assertIsInstance(
+                mock_argument(
+                    cast(MagicMock, total_plot), 0, TotalWidthHistogramPlot
+                ).data,
+                TotalWidthHistogram,
+            )
+            self.assertIsNotNone(
+                mock_argument(
+                    cast(MagicMock, partial_plot), 0, PartialWidthHistogramPlot
+                ).context
+            )
 
             unexpected = PartialWidthHistogram.create(
                 state_index=1,
@@ -347,13 +360,17 @@ class PartialWidthsStatisticsTests(unittest.TestCase):
             )
             unexpected.save(directory=destination_directory)
             with self.assertRaisesRegex(ValueError, "not part of the simulation"):
-                load_partial_widths_statistics_simulation(directory=destination_directory)
+                _ = load_partial_widths_statistics_simulation(
+                    directory=destination_directory
+                )
             (destination_directory / unexpected.to_path).unlink()
 
             missing_data = destination_directory / next(iter(restored_simulation)).to_path
             missing_data.unlink()
             with self.assertRaisesRegex(ValueError, "Saved data .* is missing"):
-                load_partial_widths_statistics_simulation(directory=destination_directory)
+                _ = load_partial_widths_statistics_simulation(
+                    directory=destination_directory
+                )
             with self.assertRaisesRegex(ValueError, "Saved data .* is missing"):
                 restored_simulation.plot(destination_directory)
 
@@ -430,4 +447,4 @@ class PartialWidthsStatisticsTests(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    _ = unittest.main()

@@ -9,9 +9,15 @@ from unittest.mock import MagicMock, patch
 import attrs
 import numpy as np
 from matplotlib import pyplot as plt
+from matplotlib.lines import Line2D
 
-from rmtpy.conversion import unwrap_json_value
+from rmtpy.conversion import AttrsFields, unwrap_json_value
 from rmtpy.ensembles import GOE
+from rmtpy.simulations.base_data import Data
+from rmtpy.simulations.base_plot import (
+    ENSEMBLE_AVERAGED_CURVE_WIDTH,
+    SINGLE_REALIZATION_CURVE_WIDTH,
+)
 from rmtpy.simulations.base_simulation import ExecutionState
 from rmtpy.simulations.histograms import Histogram
 from rmtpy.simulations.spectral_statistics import (
@@ -44,6 +50,15 @@ from rmtpy.simulations.statistics import (
     nearest_neighbor_spacings,
 )
 from rmtpy.simulations.unfolding import TruncatedPolynomialCDFFactory, unfold_values
+from tests.support import (
+    ArchiveArray,
+    ComplexArray,
+    FloatVector,
+    archive_fields,
+    json_mapping,
+    manifest_section,
+    mock_argument,
+)
 
 
 def build_ensemble(*, max_degree: int = 0, seed: int = 123) -> GOE:
@@ -81,7 +96,10 @@ def form_factor_moments(
     second_moment = np.zeros(len(times), dtype=np.float64)
     single_realization_form_factor = np.zeros(len(times), dtype=np.float64)
     for index, sample in enumerate(samples):
-        contribution = np.sum(np.exp(-1j * np.outer(sample, times)), axis=0) / len(sample)
+        contribution = cast(
+            ComplexArray,
+            np.sum(np.exp(-1j * np.outer(sample, times)), axis=0) / len(sample),
+        )
         first_moment += contribution
         second_moment += np.abs(contribution) ** 2
         if index == 0:
@@ -102,7 +120,7 @@ class SpectralStatisticsTests(unittest.TestCase):
                     data=simulation.raw_buffers.form_factors,
                     context=simulation.manifest,
                 ),
-                ("#0072B2", "#D55E00", "#009E73"),
+                ("#0072B2", "#D54300", "#009E73"),
                 ("-", "-", "-"),
             ),
             (
@@ -110,7 +128,7 @@ class SpectralStatisticsTests(unittest.TestCase):
                     data=simulation.wgt_unfolded_buffers.form_factors,
                     context=simulation.manifest,
                 ),
-                ("#0072B2", "#D55E00", "Black", "#009E73"),
+                ("#0072B2", "#D54300", "Black", "#009E73"),
                 ("-", "-", ":", "-"),
             ),
         )
@@ -127,29 +145,40 @@ class SpectralStatisticsTests(unittest.TestCase):
                     )
                     self.assertEqual(
                         tuple(line.get_linewidth() for line in plot.ax.lines),
-                        (2.0,) * len(expected_colors),
+                        (ENSEMBLE_AVERAGED_CURVE_WIDTH,) * (len(expected_colors) - 1)
+                        + (SINGLE_REALIZATION_CURVE_WIDTH,),
                     )
                     self.assertEqual(
                         tuple(line.get_linestyle() for line in plot.ax.lines),
                         expected_styles,
                     )
                     self.assertEqual(
-                        tuple(handle.get_color() for handle in plot.legend.handles),
+                        tuple(
+                            handle.get_color()
+                            for handle in cast(tuple[Line2D, ...], plot.legend.handles)
+                        ),
                         expected_colors,
                     )
                     self.assertEqual(
-                        tuple(handle.get_linewidth() for handle in plot.legend.handles),
-                        (2.0,) * len(expected_colors),
+                        tuple(
+                            handle.get_linewidth()
+                            for handle in cast(tuple[Line2D, ...], plot.legend.handles)
+                        ),
+                        (ENSEMBLE_AVERAGED_CURVE_WIDTH,) * (len(expected_colors) - 1)
+                        + (SINGLE_REALIZATION_CURVE_WIDTH,),
                     )
                     self.assertEqual(
-                        tuple(handle.get_linestyle() for handle in plot.legend.handles),
+                        tuple(
+                            handle.get_linestyle()
+                            for handle in cast(tuple[Line2D, ...], plot.legend.handles)
+                        ),
                         expected_styles,
                     )
                     self.assertEqual(plot.ax.lines[-1].get_alpha(), 1.0)
-                    self.assertEqual(plot.ax.lines[-1].get_zorder(), 3)
+                    self.assertEqual(plot.ax.lines[-1].get_zorder(), 1)
                     np.testing.assert_array_equal(
                         plot.ax.lines[-1].get_ydata(),
-                        plot.data.single_realization_form_factor,
+                        cast(FormFactorsData, plot.data).single_realization_form_factor,
                     )
                     self.assertEqual(
                         plot.legend.labels[-1],
@@ -169,12 +198,12 @@ class SpectralStatisticsTests(unittest.TestCase):
             (
                 SpectralHistogramPlot,
                 simulation.raw_buffers.levels,
-                f"Spectral Density: {ensemble}",
+                f"Spectral PDF: {ensemble}",
             ),
             (
                 SpacingsHistogramPlot,
                 simulation.raw_buffers.nn_spacings,
-                f"NNS Distribution: {ensemble}",
+                f"NNS PDF: {ensemble}",
             ),
             (
                 FormFactorsPlot,
@@ -197,20 +226,20 @@ class SpectralStatisticsTests(unittest.TestCase):
         unfolded_cases = (
             (
                 simulation.wgt_unfolded_buffers,
-                "Weight-unfolded",
+                "Wgt-unfolded",
             ),
             (
                 tuple(simulation.ave_unfolded_buffers)[1],
-                r"Average-unfolded (deg = $2$)",
+                r"Ave(2)-unfolded",
             ),
             (
                 tuple(simulation.var_unfolded_buffers)[0],
-                r"Variate-unfolded (deg = $1$)",
+                r"Var(1)-unfolded",
             ),
         )
         plot_cases = (
-            (UnfoldedSpectralHistogramPlot, "levels", "Spectral Density"),
-            (UnfoldedSpacingsHistogramPlot, "nn_spacings", "NNS Distribution"),
+            (UnfoldedSpectralHistogramPlot, "levels", "Spectral PDF"),
+            (UnfoldedSpacingsHistogramPlot, "nn_spacings", "NNS PDF"),
             (
                 UnfoldedFormFactorsPlot,
                 "form_factors",
@@ -222,7 +251,7 @@ class SpectralStatisticsTests(unittest.TestCase):
                 expected_title = f"{unfolding} {subject}: {ensemble}"
                 with self.subTest(title=expected_title):
                     plot = plot_cls(
-                        data=getattr(buffers, data_name),
+                        data=cast(Data, getattr(buffers, data_name)),
                         context=simulation.manifest,
                     )
                     plot.set_derived_attributes()
@@ -317,9 +346,9 @@ class SpectralStatisticsTests(unittest.TestCase):
                     self.assertEqual(
                         tuple(item._file_name for item in averaged_buffers[0]),
                         (
-                            "spectral_histogram_averaged_unfolded_degree_1",
-                            "spacings_histogram_averaged_unfolded_degree_1",
-                            "spectral_form_factors_averaged_unfolded_degree_1",
+                            "spectral_histogram_average_unfolded_degree_1",
+                            "spacings_histogram_average_unfolded_degree_1",
+                            "spectral_form_factors_average_unfolded_degree_1",
                         ),
                     )
                     self.assertEqual(
@@ -392,11 +421,19 @@ class SpectralStatisticsTests(unittest.TestCase):
             )
             self.assertEqual(
                 histogram.underflow,
-                int(np.count_nonzero(expected_coefficients < histogram.bins[0])),
+                int(
+                    np.count_nonzero(
+                        expected_coefficients < cast(np.floating, histogram.bins[0])
+                    )
+                ),
             )
             self.assertEqual(
                 histogram.overflow,
-                int(np.count_nonzero(expected_coefficients >= histogram.bins[-1])),
+                int(
+                    np.count_nonzero(
+                        expected_coefficients >= cast(np.floating, histogram.bins[-1])
+                    )
+                ),
             )
             self.assertAlmostEqual(
                 np.sum(histogram.histogram * np.diff(histogram.bins)),
@@ -591,7 +628,7 @@ class SpectralStatisticsTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "only once"):
             simulation.execute()
         with self.assertRaisesRegex(RuntimeError, "only after execution"):
-            simulation.save()
+            _ = simulation.save()
         with self.assertRaisesRegex(RuntimeError, "only after execution"):
             simulation.plot(Path("unused"))
 
@@ -623,11 +660,14 @@ class SpectralStatisticsTests(unittest.TestCase):
                 strict=True,
             ):
                 self.assertEqual(restored_data.metadata, original_data.metadata)
-                for field in attrs.fields(type(original_data)):
-                    restored_value = getattr(restored_data, field.name)
-                    original_value = getattr(original_data, field.name)
+                for field in cast(AttrsFields, attrs.fields(type(original_data))):
+                    restored_value = cast(object, getattr(restored_data, field.name))
+                    original_value = cast(object, getattr(original_data, field.name))
                     if isinstance(original_value, np.ndarray):
-                        np.testing.assert_array_equal(restored_value, original_value)
+                        np.testing.assert_array_equal(
+                            cast(ArchiveArray, restored_value),
+                            cast(ArchiveArray, original_value),
+                        )
 
             np.testing.assert_array_equal(
                 restored_simulation.ensemble.spectral_density.average_coeffs,
@@ -707,10 +747,13 @@ class SpectralStatisticsTests(unittest.TestCase):
             self.assertEqual(unfolded_spectral_plot.call_count, 5)
             self.assertEqual(unfolded_spacings_plot.call_count, 5)
             self.assertEqual(unfolded_form_factors_plot.call_count, 5)
-            self.assertIsNotNone(raw_spectral_plot.call_args.args[0].context)
+            self.assertIsNotNone(
+                mock_argument(raw_spectral_plot, 0, SpectralHistogramPlot).context
+            )
 
             shared_coefficient_plots = tuple(
-                call.args[0] for call in coefficient_plot.call_args_list
+                cast(SpectralCoefficientsHistogramPlot, call.args[0])
+                for call in coefficient_plot.call_args_list
             )
             self.assertEqual(
                 tuple(plot.axes.xlabel for plot in shared_coefficient_plots),
@@ -745,40 +788,42 @@ class SpectralStatisticsTests(unittest.TestCase):
 
             manifest_path = destination_directory / "manifest.json"
             original_manifest_text = manifest_path.read_text(encoding="utf-8")
-            malformed_manifest = json.loads(original_manifest_text)
-            malformed_manifest["execution"]["calibration"]["average_coefficients"] = []
-            manifest_path.write_text(
+            malformed_manifest = json_mapping(original_manifest_text)
+            manifest_section(malformed_manifest, "execution", "calibration")[
+                "average_coefficients"
+            ] = []
+            _ = manifest_path.write_text(
                 json.dumps(malformed_manifest, indent=2) + "\n",
                 encoding="utf-8",
             )
             with self.assertRaisesRegex(ValueError, "invalid shape"):
-                load_spectral_statistics_simulation(directory=destination_directory)
-            manifest_path.write_text(original_manifest_text, encoding="utf-8")
+                _ = load_spectral_statistics_simulation(directory=destination_directory)
+            _ = manifest_path.write_text(original_manifest_text, encoding="utf-8")
 
             form_factors_path = (
                 destination_directory
                 / restored_simulation.raw_buffers.form_factors.to_path
             )
-            with np.load(form_factors_path, allow_pickle=False) as archive:
-                form_factors_payload = {name: archive[name] for name in archive.files}
+            form_factors_payload = archive_fields(form_factors_path)
             single_form_factor = form_factors_payload["single_realization_form_factor"]
             form_factors_payload["single_realization_form_factor"] = single_form_factor[
                 :-1
             ]
-            np.savez(form_factors_path, **form_factors_payload)
+            np.savez(form_factors_path, allow_pickle=False, **form_factors_payload)
             with self.assertRaisesRegex(ValueError, "does not match"):
-                load_spectral_statistics_simulation(directory=destination_directory)
+                _ = load_spectral_statistics_simulation(directory=destination_directory)
 
-            form_factors_payload.pop("single_realization_form_factor")
-            np.savez(form_factors_path, **form_factors_payload)
-            with self.assertRaisesRegex(
-                ValueError,
-                "missing `single_realization_form_factor`",
-            ):
-                load_spectral_statistics_simulation(directory=destination_directory)
+            _ = form_factors_payload.pop("single_realization_form_factor")
+            np.savez(form_factors_path, allow_pickle=False, **form_factors_payload)
+            legacy_simulation = load_spectral_statistics_simulation(
+                directory=destination_directory
+            )
+            self.assertFalse(
+                legacy_simulation.raw_buffers.form_factors.single_realization_form_factor_available
+            )
 
             form_factors_payload["single_realization_form_factor"] = single_form_factor
-            np.savez(form_factors_path, **form_factors_payload)
+            np.savez(form_factors_path, allow_pickle=False, **form_factors_payload)
 
             unexpected = SpectralHistogram(
                 _file_name="unexpected_spectral_histogram",
@@ -786,7 +831,7 @@ class SpectralStatisticsTests(unittest.TestCase):
             )
             unexpected.save(directory=destination_directory)
             with self.assertRaisesRegex(ValueError, "not part of the simulation"):
-                load_spectral_statistics_simulation(directory=destination_directory)
+                _ = load_spectral_statistics_simulation(directory=destination_directory)
             (destination_directory / unexpected.to_path).unlink()
 
             missing_data_path = (
@@ -794,7 +839,7 @@ class SpectralStatisticsTests(unittest.TestCase):
             )
             missing_data_path.unlink()
             with self.assertRaisesRegex(ValueError, "Saved data .* is missing"):
-                load_spectral_statistics_simulation(directory=destination_directory)
+                _ = load_spectral_statistics_simulation(directory=destination_directory)
             with self.assertRaisesRegex(ValueError, "Saved data .* is missing"):
                 restored_simulation.plot(destination_directory)
 
@@ -839,8 +884,9 @@ class SpectralStatisticsTests(unittest.TestCase):
         ):
             plot.plot(Path("unused"))
 
-        plot.ax.plot.assert_called_once()
-        energies, spectral_pdf = plot.ax.plot.call_args.args
+        cast(MagicMock, plot.ax.plot).assert_called_once()
+        energies = mock_argument(cast(MagicMock, plot.ax.plot), 0, np.ndarray)
+        spectral_pdf = mock_argument(cast(MagicMock, plot.ax.plot), 1, np.ndarray)
         np.testing.assert_array_equal(
             energies,
             np.linspace(*plot.xlim, plot.num_points),
@@ -860,12 +906,15 @@ class SpectralStatisticsTests(unittest.TestCase):
     ) -> None:
         samples = np.append(np.linspace(-0.1, 0.1, 1_000), 10.0)
         bins = np.histogram_bin_edges(samples, bins="fd")
-        bins[-1] = np.nextafter(bins[-1], np.inf)
+        bins[-1] = np.nextafter(cast(np.floating, bins[-1]), np.inf)
         counts = np.histogram(samples, bins=bins)[0]
         histogram = SpectralCoefficientsHistogram(
             metadata={"degree": 1, "unfolding": "raw"},
             _file_name="spectral_coeff_1_histogram",
-            support=(float(bins[0]), float(bins[-1])),
+            support=(
+                float(cast(np.floating, bins[0])),
+                float(cast(np.floating, bins[-1])),
+            ),
             num_bins=len(counts),
             bins=bins,
             counts=counts,
@@ -881,9 +930,11 @@ class SpectralStatisticsTests(unittest.TestCase):
         plot.set_derived_attributes()
 
         self.assertEqual(np.sum(histogram.counts), len(samples))
-        self.assertGreater(histogram.support[1], samples[-1])
-        self.assertGreaterEqual(plot.xlim[1], np.max(samples[:-1]))
-        self.assertLess(plot.xlim[1], samples[-1])
+        self.assertGreater(histogram.support[1], float(cast(np.floating, samples[-1])))
+        self.assertGreaterEqual(
+            plot.xlim[1], float(np.max(cast(FloatVector, samples[:-1])))
+        )
+        self.assertLess(plot.xlim[1], float(cast(np.floating, samples[-1])))
         self.assertEqual(plot.xlim[0], -plot.xlim[1])
 
     def test_run_helper_executes_saves_reloads_and_dispatches_plots(self) -> None:
@@ -915,4 +966,4 @@ class SpectralStatisticsTests(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    _ = unittest.main()

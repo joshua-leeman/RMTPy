@@ -110,7 +110,7 @@ class SimulationStatisticsTests(unittest.TestCase):
         self.assertEqual(empty_factory.input_grid.size, 0)
 
         with self.assertRaises(NotImplementedError):
-            TruncatedPolynomialCDFFactory(
+            _ = TruncatedPolynomialCDFFactory(
                 density=density_without_expansion,
                 degrees=(1,),
             )
@@ -120,7 +120,7 @@ class SimulationStatisticsTests(unittest.TestCase):
             max_spectral_polynomial_degree=2,
         ).spectral_density
         with self.assertRaisesRegex(ValueError, "cannot exceed"):
-            TruncatedPolynomialCDFFactory(
+            _ = TruncatedPolynomialCDFFactory(
                 density=density,
                 degrees=(3,),
             )
@@ -130,8 +130,8 @@ class SimulationStatisticsTests(unittest.TestCase):
             degrees=(2,),
         )
         with self.assertRaisesRegex(ValueError, "shorter"):
-            factory.interpolators_from_coeffs(np.array([1.0, 0.0]))
+            _ = factory.interpolators_from_coeffs(np.array([1.0, 0.0]))
 
 
 if __name__ == "__main__":
-    unittest.main()
+    _ = unittest.main()

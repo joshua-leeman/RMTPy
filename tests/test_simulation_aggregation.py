@@ -3,6 +3,7 @@ import tempfile
 import unittest
 from collections.abc import Callable
 from pathlib import Path
+from typing import cast
 
 import numpy as np
 
@@ -18,8 +19,17 @@ from rmtpy.simulations import (
     TransmissionCoefficientsSimulation,
 )
 from rmtpy.simulations.base_simulation import ExecutionState
+from rmtpy.simulations.histograms import MeanScaledHistogram
 from rmtpy.simulations.spectral_statistics.spectral_coefficients_histogram import (
     SpectralCoefficientsHistogram,
+)
+from rmtpy.simulations.spectral_statistics.spectral_form_factors import FormFactorsData
+from tests.support import (
+    FloatArray,
+    NumericArray,
+    archive_fields,
+    json_mapping,
+    manifest_section,
 )
 
 
@@ -29,18 +39,19 @@ def rewrite_data_archive(
     omitted_fields: tuple[str, ...] = (),
     omitted_metadata: tuple[str, ...] = (),
 ) -> None:
-    with np.load(path, allow_pickle=False) as archive:
-        payload = {
-            name: archive[name] for name in archive.files if name not in omitted_fields
-        }
+    payload = {
+        name: value
+        for name, value in archive_fields(path).items()
+        if name not in omitted_fields
+    }
 
     if omitted_metadata:
-        metadata = json.loads(str(payload["metadata"].item()))
+        metadata = json_mapping(cast(str, payload["metadata"].item()))
         for name in omitted_metadata:
-            metadata.pop(name, None)
+            _ = metadata.pop(name, None)
         payload["metadata"] = np.asarray(json.dumps(metadata))
 
-    np.savez(path, **payload)
+    np.savez(path, allow_pickle=False, **payload)
 
 
 def build_compound(*, seed: int) -> CompoundEnsemble:
@@ -54,7 +65,7 @@ def build_compound(*, seed: int) -> CompoundEnsemble:
     )
 
 
-def build_spectral(*, seed: int, realizs: int) -> Simulation:
+def build_spectral(*, seed: int, realizs: int) -> SpectralStatisticsSimulation:
     return SpectralStatisticsSimulation(
         ensemble=GOE(
             num_majoranas=4,
@@ -65,14 +76,14 @@ def build_spectral(*, seed: int, realizs: int) -> Simulation:
     )
 
 
-def build_resonance(*, seed: int, realizs: int) -> Simulation:
+def build_resonance(*, seed: int, realizs: int) -> ResonanceStatisticsSimulation:
     return ResonanceStatisticsSimulation(
         compound=build_compound(seed=seed),
         realizs=realizs,
     )
 
 
-def build_partial_widths(*, seed: int, realizs: int) -> Simulation:
+def build_partial_widths(*, seed: int, realizs: int) -> PartialWidthsStatisticsSimulation:
     return PartialWidthsStatisticsSimulation(
         compound=build_compound(seed=seed),
         width_indices=((0, 0), (0,)),
@@ -80,7 +91,7 @@ def build_partial_widths(*, seed: int, realizs: int) -> Simulation:
     )
 
 
-def build_time_delays(*, seed: int, realizs: int) -> Simulation:
+def build_time_delays(*, seed: int, realizs: int) -> TimeDelayStatisticsSimulation:
     return TimeDelayStatisticsSimulation(
         compound=build_compound(seed=seed),
         energies=np.array([-0.25, 0.25]),
@@ -88,7 +99,7 @@ def build_time_delays(*, seed: int, realizs: int) -> Simulation:
     )
 
 
-def build_transmission(*, seed: int, realizs: int) -> Simulation:
+def build_transmission(*, seed: int, realizs: int) -> TransmissionCoefficientsSimulation:
     return TransmissionCoefficientsSimulation(
         compound=build_compound(seed=seed),
         channel_indices=(0,),
@@ -96,7 +107,16 @@ def build_transmission(*, seed: int, realizs: int) -> Simulation:
     )
 
 
-SIMULATION_BUILDERS: tuple[Callable[..., Simulation], ...] = (
+type StatisticsSimulation = (
+    SpectralStatisticsSimulation
+    | ResonanceStatisticsSimulation
+    | PartialWidthsStatisticsSimulation
+    | TimeDelayStatisticsSimulation
+    | TransmissionCoefficientsSimulation
+)
+
+
+SIMULATION_BUILDERS: tuple[Callable[..., StatisticsSimulation], ...] = (
     build_spectral,
     build_resonance,
     build_partial_widths,
@@ -120,7 +140,7 @@ class SimulationAggregationTests(unittest.TestCase):
                 tempfile.TemporaryDirectory() as root,
             ):
                 superfolder = Path(root)
-                sources: list[Simulation] = []
+                sources: list[StatisticsSimulation] = []
                 source_directories: list[Path] = []
                 for job_index, (seed, realizs) in enumerate(((101, 1), (202, 2))):
                     source = builder(seed=seed, realizs=realizs)
@@ -136,23 +156,35 @@ class SimulationAggregationTests(unittest.TestCase):
                 self.assertIsInstance(aggregate, type(sources[0]))
                 self.assertEqual(aggregate.execution_state, ExecutionState.COMPLETE)
                 self.assertEqual(aggregate.realizs, 3)
-                self.assertIsNone(aggregate._rmg.seed)
+                ensemble = (
+                    aggregate.ensemble
+                    if isinstance(aggregate, SpectralStatisticsSimulation)
+                    else aggregate.compound.ensemble
+                )
+                self.assertIsNone(ensemble.seed)
                 self.assertEqual(aggregate.manifest.rng["policy"], "aggregate")
                 self.assertEqual(
-                    aggregate.manifest.execution["aggregation"]["job_indices"],
+                    manifest_section(aggregate.manifest.execution, "aggregation")[
+                        "job_indices"
+                    ],
                     [0, 1],
                 )
                 self.assertEqual(
-                    aggregate.manifest.execution["aggregation"]["source_realizs"],
+                    manifest_section(aggregate.manifest.execution, "aggregation")[
+                        "source_realizs"
+                    ],
                     [1, 2],
                 )
                 self.assertEqual(
                     aggregate.manifest.rng["seed"],
                     {"type": "aggregate", "source_seeds": [101, 202]},
                 )
-                source_completion_times = aggregate.manifest.execution["aggregation"][
-                    "source_completion_times"
-                ]
+                source_completion_times = cast(
+                    list[object],
+                    manifest_section(aggregate.manifest.execution, "aggregation")[
+                        "source_completion_times"
+                    ],
+                )
                 self.assertTrue(
                     all(
                         isinstance(completion_time, str)
@@ -171,39 +203,48 @@ class SimulationAggregationTests(unittest.TestCase):
                             continue
                         expected = sum(
                             (
-                                getattr(items[file_name], field_name)
+                                cast(NumericArray, getattr(items[file_name], field_name))
                                 for items in source_data
                             ),
-                            start=np.zeros_like(getattr(combined, field_name)),
+                            start=np.zeros_like(
+                                cast(NumericArray, getattr(combined, field_name))
+                            ),
                         )
                         np.testing.assert_allclose(
-                            getattr(combined, field_name),
+                            cast(NumericArray, getattr(combined, field_name)),
                             expected,
                         )
-                    if hasattr(combined, "sample_sum"):
-                        self.assertAlmostEqual(
-                            combined.sample_sum,
-                            sum(items[file_name].sample_sum for items in source_data),
-                        )
-                    if hasattr(combined, "single_realization_form_factor"):
+                    if isinstance(combined, MeanScaledHistogram):
+                        assert combined.sample_sum is not None
+                        expected_sample_sum = 0.0
+                        for items in source_data:
+                            contribution = cast(MeanScaledHistogram, items[file_name])
+                            assert contribution.sample_sum is not None
+                            expected_sample_sum += contribution.sample_sum
+                        self.assertAlmostEqual(combined.sample_sum, expected_sample_sum)
+                    if isinstance(combined, FormFactorsData):
                         np.testing.assert_array_equal(
                             combined.single_realization_form_factor,
-                            source_data[0][file_name].single_realization_form_factor,
+                            cast(
+                                FormFactorsData, source_data[0][file_name]
+                            ).single_realization_form_factor,
                         )
 
                 saved_aggregate = aggregate.save(superfolder / "aggregated_outputs")
-                restored = Simulation.load(saved_aggregate)
+                restored = type(aggregate).load(saved_aggregate)
                 self.assertEqual(restored.execution_state, ExecutionState.COMPLETE)
                 self.assertEqual(restored.realizs, 3)
                 self.assertEqual(
                     restored.manifest.execution["aggregation"],
-                    aggregate.manifest.execution["aggregation"],
+                    manifest_section(aggregate.manifest.execution, "aggregation"),
                 )
                 restored_data = {data._file_name: data for data in restored}
                 for file_name, combined in aggregate_data.items():
-                    if hasattr(combined, "single_realization_form_factor"):
+                    if isinstance(combined, FormFactorsData):
                         np.testing.assert_array_equal(
-                            restored_data[file_name].single_realization_form_factor,
+                            cast(
+                                FormFactorsData, restored_data[file_name]
+                            ).single_realization_form_factor,
                             combined.single_realization_form_factor,
                         )
                 for source_directory in source_directories:
@@ -222,15 +263,35 @@ class SimulationAggregationTests(unittest.TestCase):
                     np.array([coefficient], dtype=np.float64),
                 )
                 simulation.execute()
-                simulation.save(superfolder / f"job_{job_index}_outputs")
+                _ = simulation.save(superfolder / f"job_{job_index}_outputs")
 
             aggregate = SpectralStatisticsSimulation.aggregate(superfolder)
-            calibration = aggregate.manifest.execution["calibration"]
+            calibration = manifest_section(aggregate.manifest.execution, "calibration")
             self.assertEqual(calibration["density"], "spectral")
             self.assertEqual(calibration["timing"], "aggregated")
+            provenance = manifest_section(aggregate.manifest.execution, "aggregation")
+            self.assertEqual(provenance["unfolding_policy"], "pooled_source_calibrations")
+            source_calibrations = cast(
+                list[dict[str, object]], provenance["source_calibrations"]
+            )
+            self.assertEqual(len(source_calibrations), 2)
+            for source_calibration, coefficient in zip(
+                source_calibrations, (1.25, 2.75), strict=True
+            ):
+                np.testing.assert_array_equal(
+                    cast(
+                        FloatArray,
+                        unwrap_json_value(source_calibration["average_coefficients"]),
+                    ),
+                    [coefficient],
+                )
+            saved = aggregate.save(superfolder / "aggregate")
+            restored = SpectralStatisticsSimulation.load(saved)
+            self.assertEqual(restored.manifest.execution["aggregation"], provenance)
+
             expected = np.array([(1.25 + 3 * 2.75) / 4], dtype=np.float64)
             np.testing.assert_allclose(
-                unwrap_json_value(calibration["average_coefficients"]),
+                cast(FloatArray, unwrap_json_value(calibration["average_coefficients"])),
                 expected,
             )
             np.testing.assert_allclose(
@@ -246,6 +307,8 @@ class SimulationAggregationTests(unittest.TestCase):
                 simulation = build_partial_widths(seed=seed, realizs=2)
                 simulation.execute()
                 for data in simulation:
+                    assert isinstance(data, MeanScaledHistogram)
+                    assert data.sample_sum is not None
                     expected_sums[data._file_name] = expected_sums.get(
                         data._file_name, 0.0
                     ) + float(data.sample_sum)
@@ -261,12 +324,14 @@ class SimulationAggregationTests(unittest.TestCase):
 
             aggregate = PartialWidthsStatisticsSimulation.aggregate(superfolder)
             for data in aggregate:
+                assert isinstance(data, MeanScaledHistogram)
+                assert data.sample_sum is not None
                 self.assertAlmostEqual(
                     data.sample_sum,
                     expected_sums[data._file_name],
                 )
                 self.assertAlmostEqual(
-                    data.metadata["average_width"],
+                    cast(float, data.metadata["average_width"]),
                     expected_sums[data._file_name] / aggregate.realizs,
                 )
 
@@ -283,10 +348,10 @@ class SimulationAggregationTests(unittest.TestCase):
                     realizs=1,
                 )
                 simulation.execute()
-                simulation.save(superfolder / f"job_{job_index}_outputs")
+                _ = simulation.save(superfolder / f"job_{job_index}_outputs")
 
             with self.assertRaisesRegex(ValueError, "scientific configuration"):
-                SpectralStatisticsSimulation.aggregate(superfolder)
+                _ = SpectralStatisticsSimulation.aggregate(superfolder)
 
         with tempfile.TemporaryDirectory() as root:
             superfolder = Path(root)
@@ -295,10 +360,10 @@ class SimulationAggregationTests(unittest.TestCase):
                 for seed in (job_index, job_index + 10):
                     simulation = build_spectral(seed=seed, realizs=1)
                     simulation.execute()
-                    simulation.save(job_directory)
+                    _ = simulation.save(job_directory)
 
             with self.assertRaisesRegex(ValueError, "exactly one"):
-                SpectralStatisticsSimulation.aggregate(superfolder)
+                _ = SpectralStatisticsSimulation.aggregate(superfolder)
 
     def test_base_discovery_requires_an_unambiguous_simulation_class(self) -> None:
         with tempfile.TemporaryDirectory() as root:
@@ -309,19 +374,19 @@ class SimulationAggregationTests(unittest.TestCase):
                 build_transmission(seed=1, realizs=1),
             ):
                 simulation.execute()
-                simulation.save(job_directory)
+                _ = simulation.save(job_directory)
 
             with self.assertRaisesRegex(ValueError, "unambiguous simulation"):
-                Simulation.aggregate(superfolder)
+                _ = Simulation.aggregate(superfolder)
 
     def test_concrete_discovery_rejects_wrong_classes_and_incomplete_runs(self) -> None:
         with tempfile.TemporaryDirectory() as root:
             superfolder = Path(root)
             simulation = build_transmission(seed=1, realizs=1)
             simulation.execute()
-            simulation.save(superfolder / "job_0_outputs")
+            _ = simulation.save(superfolder / "job_0_outputs")
             with self.assertRaisesRegex(ValueError, "exactly one"):
-                SpectralStatisticsSimulation.aggregate(superfolder)
+                _ = SpectralStatisticsSimulation.aggregate(superfolder)
 
         with tempfile.TemporaryDirectory() as root:
             superfolder = Path(root)
@@ -329,11 +394,11 @@ class SimulationAggregationTests(unittest.TestCase):
             simulation.execute()
             source_directory = simulation.save(superfolder / "job_0_outputs")
             manifest_path = source_directory / "manifest.json"
-            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-            manifest["execution"]["execution_state"] = "failed"
-            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            manifest = json_mapping(manifest_path.read_text(encoding="utf-8"))
+            manifest_section(manifest, "execution")["execution_state"] = "failed"
+            _ = manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "not complete"):
-                SpectralStatisticsSimulation.aggregate(superfolder)
+                _ = SpectralStatisticsSimulation.aggregate(superfolder)
 
     def test_coefficient_grids_and_tail_counts_are_exactly_additive(self) -> None:
         first = SpectralCoefficientsHistogram.create(degree=2, dimension=16)
@@ -363,7 +428,7 @@ class SimulationAggregationTests(unittest.TestCase):
         self.assertEqual(aggregate.overflow, 1)
 
         legacy = SpectralCoefficientsHistogram.create(degree=2, dimension=16)
-        legacy.metadata.pop("grid_policy")
+        _ = legacy.metadata.pop("grid_policy")
         with self.assertRaisesRegex(ValueError, "cannot be aggregated exactly"):
             aggregate.add_contribution(legacy)
 
@@ -394,20 +459,20 @@ class SimulationAggregationTests(unittest.TestCase):
                 omitted_metadata=("grid_policy", "dimension"),
             )
 
-            restored = Simulation.load(source_directory)
+            restored = SpectralStatisticsSimulation.load(source_directory)
             coefficient_data = next(iter(restored.coefficient_buffers))
             self.assertEqual(coefficient_data.underflow, 0)
             self.assertEqual(coefficient_data.overflow, 0)
             with self.assertRaisesRegex(ValueError, "cannot be aggregated exactly"):
-                SpectralStatisticsSimulation.aggregate(superfolder)
+                _ = SpectralStatisticsSimulation.aggregate(superfolder)
 
     def test_missing_job_outputs_are_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as root:
             malformed_job = Path(root) / "job_worker_outputs"
             malformed_job.mkdir()
             with self.assertRaisesRegex(ValueError, "no job output directories"):
-                Simulation.aggregate(root)
+                _ = Simulation.aggregate(root)
 
 
 if __name__ == "__main__":
-    unittest.main()
+    _ = unittest.main()

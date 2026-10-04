@@ -67,7 +67,7 @@ class BaseDataTests(unittest.TestCase):
             np.savez_compressed(malformed_path, metadata=np.array("{}"))
 
             with self.assertRaisesRegex(ValueError, "class is missing"):
-                Data.load(malformed_path)
+                _ = Data.load(malformed_path)
 
             missing_field_path = directory / "missing_field_data.npz"
             np.savez_compressed(
@@ -78,7 +78,7 @@ class BaseDataTests(unittest.TestCase):
                 },
             )
             with self.assertRaisesRegex(ValueError, "missing `metadata`"):
-                Data.load(missing_field_path)
+                _ = Data.load(missing_field_path)
 
             histogram_2d = Histogram2D(
                 _file_name="example_histogram_2d",
@@ -89,10 +89,10 @@ class BaseDataTests(unittest.TestCase):
             )
             histogram_2d.save(directory=directory)
             with self.assertRaisesRegex(TypeError, "cannot load"):
-                Histogram.load(directory / histogram_2d.to_path)
+                _ = Histogram.load(directory / histogram_2d.to_path)
 
             with self.assertRaisesRegex(ValueError, "malformed"):
-                Data.load(directory / "missing_data.npz")
+                _ = Data.load(directory / "missing_data.npz")
 
     def test_saved_data_discovery_rejects_duplicate_file_names(self) -> None:
         first_histogram = build_histogram(archive_name="first_histogram")
@@ -111,12 +111,12 @@ class BaseDataTests(unittest.TestCase):
 
             duplicate_directory = directory / "duplicate"
             duplicate_directory.mkdir()
-            shutil.copyfile(
+            _ = shutil.copyfile(
                 directory / first_histogram.to_path,
                 duplicate_directory / "duplicate_data.npz",
             )
             with self.assertRaisesRegex(ValueError, "duplicated"):
-                load_saved_data(directory)
+                _ = load_saved_data(directory)
 
     def test_loaded_data_are_grafted_recursively_and_type_checked(self) -> None:
         expected_histogram = build_histogram(archive_name="expected_histogram")
@@ -131,7 +131,7 @@ class BaseDataTests(unittest.TestCase):
         self.assertEqual(loaded_data, {})
 
         with self.assertRaisesRegex(ValueError, "is missing"):
-            graft_loaded_data(expected_histogram, {})
+            _ = graft_loaded_data(expected_histogram, {})
 
         wrong_class = Histogram2D(
             _file_name=expected_histogram._file_name,
@@ -141,11 +141,11 @@ class BaseDataTests(unittest.TestCase):
             y_num_bins=2,
         )
         with self.assertRaisesRegex(TypeError, "has class"):
-            graft_loaded_data(
+            _ = graft_loaded_data(
                 expected_histogram,
                 {expected_histogram._file_name: wrong_class},
             )
 
 
 if __name__ == "__main__":
-    unittest.main()
+    _ = unittest.main()

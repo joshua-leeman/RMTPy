@@ -4,17 +4,19 @@ import unittest
 from copy import deepcopy
 from pathlib import Path
 from typing import cast
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.colors import to_rgba
 from matplotlib.lines import Line2D
 from matplotlib.ticker import NullLocator
+from scipy.interpolate import PchipInterpolator
 from scipy.special import jn_zeros
 
 from rmtpy.compounds import CompoundEnsemble
 from rmtpy.ensembles import GOE, GUE
+from rmtpy.simulations.base_plot import ENSEMBLE_AVERAGED_CURVE_WIDTH, ConfigurableAxes
 from rmtpy.simulations.base_simulation import ExecutionState
 from rmtpy.simulations.spectral_statistics import SpectralStatisticsSimulation
 from rmtpy.simulations.spectral_statistics.spectral_form_factors import (
@@ -39,6 +41,12 @@ from rmtpy.simulations.time_delay_statistics.time_delay_statistics_simulation im
     unfold_time_delays,
 )
 from rmtpy.simulations.unfolding import TruncatedPolynomialCDFFactory
+from tests.support import (
+    FloatVector,
+    json_mapping,
+    manifest_section,
+    mock_argument,
+)
 
 
 def build_compound(*, max_degree: int = 0, seed: int = 123) -> CompoundEnsemble:
@@ -102,35 +110,27 @@ class TimeDelayStatisticsTests(unittest.TestCase):
             realizs=1,
         )
         ensemble = simulation.compound.ensemble.to_latex
-        suffix = r", $N_\text{f} = {1}$, {$\alpha = {-0.6}$}"
+        suffix = r", $N_\text{f} = {1}$"
         cases = (
             (
                 TimeDelayHistogramPlot,
                 simulation.raw_buffers.time_delays[0],
-                f"Time-delay Distribution: {ensemble}{suffix}",
+                f"Time-delay PDF: {ensemble}{suffix}",
             ),
             (
                 UnfoldedTimeDelayHistogramPlot,
                 simulation.wgt_unfolded_buffers.time_delays[0],
-                f"Weight-unfolded Time-delay Distribution: {ensemble}{suffix}",
+                f"Wgt-unfolded Time-delay PDF: {ensemble}{suffix}",
             ),
             (
                 UnfoldedTimeDelayHistogramPlot,
                 tuple(simulation.ave_unfolded_buffers)[1].time_delays[0],
-                (
-                    r"Average-unfolded (deg = $2$) Time-delay Distribution: "
-                    + ensemble
-                    + suffix
-                ),
+                (r"Ave(2)-unfolded Time-delay PDF: " + ensemble + suffix),
             ),
             (
                 UnfoldedTimeDelayHistogramPlot,
                 tuple(simulation.var_unfolded_buffers)[0].time_delays[0],
-                (
-                    r"Variate-unfolded (deg = $1$) Time-delay Distribution: "
-                    + ensemble
-                    + suffix
-                ),
+                (r"Var(1)-unfolded Time-delay PDF: " + ensemble + suffix),
             ),
         )
         for plot_cls, data, expected_title in cases:
@@ -182,14 +182,14 @@ class TimeDelayStatisticsTests(unittest.TestCase):
         )
         for energies in invalid_energies:
             with self.subTest(energies=energies), self.assertRaises(ValueError):
-                TimeDelayStatisticsSimulation(
+                _ = TimeDelayStatisticsSimulation(
                     compound=build_compound(),
                     energies=as_energy_argument(energies),
                     realizs=1,
                 )
 
         with self.assertRaises(TypeError):
-            TimeDelayStatisticsSimulation(  # pyright: ignore[reportCallIssue]
+            _ = TimeDelayStatisticsSimulation(  # pyright: ignore[reportCallIssue]
                 compound=build_compound(),
                 realizs=1,
             )
@@ -294,8 +294,8 @@ class TimeDelayStatisticsTests(unittest.TestCase):
                     self.assertEqual(
                         tuple(histogram._file_name for histogram in averaged_buffers[0]),
                         (
-                            "time_delay_energy_0_histogram_averaged_unfolded_degree_1",
-                            "time_delay_energy_1_histogram_averaged_unfolded_degree_1",
+                            "time_delay_energy_0_histogram_average_unfolded_degree_1",
+                            "time_delay_energy_1_histogram_average_unfolded_degree_1",
                         ),
                     )
                     self.assertEqual(
@@ -347,7 +347,7 @@ class TimeDelayStatisticsTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "only once"):
             simulation.execute()
         with self.assertRaisesRegex(RuntimeError, "only after execution"):
-            simulation.save()
+            _ = simulation.save()
         with self.assertRaisesRegex(RuntimeError, "only after execution"):
             simulation.plot(Path("unused"))
 
@@ -362,6 +362,11 @@ class TimeDelayStatisticsTests(unittest.TestCase):
         spectral_density = simulation.compound.ensemble.spectral_density
         compute_coefficients = spectral_density.compute_variate_coeffs
 
+        def compute_sample_coefficients(
+            _density: object, values: FloatVector
+        ) -> FloatVector:
+            return compute_coefficients(values)
+
         with (
             patch.object(
                 CompoundEnsemble,
@@ -372,20 +377,22 @@ class TimeDelayStatisticsTests(unittest.TestCase):
                 type(spectral_density),
                 "compute_variate_coeffs",
                 autospec=True,
-                side_effect=lambda _density, values: compute_coefficients(values),
+                side_effect=compute_sample_coefficients,
             ) as compute,
         ):
             returned = simulation.execute()
 
         self.assertIsNone(returned)
         self.assertEqual(simulation.execution_state, ExecutionState.COMPLETE)
-        np.testing.assert_array_equal(compute.call_args.args[1], closed_eigenvalues)
+        np.testing.assert_array_equal(
+            mock_argument(cast(MagicMock, compute), 1, np.ndarray), closed_eigenvalues
+        )
 
         for energy_index, histogram in enumerate(simulation.raw_buffers.time_delays):
             np.testing.assert_array_equal(
                 histogram.counts,
                 histogram_counts(
-                    (time_delays[energy_index],),
+                    (cast(FloatVector, time_delays[energy_index]),),
                     bins=histogram.bins,
                 ),
             )
@@ -395,8 +402,8 @@ class TimeDelayStatisticsTests(unittest.TestCase):
             simulation.wgt_unfolded_buffers.time_delays
         ):
             unfolded_delays = unfold_time_delays(
-                time_delays[energy_index],
-                energy=float(simulation.energies[energy_index]),
+                cast(FloatVector, time_delays[energy_index]),
+                energy=float(cast(np.floating, simulation.energies[energy_index])),
                 cdf=weight_cdf,
                 dimension=simulation.compound.ensemble.dimension,
             )
@@ -429,7 +436,7 @@ class TimeDelayStatisticsTests(unittest.TestCase):
         )
         average_cdfs = cdf_factory.average_interpolators()
         samples: list[np.ndarray] = []
-        variate_cdfs_by_sample = []
+        variate_cdfs_by_sample: list[tuple[PchipInterpolator, ...]] = []
         for time_delays, closed_eigenvalues in control.time_delays_stream(
             energies=simulation.energies,
             realizs=2,
@@ -453,7 +460,9 @@ class TimeDelayStatisticsTests(unittest.TestCase):
         self.assertEqual(calibration["timing"], "cached_during_execution")
 
         for energy_index, energy in enumerate(simulation.energies):
-            raw_samples = tuple(sample[energy_index] for sample in samples)
+            raw_samples = tuple(
+                cast(FloatVector, sample[energy_index]) for sample in samples
+            )
             raw_histogram = simulation.raw_buffers.time_delays[energy_index]
             np.testing.assert_array_equal(
                 raw_histogram.counts,
@@ -467,7 +476,7 @@ class TimeDelayStatisticsTests(unittest.TestCase):
             ):
                 average_samples = tuple(
                     unfold_time_delays(
-                        sample[energy_index],
+                        cast(FloatVector, sample[energy_index]),
                         energy=float(energy),
                         cdf=cdf,
                         dimension=control.ensemble.dimension,
@@ -486,7 +495,7 @@ class TimeDelayStatisticsTests(unittest.TestCase):
             for degree_index, buffers in enumerate(simulation.var_unfolded_buffers):
                 variate_samples = tuple(
                     unfold_time_delays(
-                        sample[energy_index],
+                        cast(FloatVector, sample[energy_index]),
                         energy=float(energy),
                         cdf=cdfs[degree_index],
                         dimension=control.ensemble.dimension,
@@ -573,25 +582,34 @@ class TimeDelayStatisticsTests(unittest.TestCase):
 
             self.assertEqual(raw_plot.call_count, 2)
             self.assertEqual(unfolded_plot.call_count, 6)
-            self.assertIsNotNone(raw_plot.call_args.args[0].context)
+            self.assertIsNotNone(
+                mock_argument(
+                    cast(MagicMock, raw_plot), 0, TimeDelayHistogramPlot
+                ).context
+            )
             self.assertTrue(
                 all(
-                    call.args[0].spectral_form_factors is None
+                    cast(
+                        UnfoldedTimeDelayHistogramPlot, call.args[0]
+                    ).spectral_form_factors
+                    is None
                     for call in (*raw_plot.call_args_list, *unfolded_plot.call_args_list)
                 )
             )
 
             manifest_path = destination_directory / "manifest.json"
             manifest_text = manifest_path.read_text(encoding="utf-8")
-            manifest = json.loads(manifest_text)
-            manifest["execution"]["calibration"]["average_coefficients"] = []
-            manifest_path.write_text(
+            manifest = json_mapping(manifest_text)
+            manifest_section(manifest, "execution", "calibration")[
+                "average_coefficients"
+            ] = []
+            _ = manifest_path.write_text(
                 json.dumps(manifest, indent=2) + "\n",
                 encoding="utf-8",
             )
             with self.assertRaisesRegex(ValueError, "invalid shape"):
-                load_time_delay_statistics_simulation(directory=destination_directory)
-            manifest_path.write_text(manifest_text, encoding="utf-8")
+                _ = load_time_delay_statistics_simulation(directory=destination_directory)
+            _ = manifest_path.write_text(manifest_text, encoding="utf-8")
 
             unexpected = TimeDelayHistogram(
                 _file_name="unexpected_time_delay_histogram",
@@ -599,7 +617,7 @@ class TimeDelayStatisticsTests(unittest.TestCase):
             )
             unexpected.save(directory=destination_directory)
             with self.assertRaisesRegex(ValueError, "not part of the simulation"):
-                load_time_delay_statistics_simulation(directory=destination_directory)
+                _ = load_time_delay_statistics_simulation(directory=destination_directory)
             (destination_directory / unexpected.to_path).unlink()
 
             missing_data_path = (
@@ -607,7 +625,7 @@ class TimeDelayStatisticsTests(unittest.TestCase):
             )
             missing_data_path.unlink()
             with self.assertRaisesRegex(ValueError, "Saved data .* is missing"):
-                load_time_delay_statistics_simulation(directory=destination_directory)
+                _ = load_time_delay_statistics_simulation(directory=destination_directory)
             with self.assertRaisesRegex(ValueError, "Saved data .* is missing"):
                 restored_simulation.plot(destination_directory)
 
@@ -720,7 +738,7 @@ class TimeDelayStatisticsTests(unittest.TestCase):
                     self.subTest(ensemble=ensemble),
                     self.assertRaisesRegex(ValueError, "does not match"),
                 ):
-                    SpectralFormFactorsOverlay.from_directory(
+                    _ = SpectralFormFactorsOverlay.from_directory(
                         directory=spectral_directory,
                         ensemble=ensemble,
                     )
@@ -728,13 +746,13 @@ class TimeDelayStatisticsTests(unittest.TestCase):
     def test_spectral_overlay_rejects_invalid_simulation_outputs(self) -> None:
         incomplete_simulation = build_spectral_simulation()
         with self.assertRaisesRegex(ValueError, "not complete"):
-            SpectralFormFactorsOverlay(simulation=incomplete_simulation)
+            _ = SpectralFormFactorsOverlay(simulation=incomplete_simulation)
 
         malformed_simulation = build_spectral_simulation()
         malformed_simulation.execute()
         malformed_simulation.raw_buffers.form_factors.metadata["unfolding"] = "weight"
         with self.assertRaisesRegex(ValueError, "does not match its simulation buffer"):
-            SpectralFormFactorsOverlay(simulation=malformed_simulation)
+            _ = SpectralFormFactorsOverlay(simulation=malformed_simulation)
 
         time_delay_simulation = TimeDelayStatisticsSimulation(
             compound=build_compound(),
@@ -745,13 +763,13 @@ class TimeDelayStatisticsTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary_directory:
             time_delay_directory = time_delay_simulation.save(temporary_directory)
             with self.assertRaisesRegex(TypeError, "SpectralStatisticsSimulation"):
-                SpectralFormFactorsOverlay.from_directory(
+                _ = SpectralFormFactorsOverlay.from_directory(
                     directory=time_delay_directory,
                     ensemble=time_delay_simulation.compound.ensemble,
                 )
 
             with self.assertRaisesRegex(ValueError, "malformed"):
-                SpectralFormFactorsOverlay.from_directory(
+                _ = SpectralFormFactorsOverlay.from_directory(
                     directory=Path(temporary_directory) / "missing",
                     ensemble=time_delay_simulation.compound.ensemble,
                 )
@@ -764,7 +782,7 @@ class TimeDelayStatisticsTests(unittest.TestCase):
             )
             missing_form_factors.unlink()
             with self.assertRaisesRegex(ValueError, "Saved data .* is missing"):
-                SpectralFormFactorsOverlay.from_directory(
+                _ = SpectralFormFactorsOverlay.from_directory(
                     directory=spectral_directory,
                     ensemble=time_delay_simulation.compound.ensemble,
                 )
@@ -823,21 +841,23 @@ class TimeDelayStatisticsTests(unittest.TestCase):
                     self.assertTrue(plot.ax.patches)
                     for histogram_patch in plot.ax.patches:
                         np.testing.assert_allclose(
-                            histogram_patch.get_facecolor(),
-                            to_rgba("#F0E442", alpha=0.42),
+                            np.asarray(histogram_patch.get_facecolor(), dtype=np.float64),
+                            to_rgba("#E8B03F", alpha=0.42),
                         )
 
                     self.assertEqual(len(plot.ax.lines), 1)
                     bfb_line = plot.ax.lines[0]
                     self.assertEqual(bfb_line.get_color(), "Black")
-                    self.assertEqual(bfb_line.get_linewidth(), 2.0)
+                    self.assertEqual(
+                        bfb_line.get_linewidth(), ENSEMBLE_AVERAGED_CURVE_WIDTH
+                    )
                     self.assertEqual(bfb_line.get_linestyle(), "-")
 
                     if isinstance(plot, UnfoldedTimeDelayHistogramPlot):
-                        expected_sff_colors = ("#0072B2", "#D55E00", "Black")
+                        expected_sff_colors = ("#0072B2", "#D54300", "Black")
                         expected_sff_styles = ("-", "-", ":")
                     else:
-                        expected_sff_colors = ("#0072B2", "#D55E00")
+                        expected_sff_colors = ("#0072B2", "#D54300")
                         expected_sff_styles = ("-", "-")
 
                     self.assertEqual(
@@ -852,7 +872,7 @@ class TimeDelayStatisticsTests(unittest.TestCase):
                         tuple(
                             line.get_linewidth() for line in plot.form_factors_ax.lines
                         ),
-                        (2.0,) * expected_line_count,
+                        (ENSEMBLE_AVERAGED_CURVE_WIDTH,) * expected_line_count,
                     )
                     self.assertEqual(
                         tuple(
@@ -875,7 +895,7 @@ class TimeDelayStatisticsTests(unittest.TestCase):
                     )
                     self.assertEqual(
                         tuple(line.get_linewidth() for line in legend_lines),
-                        (2.0,) * len(legend_lines),
+                        (ENSEMBLE_AVERAGED_CURVE_WIDTH,) * len(legend_lines),
                     )
                     self.assertEqual(
                         tuple(line.get_linestyle() for line in legend_lines),
@@ -894,11 +914,11 @@ class TimeDelayStatisticsTests(unittest.TestCase):
                         NullLocator,
                     )
 
-                    plot.axes.configure(plot.ax)
+                    plot.axes.configure(cast(ConfigurableAxes, cast(object, plot.ax)))
                     plot.legend.configure(plot.ax)
                     self.assertEqual(plot.ax.get_title(), plot.axes.title)
                     legend = plot.ax.get_legend()
-                    self.assertIsNotNone(legend)
+                    assert legend is not None
                     self.assertEqual(legend.get_title().get_text(), "")
                     self.assertTrue(
                         all(
@@ -924,7 +944,10 @@ class TimeDelayStatisticsTests(unittest.TestCase):
                             spectral_simulation.wgt_unfolded_buffers.form_factors
                         )
                         np.testing.assert_allclose(
-                            plot.form_factors_ax.lines[-1].get_ydata(),
+                            np.asarray(
+                                plot.form_factors_ax.lines[-1].get_ydata(),
+                                dtype=np.float64,
+                            ),
                             spectral_simulation.ensemble.universal_connected_sff(
                                 form_factors.times
                             ),
@@ -1022,8 +1045,16 @@ class TimeDelayStatisticsTests(unittest.TestCase):
             self.assertEqual(simulation.execution_state, ExecutionState.COMPLETE)
             raw_plot.assert_called_once()
             unfolded_plot.assert_called_once()
-            self.assertIsNone(raw_plot.call_args.args[0].spectral_form_factors)
-            self.assertIsNone(unfolded_plot.call_args.args[0].spectral_form_factors)
+            self.assertIsNone(
+                mock_argument(
+                    cast(MagicMock, raw_plot), 0, TimeDelayHistogramPlot
+                ).spectral_form_factors
+            )
+            self.assertIsNone(
+                mock_argument(
+                    cast(MagicMock, unfolded_plot), 0, UnfoldedTimeDelayHistogramPlot
+                ).spectral_form_factors
+            )
             completion_time = simulation.manifest.execution["execution_time"]
             destination_directory = (
                 Path(temporary_directory) / simulation.to_path / str(completion_time)
@@ -1063,11 +1094,15 @@ class TimeDelayStatisticsTests(unittest.TestCase):
         self.assertEqual(simulation.execution_state, ExecutionState.COMPLETE)
         raw_plot.assert_called_once()
         unfolded_plot.assert_called_once()
-        raw_overlay = raw_plot.call_args.args[0].spectral_form_factors
-        unfolded_overlay = unfolded_plot.call_args.args[0].spectral_form_factors
+        raw_overlay = mock_argument(
+            cast(MagicMock, raw_plot), 0, TimeDelayHistogramPlot
+        ).spectral_form_factors
+        unfolded_overlay = mock_argument(
+            cast(MagicMock, unfolded_plot), 0, UnfoldedTimeDelayHistogramPlot
+        ).spectral_form_factors
         self.assertIsNotNone(raw_overlay)
         self.assertIs(raw_overlay, unfolded_overlay)
 
 
 if __name__ == "__main__":
-    unittest.main()
+    _ = unittest.main()

@@ -64,7 +64,7 @@ class HistogramTests(unittest.TestCase):
         )
         for arguments in invalid_arguments:
             with self.subTest(arguments=arguments), self.assertRaises(ValueError):
-                Histogram(
+                _ = Histogram(
                     _file_name="invalid_histogram",
                     support=(0.0, 1.0),
                     num_bins=2,
@@ -123,4 +123,4 @@ class HistogramTests(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    _ = unittest.main()

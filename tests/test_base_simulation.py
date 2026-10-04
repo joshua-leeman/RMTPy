@@ -18,6 +18,7 @@ from rmtpy.simulations.base_simulation import (
 )
 from rmtpy.simulations.spectral_statistics import SpectralStatisticsSimulation
 from rmtpy.simulations.time_delay_statistics import TimeDelayStatisticsSimulation
+from tests.support import json_mapping, manifest_section
 
 
 def build_spectral_simulation(*, seed: int = 123) -> SpectralStatisticsSimulation:
@@ -117,7 +118,7 @@ class BaseSimulationTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "only once"):
             simulation.execute()
         with self.assertRaisesRegex(RuntimeError, "only after execution"):
-            simulation.save()
+            _ = simulation.save()
         with self.assertRaisesRegex(RuntimeError, "only after execution"):
             simulation.plot(Path("unused"))
 
@@ -160,14 +161,14 @@ class BaseSimulationTests(unittest.TestCase):
                 self.assertTrue((destination_directory / restored_data.to_path).is_file())
 
             with self.assertRaises(FileExistsError):
-                simulation.save(temporary_directory)
+                _ = simulation.save(temporary_directory)
 
     def test_loading_rejects_malformed_directories_and_manifest_state(self) -> None:
         with (
             tempfile.TemporaryDirectory() as temporary_directory,
             self.assertRaisesRegex(ValueError, "malformed"),
         ):
-            Simulation.load(temporary_directory)
+            _ = Simulation.load(temporary_directory)
 
         simulation = build_spectral_simulation(seed=78)
         simulation.execute()
@@ -176,34 +177,38 @@ class BaseSimulationTests(unittest.TestCase):
             manifest_path = destination_directory / "manifest.json"
             original_manifest_text = manifest_path.read_text(encoding="utf-8")
 
-            malformed_manifest = json.loads(original_manifest_text)
-            del malformed_manifest["configuration"]["parameters"]["realizs"]
-            manifest_path.write_text(
+            malformed_manifest = json_mapping(original_manifest_text)
+            del manifest_section(malformed_manifest, "configuration", "parameters")[
+                "realizs"
+            ]
+            _ = manifest_path.write_text(
                 json.dumps(malformed_manifest, indent=2) + "\n",
                 encoding="utf-8",
             )
             with self.assertRaisesRegex(ValueError, "missing `realizs`"):
-                Simulation.load(destination_directory)
+                _ = Simulation.load(destination_directory)
 
-            manifest_path.write_text(original_manifest_text, encoding="utf-8")
-            malformed_manifest = json.loads(original_manifest_text)
-            malformed_manifest["execution"]["execution_state"] = "unknown"
-            manifest_path.write_text(
+            _ = manifest_path.write_text(original_manifest_text, encoding="utf-8")
+            malformed_manifest = json_mapping(original_manifest_text)
+            manifest_section(malformed_manifest, "execution")["execution_state"] = (
+                "unknown"
+            )
+            _ = manifest_path.write_text(
                 json.dumps(malformed_manifest, indent=2) + "\n",
                 encoding="utf-8",
             )
             with self.assertRaisesRegex(ValueError, "not valid"):
-                Simulation.load(destination_directory)
+                _ = Simulation.load(destination_directory)
 
-            manifest_path.write_text(original_manifest_text, encoding="utf-8")
-            malformed_manifest = json.loads(original_manifest_text)
-            del malformed_manifest["rng"]["final_state"]
-            manifest_path.write_text(
+            _ = manifest_path.write_text(original_manifest_text, encoding="utf-8")
+            malformed_manifest = json_mapping(original_manifest_text)
+            del manifest_section(malformed_manifest, "rng")["final_state"]
+            _ = manifest_path.write_text(
                 json.dumps(malformed_manifest, indent=2) + "\n",
                 encoding="utf-8",
             )
             with self.assertRaisesRegex(ValueError, "final state is malformed"):
-                Simulation.load(destination_directory)
+                _ = Simulation.load(destination_directory)
 
     def test_manifest_loading_copies_nested_values(self) -> None:
         simulation = build_spectral_simulation()
@@ -231,4 +236,4 @@ class BaseSimulationTests(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    _ = unittest.main()
