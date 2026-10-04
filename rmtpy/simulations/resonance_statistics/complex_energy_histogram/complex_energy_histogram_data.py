@@ -1,3 +1,5 @@
+from typing import override
+
 import attrs
 
 from ...histograms import Histogram2D
@@ -13,6 +15,7 @@ COMPLEX_ENERGY_WIDTH_LOG_BASE: float = 10.0
 
 @attrs.frozen(kw_only=True, eq=False, weakref_slot=False)
 class ComplexEnergyHistogram(Histogram2D):
+    @override
     def compute_statistics(self) -> None:
         self.compute_histogram_probabilities()
 

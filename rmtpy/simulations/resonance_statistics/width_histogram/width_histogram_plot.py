@@ -3,13 +3,18 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import cast, override
 
-import numpy as np
 from matplotlib.patches import Patch
 from matplotlib.ticker import NullFormatter
 
 from ....compounds import CompoundEnsemble
 from ...base_data import Data
-from ...base_plot import UNFOLDING_LABELS_BY_TYPE, Plot, PlotAxes, PlotLegend
+from ...base_plot import (
+    UNFOLDING_LABELS_BY_TYPE,
+    Plot,
+    PlotAxes,
+    PlotLegend,
+    format_coupling_label,
+)
 from .width_histogram_data import WidthHistogram
 
 
@@ -59,10 +64,12 @@ class WidthHistogramPlot(Plot):
     legend_handles: tuple[Patch] = (Patch(color=histogram_color, alpha=histogram_alpha),)
 
     def set_derived_attributes(self) -> None:
+        if self._derived_attributes_are_set:
+            return
+
         self.compound: CompoundEnsemble = self.store_manifest_arg(
             "compound", CompoundEnsemble
         )
-        mean_coupling_squared = float(np.mean(self.compound.couplings**2))
         ensemble = self.compound.ensemble
 
         self.legend: PlotLegend = PlotLegend(
@@ -72,11 +79,7 @@ class WidthHistogramPlot(Plot):
             bbox=(0.94, 0.95),
         )
 
-        coupling_exponent = cast(
-            float, np.log10(mean_coupling_squared / ensemble.spectral_radius)
-        )
-        coupling_exponent = 0.0 if abs(coupling_exponent) < 0.005 else coupling_exponent
-        coupling_label = rf"$\alpha = {{{coupling_exponent:.1f}}}$"
+        coupling_label = format_coupling_label(self.compound)
 
         self.axes.title = (
             "Pole-width PDF: "
@@ -89,6 +92,8 @@ class WidthHistogramPlot(Plot):
             x=lambda value: 10**value,
             y=lambda value: 10**value,
         )
+
+        self._derived_attributes_are_set: bool = True
 
     @override
     def plot(self, path: str | Path) -> None:
@@ -161,10 +166,12 @@ class UnfoldedWidthHistogramPlot(Plot):
     legend_handles: tuple[Patch] = (Patch(color=histogram_color, alpha=histogram_alpha),)
 
     def set_derived_attributes(self) -> None:
+        if self._derived_attributes_are_set:
+            return
+
         self.compound: CompoundEnsemble = self.store_manifest_arg(
             "compound", CompoundEnsemble
         )
-        mean_coupling_squared = float(np.mean(self.compound.couplings**2))
         ensemble = self.compound.ensemble
 
         self.legend: PlotLegend = PlotLegend(
@@ -174,11 +181,7 @@ class UnfoldedWidthHistogramPlot(Plot):
             bbox=(0.94, 0.95),
         )
 
-        coupling_exponent = cast(
-            float, np.log10(mean_coupling_squared / ensemble.spectral_radius)
-        )
-        coupling_exponent = 0.0 if abs(coupling_exponent) < 0.005 else coupling_exponent
-        coupling_label = rf"$\alpha = {{{coupling_exponent:.1f}}}$"
+        coupling_label = format_coupling_label(self.compound)
 
         unfolding_type = cast(str, self.data.metadata["unfolding"])
         unfolding_label = UNFOLDING_LABELS_BY_TYPE[unfolding_type]
@@ -197,6 +200,8 @@ class UnfoldedWidthHistogramPlot(Plot):
             x=lambda value: 10**value,
             y=lambda value: 10**value,
         )
+
+        self._derived_attributes_are_set: bool = True
 
     @override
     def plot(self, path: str | Path) -> None:

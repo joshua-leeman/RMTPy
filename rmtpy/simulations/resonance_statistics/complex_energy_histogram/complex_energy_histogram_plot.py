@@ -18,6 +18,7 @@ from ...base_plot import (
     Plot,
     PlotAxes,
     PlotLegend,
+    format_coupling_label,
 )
 from .complex_energy_histogram_data import ComplexEnergyHistogram
 
@@ -70,6 +71,7 @@ class ComplexEnergyHistogramPlot(Plot):
 
     width_curve_zorder: int = 2
     width_curve_alpha: float = 1.0
+    width_curve_width: float = ENSEMBLE_AVERAGED_CURVE_WIDTH
     width_ENSEMBLE_AVERAGED_CURVE_WIDTH: float = ENSEMBLE_AVERAGED_CURVE_WIDTH
     width_curve_color: str = "Cyan"
     width_curve_legend: str = r"$\ensavg{\Gamma(E)}$"
@@ -86,11 +88,58 @@ class ComplexEnergyHistogramPlot(Plot):
         ),
     )
 
+    _curve_width_aliases_are_set: bool = dataclasses.field(
+        default=False,
+        init=False,
+        repr=False,
+    )
+
+    @override
+    def __new__[PlotType: ComplexEnergyHistogramPlot](
+        cls: type[PlotType], **arguments: object
+    ) -> PlotType:
+        if (
+            "width_curve_width" in arguments
+            and "width_ENSEMBLE_AVERAGED_CURVE_WIDTH" in arguments
+            and arguments["width_curve_width"]
+            != arguments["width_ENSEMBLE_AVERAGED_CURVE_WIDTH"]
+        ):
+            raise ValueError("Conflicting values for the width-curve aliases.")
+
+        return object.__new__(cls)
+
+    @override
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        width = (
+            self.width_ENSEMBLE_AVERAGED_CURVE_WIDTH
+            if self.width_curve_width == ENSEMBLE_AVERAGED_CURVE_WIDTH
+            else self.width_curve_width
+        )
+        self.width_curve_width = width
+        self.width_ENSEMBLE_AVERAGED_CURVE_WIDTH = width
+        self._curve_width_aliases_are_set = True
+
+    @override
+    def __setattr__(self, name: str, value: object) -> None:
+        object.__setattr__(self, name, value)
+        if name in {"width_curve_width", "width_ENSEMBLE_AVERAGED_CURVE_WIDTH"} and cast(
+            bool, getattr(self, "_curve_width_aliases_are_set", False)
+        ):
+            alias = (
+                "width_ENSEMBLE_AVERAGED_CURVE_WIDTH"
+                if name == "width_curve_width"
+                else "width_curve_width"
+            )
+            object.__setattr__(self, alias, value)
+
     def set_derived_attributes(self) -> None:
+        if self._derived_attributes_are_set:
+            return
+
         self.compound: CompoundEnsemble = self.store_manifest_arg(
             "compound", CompoundEnsemble
         )
-        mean_coupling_squared = float(np.mean(self.compound.couplings**2))
         ensemble = self.compound.ensemble
 
         self.legend: PlotLegend = PlotLegend(
@@ -101,11 +150,7 @@ class ComplexEnergyHistogramPlot(Plot):
             bbox=(0.98, 0.95),
         )
 
-        coupling_exponent = cast(
-            float, np.log10(mean_coupling_squared / ensemble.spectral_radius)
-        )
-        coupling_exponent = 0.0 if abs(coupling_exponent) < 0.005 else coupling_exponent
-        coupling_label = rf"$\alpha = {{{coupling_exponent:.1f}}}$"
+        coupling_label = format_coupling_label(self.compound)
 
         self.axes.title = (
             "Pole Distribution: "
@@ -115,6 +160,8 @@ class ComplexEnergyHistogramPlot(Plot):
         )
 
         self.scale_limits_and_ticks(y=lambda value: 10**value)
+
+        self._derived_attributes_are_set: bool = True
 
     @override
     def plot(self, path: str | Path) -> None:
@@ -173,7 +220,7 @@ class ComplexEnergyHistogramPlot(Plot):
                 average_width_given_center,
                 color=self.width_curve_color,
                 alpha=self.width_curve_alpha,
-                linewidth=self.width_ENSEMBLE_AVERAGED_CURVE_WIDTH,
+                linewidth=self.width_curve_width,
                 zorder=self.width_curve_zorder,
             )
 
@@ -191,10 +238,12 @@ class UnfoldedComplexEnergyHistogramPlot(ComplexEnergyHistogramPlot):
 
     @override
     def set_derived_attributes(self) -> None:
+        if self._derived_attributes_are_set:
+            return
+
         self.compound: CompoundEnsemble = self.store_manifest_arg(
             "compound", CompoundEnsemble
         )
-        mean_coupling_squared = float(np.mean(self.compound.couplings**2))
         ensemble = self.compound.ensemble
 
         self.legend: PlotLegend = PlotLegend(
@@ -205,11 +254,7 @@ class UnfoldedComplexEnergyHistogramPlot(ComplexEnergyHistogramPlot):
             bbox=(0.98, 0.95),
         )
 
-        coupling_exponent = cast(
-            float, np.log10(mean_coupling_squared / ensemble.spectral_radius)
-        )
-        coupling_exponent = 0.0 if abs(coupling_exponent) < 0.005 else coupling_exponent
-        coupling_label = rf"$\alpha = {{{coupling_exponent:.1f}}}$"
+        coupling_label = format_coupling_label(self.compound)
 
         unfolding_type = cast(str, self.data.metadata["unfolding"])
         unfolding_label = UNFOLDING_LABELS_BY_TYPE[unfolding_type]
@@ -225,3 +270,5 @@ class UnfoldedComplexEnergyHistogramPlot(ComplexEnergyHistogramPlot):
         )
 
         self.scale_limits_and_ticks(y=lambda value: 10**value)
+
+        self._derived_attributes_are_set: bool = True

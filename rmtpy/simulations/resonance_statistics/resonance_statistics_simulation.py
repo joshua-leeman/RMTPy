@@ -53,8 +53,6 @@ def load_resonance_statistics_simulation(
     directory: str | Path,
 ) -> ResonanceStatisticsSimulation:
     simulation = ResonanceStatisticsSimulation.load(directory)
-    if not isinstance(simulation, ResonanceStatisticsSimulation):
-        raise TypeError("Saved simulation is not a ResonanceStatisticsSimulation.")
 
     return simulation
 
@@ -460,13 +458,13 @@ class ResonanceStatisticsSimulation(Simulation):
             variate_coefficients = resonance_density.compute_variate_coeffs(
                 resonance_centers
             )
-            for histogram, coefficient in zip(
+            for histogram, coefficient_index in zip(
                 coefficient_buffers,
-                variate_coefficients[1 : len(coefficient_buffers) + 1],
+                range(1, len(coefficient_buffers) + 1),
                 strict=True,
             ):
                 histogram.add_histogram_contribution(
-                    np.array([coefficient], dtype=np.float64)
+                    variate_coefficients[coefficient_index : coefficient_index + 1]
                 )
 
             self.wgt_unfolded_buffers.accumulate_unfolded_resonances(

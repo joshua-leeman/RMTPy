@@ -1,5 +1,4 @@
 import dataclasses
-import math
 from collections.abc import Callable
 from pathlib import Path
 from typing import cast, override
@@ -7,7 +6,6 @@ from typing import cast, override
 import numpy as np
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
-from matplotlib.ticker import MaxNLocator
 
 from ....compounds import CompoundEnsemble
 from ....ensembles import PoissonEnsemble, SachdevYeKitaevEnsemble
@@ -18,12 +16,15 @@ from ...base_plot import (
     Plot,
     PlotAxes,
     PlotLegend,
+    format_coupling_label,
+    latex_tick_labels,
+    minor_ticks,
+    nice_major_ticks,
 )
 from .resonance_histogram_data import ResonanceHistogram
 
 _Y_AXIS_PADDING: float = 0.05
 _NUM_Y_MAJOR_INTERVALS: int = 5
-_MAJOR_TICK_STEPS: tuple[float, ...] = (1.0, 2.0, 2.5, 5.0, 10.0)
 _POLYNOMIAL_WEIGHT_LEGEND: str = "polynomial weight"
 
 
@@ -81,11 +82,6 @@ class ResonanceHistogramPlot(Plot):
     data: Data
     axes: PlotAxes = dataclasses.field(default_factory=ResonanceHistogramAxes)
 
-    _derived_attributes_are_set: bool = dataclasses.field(
-        default=False,
-        init=False,
-        repr=False,
-    )
     _resonance_centers: np.ndarray[tuple[int], np.dtype[np.floating]] | None = (
         dataclasses.field(
             default=None,
@@ -136,7 +132,6 @@ class ResonanceHistogramPlot(Plot):
         self.compound: CompoundEnsemble = self.store_manifest_arg(
             "compound", CompoundEnsemble
         )
-        mean_coupling_squared = float(np.mean(self.compound.couplings**2))
         ensemble = self.compound.ensemble
 
         self.legend: PlotLegend = PlotLegend(
@@ -146,11 +141,7 @@ class ResonanceHistogramPlot(Plot):
             bbox=(0.99, 0.95),
         )
 
-        coupling_exponent = cast(
-            float, np.log10(mean_coupling_squared / ensemble.spectral_radius)
-        )
-        coupling_exponent = 0.0 if abs(coupling_exponent) < 0.005 else coupling_exponent
-        coupling_label = rf"$\alpha = {{{coupling_exponent:.1f}}}$"
+        coupling_label = format_coupling_label(self.compound)
 
         self.axes.title = (
             "Resonance PDF: "
@@ -223,49 +214,22 @@ class ResonanceHistogramPlot(Plot):
         density_peak = max(histogram_peak, pdf_peak)
         if density_peak > 0.0:
             dimensionless_peak = np.pi * ensemble.spectral_radius * density_peak
-            locator = MaxNLocator(
-                nbins=_NUM_Y_MAJOR_INTERVALS,
-                steps=_MAJOR_TICK_STEPS,
-                min_n_ticks=3,
-            )
-            axes.yticks = tuple(
-                float(value)
-                for value in locator.tick_values(
-                    0.0,
-                    dimensionless_peak * (1.0 + _Y_AXIS_PADDING),
-                )
+            axes.yticks = nice_major_ticks(
+                0.0,
+                dimensionless_peak * (1.0 + _Y_AXIS_PADDING),
+                num_intervals=_NUM_Y_MAJOR_INTERVALS,
             )
             self.ylim = (0.0, axes.yticks[-1])
-            axes.yticks_minor = tuple(
-                0.5 * (axes.yticks[index] + axes.yticks[index + 1])
-                for index in range(len(axes.yticks) - 1)
-            )
-
-            major_tick_step = min(
-                right - left
-                for left, right in zip(axes.yticks, axes.yticks[1:], strict=False)
-                if right > left
-            )
-            decimal_places = max(0, -math.floor(math.log10(major_tick_step)))
-            scaled_step = major_tick_step * 10**decimal_places
-            if not math.isclose(
-                scaled_step,
-                round(scaled_step),
-                rel_tol=1e-9,
-                abs_tol=1e-9,
-            ):
-                decimal_places += 1
-
-            zero_tolerance = major_tick_step * 1e-9
-            axes.ytick_labels = tuple(
-                rf"${(0.0 if abs(tick) <= zero_tolerance else tick):.{decimal_places}f}$"
-                for tick in axes.yticks
+            axes.yticks_minor = minor_ticks(axes.yticks)
+            axes.ytick_labels = latex_tick_labels(
+                axes.yticks,
+                show_positive_sign=False,
             )
 
         self.scale_limits_and_ticks(
             y=lambda value: value / np.pi / ensemble.spectral_radius,
         )
-        self._derived_attributes_are_set = True
+        self._derived_attributes_are_set: bool = True
 
     @override
     def plot(self, path: str | Path) -> None:
@@ -343,10 +307,12 @@ class UnfoldedResonanceHistogramPlot(Plot):
     )
 
     def set_derived_attributes(self) -> None:
+        if self._derived_attributes_are_set:
+            return
+
         self.compound: CompoundEnsemble = self.store_manifest_arg(
             "compound", CompoundEnsemble
         )
-        mean_coupling_squared = float(np.mean(self.compound.couplings**2))
         ensemble = self.compound.ensemble
 
         self.legend: PlotLegend = PlotLegend(
@@ -356,11 +322,7 @@ class UnfoldedResonanceHistogramPlot(Plot):
             bbox=(0.94, 0.95),
         )
 
-        coupling_exponent = cast(
-            float, np.log10(mean_coupling_squared / ensemble.spectral_radius)
-        )
-        coupling_exponent = 0.0 if abs(coupling_exponent) < 0.005 else coupling_exponent
-        coupling_label = rf"$\alpha = {{{coupling_exponent:.1f}}}$"
+        coupling_label = format_coupling_label(self.compound)
 
         unfolding_type = cast(str, self.data.metadata["unfolding"])
         unfolding_label = UNFOLDING_LABELS_BY_TYPE[unfolding_type]
@@ -379,6 +341,8 @@ class UnfoldedResonanceHistogramPlot(Plot):
             x=lambda value: value * ensemble.dimension,
             y=lambda value: value / ensemble.dimension,
         )
+
+        self._derived_attributes_are_set: bool = True
 
     @override
     def plot(self, path: str | Path) -> None:

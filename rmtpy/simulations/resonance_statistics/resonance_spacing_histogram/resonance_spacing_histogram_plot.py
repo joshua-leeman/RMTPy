@@ -1,5 +1,4 @@
 import dataclasses
-from collections.abc import Callable
 from pathlib import Path
 from typing import cast, override
 
@@ -11,10 +10,14 @@ from ....compounds import CompoundEnsemble
 from ...base_data import Data
 from ...base_plot import (
     ENSEMBLE_AVERAGED_CURVE_WIDTH,
+    SPACING_REFERENCE_LABELS,
     UNFOLDING_LABELS_BY_TYPE,
     Plot,
     PlotAxes,
     PlotLegend,
+    draw_spacing_references,
+    format_coupling_label,
+    spacing_legend_handles,
 )
 from .resonance_spacing_histogram_data import ResonanceSpacingHistogram
 
@@ -58,25 +61,31 @@ class ResonanceSpacingHistogramPlot(Plot):
     surmise_zorder: int = 2
     surmise_width: float = ENSEMBLE_AVERAGED_CURVE_WIDTH
     surmise_alpha: float = 1.0
-    surmise_color: str = "Black"
-    surmise_legend: str = "surmise"
 
-    legend_labels: tuple[str, str] = (histogram_legend, surmise_legend)
-    legend_handles: tuple[Patch, Line2D] = (
-        Patch(color=histogram_color, alpha=histogram_alpha),
-        Line2D([0], [0], color=surmise_color, linewidth=surmise_width),
+    legend_labels: tuple[str, ...] = (histogram_legend, *SPACING_REFERENCE_LABELS)
+    legend_handles: tuple[Patch | Line2D, ...] = spacing_legend_handles(
+        histogram_color=histogram_color,
+        histogram_alpha=histogram_alpha,
+        width=surmise_width,
+        alpha=surmise_alpha,
     )
 
     def set_derived_attributes(self) -> None:
+        if self._derived_attributes_are_set:
+            return
+
         self.compound: CompoundEnsemble = self.store_manifest_arg(
             "compound", CompoundEnsemble
         )
-        mean_coupling_squared = float(np.mean(self.compound.couplings**2))
         ensemble = self.compound.ensemble
 
-        if ensemble.universality_class is not None:
-            self.surmise_legend = f"{ensemble.universality_class} surmise"
-            self.legend_labels = (self.histogram_legend, self.surmise_legend)
+        self.legend_labels = (self.histogram_legend, *SPACING_REFERENCE_LABELS)
+        self.legend_handles = spacing_legend_handles(
+            histogram_color=self.histogram_color,
+            histogram_alpha=self.histogram_alpha,
+            width=self.surmise_width,
+            alpha=self.surmise_alpha,
+        )
 
         self.legend: PlotLegend = PlotLegend(
             handles=self.legend_handles,
@@ -85,11 +94,7 @@ class ResonanceSpacingHistogramPlot(Plot):
             bbox=(0.94, 0.95),
         )
 
-        coupling_exponent = cast(
-            float, np.log10(mean_coupling_squared / ensemble.spectral_radius)
-        )
-        coupling_exponent = 0.0 if abs(coupling_exponent) < 0.005 else coupling_exponent
-        coupling_label = rf"$\alpha = {{{coupling_exponent:.1f}}}$"
+        coupling_label = format_coupling_label(self.compound)
 
         self.axes.title = (
             "Resonance NNS PDF: "
@@ -103,6 +108,8 @@ class ResonanceSpacingHistogramPlot(Plot):
             x=lambda value: value * mean_spacing,
             y=lambda value: value / mean_spacing,
         )
+
+        self._derived_attributes_are_set: bool = True
 
     @override
     def plot(self, path: str | Path) -> None:
@@ -122,15 +129,11 @@ class ResonanceSpacingHistogramPlot(Plot):
         spacings = np.linspace(*self.xlim, self.num_points)
         mean_spacing = cast(float, self.data.metadata["global_mean_spacing"])
 
-        surmise = self.compound.ensemble.wigner_surmise(spacings / mean_spacing)
-        surmise /= mean_spacing
-
-        plot = cast(Callable[..., object], self.ax.plot)
-        _ = plot(
+        draw_spacing_references(
+            self,
             spacings,
-            surmise,
-            color=self.surmise_color,
-            linewidth=self.surmise_width,
+            mean_spacing=mean_spacing,
+            width=self.surmise_width,
             alpha=self.surmise_alpha,
             zorder=self.surmise_zorder,
         )
@@ -179,25 +182,31 @@ class UnfoldedResonanceSpacingHistogramPlot(Plot):
     surmise_zorder: int = 2
     surmise_width: float = ENSEMBLE_AVERAGED_CURVE_WIDTH
     surmise_alpha: float = 1.0
-    surmise_color: str = "Black"
-    surmise_legend: str = "surmise"
 
-    legend_labels: tuple[str, str] = (histogram_legend, surmise_legend)
-    legend_handles: tuple[Patch, Line2D] = (
-        Patch(color=histogram_color, alpha=histogram_alpha),
-        Line2D([0], [0], color=surmise_color, linewidth=surmise_width),
+    legend_labels: tuple[str, ...] = (histogram_legend, *SPACING_REFERENCE_LABELS)
+    legend_handles: tuple[Patch | Line2D, ...] = spacing_legend_handles(
+        histogram_color=histogram_color,
+        histogram_alpha=histogram_alpha,
+        width=surmise_width,
+        alpha=surmise_alpha,
     )
 
     def set_derived_attributes(self) -> None:
+        if self._derived_attributes_are_set:
+            return
+
         self.compound: CompoundEnsemble = self.store_manifest_arg(
             "compound", CompoundEnsemble
         )
-        mean_coupling_squared = float(np.mean(self.compound.couplings**2))
         ensemble = self.compound.ensemble
 
-        if ensemble.universality_class is not None:
-            self.surmise_legend = f"{ensemble.universality_class} surmise"
-            self.legend_labels = (self.histogram_legend, self.surmise_legend)
+        self.legend_labels = (self.histogram_legend, *SPACING_REFERENCE_LABELS)
+        self.legend_handles = spacing_legend_handles(
+            histogram_color=self.histogram_color,
+            histogram_alpha=self.histogram_alpha,
+            width=self.surmise_width,
+            alpha=self.surmise_alpha,
+        )
 
         self.legend: PlotLegend = PlotLegend(
             handles=self.legend_handles,
@@ -206,11 +215,7 @@ class UnfoldedResonanceSpacingHistogramPlot(Plot):
             bbox=(0.94, 0.95),
         )
 
-        coupling_exponent = cast(
-            float, np.log10(mean_coupling_squared / ensemble.spectral_radius)
-        )
-        coupling_exponent = 0.0 if abs(coupling_exponent) < 0.005 else coupling_exponent
-        coupling_label = rf"$\alpha = {{{coupling_exponent:.1f}}}$"
+        coupling_label = format_coupling_label(self.compound)
 
         unfolding_type = cast(str, self.data.metadata["unfolding"])
         unfolding_label = UNFOLDING_LABELS_BY_TYPE[unfolding_type]
@@ -224,6 +229,8 @@ class UnfoldedResonanceSpacingHistogramPlot(Plot):
             + rf", $N_\text{{f}} = {{{self.compound.num_free_complex_fermions}}}$"
             + f", {{{coupling_label}}}"
         )
+
+        self._derived_attributes_are_set: bool = True
 
     @override
     def plot(self, path: str | Path) -> None:
@@ -241,14 +248,10 @@ class UnfoldedResonanceSpacingHistogramPlot(Plot):
         )
 
         spacings = np.linspace(*self.xlim, self.num_points)
-        surmise = self.compound.ensemble.wigner_surmise(spacings)
-
-        plot = cast(Callable[..., object], self.ax.plot)
-        _ = plot(
+        draw_spacing_references(
+            self,
             spacings,
-            surmise,
-            color=self.surmise_color,
-            linewidth=self.surmise_width,
+            width=self.surmise_width,
             alpha=self.surmise_alpha,
             zorder=self.surmise_zorder,
         )

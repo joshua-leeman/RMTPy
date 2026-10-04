@@ -1,12 +1,10 @@
 import dataclasses
 import math
-from collections.abc import Callable
 from pathlib import Path
 from typing import cast, override
 
 import numpy as np
 from matplotlib.lines import Line2D
-from matplotlib.ticker import LogLocator
 from scipy.special import jn_zeros
 
 from ....compounds import CompoundEnsemble
@@ -24,6 +22,9 @@ from ...base_plot import (
     Plot,
     PlotAxes,
     PlotLegend,
+    configure_form_factor_axes,
+    configure_form_factor_minor_ticks,
+    format_coupling_label,
 )
 from ...spectral_statistics.spectral_form_factors import FormFactorsData
 from ...statistics import LOG_D_TIME_SUPPORT, LOG_D_UNFOLDED_TIME_SUPPORT
@@ -41,14 +42,7 @@ class ResonanceFormFactorsAxes(LogDimensionTimeAxes):
     @override
     def configure(self, axes: ConfigurableAxes) -> None:
         super().configure(axes)
-        _ = axes.tick_params(
-            axis="both",
-            which="minor",
-            bottom=False,
-            top=False,
-            left=False,
-            right=False,
-        )
+        configure_form_factor_minor_ticks(axes)
 
 
 @dataclasses.dataclass(slots=True, kw_only=True, eq=False, weakref_slot=False)
@@ -96,10 +90,12 @@ class ResonanceFormFactorsPlot(Plot):
     )
 
     def set_derived_attributes(self) -> None:
+        if self._derived_attributes_are_set:
+            return
+
         self.compound: CompoundEnsemble = self.store_manifest_arg(
             "compound", CompoundEnsemble
         )
-        mean_coupling_squared = float(np.mean(self.compound.couplings**2))
         ensemble = self.compound.ensemble
 
         self.legend: PlotLegend = PlotLegend(
@@ -109,11 +105,7 @@ class ResonanceFormFactorsPlot(Plot):
             bbox=(0.925, 0.99),
         )
 
-        coupling_exponent = cast(
-            float, np.log10(mean_coupling_squared / ensemble.spectral_radius)
-        )
-        coupling_exponent = 0.0 if abs(coupling_exponent) < 0.005 else coupling_exponent
-        coupling_label = rf"$\alpha = {{{coupling_exponent:.1f}}}$"
+        coupling_label = format_coupling_label(self.compound)
 
         self.axes.title = (
             "RFFs: "
@@ -130,6 +122,8 @@ class ResonanceFormFactorsPlot(Plot):
             y=lambda value: math.pow(ensemble.dimension, value),
         )
 
+        self._derived_attributes_are_set: bool = True
+
     @override
     def plot(self, path: str | Path) -> None:
         self.set_derived_attributes()
@@ -141,50 +135,45 @@ class ResonanceFormFactorsPlot(Plot):
 
         dimension = self.compound.ensemble.dimension
 
-        set_xscale = cast(Callable[..., object], self.ax.set_xscale)
-        _ = set_xscale("log", base=dimension)
-
-        set_yscale = cast(Callable[..., object], self.ax.set_yscale)
-        _ = set_yscale("log", base=dimension)
-
-        set_x_major_locator = cast(Callable[..., object], self.ax.xaxis.set_major_locator)
-        _ = set_x_major_locator(
-            LogLocator(base=dimension, numticks=len(self.axes.xticks))
+        configure_form_factor_axes(
+            self.ax,
+            dimension=dimension,
+            x_tick_count=len(self.axes.xticks),
+            y_tick_count=len(self.axes.yticks),
         )
 
-        set_y_major_locator = cast(Callable[..., object], self.ax.yaxis.set_major_locator)
-        _ = set_y_major_locator(
-            LogLocator(base=dimension, numticks=len(self.axes.yticks))
-        )
-
-        plot = cast(Callable[..., object], self.ax.plot)
-        _ = plot(
+        self.draw_curve(
             self.data.times,
             self.data.form_factor,
             color=self.sff_color,
             alpha=self.sff_alpha,
-            linewidth=self.sff_width,
+            width=self.sff_width,
             zorder=self.sff_zorder,
             label=self.sff_legend,
         )
-        _ = plot(
+        self.draw_curve(
             self.data.times,
             self.data.connected_form_factor,
             color=self.csff_color,
             alpha=self.csff_alpha,
-            linewidth=self.csff_width,
+            width=self.csff_width,
             zorder=self.csff_zorder,
             label=self.csff_legend,
         )
-        _ = plot(
-            self.data.times,
-            self.data.single_realization_form_factor,
-            color=self.single_sff_color,
-            alpha=self.single_sff_alpha,
-            linewidth=self.single_sff_width,
-            zorder=self.single_sff_zorder,
-            label=self.single_sff_legend,
-        )
+        if self.data.single_realization_form_factor_available:
+            self.draw_curve(
+                self.data.times,
+                self.data.single_realization_form_factor,
+                color=self.single_sff_color,
+                alpha=self.single_sff_alpha,
+                width=self.single_sff_width,
+                zorder=self.single_sff_zorder,
+                label=self.single_sff_legend,
+            )
+
+        else:
+            self.legend.handles = self.legend.handles[:-1]
+            self.legend.labels = self.legend.labels[:-1]
 
         self.finish_plot(path=path)
 
@@ -201,14 +190,7 @@ class UnfoldedResonanceFormFactorsAxes(LogDimensionUnfoldedTimeAxes):
     @override
     def configure(self, axes: ConfigurableAxes) -> None:
         super().configure(axes)
-        _ = axes.tick_params(
-            axis="both",
-            which="minor",
-            bottom=False,
-            top=False,
-            left=False,
-            right=False,
-        )
+        configure_form_factor_minor_ticks(axes)
 
 
 @dataclasses.dataclass(slots=True, kw_only=True, eq=False, weakref_slot=False)
@@ -272,10 +254,12 @@ class UnfoldedResonanceFormFactorsPlot(Plot):
     )
 
     def set_derived_attributes(self) -> None:
+        if self._derived_attributes_are_set:
+            return
+
         self.compound: CompoundEnsemble = self.store_manifest_arg(
             "compound", CompoundEnsemble
         )
-        mean_coupling_squared = float(np.mean(self.compound.couplings**2))
         ensemble = self.compound.ensemble
 
         if ensemble.universality_class is not None:
@@ -297,11 +281,7 @@ class UnfoldedResonanceFormFactorsPlot(Plot):
             bbox=(0.925, 0.99),
         )
 
-        coupling_exponent = cast(
-            float, np.log10(mean_coupling_squared / ensemble.spectral_radius)
-        )
-        coupling_exponent = 0.0 if abs(coupling_exponent) < 0.005 else coupling_exponent
-        coupling_label = rf"$\alpha = {{{coupling_exponent:.1f}}}$"
+        coupling_label = format_coupling_label(self.compound)
 
         unfolding_type = cast(str, self.data.metadata["unfolding"])
         unfolding_label = UNFOLDING_LABELS_BY_TYPE[unfolding_type]
@@ -321,6 +301,8 @@ class UnfoldedResonanceFormFactorsPlot(Plot):
             y=lambda value: math.pow(ensemble.dimension, value),
         )
 
+        self._derived_attributes_are_set: bool = True
+
     @override
     def plot(self, path: str | Path) -> None:
         self.set_derived_attributes()
@@ -332,61 +314,56 @@ class UnfoldedResonanceFormFactorsPlot(Plot):
 
         dimension = self.compound.ensemble.dimension
 
-        set_xscale = cast(Callable[..., object], self.ax.set_xscale)
-        _ = set_xscale("log", base=dimension)
-
-        set_yscale = cast(Callable[..., object], self.ax.set_yscale)
-        _ = set_yscale("log", base=dimension)
-
-        set_x_major_locator = cast(Callable[..., object], self.ax.xaxis.set_major_locator)
-        _ = set_x_major_locator(
-            LogLocator(base=dimension, numticks=len(self.axes.xticks))
+        configure_form_factor_axes(
+            self.ax,
+            dimension=dimension,
+            x_tick_count=len(self.axes.xticks),
+            y_tick_count=len(self.axes.yticks),
         )
 
-        set_y_major_locator = cast(Callable[..., object], self.ax.yaxis.set_major_locator)
-        _ = set_y_major_locator(
-            LogLocator(base=dimension, numticks=len(self.axes.yticks))
-        )
-
-        plot = cast(Callable[..., object], self.ax.plot)
-        _ = plot(
+        self.draw_curve(
             self.data.times,
             self.data.form_factor,
             color=self.sff_color,
             alpha=self.sff_alpha,
-            linewidth=self.sff_width,
+            width=self.sff_width,
             zorder=self.sff_zorder,
             label=self.sff_legend,
         )
-        _ = plot(
+        self.draw_curve(
             self.data.times,
             self.data.connected_form_factor,
             color=self.csff_color,
             alpha=self.csff_alpha,
-            linewidth=self.csff_width,
+            width=self.csff_width,
             zorder=self.csff_zorder,
             label=self.csff_legend,
         )
 
         universal_sff = self.compound.ensemble.universal_connected_sff(self.data.times)
-        _ = plot(
+        self.draw_curve(
             self.data.times,
             universal_sff,
             color=self.universal_sff_color,
             alpha=self.universal_sff_alpha,
-            linewidth=self.universal_sff_width,
-            linestyle=self.universal_sff_style,
+            width=self.universal_sff_width,
+            style=self.universal_sff_style,
             zorder=self.universal_sff_zorder,
             label=self.universal_sff_legend,
         )
-        _ = plot(
-            self.data.times,
-            self.data.single_realization_form_factor,
-            color=self.single_sff_color,
-            alpha=self.single_sff_alpha,
-            linewidth=self.single_sff_width,
-            zorder=self.single_sff_zorder,
-            label=self.single_sff_legend,
-        )
+        if self.data.single_realization_form_factor_available:
+            self.draw_curve(
+                self.data.times,
+                self.data.single_realization_form_factor,
+                color=self.single_sff_color,
+                alpha=self.single_sff_alpha,
+                width=self.single_sff_width,
+                zorder=self.single_sff_zorder,
+                label=self.single_sff_legend,
+            )
+
+        else:
+            self.legend.handles = self.legend.handles[:-1]
+            self.legend.labels = self.legend.labels[:-1]
 
         self.finish_plot(path=path)
