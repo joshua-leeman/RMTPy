@@ -20,8 +20,16 @@ from .base_compound import CompoundEnsemble, CouplingMatrix, order_compound_fiel
 
 def _build_conjugated_coupling_matrix(compound: SYKCompoundEnsemble) -> csc_array:
     syk = compound.ensemble
-    if syk.is_even_parity != (compound.num_free_complex_fermions % 2 == 0):
-        raise ValueError("SYK model and `num_free_complex_fermions` must share parity.")
+    free_fermions_are_even = compound.num_free_complex_fermions % 2 == 0
+    if syk.is_even_parity != free_fermions_are_even:
+        syk_parity = "even" if syk.is_even_parity else "odd"
+        fermion_parity = "even" if free_fermions_are_even else "odd"
+        raise ValueError(
+            "SYK model and `num_free_complex_fermions` must share parity; "
+            + f"SYK parity is {syk_parity}, while "
+            + "`num_free_complex_fermions`="
+            + f"{compound.num_free_complex_fermions} is {fermion_parity}."
+        )
 
     return syk.majorana_fermion_basis.build_conjugated_compound_coupling_matrix(
         num_free_complex_fermions=compound.num_free_complex_fermions,
