@@ -1,5 +1,4 @@
 import dataclasses
-from collections.abc import Callable
 from pathlib import Path
 from typing import cast, override
 
@@ -11,10 +10,13 @@ from ....ensembles import ManyBodyEnsemble
 from ...base_data import Data
 from ...base_plot import (
     ENSEMBLE_AVERAGED_CURVE_WIDTH,
+    SPACING_REFERENCE_LABELS,
     UNFOLDING_LABELS_BY_TYPE,
     Plot,
     PlotAxes,
     PlotLegend,
+    draw_spacing_references,
+    spacing_legend_handles,
 )
 
 
@@ -57,23 +59,30 @@ class SpacingsHistogramPlot(Plot):
     surmise_zorder: int = 2
     surmise_width: float = ENSEMBLE_AVERAGED_CURVE_WIDTH
     surmise_alpha: float = 1.0
-    surmise_color: str = "Black"
-    surmise_legend: str = "surmise"
 
-    legend_labels: tuple[str, str] = (histogram_legend, surmise_legend)
-    legend_handles: tuple[Patch, Line2D] = (
-        Patch(color=histogram_color, alpha=histogram_alpha),
-        Line2D([0], [0], color=surmise_color, linewidth=surmise_width),
+    legend_labels: tuple[str, ...] = (histogram_legend, *SPACING_REFERENCE_LABELS)
+    legend_handles: tuple[Patch | Line2D, ...] = spacing_legend_handles(
+        histogram_color=histogram_color,
+        histogram_alpha=histogram_alpha,
+        width=surmise_width,
+        alpha=surmise_alpha,
     )
 
     def set_derived_attributes(self) -> None:
+        if self._derived_attributes_are_set:
+            return
+
         self.ensemble: ManyBodyEnsemble = self.store_manifest_arg(
             "ensemble", ManyBodyEnsemble
         )
 
-        if self.ensemble.universality_class is not None:
-            self.surmise_legend = f"{self.ensemble.universality_class} surmise"
-            self.legend_labels = (self.histogram_legend, self.surmise_legend)
+        self.legend_labels = (self.histogram_legend, *SPACING_REFERENCE_LABELS)
+        self.legend_handles = spacing_legend_handles(
+            histogram_color=self.histogram_color,
+            histogram_alpha=self.histogram_alpha,
+            width=self.surmise_width,
+            alpha=self.surmise_alpha,
+        )
 
         self.legend: PlotLegend = PlotLegend(
             handles=self.legend_handles,
@@ -90,6 +99,8 @@ class SpacingsHistogramPlot(Plot):
             y=lambda value: value / mean_spacing,
         )
 
+        self._derived_attributes_are_set: bool = True
+
     @override
     def plot(self, path: str | Path) -> None:
         self.set_derived_attributes()
@@ -105,15 +116,11 @@ class SpacingsHistogramPlot(Plot):
         spacings = np.linspace(*self.xlim, self.num_points)
         mean_spacing = cast(float, self.data.metadata["global_mean_spacing"])
 
-        surmise = self.ensemble.wigner_surmise(spacings / mean_spacing)
-        surmise /= mean_spacing
-
-        plot = cast(Callable[..., object], self.ax.plot)
-        _ = plot(
+        draw_spacing_references(
+            self,
             spacings,
-            surmise,
-            color=self.surmise_color,
-            linewidth=self.surmise_width,
+            mean_spacing=mean_spacing,
+            width=self.surmise_width,
             alpha=self.surmise_alpha,
             zorder=self.surmise_zorder,
         )
@@ -160,23 +167,30 @@ class UnfoldedSpacingsHistogramPlot(Plot):
     surmise_zorder: int = 2
     surmise_width: float = ENSEMBLE_AVERAGED_CURVE_WIDTH
     surmise_alpha: float = 1.0
-    surmise_color: str = "Black"
-    surmise_legend: str = "surmise"
 
-    legend_labels: tuple[str, str] = (histogram_legend, surmise_legend)
-    legend_handles: tuple[Patch, Line2D] = (
-        Patch(color=histogram_color, alpha=histogram_alpha),
-        Line2D([0], [0], color=surmise_color, linewidth=surmise_width),
+    legend_labels: tuple[str, ...] = (histogram_legend, *SPACING_REFERENCE_LABELS)
+    legend_handles: tuple[Patch | Line2D, ...] = spacing_legend_handles(
+        histogram_color=histogram_color,
+        histogram_alpha=histogram_alpha,
+        width=surmise_width,
+        alpha=surmise_alpha,
     )
 
     def set_derived_attributes(self) -> None:
+        if self._derived_attributes_are_set:
+            return
+
         self.ensemble: ManyBodyEnsemble = self.store_manifest_arg(
             "ensemble", ManyBodyEnsemble
         )
 
-        if self.ensemble.universality_class is not None:
-            self.surmise_legend = f"{self.ensemble.universality_class} surmise"
-            self.legend_labels = (self.histogram_legend, self.surmise_legend)
+        self.legend_labels = (self.histogram_legend, *SPACING_REFERENCE_LABELS)
+        self.legend_handles = spacing_legend_handles(
+            histogram_color=self.histogram_color,
+            histogram_alpha=self.histogram_alpha,
+            width=self.surmise_width,
+            alpha=self.surmise_alpha,
+        )
 
         self.legend: PlotLegend = PlotLegend(
             handles=self.legend_handles,
@@ -194,6 +208,8 @@ class UnfoldedSpacingsHistogramPlot(Plot):
             title = f"{unfolding_label}-unfolded"
         self.axes.title = f"{title} NNS PDF: {self.ensemble.to_latex}"
 
+        self._derived_attributes_are_set: bool = True
+
     @override
     def plot(self, path: str | Path) -> None:
         self.set_derived_attributes()
@@ -207,14 +223,10 @@ class UnfoldedSpacingsHistogramPlot(Plot):
         )
 
         spacings = np.linspace(0, self.xlim[1], self.num_points)
-        surmise = self.ensemble.wigner_surmise(spacings)
-
-        plot = cast(Callable[..., object], self.ax.plot)
-        _ = plot(
+        draw_spacing_references(
+            self,
             spacings,
-            surmise,
-            color=self.surmise_color,
-            linewidth=self.surmise_width,
+            width=self.surmise_width,
             alpha=self.surmise_alpha,
             zorder=self.surmise_zorder,
         )

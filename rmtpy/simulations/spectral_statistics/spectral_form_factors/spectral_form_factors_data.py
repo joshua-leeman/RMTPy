@@ -1,4 +1,5 @@
-from typing import cast
+from pathlib import Path
+from typing import cast, override
 
 import attrs
 import numpy as np
@@ -117,6 +118,7 @@ class FormFactorsData(Data):
             default=attrs.Factory(_build_float_zeros, takes_self=True),
             converter=np.asarray,
             validator=_validate_real_series,
+            metadata={"archive_optional": True},
             repr=False,
         )
     )
@@ -176,6 +178,39 @@ class FormFactorsData(Data):
 
         return unfolded_form_factors
 
+    @classmethod
+    @override
+    def load(cls, path: str | Path, /) -> FormFactorsData:
+        path = Path(path)
+        if path.is_dir():
+            path = path / f"{path.name}_data.npz"
+
+        form_factors = cast(FormFactorsData, super().load(path))
+        with cast(np.lib.npyio.NpzFile, np.load(path, allow_pickle=False)) as archive:
+            has_single_realization = "single_realization_form_factor" in archive.files
+
+        if not has_single_realization:
+            if form_factors.realizs == 1:
+                form_factors.single_realization_form_factor[:] = (
+                    form_factors.second_moment
+                )
+            else:
+                form_factors.metadata["single_realization_form_factor_available"] = False
+
+        return form_factors
+
+    @property
+    def single_realization_form_factor_available(self) -> bool:
+        return self.metadata.get("single_realization_form_factor_available", True) is True
+
+    @override
+    def _aggregation_metadata(self) -> dict[str, object]:
+        return {
+            key: value
+            for key, value in self.metadata.items()
+            if key != "single_realization_form_factor_available"
+        }
+
     def compute_moment_contributions(
         self,
         levels: np.ndarray[tuple[int], np.dtype[np.floating]],
@@ -215,6 +250,7 @@ class FormFactorsData(Data):
             self.form_factor - np.abs(self.first_moment / self.realizs) ** 2
         ) * (self.realizs / (self.realizs - 1))
 
+    @override
     def add_contribution(self, contribution: Data, /) -> None:
         self._validate_contribution(contribution)
         if not isinstance(contribution, FormFactorsData):
@@ -235,10 +271,13 @@ class FormFactorsData(Data):
             self.single_realization_form_factor[:] = (
                 contribution.single_realization_form_factor
             )
+            if not contribution.single_realization_form_factor_available:
+                self.metadata["single_realization_form_factor_available"] = False
 
         self.first_moment[:] += contribution.first_moment
         self.second_moment[:] += contribution.second_moment
         self._add_realizations(contribution)
 
+    @override
     def compute_statistics(self) -> None:
         self.compute_form_factors()

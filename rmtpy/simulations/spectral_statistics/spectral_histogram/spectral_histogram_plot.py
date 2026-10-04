@@ -105,6 +105,9 @@ class SpectralHistogramPlot(Plot):
     )
 
     def set_derived_attributes(self) -> None:
+        if self._derived_attributes_are_set:
+            return
+
         self.ensemble: ManyBodyEnsemble = self.store_manifest_arg(
             "ensemble", ManyBodyEnsemble
         )
@@ -145,6 +148,8 @@ class SpectralHistogramPlot(Plot):
             y=lambda value: value / np.pi / self.ensemble.spectral_radius,
         )
 
+        self._derived_attributes_are_set: bool = True
+
     @override
     def plot(self, path: str | Path) -> None:
         self.set_derived_attributes()
@@ -158,11 +163,11 @@ class SpectralHistogramPlot(Plot):
         )
 
         spectral_density = self.ensemble.spectral_density
+        energies = np.linspace(*self.xlim, self.num_points)
         if (
             self.ensemble.max_spectral_polynomial_degree == 0
             and spectral_density.has_polynomial_expansion
         ):
-            energies = np.linspace(*self.xlim, self.num_points)
             spectral_pdf = spectral_density.weight_pdf(energies)
             self.legend.labels = (
                 self.legend.labels[0],
@@ -175,7 +180,6 @@ class SpectralHistogramPlot(Plot):
                 self.legend.labels = self.legend.labels[:1]
                 spectral_pdf = None
             else:
-                energies = np.linspace(*self.xlim, self.num_points)
                 spectral_pdf = spectral_density.variate_pdf(
                     energies,
                     coeffs=coefficients,
@@ -244,6 +248,9 @@ class UnfoldedSpectralHistogramPlot(Plot):
     )
 
     def set_derived_attributes(self) -> None:
+        if self._derived_attributes_are_set:
+            return
+
         self.ensemble: ManyBodyEnsemble = self.store_manifest_arg(
             "ensemble", ManyBodyEnsemble
         )
@@ -269,6 +276,8 @@ class UnfoldedSpectralHistogramPlot(Plot):
             x=lambda value: value * dimension,
             y=lambda value: value / dimension,
         )
+
+        self._derived_attributes_are_set: bool = True
 
     @override
     def plot(self, path: str | Path) -> None:

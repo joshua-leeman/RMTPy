@@ -1,12 +1,10 @@
 import dataclasses
 import math
-from collections.abc import Callable
 from pathlib import Path
 from typing import cast, override
 
 import numpy as np
 from matplotlib.lines import Line2D
-from matplotlib.ticker import LogLocator
 from scipy.special import jn_zeros
 
 from ....ensembles import ManyBodyEnsemble
@@ -24,6 +22,8 @@ from ...base_plot import (
     Plot,
     PlotAxes,
     PlotLegend,
+    configure_form_factor_axes,
+    configure_form_factor_minor_ticks,
 )
 from ...statistics import LOG_D_TIME_SUPPORT, LOG_D_UNFOLDED_TIME_SUPPORT
 from .spectral_form_factors_data import FormFactorsData
@@ -41,14 +41,7 @@ class FormFactorsAxes(LogDimensionTimeAxes):
     @override
     def configure(self, axes: ConfigurableAxes) -> None:
         super().configure(axes)
-        _ = axes.tick_params(
-            axis="both",
-            which="minor",
-            bottom=False,
-            top=False,
-            left=False,
-            right=False,
-        )
+        configure_form_factor_minor_ticks(axes)
 
 
 @dataclasses.dataclass(slots=True, kw_only=True, eq=False, weakref_slot=False)
@@ -96,6 +89,9 @@ class FormFactorsPlot(Plot):
     )
 
     def set_derived_attributes(self) -> None:
+        if self._derived_attributes_are_set:
+            return
+
         self.ensemble: ManyBodyEnsemble = self.store_manifest_arg(
             "ensemble", ManyBodyEnsemble
         )
@@ -118,6 +114,8 @@ class FormFactorsPlot(Plot):
             y=lambda value: math.pow(self.ensemble.dimension, value),
         )
 
+        self._derived_attributes_are_set: bool = True
+
     @override
     def plot(self, path: str | Path) -> None:
         self.set_derived_attributes()
@@ -127,49 +125,45 @@ class FormFactorsPlot(Plot):
 
         self.build_figure()
 
-        set_xscale = cast(Callable[..., object], self.ax.set_xscale)
-        _ = set_xscale("log", base=self.ensemble.dimension)
-
-        set_yscale = cast(Callable[..., object], self.ax.set_yscale)
-        _ = set_yscale("log", base=self.ensemble.dimension)
-
-        set_x_major_locator = cast(Callable[..., object], self.ax.xaxis.set_major_locator)
-        _ = set_x_major_locator(
-            LogLocator(base=self.ensemble.dimension, numticks=len(self.axes.xticks))
-        )
-        set_y_major_locator = cast(Callable[..., object], self.ax.yaxis.set_major_locator)
-        _ = set_y_major_locator(
-            LogLocator(base=self.ensemble.dimension, numticks=len(self.axes.yticks))
+        configure_form_factor_axes(
+            self.ax,
+            dimension=self.ensemble.dimension,
+            x_tick_count=len(self.axes.xticks),
+            y_tick_count=len(self.axes.yticks),
         )
 
-        plot = cast(Callable[..., object], self.ax.plot)
-        _ = plot(
+        self.draw_curve(
             self.data.times,
             self.data.form_factor,
             color=self.sff_color,
             alpha=self.sff_alpha,
-            linewidth=self.sff_width,
+            width=self.sff_width,
             zorder=self.sff_zorder,
             label=self.sff_legend,
         )
-        _ = plot(
+        self.draw_curve(
             self.data.times,
             self.data.connected_form_factor,
             color=self.csff_color,
             alpha=self.csff_alpha,
-            linewidth=self.csff_width,
+            width=self.csff_width,
             zorder=self.csff_zorder,
             label=self.csff_legend,
         )
-        _ = plot(
-            self.data.times,
-            self.data.single_realization_form_factor,
-            color=self.single_sff_color,
-            alpha=self.single_sff_alpha,
-            linewidth=self.single_sff_width,
-            zorder=self.single_sff_zorder,
-            label=self.single_sff_legend,
-        )
+        if self.data.single_realization_form_factor_available:
+            self.draw_curve(
+                self.data.times,
+                self.data.single_realization_form_factor,
+                color=self.single_sff_color,
+                alpha=self.single_sff_alpha,
+                width=self.single_sff_width,
+                zorder=self.single_sff_zorder,
+                label=self.single_sff_legend,
+            )
+
+        else:
+            self.legend.handles = self.legend.handles[:-1]
+            self.legend.labels = self.legend.labels[:-1]
 
         self.finish_plot(path=path)
 
@@ -186,14 +180,7 @@ class UnfoldedFormFactorsAxes(LogDimensionUnfoldedTimeAxes):
     @override
     def configure(self, axes: ConfigurableAxes) -> None:
         super().configure(axes)
-        _ = axes.tick_params(
-            axis="both",
-            which="minor",
-            bottom=False,
-            top=False,
-            left=False,
-            right=False,
-        )
+        configure_form_factor_minor_ticks(axes)
 
 
 @dataclasses.dataclass(slots=True, kw_only=True, eq=False, weakref_slot=False)
@@ -257,6 +244,9 @@ class UnfoldedFormFactorsPlot(Plot):
     )
 
     def set_derived_attributes(self) -> None:
+        if self._derived_attributes_are_set:
+            return
+
         self.ensemble: ManyBodyEnsemble = self.store_manifest_arg(
             "ensemble", ManyBodyEnsemble
         )
@@ -294,6 +284,8 @@ class UnfoldedFormFactorsPlot(Plot):
             y=lambda value: math.pow(self.ensemble.dimension, value),
         )
 
+        self._derived_attributes_are_set: bool = True
+
     @override
     def plot(self, path: str | Path) -> None:
         self.set_derived_attributes()
@@ -303,60 +295,56 @@ class UnfoldedFormFactorsPlot(Plot):
 
         self.build_figure()
 
-        set_xscale = cast(Callable[..., object], self.ax.set_xscale)
-        _ = set_xscale("log", base=self.ensemble.dimension)
-
-        set_yscale = cast(Callable[..., object], self.ax.set_yscale)
-        _ = set_yscale("log", base=self.ensemble.dimension)
-
-        set_x_major_locator = cast(Callable[..., object], self.ax.xaxis.set_major_locator)
-        _ = set_x_major_locator(
-            LogLocator(base=self.ensemble.dimension, numticks=len(self.axes.xticks))
-        )
-        set_y_major_locator = cast(Callable[..., object], self.ax.yaxis.set_major_locator)
-        _ = set_y_major_locator(
-            LogLocator(base=self.ensemble.dimension, numticks=len(self.axes.yticks))
+        configure_form_factor_axes(
+            self.ax,
+            dimension=self.ensemble.dimension,
+            x_tick_count=len(self.axes.xticks),
+            y_tick_count=len(self.axes.yticks),
         )
 
-        plot = cast(Callable[..., object], self.ax.plot)
-        _ = plot(
+        self.draw_curve(
             self.data.times,
             self.data.form_factor,
             color=self.sff_color,
             alpha=self.sff_alpha,
-            linewidth=self.sff_width,
+            width=self.sff_width,
             zorder=self.sff_zorder,
             label=self.sff_legend,
         )
-        _ = plot(
+        self.draw_curve(
             self.data.times,
             self.data.connected_form_factor,
             color=self.csff_color,
             alpha=self.csff_alpha,
-            linewidth=self.csff_width,
+            width=self.csff_width,
             zorder=self.csff_zorder,
             label=self.csff_legend,
         )
 
         universal_sff = self.ensemble.universal_connected_sff(self.data.times)
-        _ = plot(
+        self.draw_curve(
             self.data.times,
             universal_sff,
             color=self.universal_sff_color,
             alpha=self.universal_sff_alpha,
-            linewidth=self.universal_sff_width,
-            linestyle=self.universal_sff_style,
+            width=self.universal_sff_width,
+            style=self.universal_sff_style,
             zorder=self.universal_sff_zorder,
             label=self.universal_sff_legend,
         )
-        _ = plot(
-            self.data.times,
-            self.data.single_realization_form_factor,
-            color=self.single_sff_color,
-            alpha=self.single_sff_alpha,
-            linewidth=self.single_sff_width,
-            zorder=self.single_sff_zorder,
-            label=self.single_sff_legend,
-        )
+        if self.data.single_realization_form_factor_available:
+            self.draw_curve(
+                self.data.times,
+                self.data.single_realization_form_factor,
+                color=self.single_sff_color,
+                alpha=self.single_sff_alpha,
+                width=self.single_sff_width,
+                zorder=self.single_sff_zorder,
+                label=self.single_sff_legend,
+            )
+
+        else:
+            self.legend.handles = self.legend.handles[:-1]
+            self.legend.labels = self.legend.labels[:-1]
 
         self.finish_plot(path=path)

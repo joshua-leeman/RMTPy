@@ -43,8 +43,6 @@ def load_spectral_statistics_simulation(
     directory: str | Path,
 ) -> SpectralStatisticsSimulation:
     simulation = SpectralStatisticsSimulation.load(directory)
-    if not isinstance(simulation, SpectralStatisticsSimulation):
-        raise TypeError("Saved simulation is not a SpectralStatisticsSimulation.")
 
     return simulation
 
@@ -356,13 +354,13 @@ class SpectralStatisticsSimulation(Simulation):
             self.raw_buffers.accumulate_eigenvalues(eigvals, degeneracy=degeneracy)
 
             variate_coeffs = density.compute_variate_coeffs(eigvals)
-            for histogram, coefficient in zip(
+            for histogram, coefficient_index in zip(
                 coefficient_buffers,
-                variate_coeffs[1 : len(coefficient_buffers) + 1],
+                range(1, len(coefficient_buffers) + 1),
                 strict=True,
             ):
                 histogram.add_histogram_contribution(
-                    np.array([coefficient], dtype=np.float64)
+                    variate_coeffs[coefficient_index : coefficient_index + 1]
                 )
 
             wgt_unf_eigvals = unfold_values(
