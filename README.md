@@ -1,13 +1,13 @@
 # RMTPy
 
-RMTPy is a Python codebase for numerical studies of random-matrix ensembles,
-many-body Hamiltonians, and open quantum systems. It generates closed
-Hamiltonians, couples them to decay channels, and accumulates Monte Carlo
-statistics for spectra, scattering poles, decay widths, proper delay times, and
-transmission coefficients.
+RMTPy is a Python codebase for numerical studies of Sachdev–Ye–Kitaev (SYK)
+many-body Hamiltonians, classical random-matrix ensembles, and open quantum
+systems. It generates closed Hamiltonians, couples them to decay channels, and
+accumulates Monte Carlo statistics for spectra, scattering poles, decay widths,
+proper delay times, and transmission coefficients.
 
 A calculation has three main layers. An ensemble supplies one closed random
-Hamiltonian realization. A compound adds open channels to that Hamiltonian. A
+Hamiltonian realization. A compound couples open channels to that Hamiltonian. A
 simulation repeats the calculation and combines the resulting measurements.
 
 ```text
@@ -25,7 +25,7 @@ physical source ──► Simulation ──► finalized Data ──► NPZ + ma
 
 | Part of the calculation | Implemented capabilities |
 | --- | --- |
-| Closed ensembles | GOE, GUE, GSE, Bogoliubov–de Gennes classes C and D, Poisson spectra, and the Sachdev–Ye–Kitaev model |
+| Closed ensembles | The Sachdev–Ye–Kitaev model, GOE, GUE, GSE, Bogoliubov–de Gennes classes C and D, and Poisson spectra |
 | Fermionic construction | Sparse Majorana and complex-fermion operators, parity blocks, charge conjugation, few-fermion states, and decomposed $`q`$-body monomials |
 | Open systems | Effective non-Hermitian Hamiltonians, resonances, partial widths, reaction and scattering matrices, Wigner–Smith matrices, and proper delay times |
 | Statistical experiments | Spectral, resonance, partial-width, time-delay, and transmission-coefficient simulations |
@@ -45,8 +45,9 @@ H\lvert n\rangle = E_n\lvert n\rangle.
 ```
 
 Random matrix theory asks for statistical properties shared by many such
-draws. The matrix-entry distribution fixes a global energy scale. Symmetries
-fix the allowed matrix structure and the correlations among its eigenvalues.
+draws. The random couplings or matrix-entry distribution fix a global energy
+scale. Symmetries fix the allowed matrix structure and the correlations among
+its eigenvalues.
 The latter are organized by the Dyson index $`\beta`$: $`\beta=1`$ for GOE,
 $`\beta=2`$ for GUE, and $`\beta=4`$ for GSE. Poisson spectra provide the
 uncorrelated reference case with $`\beta=0`$.
@@ -89,12 +90,52 @@ and forms
 ```math
 K(t)=\frac{1}{R}\sum_{r=1}^{R}\lvert Z_r(t)\rvert^2,
 \qquad
-K_{\mathrm{conn}}(t)=K(t)-
-\left\lvert\frac{1}{R}\sum_{r=1}^{R}Z_r(t)\right\rvert^2.
+K_{\mathrm{conn}}(t)=\frac{R}{R-1}\left[
+K(t)-\left\lvert\frac{1}{R}\sum_{r=1}^{R}Z_r(t)\right\rvert^2
+\right],\qquad R>1.
 ```
 
 Here $`R`$ is the number of realizations and $`N`$ is the number of levels in
-the current sample.
+the current sample. The connected estimator is zero for a single realization.
+
+Spectral and resonance form-factor archives also retain the first realization's
+$`\lvert Z_1(t)\rvert^2`$. Standalone form-factor plots show this trace as
+$`K^{(1)}(t)`$ when available, alongside the ensemble averages.
+
+### SYK Hamiltonians and fermions
+
+SYK couples $`N_m`$ Majorana fermions through random interactions among every
+set of $`q`$ distinct modes. For the $`q=4`$ model used here, RMTPy's convention
+is
+
+```math
+H=\sum_{1\le i<j<k<l\le N_m}J_{ijkl}\chi_i\chi_j\chi_k\chi_l,
+\qquad \{\chi_i,\chi_j\}=2\delta_{ij}.
+```
+
+The couplings are independent real Gaussian variables with
+
+```math
+\mathbb{E}[J_{ijkl}]=0,
+\qquad \mathbb{E}[J_{ijkl}^2]=\frac{3!J^2}{N_m^3},
+```
+
+where $`J`$ is `interaction_strength`. Other supported even-$`q`$ models use
+variance $`(q-1)!J^2/N_m^{q-1}`$; the matrix builder includes an imaginary
+prefactor when `q % 4 == 2` to keep the Hamiltonian Hermitian. Even-$`q`$
+interactions preserve fermion parity, so `is_even_parity` selects one block of
+dimension $`D=2^{N_m/2-1}`$. The SYK model and its symmetry class are distinct:
+the $`q=4`$, $`N_m=24`$ results below have GOE symmetry, while other supported
+configurations can have GUE, GSE, or Poisson references.
+
+[rmtpy/fermions.py](rmtpy/fermions.py) supplies `MajoranaFermionBasis`, which
+lazily builds and caches sparse Majorana operators, complex-fermion creation
+and annihilation operators, the vacuum, charge conjugation, and a parity slice.
+The operators act on the full $`2^{N_m/2}`$-dimensional Fock space. SYK uses
+decomposed $`q`$-body monomials restricted to the selected parity block to
+assemble each dense Hamiltonian. `SYKCompoundEnsemble` uses the same basis to
+create few-fermion channel states, symmetry-compatible couplings, and the
+sparse width matrix that opens the system.
 
 ### Opening the system
 
@@ -146,37 +187,45 @@ describes ideal transmission.
 
 ## Representative results
 
-The following figures were generated by the current simulation and plotting
-code.
+The following figures come from saved runs of the even-parity SYK model with
+$`q=4`$, $`N_m=24`$, $`J=1`$, and 100 realizations.
 
-![GOE nearest-neighbor spacing histogram after degree-four averaged unfolding, compared with the GOE Wigner surmise](assets/readme/goe-level-spacings.png)
+![Weight-unfolded even-parity SYK nearest-neighbor spacing histogram with GOE, GUE, GSE, and Poisson references](assets/readme/syk-level-spacings.png)
 
-*Nearest-neighbor spacings from 100 GOE realizations with $`N_m=20`$. The
-degree-four averaged unfolding removes the smooth density before comparison
-with the GOE Wigner surmise.*
+*Weight-unfolded nearest-neighbor spacings from 100 even-parity SYK
+realizations with $`q=4`$, $`N_m=24`$, and $`J=1`$. The histogram is compared
+with GOE, GUE, and GSE Wigner surmises and the Poisson reference. GOE is the
+symmetry class of this SYK configuration.*
 
-![Two-dimensional histogram of complex GOE scattering poles with the average resonance width](assets/readme/goe-resonance-poles.png)
+![Weight-unfolded two-dimensional histogram of even-parity SYK scattering poles with the energy-resolved average width](assets/readme/syk-resonance-poles.png)
 
-*The raw complex-energy histogram from 100 GOE compound realizations with
-$`N_m=20`$, $`N_f=2`$, and equal couplings $`v_a=\sqrt{20}`$. This choice gives
-$`\binom{10}{2}=45`$ open channels. The vertical coordinate is
-$`\log_{10}(\Gamma/E_0)`$; the cyan curve is the energy-resolved average width.*
+*Weight-unfolded complex-energy histogram from 100 even-parity SYK compound
+realizations with $`q=4`$, $`N_m=24`$, $`J=1`$, $`N_f=2`$, and equal couplings
+$`v_a=\sqrt{E_0}\approx2.14384`$, giving $`\binom{12}{2}=66`$ open channels.
+Here $`E_0`$ is the SYK spectral radius. The horizontal coordinate remains
+$`E/E_0`$; the vertical coordinate is $`\log_{10}\gamma`$, where $`\gamma`$
+is the width unfolded with the SYK $`q`$-Hermite weight. The cyan curve is the
+energy-resolved average unfolded width.*
 
-![Degree-four average-unfolded GOE proper-delay histogram with spectral form factors overlaid](assets/readme/goe-time-delay-sff-overlay.png)
+![Weight-unfolded even-parity SYK proper-delay histogram at energy zero with matching weight-unfolded spectral form factors overlaid](assets/readme/syk-time-delay-sff-overlay.png)
 
-*The degree-four average-unfolded proper-delay distribution at $`E=0`$ from
-100 GOE compound realizations with $`N_m=20`$, $`N_f=2`$, and
-$`v_a=\sqrt{20}`$. The yellow histogram and black Brouwer–Frahm–Beenakker
-(BFB) reference use the left axis. The matching spectral run supplies
-$`K(\upsilon)`$ and $`K_{\mathrm{conn}}(\upsilon)`$ on the right axis; the dotted
-curve is the universal GOE connected form factor.*
+*Weight-unfolded proper-delay distribution at $`E=0`$ from 100 even-parity SYK
+compound realizations with $`q=4`$, $`N_m=24`$, $`J=1`$, $`N_f=2`$, and
+$`v_a=\sqrt{E_0}\approx2.14384`$ for all 66 channels. The yellow histogram and
+black Brouwer–Frahm–Beenakker (BFB) reference use the linear left axis. The
+matching weight-unfolded spectral run supplies the blue $`K(\upsilon)`$ and
+orange $`K_{\mathrm{conn}}(\upsilon)`$ on the logarithmic right axis; the
+dotted curve is the universal GOE connected form factor for this SYK symmetry
+class.*
 
-![Energy-dependent transmission coefficient for channel zero of a GOE compound](assets/readme/goe-transmission-coefficient.png)
+![Energy-dependent channel-zero transmission coefficient for an even-parity SYK compound](assets/readme/syk-transmission-coefficient.png)
 
-*The channel-zero transmission coefficient from 100 GOE compound
-realizations with $`N_m=20`$, $`N_f=2`$, and $`v_a=\sqrt{20}`$ for all 45
-channels. The calculation averages $`S_{00}(E)`$ before taking the squared
-modulus.*
+*Channel-zero transmission from 100 even-parity SYK compound realizations
+with $`q=4`$, $`N_m=24`$, $`J=1`$, $`N_f=2`$, and
+$`v_a=\sqrt{E_0}\approx2.14384`$ for all 66 channels. The 500-point grid spans
+1.5 times the density plotting interval. The calculation averages $`S_{00}(E)`$
+before forming $`T_0(E)=1-\lvert\langle S_{00}(E)\rangle\rvert^2`$. The
+horizontal coordinate is $`E/E_0`$; transmission has no unfolding variant.*
 
 ## Installation
 
@@ -208,8 +257,8 @@ Public imports begin at `rmtpy.ensembles`, `rmtpy.compounds`, and
 imports.
 
 ```python
-from rmtpy.compounds import CompoundEnsemble
-from rmtpy.ensembles import GOE
+from rmtpy.compounds import SYKCompoundEnsemble
+from rmtpy.ensembles import SYK
 from rmtpy.simulations import SpectralStatisticsSimulation
 ```
 
@@ -217,30 +266,36 @@ from rmtpy.simulations import SpectralStatisticsSimulation
 
 ### Stream one closed and one open realization
 
-This example draws a GOE spectrum, opens the same ensemble with four channels,
-and evaluates its poles and delay times.
+This example draws an even-parity $`q=4`$ SYK spectrum, opens the same ensemble
+with six channels, and evaluates its poles and delay times.
 
 ```python
 import numpy as np
 
-from rmtpy.compounds import CompoundEnsemble
-from rmtpy.ensembles import GOE
+from rmtpy.compounds import SYKCompoundEnsemble
+from rmtpy.ensembles import SYK
 
 # N_m = 8 gives one parity block with dimension D = 8.
-ensemble = GOE(num_majoranas=8, seed=2025)
+ensemble = SYK(
+    q=4,
+    num_majoranas=8,
+    is_even_parity=True,
+    max_spectral_polynomial_degree=0,
+    seed=2025,
+)
 
 levels = next(ensemble.eigvals_stream(realizs=1)).copy()
 spacings = np.diff(levels)
 
 print(ensemble.dimension)           # 8
-print(ensemble.universality_class)  # GOE
+print(ensemble.universality_class)  # GOE: the symmetry class of this SYK model
 print(levels.shape)                 # (8,)
 print(spacings.shape)               # (7,)
 
-# N_f = 1 gives C = binom(4, 1) = 4 open channels.
-compound = CompoundEnsemble(
+# Even N_f matches even parity; N_f = 2 gives C = binom(4, 2) = 6 channels.
+compound = SYKCompoundEnsemble(
     ensemble=ensemble,
-    num_free_complex_fermions=1,
+    num_free_complex_fermions=2,
 )
 
 poles = next(compound.resonances_stream(realizs=1)).copy()
@@ -256,14 +311,36 @@ delay_times, closed_levels = next(
 delay_times = delay_times.copy()
 closed_levels = closed_levels.copy()
 
-print(compound.num_channels)   # 4
+print(compound.num_channels)   # 6
 print(poles.shape)             # (8,)
-print(delay_times.shape)       # (1, 4): one energy, four channels
+print(delay_times.shape)       # (1, 6): one energy, six channels
 ```
 
 Methods ending in `_stream` yield one realization at a time. Several streams
 reuse their working arrays for subsequent draws. Copy a yielded array when it
 must remain unchanged after the iterator advances.
+
+### Inspect the fermionic basis
+
+The SYK `ensemble` above owns a `MajoranaFermionBasis`. Access its sparse
+operators and vacuum directly:
+
+```python
+basis = ensemble.majorana_fermion_basis
+majoranas = basis.majorana_fermions
+annihilation, creation = basis.complex_fermions
+vacuum = basis.vacuum_state
+parity_slice = basis.parity_block_slice
+
+print(basis.num_complex_fermions)  # 4
+print(basis.dimension)            # 16: the full Fock space
+print(majoranas[0].shape)          # (16, 16)
+print(vacuum.shape)               # (16, 1)
+print(ensemble.dimension)         # 8: the selected parity block
+```
+
+The basis reuses these cached objects when building the SYK interactions and
+the compound's few-fermion channel states.
 
 ### Run, save, plot, and reload a simulation
 
@@ -274,15 +351,17 @@ constructs raw and weight-unfolded statistics without polynomial calibration.
 ```python
 from pathlib import Path
 
-from rmtpy.ensembles import GOE
+from rmtpy.ensembles import SYK
 from rmtpy.simulations import (
     SpectralStatisticsSimulation,
     load_spectral_statistics_simulation,
 )
 
 simulation = SpectralStatisticsSimulation(
-    ensemble=GOE(
+    ensemble=SYK(
+        q=4,
         num_majoranas=8,
+        is_even_parity=True,
         max_spectral_polynomial_degree=0,
         seed=7,
     ),
@@ -428,7 +507,7 @@ of duplicate values. Pass a completed spectral run as
 overlay its matching raw and unfolded form factors. The ensemble configuration
 and time range must match; its seed and realization count may differ.
 
-Transmission simulations use a fixed 100-point grid spanning 1.5 times the
+Transmission simulations use a fixed 500-point grid spanning 1.5 times the
 ensemble density's plotting range. `channel_indices` chooses the individual
 $`T_a(E)`$ curves retained for output. The accompanying Weisskopf estimate
 
@@ -490,7 +569,7 @@ underlying density supports them:
 | --- | --- |
 | Raw | Original energies or widths in model units |
 | Weight-unfolded | The ensemble's leading semicircle, uniform, or $`q`$-Hermite weight |
-| Averaged-unfolded | Polynomial coefficients averaged over additional ensemble samples, with one result for every truncation degree |
+| Average-unfolded | Polynomial coefficients averaged over additional ensemble samples, with one result for every truncation degree |
 | Variate-unfolded | Coefficients fitted to each realization, with one result for every truncation degree |
 
 For a density histogram with bin count $`n_i`$ and bin width $`\Delta_i`$, the
@@ -503,19 +582,23 @@ h_i=\frac{n_i}{\left(\sum_j n_j\right)\Delta_i}.
 This normalization integrates to one over the samples that fall inside the
 declared histogram support.
 
-For `max_spectral_polynomial_degree=M`, coefficient histograms and averaged and
-variate groups are created for every degree from 1 through $`M`$, including odd
-degrees. Setting `M=0` leaves the raw and weight-unfolded groups and avoids the
-polynomial groups and averaged-density calibration. For densities with a
-polynomial expansion, the degree-zero raw spectral and resonance plots still
-overlay the polynomial weight as a reference curve.
+For `max_spectral_polynomial_degree=M`, coefficient histograms and both average
+and variate unfolding groups are created for every degree from 1 through
+$`M`$, including odd degrees. Setting `M=0` leaves the raw and weight-unfolded
+groups and avoids the polynomial groups and averaged-density calibration. For
+densities with a polynomial expansion, the degree-zero raw spectral and
+resonance plots still overlay the polynomial weight as a reference curve.
 
-Spectral and resonance coefficient samples must be finite. Each coefficient
-degree uses Freedman–Diaconis bin edges derived after all realizations have
-been accumulated, so the saved support retains every finite sample. The plots
-use a symmetric window around the central 1st–99th-percentile mass, and all
-coefficient plots in one spectral or resonance run share the widest such
-horizontal scale.
+Spectral and resonance coefficient samples must be finite. A coefficient of
+degree $`n`$ uses a deterministic symmetric support
+$`\pm(n+1)/\sqrt{D}`$, where $`D`$ is the density dimension, and
+$`\max(100,\lceil\sqrt{D}\rceil)`$ bins. Runs with the same scientific
+configuration therefore have identical grids regardless of seed or realization
+count. Samples outside the finite grid are recorded in explicit underflow and
+overflow counters, and archives identify the rule with
+`metadata["grid_policy"] == "configuration_v1"`. The plots use a symmetric
+window around the central 1st–99th-percentile in-range mass, and all coefficient
+plots in one spectral or resonance run share the widest such horizontal scale.
 
 Spectral statistics use `ensemble.spectral_density`. Resonance statistics use
 `compound.resonance_density` and fit the resonance centers. In an unfolded
@@ -556,6 +639,132 @@ Chebyshev-$`U`$, Legendre, and $`q`$-Hermite recurrences and weights.
 parity projections, $`q`$-body monomials, and few-fermion channel states used by
 the SYK constructions.
 
+## Slurm jobs
+
+The top-level `slurm` package validates a simulation locally and writes a
+portable Slurm batch script. Its built-in configuration is deliberately small
+and cluster-neutral: one node, one task, one CPU per task, a one-hour limit,
+cyclic distribution, and no assumed partition, modules, conda environment,
+mail address, CPU binding, or NUMA layout.
+
+Run the generator from the RMTPy repository root and state the resources needed
+by the first test job explicitly:
+
+```bash
+python -m slurm \
+  --simulation spectral-statistics \
+  --ensemble "{'name': 'SYK', 'q': 4, 'N': 16, 'seed': 123}" \
+  --realizs-per-task 2 \
+  --directory outputs/slurm_tutorial \
+  --job-name syk_smoke \
+  --output syk_smoke.slurm \
+  --nodes 1 \
+  --tasks-per-node 4 \
+  --cpus-per-task 2 \
+  --time 01:00:00 \
+  --no-plot
+
+bash -n syk_smoke.slurm
+sbatch syk_smoke.slurm
+```
+
+### Private cluster profiles
+
+Site-specific queue names, limits, modules, environments, and memory policies
+belong in a private TOML profile rather than public Python. Copy
+[`slurm/profile.example.toml`](slurm/profile.example.toml) to the ignored
+`.rmtpy-slurm.toml` path or to a location outside the repository, replace its
+fictional values with the cluster's documented values, and select it through an
+environment variable:
+
+```bash
+export RMTPY_SLURM_PROFILE_FILE=.rmtpy-slurm.toml
+python -m slurm --help
+```
+
+An existing `.env` file can hold that export and other private values, but the
+package does not silently load `.env` or require `python-dotenv`. From the
+repository root, import its values into the current shell with:
+
+```bash
+set -a
+source .env
+set +a
+```
+
+Explicit command-line values override profile values; profile values override
+the generic defaults. A profile can define partition-specific core counts,
+maximum nodes, maximum wall time, required memory, and a NUMA default. With no
+partition table, `--partition` accepts any site-defined name and leaves final
+validation to Slurm.
+
+The generator supports `--nodes`, `--tasks-per-node`, `--cpus-per-task`,
+`--time`, `--partition`, `--memory`, and `--distribution`. Environment setup is
+optional: use repeated `--module` flags, `--module-purge`/`--no-module-purge`,
+`--conda-env`/`--no-conda`, `--cpu-bind`/`--no-cpu-bind`, and
+`--numactl`/`--no-numactl` with `--numa-policy`. `--no-modules` and
+`--no-partition` clear corresponding profile defaults.
+
+### Private notification addresses
+
+Generated scripts never contain `#SBATCH --mail-user`. Slurm reads `#SBATCH`
+directives before the shell runs and therefore does not expand an environment
+variable placed in a directive. If the cluster's submitting-user default is
+not sufficient, keep the address in a private environment variable and pass it
+only while submitting:
+
+```bash
+export RMTPY_SLURM_MAIL_USER=user@example.com
+sbatch --mail-user="$RMTPY_SLURM_MAIL_USER" \
+  --mail-type=BEGIN,END,FAIL syk_smoke.slurm
+```
+
+See the official [`sbatch` documentation](https://slurm.schedmd.com/sbatch.html)
+for directive and command-line precedence. Generated `*.slurm` files are
+ignored because explicitly supplied paths or other local settings may still be
+private.
+
+### Scientific inputs and distributed execution
+
+The mapping options accept JSON or safe Python-literal syntax. Common compact
+aliases are normalized: `N` means `num_majoranas`, `J` means
+`interaction_strength`, `max_degree` means
+`max_spectral_polynomial_degree`, and `parity` means `is_even_parity`.
+Compound mappings similarly accept `Nf` for `num_free_complex_fermions` and
+`v` for `couplings`. The appropriate SYK, Poisson, or generic compound class is
+inferred when the compound `name` is omitted.
+
+Each family uses the following `--simulation-args` mapping:
+
+| `--simulation` | Simulation arguments |
+| --- | --- |
+| `spectral-statistics` | `{}` (the default) |
+| `resonance-statistics` | `{}` (the default) |
+| `partial-widths-statistics` | Required `width_indices`, for example `{'width_indices': [[0, 0], [0]]}` |
+| `time-delay-statistics` | Required `energies`; optional `spectral_statistics_directory` for the plot overlay |
+| `transmission-coefficients` | Required `channel_indices`, for example `{'channel_indices': [0, 1]}` |
+
+Generation constructs the actual ensemble, compound, and simulation objects,
+so invalid scientific combinations fail before allocation. If no seed is
+given, the generator materializes one and embeds it in the normalized
+specification. Calibration and production workers receive separate,
+reproducible NumPy `SeedSequence` children.
+
+`--realizs-per-task` is a per-task count:
+
+```text
+total realizations = nodes × tasks per node × realizations per task
+```
+
+Workers write partial RMTPy archives to the cluster's shared filesystem. One
+coordinator pools density calibration, merges additive accumulators, finalizes
+one ordinary RMTPy simulation, records distributed provenance in its manifest,
+and plots once. Temporary state lives under
+`<directory>/.rmtpy-slurm/$SLURM_JOB_ID`; it is removed after successful
+publication and retained after failure. The generator creates the log directory
+and refuses to replace an existing script unless `--force` is supplied. Use
+`--no-plot` when the compute environment lacks RMTPy's TeX plotting tools.
+
 ## Saved runs and plots
 
 `Simulation.save(root)` writes beneath a readable path derived from the
@@ -565,22 +774,24 @@ have the form
 ```text
 outputs/
 └── spectral_statistics_simulation/
-    └── GOE/Nm_8/J_1p0/max_polydeg_0/realizs_64/
-        └── 2026-10-01T23:53:25.711519Z/
+    └── SYK_4_even/Nm_24/J_1p0/max_polydeg_2/realizs_100/
+        └── 2026-10-04T04:19:02.900442Z/
             ├── manifest.json
             ├── spectral_histogram/
             │   ├── spectral_histogram_data.npz
             │   └── spectral_histogram_plot.png
-            ├── nn_spacings_histogram/
-            │   ├── nn_spacings_histogram_data.npz
-            │   └── nn_spacings_histogram_plot.png
+            ├── spacings_histogram/
+            │   ├── spacings_histogram_data.npz
+            │   └── spacings_histogram_plot.png
             └── spectral_form_factors/
                 ├── spectral_form_factors_data.npz
                 └── spectral_form_factors_plot.png
 ```
 
-Compound paths add $`N_f`$ and the coupling value or a stable coupling-array
-identifier. Each execution receives a UTC timestamp directory.
+Compound paths add $`N_f`$ and, for equal couplings, an `alpha_...` label based
+on $`\alpha=\log_{10}(\langle v_a^2\rangle/E_0)`$. Nonuniform couplings use a
+stable `couplingsID_...` identifier instead. Each execution receives a UTC
+timestamp directory.
 
 The manifest records:
 
@@ -597,6 +808,52 @@ required ensemble or compound as detached plotting context, and use the
 recorded calibration. A PNG is written atomically beside its data archive, and
 an existing plot path is preserved.
 
+### Aggregating cluster jobs
+
+`Simulation.aggregate(superfolder)` combines completed, embarrassingly parallel
+runs without modifying their archives. The superfolder must contain immediate
+children named `job_<integer>_outputs`; each child must contain exactly one saved
+run of the requested concrete simulation class. Seeds and per-job realization
+counts may differ, while every scientific parameter and dtype must match.
+
+For example, collect saved SYK spectral runs with matching $`q`$, $`N_m`$,
+parity, interaction strength, and polynomial degree under `syk_cluster_results`:
+
+```python
+from rmtpy.simulations import SpectralStatisticsSimulation
+
+aggregate = SpectralStatisticsSimulation.aggregate("syk_cluster_results")
+aggregate_directory = aggregate.save("syk_aggregated_outputs")
+aggregate.plot(aggregate_directory)
+```
+
+The returned simulation is already complete. Its realization count is the sum
+of the workers, its derived statistics are recomputed from summed counts and
+moments, and its manifest records the ordered source paths, seeds, realization
+counts, completion times, and pooled density calibration. It also retains each
+source calibration and records `unfolding_policy="pooled_source_calibrations"`.
+Histograms unfolded with different source calibrations are pooled as saved;
+the weighted calibration summarizes those sources. Re-unfolding all samples
+with one global calibration would require the original spectra.
+The source fields live
+under `execution["aggregation"]`; the RNG policy is `"aggregate"`, with ordered
+source seeds in `rng["seed"]`. Calling the base `Simulation.aggregate` is
+supported only when each job directory contains one unambiguous simulation
+class.
+
+Archives written before deterministic coefficient grids remain loadable and
+plottable, but they cannot be aggregated exactly because their adaptive bin
+edges may differ. Aggregation rejects those coefficient archives with an
+explicit error. Legacy partial-width archives remain exactly aggregatable: the
+unnormalized width sum is recovered from their saved mean and realization
+count.
+
+Legacy `averaged` unfolding names are accepted alongside `average`. Saved
+transmission energy grids are restored from their archives, including older
+100-point grids. If an older form-factor archive lacks its first-realization
+trace, that trace is recovered for a single-realization run. For larger runs,
+the trace is omitted from plots because aggregate moments cannot recover it.
+
 ## Numerical behavior and limits
 
 - Matrix construction and polynomial recurrences use Numba. The first call to
@@ -610,11 +867,9 @@ an existing plot path is preserved.
   realized Hamiltonians remain dense for diagonalization.
 - Ensemble and compound streams retain one realization at a time. Histogram
   counts and form-factor moments accumulate in fixed-size buffers.
-- Except for spectral and resonance coefficient histograms, histograms use
-  fixed half-open supports and omit samples outside them. Coefficient
-  histograms instead derive their support with the Freedman–Diaconis rule and
-  retain every finite sample; their central-mass plot window does not discard
-  stored tail counts.
+- Histograms use fixed half-open supports. Samples outside ordinary histogram
+  supports are omitted; coefficient histograms additionally retain explicit
+  underflow and overflow counts so parallel runs remain exactly additive.
 - Seeded runs reproduce the NumPy random trajectory within the same numerical
   software stack. BLAS/LAPACK, NumPy, SciPy, and Numba versions can affect
   bitwise results.
@@ -637,9 +892,10 @@ rmtpy/
 ├── conversion.py    # structured conversion plus path and LaTeX labels
 └── validators.py    # shared numerical validation
 
+slurm/               # cluster-neutral Slurm generation and distributed execution
 tests/               # numerical, lifecycle, persistence, plotting, and API tests
 assets/readme/       # figures embedded in this README
-pyproject.toml       # Python requirement and Ruff/Black configuration
+pyproject.toml       # Python, Ruff/Black, and Cursor recommended typing settings
 ```
 
 The code uses Python 3.14 type syntax, keyword-only frozen `attrs` records for
@@ -653,14 +909,18 @@ active:
 
 ```bash
 python -m unittest discover -s tests -v
-ruff check rmtpy tests
-ruff format --check rmtpy tests
+ruff check rmtpy tests slurm notebooks
+ruff format --check rmtpy tests slurm notebooks
 ```
 
 The tests cover analytical and matrix-level numerical regressions, ensemble and
 compound behavior, histogram normalization, unfolding, simulation lifecycle,
 all five simulation families, save/load restoration, plotting, and the public
 simulation exports.
+
+Cursor Pyright uses recommended mode with the Python 3.14 scientific interpreter.
+The project settings cover the library, tests, and Slurm tools; local notebook
+code is checked separately. Errors and warnings should both be resolved.
 
 ## License
 
